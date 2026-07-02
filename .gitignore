@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+backend/
+out/
+flask_app/build/
+flask_app/dist/
+dist/
+build/
+
+# Local vault/user data
+flask_app/*.db
+flask_app/*.db.backup
+flask_app/*.sqlite
+flask_app/*.sqlite3
+flask_app/*.txt
+flask_app/*.pem
+flask_app/*.key
+flask_app/*.crt
+flask_app/*.cer
+*.backup
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cer
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

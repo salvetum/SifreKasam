@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block page_shell_class %}kasa-form-page-shell mx-auto px-4 py-8{% endblock %}
+
+{% block content %}
+<div class="vault-form-page card-animated">
+    <header class="vault-form-hero">
+        <div class="vault-form-title-wrap">
+            <span class="vault-form-icon"><i class="fa-solid fa-vault"></i></span>
+            <div>
+                <h1 class="kasa-page-title">{{ title }}</h1>
+                <p>{{ _('Kayıt bilgilerini düzenleyin ve güvenli kasaya kaydedin.') }}</p>
+            </div>
+        </div>
+        <a href="{{ url_for('index') }}" class="kasa-btn kasa-btn-muted vault-form-back">
+            <i class="fa-solid fa-arrow-left text-xs"></i>{{ _('Geri') }}
+        </a>
+    </header>
+
+    <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form>
+        <section class="vault-form-panel vault-form-main">
+            <div class="vault-section-head">
+                <span><i class="fa-solid fa-layer-group"></i></span>
+                <div>
+                    <h2>{{ _('Temel Bilgiler') }}</h2>
+                    <p>{{ _('Kayıt türü, kategori ve başlık alanları.') }}</p>
+                </div>
+            </div>
+
+            <div class="vault-form-row vault-form-row-two">
+                <div class="vault-field">
+                    <label for="kayit_tipi">{{ _('Kayıt Tipi') }}</label>
+                    <select name="kayit_tipi" id="kayit_tipi" required class="kasa-field">
+                        <option value="Website"    {% if kayit and kayit.full_data['Website name'] %}selected{% endif %}>🌐 {{ _('Website') }}</option>
+                        <option value="Application"{% if kayit and kayit.full_data['Application'] %}selected{% endif %}>💻 {{ _('Uygulama') }}</option>
+                        <option value="CreditCard" {% if kayit and kayit.full_data['CreditCard'] %}selected{% endif %}>💳 {{ _('Kredi Kartı') }}</option>
+                        <option value="SecureNote" {% if kayit and kayit.full_data['SecureNote'] %}selected{% endif %}>📝 {{ _('Not') }}</option>
+                        <option value="Other"      {% if kayit and kayit.full_data['Account name'] %}selected{% endif %}>📁 {{ _('Diğer') }}</option>
+                    </select>
+                </div>
+
+                <div class="vault-field" id="kategori_group">
+                    <label for="kategori">{{ _('Kategori') }}</label>
+                    <input type="text" name="kategori" id="kategori" placeholder="{{ _('Genel') }}"
+                        value="{{ kayit.full_data.Category if kayit else 'Genel' }}"
+                        class="kasa-field">
+                </div>
+            </div>
+
+            <div class="vault-field">
+                <label for="isim" id="isim_label">{{ _('İsim / Başlık') }}</label>
+                <input type="text" name="isim" id="isim" required placeholder="{{ _('Örn: Google, Netflix…') }}"
+                    value="{{ kayit.full_data['Website name'] or kayit.full_data['Application'] or kayit.full_data['Account name'] or kayit.full_data['CreditCard'] or kayit.full_data['SecureNote'] if kayit }}"
+                    class="kasa-field">
+            </div>
+
+            <div class="vault-field" id="website_url_group" style="display:none;">
+                <label for="website_url">{{ _('Website URL') }}</label>
+                <input type="text" name="website_url" id="website_url" placeholder="https://…"
+                    value="{{ kayit.full_data['Website URL'] if kayit and 'Website URL' in kayit.full_data }}"
+                    class="kasa-field">
+            </div>
+        </section>
+
+        <section class="vault-form-panel vault-form-access" id="login_password_row">
+            <div class="vault-section-head">
+                <span><i class="fa-solid fa-key"></i></span>
+                <div>
+                    <h2>{{ _('Giriş Bilgileri') }}</h2>
+                    <p>{{ _('Kullanıcı adı ve şifre alanları.') }}</p>
+                </div>
+            </div>
+
+            <div class="vault-form-row vault-form-row-two">
+                <div class="vault-field" id="login_group">
+                    <label for="login" id="login_label">{{ _('Kullanıcı Adı') }}</label>
+                    <input type="text" name="login" id="login" placeholder="kullanici@mail.com"
+                        value="{{ kayit.full_data.Login if kayit }}"
+                        class="kasa-field">
+                </div>
+
+                <div class="vault-field" id="password_group">
+                    <label for="page-password" id="password_label">{{ _('Şifre') }}</label>
+                    <div class="vault-password-line">
+                        <input type="text" name="password" id="page-password" placeholder="••••••••"
+                            value="{{ kayit.full_data.Password if kayit }}"
+                            class="kasa-field vault-password-input">
+                        <button type="button" id="page-generate-btn" title="{{ _('Şifre Üretici') }}"
+                            class="kasa-btn kasa-btn-icon generator-copy-btn">
+                            <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vault-strength-card" id="vault-strength-card">
+                <div class="vault-strength-head">
+                    <span><i class="fa-solid fa-shield-halved"></i></span>
+                    <div>
+                        <strong>{{ _('Şifre Güvenliği') }}</strong>
+                        <small>{{ _('Tahmini dayanımı burada görebilirsiniz.') }}</small>
+                    </div>
+                </div>
+                <div class="vault-strength">
+                    <div class="h-1.5 rounded-full bg-kasa-border-hi overflow-hidden" id="password-strength-container">
+                        <div id="password-strength-bar" class="progress-bar h-full rounded-full transition-all duration-300" style="width:0%"></div>
+                    </div>
+                    <small id="password-strength-text" class="text-kasa-text-muted text-xs"></small>
+                </div>
+            </div>
+
+            <div id="pageGenerator" class="vault-generator-panel is-collapsed" aria-hidden="true">
+                <div class="page-generator-controls">
+                    <div class="flex justify-between items-center mb-2 text-sm">
+                        <span class="text-kasa-text-muted">{{ _('Uzunluk') }}</span>
+                        <span id="page-length-display" class="font-bold text-kasa-text">16</span>
+                    </div>
+                    <input type="range" class="w-full" min="8" max="32" value="16" id="page-length">
+                </div>
+                <div class="page-generator-options generator-checkboxes">
+                    <label><input type="checkbox" id="page-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük') }}</label>
+                    <label><input type="checkbox" id="page-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük') }}</label>
+                    <label><input type="checkbox" id="page-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}</label>
+                    <label><input type="checkbox" id="page-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}</label>
+                </div>
+                <button type="button" id="page-gen-now" class="page-generator-action kasa-btn kasa-btn-primary">
+                    <i class="fa-solid fa-rotate mr-2"></i>{{ _('Yeni Şifre Oluştur') }}
+                </button>
+            </div>
+        </section>
+
+        <section class="vault-form-panel vault-form-notes">
+            <div class="vault-section-head">
+                <span><i class="fa-solid fa-note-sticky"></i></span>
+                <div>
+                    <h2>{{ _('Notlar') }}</h2>
+                    <p>{{ _('Ek açıklamalar ve hatırlatıcı bilgiler.') }}</p>
+                </div>
+            </div>
+
+            <div class="vault-field">
+                <label for="comment" id="comment_label">{{ _('Not (İsteğe Bağlı)') }}</label>
+                <textarea name="comment" id="comment" rows="4" placeholder="{{ _('Notlar…') }}"
+                    class="kasa-field resize-none">{{ kayit.full_data.Comment if kayit }}</textarea>
+            </div>
+        </section>
+
+        <aside class="vault-form-side">
+            <section class="vault-form-panel vault-form-expiry">
+                <div class="vault-section-head">
+                    <span><i class="fa-regular fa-calendar"></i></span>
+                    <div>
+                        <h2>{{ _('Süre') }}</h2>
+                        <p>{{ _('Opsiyonel son kullanma tarihi.') }}</p>
+                    </div>
+                </div>
+
+                <div class="vault-field">
+                    <label for="expiry_date">{{ _('Son Kullanma Tarihi') }}</label>
+                    <input type="date" name="expiry_date" id="expiry_date"
+                        value="{{ kayit.full_data.expiry_date if kayit and kayit.full_data.expiry_date }}"
+                        class="kasa-field">
+                    <p class="vault-help">{{ _('Tarih geçtiğinde kayıt süresi dolmuş olarak işaretlenir.') }}</p>
+                </div>
+            </section>
+
+            <section class="vault-form-actions">
+                <button type="submit" id="save-btn" class="kasa-btn kasa-btn-primary">
+                    <i class="fa-solid fa-save mr-2"></i>{{ _('Kaydet') }}
+                </button>
+                <a href="{{ url_for('index') }}" class="kasa-btn kasa-btn-muted">
+                    {{ _('Vazgeç') }}
+                </a>
+            </section>
+        </aside>
+    </form>
+</div>
+
+<script>
+    document.getElementById('ekle-form').addEventListener('submit', function (e) {
+        if (this.dataset.submitted) { e.preventDefault(); return; }
+        this.dataset.submitted = 'true';
+        const btn = document.getElementById('save-btn');
+        if (btn) {
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>' + _('Kaydediliyor…');
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.7';
+        }
+    });
+</script>
+{% endblock %}

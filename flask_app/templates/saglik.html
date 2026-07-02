@@ -1,0 +1,1133 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  :root {
+    --red:     #ff4d4d;
+    --amber:   #ffb340;
+    --sky:     #38c6f5;
+    --rose:    #ff3366;
+    --green:   #2ecc71;
+    --surface: #0e1017;
+    --panel:   #14171f;
+    --card:    #191d28;
+    --border:  rgba(255,255,255,0.07);
+    --text:    #e4e8f5;
+    --muted:   #5b6278;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Sora', sans-serif;
+    --glass:         rgba(255,255,255,0.06);
+    --glass-border:  rgba(255,255,255,0.12);
+    --glass-blur:    blur(18px);
+  }
+
+  .sr-root {
+    font-family: var(--sans);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0.35rem 1.5rem 2rem;
+    max-width: 1200px;
+    margin: -1.75rem auto 0;
+  }
+
+  /* ── Header ── */
+  .sr-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2.5rem;
+    gap: 1rem;
+  }
+  .sr-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  .sr-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 18px;
+    height: 1.5px;
+    background: var(--muted);
+  }
+  .sr-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin: 0 0 0.3rem;
+  }
+  .sr-subtitle {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin: 0;
+  }
+  .sr-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-family: var(--sans);
+    font-weight: 500;
+    transition: border-color 0.2s, color 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .sr-back-btn:hover { border-color: rgba(255,255,255,0.18); color: var(--text); }
+
+  /* ── Stat Cards ── */
+  .sr-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .sr-stat {
+    background: var(--glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 1.4rem 1.4rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(16px);
+    animation: slideUp 0.45s ease forwards;
+    min-width: 0;
+  }
+  .sr-stat::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+  .sr-stat[data-accent="red"]   { --accent: var(--red);   }
+  .sr-stat[data-accent="amber"] { --accent: var(--amber);  }
+  .sr-stat[data-accent="sky"]   { --accent: var(--sky);    }
+  .sr-stat[data-accent="rose"]  { --accent: var(--rose);   }
+
+  .sr-stat-icon {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    display: grid; place-items: center;
+    font-size: 0.65rem;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+  .sr-stat-num {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+  }
+  .sr-stat-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── GÜNCELLENEN ALAN: Grafiksiz, Tam Ortalanmış Dağılım Paneli ── */
+  .sr-overview {
+    display: flex !important;
+    justify-content: center !important; /* İçeriği yatayda tam merkeze kilitler */
+    align-items: center !important;
+    margin-bottom: 2rem !important;
+    background: var(--glass) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 16px !important;
+    padding: 2.5rem 2rem !important;
+    opacity: 0;
+    animation: slideUp 0.45s 0.15s ease forwards;
+  }
+
+  .sr-overview-info {
+    width: 440px !important; /* Panel genişliğini listeye göre optimize ettik */
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .sr-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+  .sr-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    font-size: 0.85rem;
+    padding: 0.2rem 0;
+  }
+  .sr-legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sr-legend-name {
+    color: var(--text);
+    flex: 1;
+    font-weight: 500;
+  }
+  .sr-legend-val {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  /* ── Detail Grid ── */
+  .sr-details {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .sr-card {
+    background: var(--glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    overflow: hidden;
+    opacity: 0;
+    animation: slideUp 0.45s ease forwards;
+    min-width: 0;
+  }
+  .sr-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 1rem 1rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .sr-card-indicator {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sr-card-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    flex: 1;
+  }
+  .sr-card-count {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .sr-card-body { padding: 0.6rem 0.8rem 0.8rem; }
+  .sr-hint {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+    line-height: 1.4;
+  }
+
+  /* List items */
+  .sr-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+  }
+  .sr-item:last-child { border-bottom: none; }
+  .sr-item-name {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text);
+    min-width: 0;
+    flex: 1;
+  }
+  .sr-item-name span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sr-item-icon { flex-shrink: 0; font-size: 0.65rem; }
+  .sr-item-tag {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    background: rgba(255,255,255,0.05);
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .sr-edit-link {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    transition: color 0.15s;
+    padding: 2px 0;
+  }
+  .sr-edit-link:hover { color: var(--text); }
+
+  /* Empty state */
+  .sr-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--green);
+    padding: 0.4rem 0;
+  }
+
+  /* Reuse groups */
+  .sr-reuse-group {
+    border-bottom: 1px solid var(--border);
+  }
+  .sr-reuse-group:last-child { border-bottom: none; }
+  .sr-reuse-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.76rem;
+    color: var(--muted);
+    user-select: none;
+    transition: color 0.15s;
+  }
+  .sr-reuse-summary:hover { color: var(--text); }
+  .sr-reuse-summary::-webkit-details-marker { display: none; }
+  .sr-reuse-left { display: flex; align-items: center; gap: 0.45rem; flex: 1; min-width: 0; }
+  .sr-reuse-badge {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 25%, transparent);
+    padding: 1px 6px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+  .sr-reuse-items { padding: 0 0 0.4rem 1rem; }
+  .sr-reuse-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    font-size: 0.76rem;
+    gap: 0.5rem;
+  }
+  .sr-reuse-item-name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Color helpers */
+  .c-red   { color: var(--red);   }
+  .c-amber { color: var(--amber); }
+  .c-sky   { color: var(--sky);   }
+  .c-rose  { color: var(--rose);  }
+  .c-green { color: var(--green); }
+  .bg-red-pill   { background: color-mix(in srgb, var(--red)   15%, transparent); color: var(--red);   }
+  .bg-amber-pill { background: color-mix(in srgb, var(--amber) 15%, transparent); color: var(--amber); }
+  .bg-sky-pill   { background: color-mix(in srgb, var(--sky)   15%, transparent); color: var(--sky);   }
+  .bg-rose-pill  { background: color-mix(in srgb, var(--rose)  15%, transparent); color: var(--rose);   }
+
+  /* Animations */
+  @keyframes slideUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .sr-stat:nth-child(1) { animation-delay: 0.05s; }
+  .sr-stat:nth-child(2) { animation-delay: 0.10s; }
+  .sr-stat:nth-child(3) { animation-delay: 0.15s; }
+  .sr-stat:nth-child(4) { animation-delay: 0.20s; }
+  .sr-card:nth-child(1) { animation-delay: 0.20s; }
+  .sr-card:nth-child(2) { animation-delay: 0.26s; }
+  .sr-card:nth-child(3) { animation-delay: 0.32s; }
+  .sr-card:nth-child(4) { animation-delay: 0.38s; }
+
+  /* ── Light Theme ── */
+  [data-bs-theme="light"] .sr-root {
+    --surface: #f0f2ff;
+    --panel:   #ffffff;
+    --card:    #ffffff;
+    --border:  rgba(31,41,55,0.10);
+    --text:    #172033;
+    --muted:   #475467;
+  }
+  [data-bs-theme="light"] .sr-stat,
+  [data-bs-theme="light"] .sr-overview,
+  [data-bs-theme="light"] .sr-card {
+    background: rgba(255,255,255,0.68);
+    border-color: rgba(31,41,55,0.12);
+  }
+
+  /* ── Glass Effects Off ── */
+  html[data-glass-effects="off"] .sr-stat,
+  html[data-glass-effects="off"] .sr-overview,
+  html[data-glass-effects="off"] .sr-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(19,21,39,0.96) !important;
+  }
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-stat,
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-overview,
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-card {
+    background: rgba(255,255,255,0.96) !important;
+  }
+
+  @media (min-width: 1280px) {
+    .sr-root {
+      max-width: min(92vw, 88rem);
+      padding: 0.65rem 1.75rem 2.35rem;
+    }
+
+    .sr-stats,
+    .sr-details {
+      gap: 1.1rem;
+    }
+
+    .sr-stat {
+      padding: 1.55rem 1.5rem 1.35rem;
+      min-height: 148px;
+    }
+
+    .sr-overview {
+      padding: 2.75rem 2.25rem !important;
+    }
+
+    .sr-overview-info {
+      width: min(100%, 620px) !important;
+    }
+  }
+
+  @media (min-width: 1600px) {
+    .sr-root {
+      max-width: min(94vw, 106rem);
+      padding-top: 0.85rem;
+    }
+
+    .sr-header {
+      margin-bottom: 2.75rem;
+    }
+
+    .sr-stats {
+      gap: 1.25rem;
+      margin-bottom: 2.25rem;
+    }
+
+    .sr-stat {
+      padding: 1.75rem 1.7rem 1.45rem;
+      min-height: 166px;
+    }
+
+    .sr-stat-icon {
+      width: 34px;
+      height: 34px;
+      font-size: 0.78rem;
+    }
+
+    .sr-stat-num {
+      font-size: 2.35rem;
+    }
+
+    .sr-stat-label {
+      font-size: 0.8rem;
+    }
+
+    .sr-overview {
+      padding: 3rem 2.75rem !important;
+      margin-bottom: 2.25rem !important;
+    }
+
+    .sr-overview-info {
+      width: min(100%, 760px) !important;
+    }
+
+    .sr-details {
+      gap: 1.25rem;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    .sr-root {
+      max-width: min(94vw, 118rem);
+    }
+
+    .sr-stats,
+    .sr-details {
+      gap: 1.35rem;
+    }
+
+    .sr-stat {
+      min-height: 176px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .sr-root { margin-top: -1rem; padding: 0.75rem 1rem 1.5rem; }
+    .sr-header { flex-direction: column; gap: 0.75rem; }
+    .sr-header-left { width: 100%; }
+    .sr-title { font-size: 1.25rem; }
+    .sr-stats { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1.25rem; }
+    .sr-stat { padding: 1rem 1rem 0.8rem; }
+    .sr-stat-num { font-size: 1.4rem; }
+    .sr-overview { padding: 1.5rem 1rem !important; }
+    .sr-overview-info { width: 100% !important; }
+    .sr-details { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .sr-card-head { padding: 0.7rem 0.75rem 0.45rem; }
+    .sr-card-body { padding: 0.45rem 0.6rem 0.6rem; }
+  }
+
+  @media (max-width: 480px) {
+    .sr-root { margin-top: -0.75rem; padding: 0.6rem 0.75rem 1rem; }
+    .sr-title { font-size: 1.1rem; }
+    .sr-subtitle { font-size: 0.72rem; }
+    .sr-back-btn { font-size: 0.72rem; padding: 0.4rem 0.7rem; }
+    .sr-stats { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; }
+    .sr-stat { padding: 0.8rem 0.7rem 0.6rem; }
+    .sr-stat-icon { width: 24px; height: 24px; font-size: 0.6rem; margin-bottom: 0.5rem; }
+    .sr-stat-num { font-size: 1.2rem; }
+    .sr-stat-label { font-size: 0.65rem; }
+    .sr-overview { padding: 1.2rem 0.75rem !important; margin-bottom: 1.25rem !important; }
+    .sr-legend-item { font-size: 0.78rem; gap: 0.6rem; }
+    .sr-legend-name { font-size: 0.78rem; }
+    .sr-legend-val { font-size: 0.72rem; }
+    .sr-details { grid-template-columns: 1fr; gap: 0.6rem; }
+    .sr-card-title { font-size: 0.72rem; }
+    .sr-hint { font-size: 0.65rem; }
+    .sr-item { font-size: 0.72rem; padding: 0.35rem 0; }
+    .sr-edit-link { font-size: 0.62rem; }
+    .sr-item-tag { font-size: 0.55rem; }
+    .sr-empty { font-size: 0.72rem; }
+    .sr-reuse-summary { font-size: 0.7rem; }
+    .sr-reuse-item { font-size: 0.7rem; }
+    .sr-reuse-item-name { font-size: 0.7rem; }
+  }
+
+  /* === ŞifreKasam Health Redesign === */
+  .sr-root {
+    --muted: #a6afc5;
+    width: min(100%, 1380px);
+    max-width: min(94vw, 1380px);
+    margin: 0 auto;
+    padding: clamp(1rem, 2.2vw, 2rem) clamp(0.9rem, 2vw, 1.75rem) 2.25rem;
+  }
+
+  .sr-header {
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.18);
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.13), transparent 34%),
+      linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.032)),
+      var(--glass);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+
+  .sr-header-left {
+    min-width: 0;
+  }
+
+  .sr-title {
+    font-size: clamp(1.45rem, 2vw, 2.05rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+
+  .sr-subtitle {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+
+  .sr-back-btn {
+    min-height: 42px;
+    padding: 0.62rem 1rem;
+    border-color: rgba(var(--accent-rgb), 0.24);
+    border-radius: 14px;
+    background: rgba(var(--accent-rgb), 0.08);
+    color: var(--text);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+  }
+
+  .sr-back-btn:hover {
+    border-color: rgba(var(--accent-rgb), 0.40);
+    background: rgba(var(--accent-rgb), 0.13);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+
+  .sr-stats {
+    gap: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .sr-stat[data-accent="red"] {
+    --accent: var(--red);
+    --sr-accent: var(--red);
+    --sr-accent-rgb: 255, 77, 77;
+  }
+
+  .sr-stat[data-accent="amber"] {
+    --accent: var(--amber);
+    --sr-accent: var(--amber);
+    --sr-accent-rgb: 255, 179, 64;
+  }
+
+  .sr-stat[data-accent="sky"] {
+    --accent: var(--sky);
+    --sr-accent: var(--sky);
+    --sr-accent-rgb: 56, 198, 245;
+  }
+
+  .sr-stat[data-accent="rose"] {
+    --accent: var(--rose);
+    --sr-accent: var(--rose);
+    --sr-accent-rgb: 255, 51, 102;
+  }
+
+  .sr-stat {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 0.9rem;
+    row-gap: 0.2rem;
+    min-height: 112px;
+    padding: 1rem;
+    border-color: rgba(var(--sr-accent-rgb), 0.24);
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(var(--sr-accent-rgb), 0.15), transparent 42%),
+      linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.028)),
+      var(--glass);
+    box-shadow: 0 14px 34px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  .sr-stat::after {
+    height: 3px;
+    opacity: 0.78;
+  }
+
+  .sr-stat-icon {
+    grid-row: 1 / span 2;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border-radius: 16px;
+    background: rgba(var(--sr-accent-rgb), 0.14);
+    border: 1px solid rgba(var(--sr-accent-rgb), 0.28);
+    color: var(--sr-accent);
+    font-size: 0.9rem;
+  }
+
+  .sr-stat-num {
+    margin: 0;
+    font-size: clamp(1.65rem, 2vw, 2.3rem);
+    color: var(--sr-accent);
+  }
+
+  .sr-stat-label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .sr-overview,
+  .sr-card {
+    border-color: rgba(var(--accent-rgb), 0.17) !important;
+    border-radius: 24px !important;
+    background:
+      radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
+      linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.028)),
+      var(--glass) !important;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.07);
+  }
+
+  .sr-overview {
+    margin-bottom: 1rem !important;
+    padding: 1.2rem !important;
+  }
+
+  .sr-overview-info {
+    width: min(100%, 680px) !important;
+  }
+
+  .sr-legend {
+    gap: 0.55rem;
+  }
+
+  .sr-legend-item {
+    min-height: 42px;
+    padding: 0.62rem 0.75rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.035);
+  }
+
+  .sr-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .sr-card-head {
+    min-height: 62px;
+    padding: 1rem 1rem 0.85rem;
+    background: rgba(var(--accent-rgb), 0.045);
+  }
+
+  .sr-card-indicator {
+    width: 10px;
+    height: 10px;
+    box-shadow: 0 0 18px currentColor;
+  }
+
+  .sr-card-title {
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .sr-card-count {
+    padding: 0.22rem 0.55rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+  }
+
+  .sr-card-body {
+    padding: 0.85rem 1rem 1rem;
+  }
+
+  .sr-hint {
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+
+  .sr-item,
+  .sr-reuse-group {
+    margin-bottom: 0.55rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.035);
+  }
+
+  .sr-item:last-child,
+  .sr-reuse-group:last-child {
+    margin-bottom: 0;
+    border-bottom: 1px solid rgba(var(--accent-rgb), 0.12);
+  }
+
+  .sr-item-name,
+  .sr-reuse-item-name {
+    color: var(--text);
+  }
+
+  .sr-edit-link {
+    color: var(--accent-2);
+  }
+
+  .sr-edit-link:hover {
+    color: var(--text);
+  }
+
+  .sr-empty {
+    min-height: 46px;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid rgba(46,204,113,0.22);
+    border-radius: 14px;
+    background: rgba(46,204,113,0.08);
+  }
+
+  .sr-reuse-summary {
+    padding: 0;
+  }
+
+  .sr-reuse-items {
+    padding: 0.55rem 0 0 1rem;
+  }
+
+  .sr-reuse-item {
+    padding: 0.45rem 0;
+  }
+
+  [data-bs-theme="light"] .sr-root {
+    --muted: #667085;
+  }
+
+  [data-bs-theme="light"] .sr-header,
+  [data-bs-theme="light"] .sr-stat,
+  [data-bs-theme="light"] .sr-overview,
+  [data-bs-theme="light"] .sr-card {
+    background:
+      radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 38%),
+      rgba(255,255,255,0.86) !important;
+    box-shadow: 0 18px 44px rgba(31,41,55,0.08), inset 0 1px 0 rgba(255,255,255,0.74);
+  }
+
+  html[data-glass-effects="off"] .sr-header,
+  html[data-glass-effects="off"] .sr-stat,
+  html[data-glass-effects="off"] .sr-overview,
+  html[data-glass-effects="off"] .sr-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background:
+      radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
+      rgba(18,21,39,0.98) !important;
+    border-color: rgba(var(--accent-rgb), 0.22) !important;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  html[data-glass-effects="off"] .sr-stat {
+    background:
+      radial-gradient(circle at top left, rgba(var(--sr-accent-rgb), 0.14), transparent 42%),
+      rgba(18,21,39,0.98) !important;
+    border-color: rgba(var(--sr-accent-rgb), 0.26) !important;
+  }
+
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-header,
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-stat,
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-overview,
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-card {
+    background:
+      radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 38%),
+      rgba(255,255,255,0.98) !important;
+    box-shadow: 0 18px 44px rgba(31,41,55,0.08), inset 0 1px 0 rgba(255,255,255,0.78);
+  }
+
+  html[data-kasa-gradient="off"] .sr-header,
+  html[data-kasa-gradient="off"] .sr-overview,
+  html[data-kasa-gradient="off"] .sr-card {
+    background: rgba(var(--accent-rgb), 0.065) !important;
+    border-color: rgba(var(--accent-rgb), 0.22) !important;
+  }
+
+  html[data-kasa-gradient="off"] .sr-stat {
+    background: rgba(var(--sr-accent-rgb), 0.08) !important;
+    border-color: rgba(var(--sr-accent-rgb), 0.28) !important;
+  }
+
+  html[data-bs-theme="light"][data-kasa-gradient="off"] .sr-header,
+  html[data-bs-theme="light"][data-kasa-gradient="off"] .sr-overview,
+  html[data-bs-theme="light"][data-kasa-gradient="off"] .sr-card {
+    background: rgba(var(--accent-rgb), 0.045) !important;
+  }
+
+  html[data-bs-theme="light"][data-kasa-gradient="off"] .sr-stat {
+    background: rgba(var(--sr-accent-rgb), 0.055) !important;
+  }
+
+  @media (min-width: 1500px) {
+    .sr-details {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 980px) {
+    .sr-stats,
+    .sr-details {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 680px) {
+    .sr-root {
+      max-width: 100%;
+      padding: 0.85rem 0.75rem 1.35rem;
+    }
+
+    .sr-header {
+      align-items: stretch;
+      flex-direction: column;
+      border-radius: 20px;
+    }
+
+    .sr-back-btn {
+      justify-content: center;
+      width: 100%;
+    }
+
+    .sr-details {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .sr-stats {
+      grid-template-columns: 1fr;
+    }
+
+    .sr-stat {
+      min-height: 96px;
+    }
+  }
+</style>
+
+<div class="sr-root">
+
+  <div class="sr-header">
+    <div class="sr-header-left">
+      <h1 class="sr-title">{{ _('Şifre Sağlık Raporu') }}</h1>
+      <p class="sr-subtitle">{{ _('Kasanızdaki tüm kayıtların güvenlik özeti') }}</p>
+    </div>
+    <a href="{{ url_for('index') }}" class="sr-back-btn">
+      <i class="fa-solid fa-arrow-left" style="font-size:0.7rem;"></i>
+      {{ _('Geri Dön') }}
+    </a>
+  </div>
+
+  <div class="sr-stats">
+    <div class="sr-stat" data-accent="red">
+      <div class="sr-stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="sr-stat-num" id="count-zayif">{{ zayif|length }}</div>
+      <div class="sr-stat-label">{{ _('Zayıf Şifre') }}</div>
+    </div>
+    <div class="sr-stat" data-accent="amber">
+      <div class="sr-stat-icon"><i class="fa-solid fa-copy"></i></div>
+      <div class="sr-stat-num" id="count-tekrar">{{ tekrar|length }}</div>
+      <div class="sr-stat-label">{{ _('Tekrarlı') }}</div>
+    </div>
+    <div class="sr-stat" data-accent="sky">
+      <div class="sr-stat-icon"><i class="fa-regular fa-clock"></i></div>
+      <div class="sr-stat-num" id="count-eski">{{ eski|length }}</div>
+      <div class="sr-stat-label">{{ _('Eski Şifre') }}</div>
+    </div>
+    <div class="sr-stat" data-accent="rose">
+      <div class="sr-stat-icon"><i class="fa-solid fa-calendar-xmark"></i></div>
+      <div class="sr-stat-num" id="count-expired">{{ expired|length }}</div>
+      <div class="sr-stat-label">{{ _('Süresi Dolmuş') }}</div>
+    </div>
+  </div>
+
+  <div class="sr-overview">
+    <div class="sr-overview-info">
+      <div style="font-size:0.75rem; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:1.2rem; text-align:center;">{{ _('Şifre Dağılım Oranları') }}</div>
+      <div class="sr-legend">
+        <div class="sr-legend-item">
+          <div class="sr-legend-dot" style="background:var(--red);"></div>
+          <span class="sr-legend-name">{{ _('Zayıf Şifreler') }}</span>
+          <span class="sr-legend-val" id="leg-zayif">—</span>
+        </div>
+        <div class="sr-legend-item">
+          <div class="sr-legend-dot" style="background:var(--amber);"></div>
+          <span class="sr-legend-name">{{ _('Tekrar Eden') }}</span>
+          <span class="sr-legend-val" id="leg-tekrar">—</span>
+        </div>
+        <div class="sr-legend-item">
+          <div class="sr-legend-dot" style="background:var(--sky);"></div>
+          <span class="sr-legend-name">{{ _('Eski Şifreler') }}</span>
+          <span class="sr-legend-val" id="leg-eski">—</span>
+        </div>
+        <div class="sr-legend-item">
+          <div class="sr-legend-dot" style="background:var(--rose);"></div>
+          <span class="sr-legend-name">{{ _('Süresi Dolmuş') }}</span>
+          <span class="sr-legend-val" id="leg-expired">—</span>
+        </div>
+        <div class="sr-legend-item">
+          <div class="sr-legend-dot" style="background:var(--green);"></div>
+          <span class="sr-legend-name">{{ _('Güvenli Şifre Oranı') }}</span>
+          <span class="sr-legend-val" id="leg-safe">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sr-details">
+
+    <div class="sr-card">
+      <div class="sr-card-head">
+        <div class="sr-card-indicator" style="background:var(--red);"></div>
+        <span class="sr-card-title c-red">{{ _('Zayıf Şifreler') }}</span>
+        <span class="sr-card-count bg-red-pill">{{ zayif|length }}</span>
+      </div>
+      <div class="sr-card-body">
+        {% if zayif %}
+        {% for item in zayif %}
+        <div class="sr-item">
+          <div class="sr-item-name">
+            <i class="fa-solid fa-triangle-exclamation sr-item-icon c-red"></i>
+            <span>{{ item.title }}</span>
+          </div>
+          <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+          </a>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="sr-empty">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>{{ _('Zayıf şifre bulunamadı.') }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="sr-card">
+      <div class="sr-card-head">
+        <div class="sr-card-indicator" style="background:var(--amber);"></div>
+        <span class="sr-card-title c-amber">{{ _('Tekrar Eden') }}</span>
+        <span class="sr-card-count bg-amber-pill">{{ tekrar|length }}</span>
+      </div>
+      <div class="sr-card-body">
+        {% if tekrar %}
+        {% for grup in tekrar %}
+        <details class="sr-reuse-group" {% if loop.first %}open{% endif %}>
+          <summary class="sr-reuse-summary">
+            <span class="sr-reuse-left">
+              <i class="fa-solid fa-copy" style="font-size:0.65rem; flex-shrink:0;"></i>
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ _('Aynı şifre grubu') }}</span>
+            </span>
+            <span class="sr-reuse-badge">{{ grup|length }}×</span>
+          </summary>
+          <div class="sr-reuse-items">
+            {% for item in grup %}
+            <div class="sr-reuse-item">
+              <span class="sr-reuse-item-name">{{ item.title }}</span>
+              <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+          </a>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endfor %}
+        {% else %}
+        <div class="sr-empty">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>{{ _('Tüm şifreler benzersiz.') }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="sr-card">
+      <div class="sr-card-head">
+        <div class="sr-card-indicator" style="background:var(--sky);"></div>
+        <span class="sr-card-title c-sky">{{ _('Eski Şifreler') }}</span>
+        <span class="sr-card-count bg-sky-pill">{{ eski|length }}</span>
+      </div>
+      <div class="sr-card-body">
+        <p class="sr-hint">{{ _('6 aydan uzun süredir değiştirilmemiş şifreler.') }}</p>
+        {% if eski %}
+        {% for item in eski %}
+        <div class="sr-item">
+          <div class="sr-item-name">
+            <i class="fa-regular fa-clock sr-item-icon c-sky"></i>
+            <span>{{ item.title }}</span>
+          </div>
+          <span class="sr-item-tag">{{ item.days }}g</span>
+          <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+          </a>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="sr-empty">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>{{ _('Şifreleriniz güncel.') }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="sr-card">
+      <div class="sr-card-head">
+        <div class="sr-card-indicator" style="background:var(--rose);"></div>
+        <span class="sr-card-title c-rose">{{ _('Süresi Dolmuş') }}</span>
+        <span class="sr-card-count bg-rose-pill">{{ expired|length }}</span>
+      </div>
+      <div class="sr-card-body">
+        <p class="sr-hint">{{ _('Son kullanma tarihi geçmiş kayıtlar.') }}</p>
+        {% if expired %}
+        {% for item in expired %}
+        <div class="sr-item">
+          <div class="sr-item-name">
+            <i class="fa-solid fa-calendar-xmark sr-item-icon c-rose"></i>
+            <span>{{ item.title }}</span>
+          </div>
+          <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+          </a>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="sr-empty">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>{{ _('Süresi dolan kayıt yok.') }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const z = parseInt(document.getElementById('count-zayif').innerText)   || 0;
+  const t = parseInt(document.getElementById('count-tekrar').innerText)  || 0;
+  const e = parseInt(document.getElementById('count-eski').innerText)    || 0;
+  const x = parseInt(document.getElementById('count-expired').innerText) || 0;
+  const total = z + t + e + x;
+  const safe  = (total === 0) ? 100 : Math.max(8, 60 - total * 3);
+  const grand  = z + t + e + x + safe;
+
+  const pct = v => grand > 0 ? Math.round((v / grand) * 100) : 0;
+  document.getElementById('leg-zayif').textContent   = z + ' ' + _('kayıt');
+  document.getElementById('leg-tekrar').textContent  = t + ' ' + _('grup');
+  document.getElementById('leg-eski').textContent    = e + ' ' + _('kayıt');
+  document.getElementById('leg-expired').textContent = x + ' ' + _('kayıt');
+  document.getElementById('leg-safe').textContent    = pct(safe) + '%';
+});
+</script>
+
+{% endblock %}

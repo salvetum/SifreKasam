@@ -1,0 +1,1077 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- ── HEADER ─────────────────────────────────────────────────── -->
+<header class="flex flex-col gap-4 mb-8 card-animated">
+
+    <!-- Üst satır: Başlık + Aksiyonlar -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-4xl kasa-page-title leading-tight">
+                {{ _('ŞifreKasam') }}
+            </h1>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- Toplu Seç -->
+            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}"
+                class="kasa-btn kasa-btn-muted" style="transition:all 0.2s ease;">
+                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
+            </button>
+            <!-- Sağlık raporu -->
+            <a href="{{ url_for('saglik_raporu') }}" title="{{ _('Şifre Sağlık Raporu') }}"
+               class="kasa-btn kasa-btn-danger">
+                <i class="fa-solid fa-heart-pulse"></i> {{ _('Sağlık') }}
+            </a>
+            <!-- Şifre üretici -->
+            <button type="button" data-kasa-modal="passwordGeneratorModal" title="{{ _('Şifre Üret') }}"
+                class="kasa-btn kasa-btn-muted">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> {{ _('Üretici') }}
+            </button>
+            <!-- Kasayı Kilitle -->
+            <button type="button" onclick="lockVault()" title="{{ _('Kasayı Kilitle') }}"
+                class="kasa-btn kasa-btn-danger">
+                <i class="fa-solid fa-lock"></i> {{ _('Kilitle') }}
+            </button>
+            <!-- Ayarlar -->
+            <button type="button" data-kasa-modal="settingsModal" title="{{ _('Ayarlar') }}"
+                class="kasa-btn kasa-btn-muted">
+                <i class="fa-solid fa-gear"></i> {{ _('Ayarlar') }}
+            </button>
+            <!-- Yeni Ekle -->
+            <a href="{{ url_for('ekle_sayfasi') }}"
+               class="kasa-btn kasa-btn-primary">
+                <i class="fa-solid fa-plus text-xs"></i>{{ _('Yeni Ekle') }}
+            </a>
+        </div>
+    </div>
+
+    <!-- ── İSTATİSTİK SATIRI ──────────────────────────────────── -->
+    <div class="glass rounded-xl px-4 py-2 flex flex-wrap items-center gap-y-1" id="stats-bar" style="justify-content:space-evenly;">
+        <div class="flex items-center gap-1.5">
+            <span style="color:var(--accent-2);font-size:.8rem;width:16px;text-align:center;"><i class="fa-solid fa-database"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-toplam">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('kayıt') }}</span>
+        </div>
+        <span style="color:var(--border);">|</span>
+        <div class="flex items-center gap-1.5">
+            <span style="color:var(--warning);font-size:.8rem;width:16px;text-align:center;"><i class="fa-solid fa-star"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-pinned">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('favori') }}</span>
+        </div>
+        <span style="color:var(--border);">|</span>
+        <div class="flex items-center gap-1.5">
+            <span style="color:var(--danger);font-size:.8rem;width:16px;text-align:center;"><i class="fa-solid fa-shield-exclamation"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-zayif">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('zayıf') }}</span>
+        </div>
+        <span style="color:var(--border);">|</span>
+        <div class="flex items-center gap-1.5">
+            <span style="color:var(--info);font-size:.8rem;width:16px;text-align:center;"><i class="fa-solid fa-clock"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-eski">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('eski') }}</span>
+        </div>
+        <span style="color:var(--border);">|</span>
+        <div class="flex items-center gap-1.5">
+            <span style="color:var(--danger);font-size:.8rem;width:16px;text-align:center;"><i class="fa-solid fa-calendar-xmark"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-expired">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('süresi doldu') }}</span>
+        </div>
+    </div>
+
+    <!-- Alt satır: Seçim + Filtre + Arama -->
+    <div class="flex flex-wrap justify-between items-center gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+            <label class="flex items-center gap-1.5 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" style="display:none;">
+                <input type="checkbox" id="select-all" style="width:15px;height:15px;accent-color:#7c6ff7;cursor:pointer;filter:brightness(1.2);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);border-radius:3px;">
+                {{ _('Tümünü seç') }}
+            </label>
+            <div class="flex flex-wrap gap-1.5" id="category-filter" role="group">
+            <button type="button" data-filter="all"
+                class="filter-btn filter-btn-active">{{ _('Tümü') }}</button>
+            <button type="button" data-filter="favorites"
+                class="filter-btn">⭐ {{ _('Favori') }}</button>
+            <button type="button" data-filter="Website"
+                class="filter-btn">🌐 {{ _('Web') }}</button>
+            <button type="button" data-filter="Application"
+                class="filter-btn">💻 {{ _('Uygulama') }}</button>
+            <button type="button" data-filter="CreditCard"
+                class="filter-btn">💳 {{ _('Kart') }}</button>
+            <button type="button" data-filter="SecureNote"
+                class="filter-btn">📝 {{ _('Not') }}</button>
+            <button type="button" data-filter="Other"
+                class="filter-btn">📁 {{ _('Diğer') }}</button>
+        </div>
+        </div>
+        <div style="flex:1;min-width:200px;max-width:380px;margin-left:auto;">
+            <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
+                class="w-full px-3 py-2 kasa-field text-sm">
+        </div>
+    </div>
+
+</header>
+
+<!-- ── TOPLU İŞLEM ARAÇ ÇUBUĞU ──────────────────────────────── -->
+<div id="bulk-toolbar" class="glass rounded-2xl px-4 py-3 shadow-2xl border border-kasa-border-hi flex items-center gap-3 transition-all duration-300" style="position:fixed; bottom:1.5rem; left:50%; z-index:50; display:none; opacity:0; transform:translateX(-50%) translateY(20px);">
+    <span class="text-sm text-kasa-text-muted whitespace-nowrap"><span id="bulk-count">0</span> {{ _('seçili') }}</span>
+    <div class="w-px h-6 bg-kasa-border"></div>
+    <button type="button" id="bulk-category-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
+        <i class="fa-solid fa-tag mr-1"></i>{{ _('Kategori') }}
+    </button>
+    <button type="button" id="bulk-export-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
+        <i class="fa-solid fa-download mr-1"></i>{{ _('Dışa Aktar') }}
+    </button>
+    <button type="button" id="bulk-delete-btn" class="kasa-btn kasa-btn-danger text-xs px-3 py-1.5">
+        <i class="fa-solid fa-trash-can mr-1"></i>{{ _('Sil') }}
+    </button>
+    <button type="button" id="bulk-cancel-btn" class="kasa-close-btn text-sm" title="{{ _('İptal') }}">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+</div>
+
+<!-- ── KART IZGARASI ─────────────────────────────────────────── -->
+<main>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="card-container">
+
+        {% for kayit in kayit_listesi %}
+        <div class="card-wrapper vault-card card-animated"
+             data-type="{{ kayit.full_data.type }}"
+             data-pinned="{{ 'true' if kayit.full_data.is_pinned else 'false' }}"
+             style="animation-delay: {{ [loop.index0, 8]|min * 18 }}ms;">
+
+            <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi hover:bg-kasa-surface-hover transition-all duration-200 overflow-hidden">
+
+                <!-- Card Body -->
+                <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
+
+                    <!-- Başlık satırı -->
+                    <div class="vault-card-header flex justify-between items-start mb-3">
+                        <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
+                            <label class="flex items-center justify-center" style="display:none;width:20px;height:20px;flex-shrink:0;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);cursor:pointer;">
+                                <input type="checkbox" class="select-item" value="{{ kayit.id }}" style="width:14px;height:14px;accent-color:#7c6ff7;cursor:pointer;margin:0;filter:brightness(1.2);">
+                            </label>
+                            <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm">
+                                {% if kayit.full_data.type == 'Website' %}🌐
+                                {% elif kayit.full_data.type == 'Application' %}💻
+                                {% elif kayit.full_data.type == 'CreditCard' %}💳
+                                {% elif kayit.full_data.type == 'SecureNote' %}📝
+                                {% else %}📁{% endif %}
+                            </span>
+                             <h5 class="font-display font-semibold text-sm truncate m-0 text-kasa-text">
+                                {{ kayit.normalized.baslik }}
+                            </h5>
+                            {% if kayit.full_data.expiry_date %}
+                            <span class="expiry-badge" data-expiry="{{ kayit.full_data.expiry_date }}"></span>
+                            {% endif %}
+                        </div>
+                        <!-- Favori Butonu -->
+                        <form action="{{ url_for('pin_kayit', kayit_id=kayit.id) }}" method="POST"
+                              class="flex-shrink-0 pin-form m-0 p-0">
+                            <button type="submit" class="card-star-btn" title="{{ _('Favorile') }}" aria-label="{{ _('Favorile') }}">
+                                <i class="fa-{{ 'solid' if kayit.full_data.is_pinned else 'regular' }} fa-star card-star-icon{{ '' if kayit.full_data.is_pinned else ' card-star-unpinned' }}"
+                                   style="color: {{ '#f59e0b' if kayit.full_data.is_pinned else '' }}; font-size:0.9rem;"></i>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Detaylar -->
+                    <div class="vault-detail-list flex-1 text-sm">
+                        {% for anahtar, deger in kayit.normalized.detaylar.items() %}
+
+                        {% if anahtar == 'Şifre' or anahtar == 'CVV / Şifre' %}
+                        <div class="vault-detail-row vault-detail-row-action password-row">
+                            <p class="vault-detail-main m-0">
+                                <span class="vault-detail-label">{{ anahtar }}</span>
+                                <span class="password-field vault-detail-value vault-secret font-mono tracking-wide" data-id="{{ kayit.id }}" data-visible="false">
+                                    ••••••••
+                                </span>
+                            </p>
+                            <div class="vault-row-actions">
+                                <button type="button" class="card-icon-btn toggle-password" title="{{ _('Göster/Gizle') }}" aria-label="{{ _('Göster/Gizle') }}"><i class="fa-solid fa-eye text-xs"></i></button>
+                                <button type="button" class="card-icon-btn copy-password" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}"><i class="fa-solid fa-copy text-xs"></i></button>
+                            </div>
+                        </div>
+
+                        {% elif anahtar == 'İnternet Adresi' %}
+                        {% set url = deger if deger.startswith('http') else 'https://' + deger %}
+                        <div class="vault-detail-row vault-detail-row-action vault-url-row">
+                            <p class="vault-detail-main m-0">
+                                <span class="vault-detail-label">{{ anahtar }}</span>
+                                <a href="{{ url }}" target="_blank" rel="noopener noreferrer"
+                                   class="vault-detail-value vault-link text-[#4f91ff] hover:text-[#7c6ff7] transition-colors duration-150 no-underline">
+                                    {{ deger }}
+                                </a>
+                            </p>
+                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="card-icon-btn flex-shrink-0" title="{{ _('Siteye Git') }}" aria-label="{{ _('Siteye Git') }}">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                            </a>
+                        </div>
+
+                        {% elif anahtar == 'Kullanıcı Adı' or anahtar == 'Kart Numarası' %}
+                        <div class="vault-detail-row vault-detail-row-action password-row">
+                            <p class="vault-detail-main m-0">
+                                <span class="vault-detail-label">{{ anahtar }}</span>
+                                <span class="vault-detail-value">{{ deger }}</span>
+                            </p>
+                            <button type="button" class="card-icon-btn copy-username flex-shrink-0" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}"
+                                    data-username="{{ deger }}">
+                                <i class="fa-solid fa-copy text-xs"></i>
+                            </button>
+                        </div>
+
+                        {% elif anahtar == 'Not' %}
+                        <div class="vault-detail-row vault-note-row">
+                            <span class="vault-detail-label">{{ anahtar }}</span>
+                            <span class="vault-detail-value vault-note-text">{{ deger }}</span>
+                        </div>
+
+                        {% else %}
+                        <div class="vault-detail-row">
+                            <span class="vault-detail-label">{{ anahtar }}</span>
+                            <span class="vault-detail-value">{{ deger }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% endfor %}
+                    </div>
+
+                </div>
+
+                <!-- Card Footer -->
+                <div class="flex justify-end items-center gap-4 px-4 py-3 border-t border-kasa-border">
+                    <button type="button" class="footer-action-btn history-btn" data-id="{{ kayit.id }}">
+                        <i class="fa-solid fa-clock-rotate-left mr-1 text-xs"></i>{{ _('Geçmiş') }}
+                    </button>
+                    <a href="{{ url_for('duzenle_sayfasi', kayit_id=kayit.id) }}" class="footer-action-btn">
+                        <i class="fa-solid fa-pen-to-square mr-1 text-xs"></i>{{ _('Düzenle') }}
+                    </a>
+                    <form action="{{ url_for('sil_kayit', kayit_id=kayit.id) }}" method="POST"
+                          class="inline m-0 p-0 delete-form">
+                        <button type="submit" class="footer-action-btn text-red-400 hover:text-red-300">
+                            <i class="fa-solid fa-trash-can mr-1 text-xs"></i>{{ _('Sil') }}
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+        {% else %}
+
+        <!-- Boş durum -->
+        <div class="col-span-full mt-16 text-center card-animated">
+            <div class="text-kasa-text-muted">
+                <i class="fa-solid fa-box-open text-5xl mb-4 block opacity-30"></i>
+                <p class="mb-4 text-base">{{ _('Kasanızda henüz kayıt yok.') }}</p>
+                <a href="{{ url_for('ekle_sayfasi') }}"
+                   class="kasa-btn kasa-btn-primary">
+                    <i class="fa-solid fa-plus text-xs"></i>{{ _('İlk kaydı ekle') }}
+                </a>
+            </div>
+        </div>
+
+        {% endfor %}
+    </div>
+</main>
+
+<!-- ─── MODALLER ─────────────────────────────────────────────── -->
+
+<!-- Şifre Üretici Modal -->
+<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" aria-hidden="true" data-target-input="modal-generated-password-display">
+    <div class="modal-dialog modal-dialog-centered generator-modal-dialog">
+        <div class="modal-content generator-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title gradient-text fw-bold" style="font-family:'Sora',sans-serif;">
+                    {{ _('Güçlü Şifre Üretici') }}
+                </h5>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body generator-modal-body">
+                <div class="generator-layout">
+                    <section class="generator-output-card">
+                        <div class="generator-output-kicker">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            {{ _('Yeni Şifre') }}
+                        </div>
+                        <div class="generator-output-row">
+                            <input type="text" class="flex-1 px-3 py-2.5 kasa-field text-sm" id="modal-generated-password-display" readonly
+                                placeholder="{{ _('Şifreniz burada görünecek…') }}" style="font-family:monospace;letter-spacing:0.08em;">
+                            <button class="kasa-btn kasa-btn-icon generator-copy-btn"
+                                    type="button" id="modal-copy-generated-password-btn" title="{{ _('Kopyala') }}">
+                                <i class="fa-solid fa-copy text-sm"></i>
+                            </button>
+                        </div>
+                        <div class="generator-strength-card">
+                            <div class="flex justify-between items-center mb-1">
+                                <small class="text-kasa-text-muted text-xs">{{ _('Şifre Gücü') }}</small>
+                                <small id="modal-strength-label" class="text-xs text-kasa-text-muted">—</small>
+                            </div>
+                            <div class="h-1.5 rounded-full bg-kasa-border-hi overflow-hidden">
+                                <div id="modal-strength-bar" class="progress-bar h-full rounded-full transition-all duration-300"
+                                     style="width:0%;"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="passwordGeneratorModal_options" class="generator-panel generator-options-card">
+                        <div class="flex justify-between items-center mb-2">
+                            <small class="text-kasa-text-muted">{{ _('Uzunluk') }}</small>
+                            <span id="modal-length-display" class="font-bold text-sm">16</span>
+                        </div>
+                        <input type="range" class="w-full mb-3 accent-[#7c6ff7]" min="8" max="32" value="16" id="modal-length">
+
+                        <div class="generator-option-grid generator-checkboxes">
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                                <input type="checkbox" id="modal-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük Harf') }}
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                                <input type="checkbox" id="modal-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük Harf') }}
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                                <input type="checkbox" id="modal-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                                <input type="checkbox" id="modal-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="gen-history-section generator-history-card">
+                        <div class="gen-history-header" onclick="this.parentElement.classList.toggle('gen-history-collapsed')">
+                            <span><i class="fa-regular fa-clock"></i> {{ _('Geçmiş') }}</span>
+                            <div class="gen-history-header-right">
+                                <button type="button" id="generator-history-clear" class="gen-history-clear-btn" title="{{ _('Temizle') }}" style="display:none;">
+                                    <i class="fa-solid fa-trash-can"></i> {{ _('Temizle') }}
+                                </button>
+                                <i class="fa-solid fa-chevron-down gen-history-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="gen-history-body">
+                            <div id="generator-history-empty" class="gen-history-empty">
+                                {{ _('Henüz geçmiş yok.') }}
+                            </div>
+                            <div id="generator-history-list"></div>
+                        </div>
+                    </section>
+                </div>
+                    </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('Kapat') }}</button>
+                <button type="button" class="btn btn-primary btn-sm" id="modal-gen-now">
+                    <i class="fa-solid fa-rotate mr-1"></i>{{ _('Yeni Üret') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- İçe Aktar Modal -->
+<div class="kasa-modal" id="importModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                    <i class="fa-solid fa-upload mr-2" style="color:#7c6ff7;"></i>{{ _('İçe Aktar') }}
+                </h5>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label for="import-file" class="block text-sm font-medium text-kasa-text-muted mb-2">{{ _('Dosya Seçin') }}</label>
+                        <input type="file" class="w-full px-3 py-2.5 kasa-field text-sm" id="import-file" name="file" accept=".json,.kasa,.txt" required>
+                        <div class="mt-3 p-3 kasa-panel-soft text-xs text-kasa-text-muted leading-loose">
+                            <i class="fa-solid fa-circle-info mr-1 text-[#38bdf8]"></i>
+                            <strong class="text-kasa-text">.kasa</strong> — {{ _('şifreli yedek') }} &nbsp;·&nbsp;
+                            <strong class="text-kasa-text">.json</strong> — {{ _('ham yedek') }} &nbsp;·&nbsp;
+                            <strong class="text-kasa-text">.txt</strong> — {{ _('eski format') }}
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full kasa-btn kasa-btn-primary">
+                        <i class="fa-solid fa-file-import mr-2"></i>{{ _('İçe Aktar') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Şifre Geçmişi Modal -->
+<div class="kasa-modal" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-height:80vh;">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid var(--border);">
+                <h5 class="modal-title fw-semibold" style="font-size:0.95rem;">
+                    <i class="fa-solid fa-clock-rotate-left mr-2 text-[#38bdf8]"></i>{{ _('Şifre Geçmişi') }}
+                </h5>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush" id="history-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('Kapat') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ayarlar Modal -->
+<div class="kasa-modal" id="settingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered settings-modal-dialog">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                    <i class="fa-solid fa-gear mr-2" style="color:#7c6ff7;"></i>{{ _('Ayarlar') }}
+                </h5>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form action="{{ url_for('save_settings') }}" method="POST" data-settings-form>
+                <div class="modal-body p-4 space-y-3 settings-body">
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-palette"></i></span>
+                        <div>
+                            <h6>{{ _('Görünüm') }}</h6>
+                            <p>{{ _('Tema, cam efekti, arkaplan ve vurgu rengini buradan ayarlayın.') }}</p>
+                        </div>
+                    </div>
+                    <!-- Koyu Tema -->
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h6 class="text-sm font-medium mb-0.5">{{ _('Koyu Tema') }}</h6>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüzü koyu renklere çevir.') }}</p>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="theme-toggle" style="width:2.5em;height:1.25em;cursor:pointer;">
+                        </div>
+                    </div>
+                    <!-- Tepsiye Küçült -->
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h6 class="text-sm font-medium mb-0.5">{{ _('Tepsiye Küçült') }}</h6>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kapatınca uygulamayı sistem tepsisinde tut.') }}</p>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="setting-minimize-to-tray" checked style="width:2.5em;height:1.25em;cursor:pointer;">
+                        </div>
+                    </div>
+                    <!-- Cam Efektleri -->
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h6 class="text-sm font-medium mb-0.5">{{ _('Cam Efektleri') }}</h6>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Düşük cihazlarda daha akıcı çalışması için bulanıklığı azalt.') }}</p>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h6 class="text-sm font-medium mb-0.5">{{ _('Hareketli Arkaplan') }}</h6>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arkaplan bloblarını yumuşak şekilde hareket ettir.') }}</p>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" name="animated_backgrounds_enabled" id="animated-backgrounds-toggle" {% if ANIMATED_BACKGROUNDS_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h6 class="text-sm font-medium mb-0.5">{{ _('Gradient Katmanları') }}</h6>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kartlarda ve arkaplanda renk geçişlerini kullan.') }}</p>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" name="gradients_enabled" id="gradients-toggle" {% if GRADIENTS_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                        </div>
+                    </div>
+                    <!-- Görünüm -->
+                    <div class="settings-appearance-card p-3 rounded-xl">
+                        <div class="settings-appearance-head">
+                            <div>
+                                <h6 class="text-sm font-medium mb-0.5">{{ _('Renk ve Arkaplan') }}</h6>
+                                <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arkaplan stili, ana vurgu rengi ve canlı önizleme.') }}</p>
+                            </div>
+                            <div id="appearance-preview" class="appearance-preview" aria-hidden="true"></div>
+                        </div>
+                        <div class="settings-appearance-grid">
+                            <label class="appearance-field">
+                                <span>{{ _('Vurgu Rengi') }}</span>
+                                <div class="accent-control-row">
+                                    <input type="color" name="accent_color" id="accent-color-input" value="{{ ACCENT_COLOR }}" aria-label="{{ _('Vurgu Rengi') }}">
+                                    <input type="text" id="accent-color-text" value="{{ ACCENT_COLOR }}" maxlength="7" class="kasa-field" aria-label="{{ _('Vurgu Rengi Kodu') }}">
+                                </div>
+                            </label>
+                            <label class="appearance-field">
+                                <span>{{ _('Arkaplan') }}</span>
+                                <select name="background_style" id="background-style-select" class="kasa-field">
+                                    <option value="aurora" {% if BACKGROUND_STYLE == 'aurora' %}selected{% endif %}>{{ _('Aurora') }}</option>
+                                    <option value="midnight" {% if BACKGROUND_STYLE == 'midnight' %}selected{% endif %}>{{ _('Gece') }}</option>
+                                    <option value="mesh" {% if BACKGROUND_STYLE == 'mesh' %}selected{% endif %}>{{ _('Mesh') }}</option>
+                                    <option value="plain" {% if BACKGROUND_STYLE == 'plain' %}selected{% endif %}>{{ _('Sade') }}</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="accent-preset-row" aria-label="{{ _('Hazır renkler') }}">
+                            <button type="button" data-accent-preset="#7c6ff7" style="--preset:#7c6ff7"><span></span>{{ _('Mor') }}</button>
+                            <button type="button" data-accent-preset="#38bdf8" style="--preset:#38bdf8"><span></span>{{ _('Mavi') }}</button>
+                            <button type="button" data-accent-preset="#22c55e" style="--preset:#22c55e"><span></span>{{ _('Yeşil') }}</button>
+                            <button type="button" data-accent-preset="#f59e0b" style="--preset:#f59e0b"><span></span>{{ _('Amber') }}</button>
+                            <button type="button" data-accent-preset="#f43f5e" style="--preset:#f43f5e"><span></span>{{ _('Rose') }}</button>
+                            <button type="button" data-accent-preset="#14b8a6" style="--preset:#14b8a6"><span></span>{{ _('Turkuaz') }}</button>
+                            <button type="button" data-accent-preset="#6366f1" style="--preset:#6366f1"><span></span>{{ _('İndigo') }}</button>
+                            <button type="button" data-accent-preset="#84cc16" style="--preset:#84cc16"><span></span>{{ _('Lime') }}</button>
+                        </div>
+                        <div class="background-choice-grid" aria-label="{{ _('Arkaplan seçenekleri') }}">
+                            <button type="button" data-background-option="aurora">
+                                <strong>{{ _('Aurora') }}</strong>
+                                <small>{{ _('Yumuşak renk patlamaları') }}</small>
+                            </button>
+                            <button type="button" data-background-option="midnight">
+                                <strong>{{ _('Gece') }}</strong>
+                                <small>{{ _('Daha sakin koyu yüzey') }}</small>
+                            </button>
+                            <button type="button" data-background-option="mesh">
+                                <strong>{{ _('Mesh') }}</strong>
+                                <small>{{ _('Daha canlı çok renkli alan') }}</small>
+                            </button>
+                            <button type="button" data-background-option="plain">
+                                <strong>{{ _('Sade') }}</strong>
+                                <small>{{ _('Düşük dikkat dağıtma') }}</small>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-sliders"></i></span>
+                        <div>
+                            <h6>{{ _('Davranış') }}</h6>
+                            <p>{{ _('Kilitleme, pencere ve günlük kullanım tercihleri.') }}</p>
+                        </div>
+                    </div>
+                    <!-- Otomatik Kilitleme -->
+                    <div class="settings-toggle-card settings-auto-lock-card">
+                        <div class="settings-toggle-main">
+                            <div class="settings-toggle-copy">
+                                <h6 class="text-sm font-medium mb-0.5">{{ _('Otomatik Kilitleme') }}</h6>
+                                <p class="text-xs text-kasa-text-muted mb-0">{{ _('Hareketsizlik durumunda kasayı kilitle.') }}</p>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" name="auto_lock_enabled" id="auto_lock_enabled" {% if AUTO_LOCK_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                            </div>
+                        </div>
+                        <div class="settings-timeout-row">
+                            <label class="text-xs text-kasa-text-muted" for="auto_lock_timeout">{{ _('Zaman Aşımı (Dakika)') }}</label>
+                            <input type="number" name="auto_lock_timeout" id="auto_lock_timeout" min="1" max="60" value="{{ AUTO_LOCK_TIMEOUT }}"
+                                   class="kasa-field settings-timeout-input">
+                        </div>
+                    </div>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-database"></i></span>
+                        <div>
+                            <h6>{{ _('Veri ve Yedekleme') }}</h6>
+                            <p>{{ _('Kasa verilerini içe aktarın veya dışa aktarın.') }}</p>
+                        </div>
+                    </div>
+                    <!-- İçe/Dışa Aktar Butonları -->
+                    <div class="settings-action-grid">
+                        <button type="button" data-kasa-close data-kasa-modal="importModal"
+                            class="settings-action-card">
+                            <span class="settings-action-icon"><i class="fa-solid fa-upload"></i></span>
+                            <span class="settings-action-copy">
+                                <strong>{{ _('İçe Aktar') }}</strong>
+                                <small>{{ _('Yedek dosyasından kayıt ekle.') }}</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                        </button>
+                        <a href="{{ url_for('export_data') }}"
+                            class="settings-action-card no-underline">
+                            <span class="settings-action-icon settings-action-icon-success"><i class="fa-solid fa-download"></i></span>
+                            <span class="settings-action-copy">
+                                <strong>{{ _('Dışa Aktar') }}</strong>
+                                <small>{{ _('Kasanın güvenli yedeğini indir.') }}</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                        </a>
+                    </div>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-language"></i></span>
+                        <div>
+                            <h6>{{ _('Dil ve Ağ') }}</h6>
+                            <p>{{ _('Arayüz dili ve yerel ağ erişim ayarları.') }}</p>
+                        </div>
+                    </div>
+                    <!-- Dil Seçici -->
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h6 class="text-sm font-medium mb-0.5">{{ _('Dil') }}</h6>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüz dilini değiştir.') }}</p>
+                        </div>
+                        <select id="settings-language-select" class="text-sm px-2 py-1.5 rounded-lg kasa-field" style="width:auto;min-width:120px;cursor:pointer;">
+                            {% for lang in AVAILABLE_LANGS %}
+                            <option value="{{ lang.code }}" {% if lang.code == CURRENT_LANG %}selected{% endif %}>
+                                {{ lang.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- LAN Erişimi -->
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h6 class="text-sm font-medium mb-0.5">{{ _('LAN Erişimi') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold align-middle" style="letter-spacing:0.02em;">{{ _('GELİŞTİRME') }}</span></h6>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Mobil cihazdan bağlanmak için ağ üzerinden erişime izin ver.') }}</p>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" name="lan_enabled" id="lan-enabled-toggle" {% if LAN_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                        </div>
+                    </div>
+                    <div class="lan-warning-card">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <p>{{ _('Bu seçenek güvenlik riskleri taşır. Bu özelliği açarak bu riski kabul etmiş olursunuz.') }}</p>
+                    </div>
+                    <div id="lan-info-box" class="p-3 rounded-xl glass-sm text-xs text-kasa-text-muted {% if not LAN_ENABLED %}hidden{% endif %}" style="transition:all 0.2s ease;">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i class="fa-solid fa-wifi text-[#22c55e]"></i>
+                            <span class="font-semibold text-kasa-text">{{ _('Ağ Adresi') }}</span>
+                        </div>
+                        <div id="lan-address" class="font-mono text-kasa-text text-sm break-all">{{ _('Yükleniyor...') }}</div>
+                        <p class="mt-1">{{ _('Bu adresi mobil cihazınızın tarayıcısına yazın.') }}</p>
+                    </div>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-shield-halved"></i></span>
+                        <div>
+                            <h6>{{ _('Güvenlik') }}</h6>
+                            <p>{{ _('Ana şifre ve kasa kilidiyle ilgili işlemler.') }}</p>
+                        </div>
+                    </div>
+                    <!-- Ana Şifre Değiştir -->
+                    <button type="button" data-kasa-modal="changePasswordModal"
+                        class="settings-action-card w-full">
+                        <span class="settings-action-icon"><i class="fa-solid fa-key"></i></span>
+                        <span class="settings-action-copy">
+                            <strong>{{ _('Ana Şifreyi Değiştir') }}</strong>
+                            <small>{{ _('Kasa kilidini ve şifreleme anahtarını güncelle.') }}</small>
+                        </span>
+                        <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                    </button>
+                </div>
+                <div class="modal-footer flex justify-between items-center w-full">
+                    <div class="text-xs text-kasa-text-muted text-left">
+                        <div><span class="font-semibold">ŞifreKasam</span> v{{ APP_VERSION }}</div>
+                        <div class="opacity-75">By Salvetum</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('İptal') }}</button>
+                        <button type="submit" class="btn btn-primary btn-sm px-4">{{ _('Kaydet') }}</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    fetch('/api/stats')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            document.getElementById('stat-toplam').textContent = data.toplam;
+            document.getElementById('stat-pinned').textContent = data.pinned;
+            document.getElementById('stat-zayif').textContent = data.zayif;
+            document.getElementById('stat-eski').textContent = data.eski;
+            document.getElementById('stat-expired').textContent = data.expired;
+        })
+        .catch(function () {});
+
+    // ── Güncelleme Kontrolü ──
+    //var currentVersion = '{{ APP_VERSION }}';
+    //var controller = new AbortController();
+    //setTimeout(function () { controller.abort(); }, 5000);
+    //try {
+    //    fetch('https://api.github.com/repos/kaan5/SifreKasaV2/releases/latest', { signal: controller.signal })
+    //        .then(function (r) { return r.json(); })
+    //        .then(function (data) {
+    //            if (data.tag_name && data.tag_name !== currentVersion) {
+    //                showToast({
+    //                    text: 'v' + data.tag_name + ' yayında! kasayı güncellemek için GitHub sayfasını ziyaret edin.',
+    //                    gravity: 'top',
+    //                    duration: 8000
+    //                });
+    //            }
+    //        })
+    //        .catch(function () {});
+    //} catch(e) {}
+
+    document.querySelectorAll('.expiry-badge').forEach(function (el) {
+        var expiryStr = el.getAttribute('data-expiry');
+        if (!expiryStr) return;
+        var parts = expiryStr.split('-');
+        var expiry = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        var now = new Date();
+        now.setHours(0, 0, 0, 0);
+        var diff = Math.floor((expiry - now) / 86400000);
+        if (diff < 0) {
+            el.textContent = _('Süresi doldu');
+            el.className = 'expiry-badge expiry-badge-expired';
+        } else if (diff <= 30) {
+            el.textContent = diff + ' ' + _('gün kaldı');
+            el.className = 'expiry-badge expiry-badge-warning';
+        } else {
+            el.textContent = expiryStr;
+            el.className = 'expiry-badge expiry-badge-ok';
+        }
+    });
+
+    // ── Toplu İşlemler ──
+    var selected = new Set();
+    var bulkToolbar = document.getElementById('bulk-toolbar');
+    var bulkCount = document.getElementById('bulk-count');
+    var selectAllLabel = document.getElementById('select-all-label');
+    var selectAll = document.getElementById('select-all');
+    var bulkToggleBtn = document.getElementById('bulk-toggle-btn');
+    var bulkMode = false;
+
+    function setBulkMode(on) {
+        bulkMode = on;
+        bulkToggleBtn.classList.toggle('bulk-active', on);
+        document.querySelectorAll('.select-item').forEach(function (cb) {
+            cb.closest('label').style.display = on ? '' : 'none';
+        });
+        selectAllLabel.style.display = on ? 'flex' : 'none';
+        if (!on) {
+            selected.clear();
+            document.querySelectorAll('.select-item').forEach(function (cb) { cb.checked = false; });
+            updateBulkUI();
+        }
+    }
+
+    bulkToggleBtn.addEventListener('click', function () { setBulkMode(!bulkMode); });
+    var checkboxes = document.querySelectorAll('.select-item');
+
+    function updateBulkUI() {
+        var count = selected.size;
+        bulkCount.textContent = count;
+        if (count > 0) {
+            bulkToolbar.style.display = 'flex';
+            requestAnimationFrame(function () {
+                bulkToolbar.style.opacity = '1';
+                bulkToolbar.style.transform = 'translateX(-50%) translateY(0)';
+            });
+        } else {
+            bulkToolbar.style.opacity = '0';
+            bulkToolbar.style.transform = 'translateX(-50%) translateY(20px)';
+            setTimeout(function () { if (selected.size === 0) bulkToolbar.style.display = 'none'; }, 300);
+        }
+        selectAll.checked = count === checkboxes.length && count > 0;
+    }
+
+    document.querySelectorAll('.select-item').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            if (this.checked) selected.add(this.value);
+            else selected.delete(this.value);
+            updateBulkUI();
+        });
+    });
+
+    document.getElementById('select-all').addEventListener('change', function () {
+        document.querySelectorAll('.select-item').forEach(function (cb) {
+            cb.checked = this.checked;
+            if (this.checked) selected.add(cb.value);
+            else selected.delete(cb.value);
+        }, this);
+        updateBulkUI();
+    });
+
+    document.getElementById('bulk-cancel-btn').addEventListener('click', function () {
+        document.querySelectorAll('.select-item').forEach(function (cb) {
+            cb.checked = false;
+        });
+        selected.clear();
+        updateBulkUI();
+    });
+
+    document.getElementById('bulk-delete-btn').addEventListener('click', function () {
+        var ids = Array.from(selected);
+        if (ids.length === 0) return;
+        Swal.fire({
+            title: ids.length + ' ' + _('kaydı sil?'),
+            text: _('Bu işlem geri alınamaz.'),
+            icon: 'warning',
+            showCancelButton: true,
+            heightAuto: false,
+            scrollbarPadding: false,
+            confirmButtonText: _('Evet, Sil'),
+            cancelButtonText: _('Vazgeç'),
+            color: 'var(--text)',
+            buttonsStyling: false,
+            customClass: {
+                popup: 'kasa-swal-popup', title: 'kasa-swal-title',
+                htmlContainer: 'kasa-swal-text', actions: 'kasa-swal-actions',
+                confirmButton: 'kasa-btn kasa-btn-danger',
+                cancelButton: 'kasa-btn kasa-btn-muted'
+            }
+        }).then(function (res) {
+            if (res.isConfirmed) {
+                fetch('/api/bulk/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ids })
+                }).then(function () { window.location.reload(); });
+            }
+        });
+    });
+
+    document.getElementById('bulk-export-btn').addEventListener('click', function () {
+        var ids = Array.from(selected);
+        if (ids.length === 0) return;
+        fetch('/api/bulk/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        }).then(function (r) { return r.blob(); }).then(function (blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'toplu_export.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    });
+
+    document.getElementById('bulk-category-btn').addEventListener('click', function () {
+        var ids = Array.from(selected);
+        if (ids.length === 0) return;
+        document.getElementById('bulk-category-count').textContent = ids.length;
+    window._bulkIds = ids;
+    window.kasaModalAc('bulkCategoryModal');
+});
+
+    document.getElementById('bulk-category-apply').addEventListener('click', function () {
+        var category = document.getElementById('bulk-category-input').value.trim();
+        if (!category) { showToast({ text: _('Lütfen bir kategori girin.'), gravity: 'top' }); return; }
+        fetch('/api/bulk/category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: window._bulkIds, category: category })
+        }).then(function (r) {
+            if (r.ok) { window.kasaModalKapat('bulkCategoryModal'); window.location.reload(); }
+            else { showToast(_('Hata oluştu.'), 'error'); }
+        });
+    });
+});
+
+// ── Dil Değiştirme (Ayarlar) ──
+document.getElementById('settings-language-select')?.addEventListener('change', function () {
+    var lang = this.value;
+    fetch('/settings/language', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: lang })
+    }).then(function () {
+        var theme = localStorage.getItem('kasa-theme') || 'dark';
+        var glass = localStorage.getItem('kasa-glass-effects') || 'on';
+        var motion = localStorage.getItem('kasa-animated-backgrounds') || 'on';
+        var gradients = localStorage.getItem('kasa-gradients') || 'on';
+        var accent = localStorage.getItem('kasa-accent') || '{{ ACCENT_COLOR }}';
+        var background = localStorage.getItem('kasa-background') || '{{ BACKGROUND_STYLE }}';
+        window.location.href = '/loading?lang=' + encodeURIComponent(lang)
+            + '&theme=' + encodeURIComponent(theme)
+            + '&glassEffects=' + encodeURIComponent(glass)
+            + '&motion=' + encodeURIComponent(motion)
+            + '&gradients=' + encodeURIComponent(gradients)
+            + '&accent=' + encodeURIComponent(accent)
+            + '&background=' + encodeURIComponent(background)
+            + '&redirect=1';
+    }).catch(function () { location.reload(); });
+});
+
+// ── Ana Şifre Değiştirme ──
+document.getElementById('changePasswordForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var oldPw = document.getElementById('cp-old').value;
+    var newPw = document.getElementById('cp-new').value;
+    var confirmPw = document.getElementById('cp-confirm').value;
+    if (newPw !== confirmPw) {
+        showToast({ text: _('Yeni şifreler eşleşmiyor.'), gravity: 'top' });
+        return;
+    }
+    var fd = new FormData();
+    fd.append('old_password', oldPw);
+    fd.append('new_password', newPw);
+    var btn = document.getElementById('cp-submit');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>' + _('Şifreleniyor…');
+    document.getElementById('cp-progress').style.display = 'block';
+    document.getElementById('cp-bar').style.width = '0%';
+    document.getElementById('cp-pct').textContent = '0%';
+    fetch('/change-password', { method: 'POST', body: fd })
+        .then(function (r) {
+            if (!r.ok) {
+                return r.json().then(function (d) { throw new Error(d.error || _('Bir hata oluştu.')); });
+            }
+            return r.json();
+        })
+        .then(function (data) {
+            var poll = setInterval(function () {
+                fetch('/change-password/progress/' + data.task_id)
+                    .then(function (r) { return r.json(); })
+                    .then(function (p) {
+                        if (p.progress >= 0) {
+                            document.getElementById('cp-bar').style.width = p.progress + '%';
+                            document.getElementById('cp-pct').textContent = p.progress + '%';
+                        }
+                        if (p.progress === 100 || p.done) {
+                            clearInterval(poll);
+                            window.kasaModalKapat('changePasswordModal');
+                            window.location.href = '/logout';
+                        }
+                        if (p.progress === -1) {
+                            clearInterval(poll);
+                            showToast({ text: _('Hata: ') + (p.error || _('Bilinmeyen hata')), gravity: 'top' });
+                            btn.disabled = false;
+                            btn.innerHTML = _('Şifreyi Güncelle ve Re-encrypt Et');
+                        }
+                    });
+            }, 200);
+        })
+        .catch(function (err) {
+            showToast({ text: err.message, gravity: 'top' });
+            btn.disabled = false;
+            btn.innerHTML = _('Şifreyi Güncelle ve Re-encrypt Et');
+        });
+});
+
+function lockVault() {
+    Swal.fire({
+        title: _('Kasayı Kilitle'),
+        text: _("Kasanızı kilitlemek istediğinize emin misiniz?"),
+        icon: 'warning',
+        showCancelButton: true,
+        heightAuto: false,
+        scrollbarPadding: false,
+        confirmButtonText: _('Evet, Kilitle'),
+        cancelButtonText: _('Vazgeç'),
+        color: 'var(--text)',
+        buttonsStyling: false,
+        customClass: {
+            popup: 'kasa-swal-popup',
+            title: 'kasa-swal-title',
+            htmlContainer: 'kasa-swal-text',
+            actions: 'kasa-swal-actions',
+            confirmButton: 'kasa-btn kasa-btn-primary',
+            cancelButton: 'kasa-btn kasa-btn-muted'
+        },
+        willOpen: (popup, container) => {
+            popup.style.opacity = '0';
+            popup.style.transform = 'scale(0.92) translateY(16px)';
+            container.style.background = 'transparent';
+        },
+        didOpen: (popup, container) => {
+            void container.offsetHeight;
+            popup.style.transition = 'opacity 0.28s cubic-bezier(0.16,1,0.3,1), transform 0.28s cubic-bezier(0.16,1,0.3,1)';
+            popup.style.opacity = '1';
+            popup.style.transform = 'scale(1) translateY(0)';
+            container.style.transition = 'background 0.25s ease';
+            container.style.background = 'rgba(0,0,0,0.42)';
+        },
+        willClose: (popup, container, done) => {
+            popup.style.transition = 'opacity 0.15s ease-in, transform 0.15s ease-in';
+            popup.style.opacity = '0';
+            popup.style.transform = 'scale(0.95) translateY(8px)';
+            container.style.transition = 'background 0.15s ease-in';
+            container.style.background = 'transparent';
+            setTimeout(done, 150);
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('{{ url_for("lock") }}', { method: 'POST' })
+                .then(() => window.location.href = '{{ url_for("login") }}');
+        }
+    });
+}
+</script>
+
+<!-- Ana Şifre Değiştirme Modal -->
+<div class="kasa-modal" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                    <i class="fa-solid fa-shield-halved mr-2 text-[#f59e0b]"></i>{{ _('Şifreyi Değiştir') }}
+                </h5>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4 space-y-3">
+                <form id="changePasswordForm">
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5">{{ _('Mevcut Ana Şifre') }}</label>
+                        <input type="password" name="old_password" id="cp-old" required placeholder="••••••••"
+                            class="w-full px-3 py-2.5 kasa-field text-sm">
+                    </div>
+                    <hr class="border-kasa-border my-4">
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5">{{ _('Yeni Ana Şifre') }}</label>
+                        <input type="password" name="new_password" id="cp-new" required placeholder="{{ _('Yeni şifre') }}"
+                            class="w-full px-3 py-2.5 kasa-field text-sm">
+                    </div>
+                    <div class="mb-5">
+                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5">{{ _('Yeni Şifre (Tekrar)') }}</label>
+                        <input type="password" name="confirm_password" id="cp-confirm" required placeholder="{{ _('Tekrar yazın') }}"
+                            class="w-full px-3 py-2.5 kasa-field text-sm">
+                    </div>
+                    <div id="cp-progress" style="display:none;" class="mb-4">
+                        <div class="flex justify-between text-xs text-kasa-text-muted mb-1">
+                            <span>{{ _('Kayıtlar yeniden şifreleniyor…') }}</span>
+                            <span id="cp-pct">0%</span>
+                        </div>
+                        <div class="h-2 rounded-full bg-kasa-border-hi overflow-hidden">
+                            <div id="cp-bar" class="h-full rounded-full bg-gradient-to-r from-[#7c6ff7] to-[#4f91ff] transition-all duration-200" style="width:0%;"></div>
+                        </div>
+                    </div>
+                    <button type="submit" id="cp-submit"
+                        class="w-full kasa-btn kasa-btn-primary">
+                        {{ _('Şifreyi Güncelle ve Re-encrypt Et') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toplu Kategori Değiştir Modal -->
+<div class="kasa-modal" id="bulkCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                    <i class="fa-solid fa-tag mr-2" style="color:#7c6ff7;"></i>{{ _('Kategori Değiştir') }}
+                </h5>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-sm text-kasa-text-muted mb-3"><span id="bulk-category-count">0</span> {{ _('kaydın kategorisi değiştirilecek.') }}</p>
+                <input type="text" id="bulk-category-input" placeholder="{{ _('Yeni kategori adı…') }}"
+                    class="w-full px-3 py-2.5 kasa-field text-sm">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('İptal') }}</button>
+                <button type="button" class="btn btn-primary btn-sm" id="bulk-category-apply">{{ _('Uygula') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

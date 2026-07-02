@@ -1,0 +1,2 @@
+.toastify{position:fixed;z-index:2200;max-width:min(360px,calc(100vw - 32px));padding:.75rem 1rem;border-radius:.75rem;box-shadow:0 12px 30px rgba(0,0,0,.24);font-size:.875rem}
+.toastify.on{opacity:1;transform:translateY(0)}

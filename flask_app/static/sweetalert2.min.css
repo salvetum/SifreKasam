@@ -1,0 +1,8 @@
+.swal2-container{position:fixed;inset:0;z-index:2100;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:rgba(0,0,0,.42)}
+.swal2-popup{width:min(30rem,calc(100vw - 2rem));box-sizing:border-box;padding:1.5rem;text-align:center}
+.swal2-icon{display:inline-flex;align-items:center;justify-content:center;width:3.25rem;height:3.25rem;margin:0 auto 1rem;border:2px solid currentColor;border-radius:999px;font-weight:700}
+.swal2-icon.swal2-warning::before{content:"!";font-size:1.7rem;line-height:1}
+.swal2-title{margin:0 0 .5rem;font-size:1.25rem;font-weight:700}
+.swal2-html-container{margin:0;color:inherit}
+.swal2-actions{display:flex;justify-content:center;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap}
+.swal2-container button{font:inherit}

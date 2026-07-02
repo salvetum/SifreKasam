@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="{{ CURRENT_LANG|default('tr') }}" class="dark" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        window.LANG = "{{ CURRENT_LANG }}";
+        window.TRANSLATIONS = {{ TRANSLATIONS_JSON|safe }};
+        window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson|safe }};
+        window._ = function (key) {
+            return window.TRANSLATIONS[key] || key;
+        };
+
+        const storedTheme = localStorage.getItem('kasa-theme') || "{{ SAVED_THEME }}";
+        if (storedTheme === 'light') {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-bs-theme', 'light');
+        } else {
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+        }
+        localStorage.setItem('kasa-theme', storedTheme === 'light' ? 'light' : 'dark');
+
+        const storedGlassEffects = localStorage.getItem('kasa-glass-effects') || "{{ 'on' if GLASS_EFFECTS_ENABLED else 'off' }}";
+        const normalizedGlassEffects = storedGlassEffects === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-glass-effects', normalizedGlassEffects);
+        localStorage.setItem('kasa-glass-effects', normalizedGlassEffects);
+
+        const storedMotion = localStorage.getItem('kasa-animated-backgrounds') || "{{ 'on' if ANIMATED_BACKGROUNDS_ENABLED else 'off' }}";
+        const normalizedMotion = storedMotion === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-kasa-motion', normalizedMotion);
+        localStorage.setItem('kasa-animated-backgrounds', normalizedMotion);
+
+        const storedGradients = localStorage.getItem('kasa-gradients') || "{{ 'on' if GRADIENTS_ENABLED else 'off' }}";
+        const normalizedGradients = storedGradients === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-kasa-gradient', normalizedGradients);
+        localStorage.setItem('kasa-gradients', normalizedGradients);
+
+        const normalizeHexColor = function (value, fallback) {
+            const raw = String(value || '').trim();
+            const hex = raw.startsWith('#') ? raw : '#' + raw;
+            return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : fallback;
+        };
+        const hexToRgb = function (hex) {
+            const clean = normalizeHexColor(hex, '#7c6ff7').slice(1);
+            return [
+                parseInt(clean.slice(0, 2), 16),
+                parseInt(clean.slice(2, 4), 16),
+                parseInt(clean.slice(4, 6), 16),
+            ].join(', ');
+        };
+        const mixColor = function (hex, targetHex, amount) {
+            const a = normalizeHexColor(hex, '#7c6ff7').slice(1);
+            const b = normalizeHexColor(targetHex, '#38bdf8').slice(1);
+            const channel = function (start, end) {
+                return Math.round(start + (end - start) * amount).toString(16).padStart(2, '0');
+            };
+            return '#' + channel(parseInt(a.slice(0, 2), 16), parseInt(b.slice(0, 2), 16))
+                + channel(parseInt(a.slice(2, 4), 16), parseInt(b.slice(2, 4), 16))
+                + channel(parseInt(a.slice(4, 6), 16), parseInt(b.slice(4, 6), 16));
+        };
+        const applyKasaAppearance = function (accent, background) {
+            const normalizedAccent = normalizeHexColor(accent, "{{ ACCENT_COLOR|default('#7c6ff7') }}");
+            const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain'].includes(background) ? background : "{{ BACKGROUND_STYLE|default('aurora') }}";
+            const accent2 = mixColor(normalizedAccent, '#38bdf8', 0.45);
+            document.documentElement.style.setProperty('--accent', normalizedAccent);
+            document.documentElement.style.setProperty('--accent-2', accent2);
+            document.documentElement.style.setProperty('--accent-rgb', hexToRgb(normalizedAccent));
+            document.documentElement.style.setProperty('--accent-2-rgb', hexToRgb(accent2));
+            document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
+            localStorage.setItem('kasa-accent', normalizedAccent);
+            localStorage.setItem('kasa-background', normalizedBackground);
+            window.KASA_APPEARANCE = { accent: normalizedAccent, background: normalizedBackground };
+        };
+        applyKasaAppearance(
+            localStorage.getItem('kasa-accent') || "{{ ACCENT_COLOR|default('#7c6ff7') }}",
+            localStorage.getItem('kasa-background') || "{{ BACKGROUND_STYLE|default('aurora') }}"
+        );
+
+        const entryParams = new URLSearchParams(window.location.search);
+        const skipFirstFade = entryParams.get('entry') === 'loading' || entryParams.get('skipFade') === '1';
+        if (!sessionStorage.getItem('kasa-loaded')) {
+            sessionStorage.setItem('kasa-loaded', '1');
+            if (!skipFirstFade) {
+                document.documentElement.classList.add('kasa-first-load');
+            }
+        }
+    </script>
+    <style>
+        html.kasa-first-load { opacity: 0; }
+        html.kasa-first-load-enter {
+            opacity: 1;
+            transition: opacity 0.25s ease;
+        }
+    </style>
+    <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
+
+    <!-- Meta Tags -->
+    <meta name="description" content="ŞifreKasam v2.2 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="theme-color" content="#080912">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ŞifreKasam">
+    <link rel="manifest" href="{{ url_for('manifest_json') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.svg') }}">
+
+    <!-- Local utility CSS (offline Tailwind subset) -->
+    <link href="{{ url_for('static', filename='tailwind-lite.css') }}?v=1.2" rel="stylesheet">
+
+    <!-- Font Awesome (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='all.min.css') }}">
+
+    <!-- Local UI libraries -->
+    <link href="{{ url_for('static', filename='sweetalert2.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='toastify.min.css') }}" rel="stylesheet">
+
+    <!-- Bootstrap kept for backward compat (Accordion, Collapse toggles in saglik.html) -->
+    <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
+
+    <!-- Our Custom CSS -->
+    <link href="{{ url_for('static', filename='style.css') }}?v=26" rel="stylesheet">
+</head>
+<body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
+
+    <!-- 3. Animasyonlu Blob (opsiyonel) -->
+    <div class="blob-accent" aria-hidden="true"></div>
+
+    <div class="page-loading-overlay" aria-live="polite" aria-hidden="true">
+        <div class="page-loading-card">
+            <div class="page-loading-mark"><i class="fa-solid fa-lock"></i></div>
+            <div>
+                <div class="page-loading-title">Yükleniyor</div>
+                <div class="page-loading-subtitle">Sayfa hazırlanıyor</div>
+            </div>
+            <div class="page-loading-track"><div></div></div>
+        </div>
+    </div>
+
+    <div class="{% block page_shell_class %}max-w-6xl mx-auto px-4 py-10{% endblock %}">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- JS Libraries -->
+    <script src="{{ url_for('static', filename='sweetalert2.all.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='toastify.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='chart.umd.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='zxcvbn.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}" defer></script>
+
+    <!-- Our Custom Scripts -->
+    <script src="{{ url_for('static', filename='app.js') }}?v=6.8" defer></script>
+
+    <!-- First-load fade-in tetikleyici -->
+    <script>
+        if (document.documentElement.classList.contains('kasa-first-load')) {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    document.documentElement.classList.add('kasa-first-load-enter');
+                });
+            });
+        }
+    </script>
+
+    <!-- Auto-lock Script -->
+    <script>
+        {% if AUTO_LOCK_ENABLED %}
+        let idleTime = 0;
+        const lockThreshold = {{ AUTO_LOCK_TIMEOUT }};
+        function timerIncrement() {
+            idleTime++;
+            if (idleTime >= lockThreshold) {
+                fetch('{{ url_for("lock") }}', { method: 'POST' })
+                .then(() => { window.location.href = '{{ url_for("login") }}'; })
+                .catch(() => { window.location.href = '{{ url_for("login") }}'; });
+            }
+        }
+        let idleInterval = setInterval(timerIncrement, 60000);
+        function resetTimer() { idleTime = 0; }
+        ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(
+            event => document.addEventListener(event, resetTimer, true)
+        );
+        {% endif %}
+    </script>
+
+    <!-- Kısayol: Ctrl+L ile kilit -->
+    <script>
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                e.preventDefault();
+                if (window.location.pathname !== '{{ url_for("login") }}') {
+                    fetch('{{ url_for("lock") }}', { method: 'POST' })
+                    .then(function () { window.location.href = '{{ url_for("login") }}'; })
+                    .catch(function () { window.location.href = '{{ url_for("login") }}'; });
+                }
+            }
+        });
+    </script>
+
+    <!-- Mouse4/Mouse5 (ileri/geri) tuşlarında loading -->
+    <script>
+        document.addEventListener('auxclick', function (e) {
+            if (e.button === 3 || e.button === 4) {
+                e.preventDefault();
+                document.body.classList.add('is-page-loading');
+            }
+        });
+    </script>
+
+    <!-- Mobil geri tuşu loading loop fix -->
+    <script>
+        window.addEventListener('pageshow', function (e) {
+            if (e.persisted) document.body.classList.remove('is-page-loading');
+        });
+        window.addEventListener('popstate', function () {
+            document.body.classList.remove('is-page-loading');
+        });
+    </script>
+
+    <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
+    <script>
+        if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
+            var swUrl = '{{ url_for("sw") }}?v=assets-v25';
+            navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
+        }
+    </script>
+</body>
+</html>
