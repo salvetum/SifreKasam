@@ -32,9 +32,10 @@ Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 
 - Login ekranındaki ve yükleme ekranındaki görsel hatalar
 
-## Eklenecek şeyler
+## Eklenecek / Değişecek şeyler
 
 - Herhangi bir filte uygulandığında eğer bir kayıt yoksa hiç bir şey bulunamadı yazısı
+- HTML, CSS, JS ve PYTHON kodu optimize (ölü kod, tekrar eden kod, performans sorunları, güvenlik sorunları) edilecek
 
 ## Geliştirme
 
