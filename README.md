@@ -34,7 +34,7 @@ Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 
 ## Eklenecek şeyler
 
-- Herhangibi bir filte uygulandığında eğer bir kayıt yoksa hiç bir şey bulunamadı yazısı
+- Herhangi bir filte uygulandığında eğer bir kayıt yoksa hiç bir şey bulunamadı yazısı
 
 ## Geliştirme
 
