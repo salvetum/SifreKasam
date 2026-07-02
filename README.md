@@ -24,6 +24,16 @@ Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 - LAN erişimi geliştirme/kolay bağlantı amaçlıdır ve güvenlik riski taşır. Güvenmediğiniz ağlarda kapalı tutun.
 - Repo’ya gerçek veritabanı, yedek, sertifika, anahtar veya kişisel kayıt dosyası yüklemeyin.
 
+## Bilinen hatalar
+
+1 - Kopyalama logosuna basıldıktan sonra gelen tik simgesinin gitmemesi.
+2 - Dışa aktarma sonucu yükleme ekranında takılı kalma 
+3 - Login ekranındaki ve yükleme ekranındaki görsel hatalar
+
+## Eklenecek şeyler
+
+- Herhangibi bir filte uygulandığında eğer bir kayıt yoksa hiç bir şey bulunamadı yazısı
+
 ## Geliştirme
 
 Gereksinimler:
