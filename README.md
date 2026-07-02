@@ -26,11 +26,11 @@ Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 
 ## Bilinen hatalar
 
-1 - Kopyalama logosuna basıldıktan sonra gelen tik simgesinin gitmemesi.
+- Kopyalama logosuna basıldıktan sonra gelen tik simgesinin gitmemesi.
 
-2 - Dışa aktarma sonucu yükleme ekranında takılı kalma 
+- Dışa aktarma sonucu yükleme ekranında takılı kalma 
 
-3 - Login ekranındaki ve yükleme ekranındaki görsel hatalar
+- Login ekranındaki ve yükleme ekranındaki görsel hatalar
 
 ## Eklenecek şeyler
 
