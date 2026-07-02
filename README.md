@@ -1,7 +1,10 @@
 # ŞifreKasam
 
 ŞifreKasam, yerel çalışan masaüstü şifre yöneticisidir. Veriler cihazda tutulur, ana şifreyle şifrelenir ve uygulama Electron + Flask tabanlı bir masaüstü paket olarak çalışır.
-vibecoding ile yapılmıştır.
+vibecoding ile yapılmıştır (ki projenin ilk amacı buydu).
+
+⚠️⚠️⚠️ NOT ⚠️⚠️⚠️
+Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 
 ## Özellikler
 
