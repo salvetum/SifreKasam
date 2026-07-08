@@ -8,7 +8,7 @@
         <div class="vault-form-title-wrap">
             <span class="vault-form-icon"><i class="fa-solid fa-vault"></i></span>
             <div>
-                <h1 class="kasa-page-title">{{ title }}</h1>
+                <h1 id="vault-form-title" class="kasa-page-title">{{ title }}</h1>
                 <p>{{ _('Kayıt bilgilerini düzenleyin ve güvenli kasaya kaydedin.') }}</p>
             </div>
         </div>
@@ -17,12 +17,12 @@
         </a>
     </header>
 
-    <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form>
-        <section class="vault-form-panel vault-form-main">
+    <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form aria-labelledby="vault-form-title">
+        <section class="vault-form-panel vault-form-main" aria-labelledby="vault-section-basic">
             <div class="vault-section-head">
                 <span><i class="fa-solid fa-layer-group"></i></span>
                 <div>
-                    <h2>{{ _('Temel Bilgiler') }}</h2>
+                    <h2 id="vault-section-basic">{{ _('Temel Bilgiler') }}</h2>
                     <p>{{ _('Kayıt türü, kategori ve başlık alanları.') }}</p>
                 </div>
             </div>
@@ -62,11 +62,11 @@
             </div>
         </section>
 
-        <section class="vault-form-panel vault-form-access" id="login_password_row">
+        <section class="vault-form-panel vault-form-access" id="login_password_row" aria-labelledby="vault-section-access">
             <div class="vault-section-head">
                 <span><i class="fa-solid fa-key"></i></span>
                 <div>
-                    <h2>{{ _('Giriş Bilgileri') }}</h2>
+                    <h2 id="vault-section-access">{{ _('Giriş Bilgileri') }}</h2>
                     <p>{{ _('Kullanıcı adı ve şifre alanları.') }}</p>
                 </div>
             </div>
@@ -86,6 +86,7 @@
                             value="{{ kayit.full_data.Password if kayit }}"
                             class="kasa-field vault-password-input">
                         <button type="button" id="page-generate-btn" title="{{ _('Şifre Üretici') }}"
+                            aria-label="{{ _('Şifre Üretici') }}" aria-controls="pageGenerator" aria-expanded="false"
                             class="kasa-btn kasa-btn-icon generator-copy-btn">
                             <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
                         </button>
@@ -115,13 +116,14 @@
                         <span class="text-kasa-text-muted">{{ _('Uzunluk') }}</span>
                         <span id="page-length-display" class="font-bold text-kasa-text">16</span>
                     </div>
+                    <label class="visually-hidden" for="page-length">{{ _('Şifre Uzunluğu') }}</label>
                     <input type="range" class="w-full" min="8" max="32" value="16" id="page-length">
                 </div>
                 <div class="page-generator-options generator-checkboxes">
-                    <label><input type="checkbox" id="page-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük') }}</label>
-                    <label><input type="checkbox" id="page-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük') }}</label>
-                    <label><input type="checkbox" id="page-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}</label>
-                    <label><input type="checkbox" id="page-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}</label>
+                    <label for="page-include-uppercase"><input type="checkbox" id="page-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük') }}</label>
+                    <label for="page-include-lowercase"><input type="checkbox" id="page-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük') }}</label>
+                    <label for="page-include-numbers"><input type="checkbox" id="page-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}</label>
+                    <label for="page-include-symbols"><input type="checkbox" id="page-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}</label>
                 </div>
                 <button type="button" id="page-gen-now" class="page-generator-action kasa-btn kasa-btn-primary">
                     <i class="fa-solid fa-rotate mr-2"></i>{{ _('Yeni Şifre Oluştur') }}
@@ -129,11 +131,11 @@
             </div>
         </section>
 
-        <section class="vault-form-panel vault-form-notes">
+        <section class="vault-form-panel vault-form-notes" aria-labelledby="vault-section-notes">
             <div class="vault-section-head">
                 <span><i class="fa-solid fa-note-sticky"></i></span>
                 <div>
-                    <h2>{{ _('Notlar') }}</h2>
+                    <h2 id="vault-section-notes">{{ _('Notlar') }}</h2>
                     <p>{{ _('Ek açıklamalar ve hatırlatıcı bilgiler.') }}</p>
                 </div>
             </div>
@@ -146,11 +148,11 @@
         </section>
 
         <aside class="vault-form-side">
-            <section class="vault-form-panel vault-form-expiry">
+            <section class="vault-form-panel vault-form-expiry" aria-labelledby="vault-section-expiry">
                 <div class="vault-section-head">
                     <span><i class="fa-regular fa-calendar"></i></span>
                     <div>
-                        <h2>{{ _('Süre') }}</h2>
+                        <h2 id="vault-section-expiry">{{ _('Süre') }}</h2>
                         <p>{{ _('Opsiyonel son kullanma tarihi.') }}</p>
                     </div>
                 </div>
@@ -159,8 +161,8 @@
                     <label for="expiry_date">{{ _('Son Kullanma Tarihi') }}</label>
                     <input type="date" name="expiry_date" id="expiry_date"
                         value="{{ kayit.full_data.expiry_date if kayit and kayit.full_data.expiry_date }}"
-                        class="kasa-field">
-                    <p class="vault-help">{{ _('Tarih geçtiğinde kayıt süresi dolmuş olarak işaretlenir.') }}</p>
+                        class="kasa-field" aria-describedby="expiry-help">
+                    <p class="vault-help" id="expiry-help">{{ _('Tarih geçtiğinde kayıt süresi dolmuş olarak işaretlenir.') }}</p>
                 </div>
             </section>
 

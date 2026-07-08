@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.2 - Main JavaScript
+ * ŞifreKasam v2.3 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,11 +9,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const glassEffectsEnabled = () =>
     document.documentElement.getAttribute('data-glass-effects') !== 'off';
 
-  const apiFetch = (path, opts = {}) =>
-    fetch(path, {
-      ...opts,
-      headers: { ...opts.headers },
-    }).catch(() => {});
+  const apiFetch = async (path, opts = {}) => {
+    try {
+      return await fetch(path, {
+        ...opts,
+        credentials: 'same-origin',
+        headers: { ...opts.headers },
+      });
+    } catch (err) {
+      console.error('API request failed:', err);
+      return null;
+    }
+  };
+
+  const apiJson = async (path, opts = {}) => {
+    const response = await apiFetch(path, opts);
+    if (!response?.ok) throw new Error(`request-failed:${path}`);
+    return response.json();
+  };
 
   const apiPost = (path, body) =>
     apiFetch(path, {
@@ -21,6 +34,33 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+
+  const createIcon = (className) => {
+    const icon = document.createElement('i');
+    icon.className = className;
+    return icon;
+  };
+
+  const createIconButton = (title, iconClass, className = 'card-icon-btn') => {
+    const button = Object.assign(document.createElement('button'), {
+      type: 'button',
+      title,
+      className,
+    });
+    button.setAttribute('aria-label', title);
+    button.appendChild(createIcon(iconClass));
+    return button;
+  };
+
+  const createStatusNode = (message, className = 'p-3 text-center text-body-secondary', iconClass = '') => {
+    const wrapper = document.createElement('div');
+    wrapper.className = className;
+    if (iconClass) {
+      wrapper.append(createIcon(iconClass), ' ');
+    }
+    wrapper.append(document.createTextNode(message));
+    return wrapper;
+  };
 
   const normalizeHexColor = (value, fallback = '#7c6ff7') => {
     const raw = String(value || '').trim();
@@ -84,30 +124,44 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeFeatureEnabled = (attribute) =>
     document.documentElement.getAttribute(attribute) !== 'off';
 
+  const pageLoadingOverlay = document.querySelector('.page-loading-overlay');
+  const setPageLoading = (isLoading) => {
+    document.body.classList.toggle('is-page-loading', isLoading);
+    pageLoadingOverlay?.setAttribute('aria-hidden', String(!isLoading));
+  };
+
   // ─── 1. HEARTBEAT ─────────────────────────────────────────────────────────
 
   const sendHeartbeat = () => apiFetch('/heartbeat', { method: 'POST' });
   sendHeartbeat();
-  setInterval(sendHeartbeat, 5000);
+  const heartbeatTimer = setInterval(sendHeartbeat, 5000);
+  window.addEventListener('pagehide', () => clearInterval(heartbeatTimer), { once: true });
 
   // ─── 2. SAYFA GEÇİŞ OVERLAY ───────────────────────────────────────────────
 
   document.querySelectorAll('[data-loading-form]').forEach(form => {
     form.addEventListener('submit', () => {
-      document.body.classList.add('is-page-loading');
+      setPageLoading(true);
       form.querySelectorAll('button, input, select, textarea')
           .forEach(el => el.setAttribute('aria-disabled', 'true'));
     });
   });
 
   document.addEventListener('click', (e) => {
-    const href = e.target.closest('a')?.getAttribute('href');
+    if (!(e.target instanceof Element)) return;
+    const link = e.target.closest('a');
+    const href = link?.getAttribute('href');
     if (!href) return;
+    const isDownload = link.hasAttribute('download')
+      || link.target === '_blank'
+      || link.hasAttribute('data-no-loading')
+      || href.startsWith('blob:')
+      || href.includes('/export');
     const isInternal = href !== '#'
       && !href.startsWith('javascript:')
       && !href.startsWith('http')
-      && !e.target.closest('[data-no-loading]');
-    if (isInternal) document.body.classList.add('is-page-loading');
+      && !isDownload;
+    if (isInternal) setPageLoading(true);
   });
 
   // ─── 3. TEMA & EFEKT TOGGLE'LARI ──────────────────────────────────────────
@@ -214,13 +268,14 @@ document.addEventListener('DOMContentLoaded', () => {
       appearancePreview.dataset.previewBackground = background;
     }
     backgroundButtons.forEach(btn => {
-      btn.classList.toggle('is-active', btn.dataset.backgroundOption === background);
+      const isActive = btn.dataset.backgroundOption === background;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
     });
     accentPresetButtons.forEach(btn => {
-      btn.classList.toggle(
-        'is-active',
-        normalizeHexColor(btn.dataset.accentPreset) === normalizeHexColor(accent)
-      );
+      const isActive = normalizeHexColor(btn.dataset.accentPreset) === normalizeHexColor(accent);
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
     });
   };
 
@@ -272,21 +327,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const lanInfoBox = document.getElementById('lan-info-box');
   const lanAddress = document.getElementById('lan-address');
 
-  function fetchLanInfo() {
+  async function fetchLanInfo() {
     if (!lanAddress) return;
     lanAddress.textContent = window._('Yükleniyor...');
-    fetch('/api/lan-info')
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.ips && data.ips.length > 0) {
-          lanAddress.textContent = (data.ssl ? 'https://' : 'http://') + data.ips[0] + ':' + data.port;
-        } else {
-          lanAddress.textContent = window._('Ağ bağlantısı bulunamadı');
-        }
-      })
-      .catch(function () {
-        lanAddress.textContent = window._('Bilgi alınamadı');
-      });
+    try {
+      const data = await apiJson('/api/lan-info');
+      if (Array.isArray(data.ips) && data.ips.length > 0) {
+        lanAddress.textContent = `${data.ssl ? 'https://' : 'http://'}${data.ips[0]}:${data.port}`;
+        return;
+      }
+      lanAddress.textContent = window._('Ağ bağlantısı bulunamadı');
+    } catch {
+      lanAddress.textContent = window._('Bilgi alınamadı');
+    }
   }
 
   if (lanToggle && lanInfoBox) {
@@ -362,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let settingsFormSnapshot = getSettingsSnapshot();
 
-    settingsForm.addEventListener('submit', (event) => {
+    settingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const nextSnapshot = getSettingsSnapshot();
       if (nextSnapshot === settingsFormSnapshot) {
@@ -371,58 +424,52 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const submitButton = settingsForm.querySelector('button[type="submit"]');
-      document.body.classList.add('is-page-loading');
+      setPageLoading(true);
       submitButton?.setAttribute('aria-disabled', 'true');
       if (submitButton) submitButton.disabled = true;
       clearTimeout(appearanceSaveTimer);
 
-      fetch(settingsForm.action, {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: new FormData(settingsForm),
-      })
-        .then((response) => {
-          if (!response.ok) throw new Error('settings-save-failed');
-          return response.json();
-        })
-        .then((data) => {
-          if (data.accent_color || data.background_style) {
-            updateAppearance(
-              data.accent_color || accentInput?.value,
-              data.background_style || backgroundSelect?.value,
-              false
-            );
-          }
-          if (typeof data.glass_effects_enabled === 'boolean' && glassToggle) {
-            glassToggle.checked = data.glass_effects_enabled;
-            const value = data.glass_effects_enabled ? 'on' : 'off';
-            document.documentElement.setAttribute('data-glass-effects', value);
-            localStorage.setItem('kasa-glass-effects', value);
-          }
-          if (typeof data.animated_backgrounds_enabled === 'boolean' && motionToggle) {
-            motionToggle.checked = data.animated_backgrounds_enabled;
-            applyThemeFeature('data-kasa-motion', 'kasa-animated-backgrounds', data.animated_backgrounds_enabled);
-          }
-          if (typeof data.gradients_enabled === 'boolean' && gradientsToggle) {
-            gradientsToggle.checked = data.gradients_enabled;
-            applyThemeFeature('data-kasa-gradient', 'kasa-gradients', data.gradients_enabled);
-          }
-          if (typeof data.lan_enabled === 'boolean' && lanToggle && lanInfoBox) {
-            lanToggle.checked = data.lan_enabled;
-            lanInfoBox.classList.toggle('hidden', !data.lan_enabled);
-            if (data.lan_enabled) setTimeout(fetchLanInfo, 1200);
-          }
-          settingsFormSnapshot = getSettingsSnapshot();
-          showSuccessToast(window._('Ayarlar kaydedildi.'));
-        })
-        .catch(() => {
-          showWarningToast(window._('Ayarlar kaydedilemedi.'));
-        })
-        .finally(() => {
-          document.body.classList.remove('is-page-loading');
-          submitButton?.removeAttribute('aria-disabled');
-          if (submitButton) submitButton.disabled = false;
+      try {
+        const data = await apiJson(settingsForm.action, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: new FormData(settingsForm),
         });
+        if (data.accent_color || data.background_style) {
+          updateAppearance(
+            data.accent_color || accentInput?.value,
+            data.background_style || backgroundSelect?.value,
+            false
+          );
+        }
+        if (typeof data.glass_effects_enabled === 'boolean' && glassToggle) {
+          glassToggle.checked = data.glass_effects_enabled;
+          const value = data.glass_effects_enabled ? 'on' : 'off';
+          document.documentElement.setAttribute('data-glass-effects', value);
+          localStorage.setItem('kasa-glass-effects', value);
+        }
+        if (typeof data.animated_backgrounds_enabled === 'boolean' && motionToggle) {
+          motionToggle.checked = data.animated_backgrounds_enabled;
+          applyThemeFeature('data-kasa-motion', 'kasa-animated-backgrounds', data.animated_backgrounds_enabled);
+        }
+        if (typeof data.gradients_enabled === 'boolean' && gradientsToggle) {
+          gradientsToggle.checked = data.gradients_enabled;
+          applyThemeFeature('data-kasa-gradient', 'kasa-gradients', data.gradients_enabled);
+        }
+        if (typeof data.lan_enabled === 'boolean' && lanToggle && lanInfoBox) {
+          lanToggle.checked = data.lan_enabled;
+          lanInfoBox.classList.toggle('hidden', !data.lan_enabled);
+          if (data.lan_enabled) setTimeout(fetchLanInfo, 1200);
+        }
+        settingsFormSnapshot = getSettingsSnapshot();
+        showSuccessToast(window._('Ayarlar kaydedildi.'));
+      } catch {
+        showWarningToast(window._('Ayarlar kaydedilemedi.'));
+      } finally {
+        setPageLoading(false);
+        submitButton?.removeAttribute('aria-disabled');
+        if (submitButton) submitButton.disabled = false;
+      }
     });
   }
 
@@ -442,15 +489,28 @@ document.addEventListener('DOMContentLoaded', () => {
       iconEl.classList.remove('copy-flash');
       delete iconEl.dataset.copyTimer;
       delete iconEl.dataset.originalClass;
-    }, 1200));
+    }, 650));
   };
 
   const copyToClipboard = async (text, iconEl) => {
     try {
-      await navigator.clipboard.writeText(text);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = Object.assign(document.createElement('textarea'), {
+          value: text,
+          readOnly: true,
+        });
+        textarea.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      }
       flashCopyIcon(iconEl);
     } catch (err) {
       console.error('Copy failed:', err);
+      showWarningToast(window._('Kopyalama başarısız oldu.'));
     }
   };
 
@@ -460,10 +520,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const field = row?.querySelector('.password-field');
     const recordId = field?.dataset.id;
     if (!recordId) return '';
-    const response = await apiFetch(`/api/record/${encodeURIComponent(recordId)}/password`);
-    if (!response || !response.ok) return '';
-    const data = await response.json();
-    return data.password || '';
+    try {
+      const data = await apiJson(`/api/record/${encodeURIComponent(recordId)}/password`);
+      return data.password || '';
+    } catch {
+      return '';
+    }
   };
 
   document.querySelectorAll('.copy-password').forEach(btn => {
@@ -503,6 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.style.overflow = 'hidden';
     modal.classList.remove('is-closing', 'is-open');
     modal.classList.add('is-visible');
+    modal.setAttribute('aria-hidden', 'false');
     requestAnimationFrame(() => modal.classList.add('is-open'));
   };
 
@@ -513,6 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.classList.add('is-closing');
     setTimeout(() => {
       modal.classList.remove('is-visible', 'is-closing');
+      modal.setAttribute('aria-hidden', 'true');
       if (!document.querySelector('.kasa-modal.is-visible'))
         document.body.style.overflow = '';
     }, 180);
@@ -725,7 +789,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const getGeneratorHistory = () => {
     try {
-      return JSON.parse(sessionStorage.getItem(GENERATOR_HISTORY_KEY) || '[]');
+      const parsed = JSON.parse(sessionStorage.getItem(GENERATOR_HISTORY_KEY) || '[]');
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter(item => item && typeof item.password === 'string')
+        .map(item => ({
+          password: item.password,
+          date: item.date || new Date().toISOString(),
+          length: Number.isFinite(Number(item.length)) ? Number(item.length) : item.password.length,
+        }));
     } catch { return []; }
   };
 
@@ -758,7 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (empty) empty.style.display = history.length ? 'none' : 'block';
     if (clearBtn) clearBtn.style.display = history.length ? 'inline-flex' : 'none';
 
-    list.innerHTML = '';
+    list.replaceChildren();
     history.forEach((item, index) => {
       const dateStr = new Date(item.date).toLocaleString('tr-TR', {
         day: '2-digit', month: '2-digit', year: 'numeric',
@@ -779,29 +851,29 @@ document.addEventListener('DOMContentLoaded', () => {
         value: item.password,
       });
 
-      const showBtn = document.createElement('button');
-      showBtn.type = 'button';
-      showBtn.className = 'gen-history-icon-btn';
-      showBtn.title = window._('Göster/Gizle');
-      showBtn.innerHTML = '<i class="fa-solid fa-eye"></i>';
+      const showBtn = createIconButton(
+        window._('Göster/Gizle'),
+        'fa-solid fa-eye',
+        'gen-history-icon-btn'
+      );
       showBtn.addEventListener('click', () => {
         const hidden = pwInput.type === 'password';
         pwInput.type = hidden ? 'text' : 'password';
         showBtn.querySelector('i').className = hidden ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
       });
 
-      const copyBtn = document.createElement('button');
-      copyBtn.type = 'button';
-      copyBtn.className = 'gen-history-icon-btn';
-      copyBtn.title = window._('Kopyala');
-      copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i>';
+      const copyBtn = createIconButton(
+        window._('Kopyala'),
+        'fa-solid fa-copy',
+        'gen-history-icon-btn'
+      );
       copyBtn.addEventListener('click', () => copyToClipboard(item.password, copyBtn.querySelector('i')));
 
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'gen-history-icon-btn gen-history-del-btn';
-      delBtn.title = window._('Sil');
-      delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+      const delBtn = createIconButton(
+        window._('Sil'),
+        'fa-solid fa-trash-can',
+        'gen-history-icon-btn gen-history-del-btn'
+      );
       delBtn.addEventListener('click', () => {
         const history = getGeneratorHistory();
         history.splice(index, 1);
@@ -814,7 +886,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const meta = document.createElement('div');
       meta.className = 'gen-history-meta';
-      meta.innerHTML = `<span><i class="fa-regular fa-clock"></i> ${dateStr}</span><span>${item.length} ${window._('karakter')}</span>`;
+      const dateMeta = document.createElement('span');
+      dateMeta.append(createIcon('fa-regular fa-clock'), ` ${dateStr}`);
+      const lengthMeta = document.createElement('span');
+      lengthMeta.textContent = `${item.length} ${window._('karakter')}`;
+      meta.append(dateMeta, lengthMeta);
 
       div.append(info, meta);
       list.appendChild(div);
@@ -827,6 +903,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   document.getElementById('generator-history-clear')?.addEventListener('click', clearGeneratorHistory);
+  document.querySelector('.gen-history-toggle')?.addEventListener('click', (event) => {
+    const button = event.currentTarget;
+    const card = button.closest('.generator-history-card');
+    const collapsed = card?.classList.toggle('gen-history-collapsed') ?? false;
+    button.setAttribute('aria-expanded', String(!collapsed));
+  });
 
   document.querySelector('[data-kasa-modal="passwordGeneratorModal"]')?.addEventListener('click', () => {
     setTimeout(renderGeneratorHistory, 50);
@@ -854,12 +936,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const searchInput   = document.getElementById('search-input');
     const categoryBtns  = document.querySelectorAll('#category-filter button');
-    const cards         = document.querySelectorAll('.card-wrapper');
+    const filterEmptyState = document.getElementById('filter-empty-state');
+    const getCards = () => Array.from(document.querySelectorAll('.card-wrapper'));
 
     const filterCards = () => {
       const term     = searchInput?.value.toLowerCase().trim() || '';
       const activeBtn = document.querySelector('#category-filter button.active');
       const category  = activeBtn?.dataset.filter || 'all';
+      const cards = getCards();
+      let visibleCount = 0;
 
       cards.forEach(wrapper => {
         const matchesSearch   = wrapper.textContent.toLowerCase().includes(term);
@@ -867,8 +952,14 @@ document.addEventListener('DOMContentLoaded', () => {
           category === 'all'       ? true :
           category === 'favorites' ? wrapper.dataset.pinned === 'true' :
                                      wrapper.dataset.type === category;
-        wrapper.style.display = matchesSearch && matchesCategory ? 'block' : 'none';
+        const isVisible = matchesSearch && matchesCategory;
+        wrapper.style.display = isVisible ? 'block' : 'none';
+        if (isVisible) visibleCount += 1;
       });
+
+      if (filterEmptyState) {
+        filterEmptyState.hidden = cards.length === 0 || visibleCount > 0;
+      }
     };
 
     let searchTimeout;
@@ -882,9 +973,11 @@ document.addEventListener('DOMContentLoaded', () => {
         categoryBtns.forEach(b => {
           b.classList.remove('active', 'btn-primary');
           b.classList.add('btn-outline-secondary');
+          b.setAttribute('aria-pressed', 'false');
         });
         btn.classList.remove('btn-outline-secondary');
         btn.classList.add('active', 'btn-primary');
+        btn.setAttribute('aria-pressed', 'true');
         filterCards();
       });
     });
@@ -892,80 +985,75 @@ document.addEventListener('DOMContentLoaded', () => {
     // Geçmiş Modal
     const historyList = document.getElementById('history-list');
     document.querySelectorAll('.history-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         e.preventDefault();
         const kayitId = btn.dataset.id;
         if (!kayitId) return;
 
-        if (historyList)
-          historyList.innerHTML =
-            '<div class="p-3 text-center text-body-secondary">' +
-            '<i class="fa-solid fa-spinner fa-spin me-2"></i>' + window._('Yükleniyor...') + '</div>';
+        if (historyList) {
+          historyList.replaceChildren(
+            createStatusNode(window._('Yükleniyor...'), 'p-3 text-center text-body-secondary', 'fa-solid fa-spinner fa-spin me-2')
+          );
+        }
         kasaModalAc('historyModal');
 
-        apiFetch(`/gecmis/${kayitId}`)
-          .then(r => r.json())
-          .then(data => {
-            if (!historyList) return;
-            if (!data.length) {
-              historyList.innerHTML =
-                '<div class="p-3 text-center text-body-secondary">' + window._('Henüz geçmiş kaydı yok.') + '</div>';
-              return;
-            }
+        try {
+          const data = await apiJson(`/gecmis/${encodeURIComponent(kayitId)}`);
+          if (!historyList) return;
+          if (!Array.isArray(data) || !data.length) {
+            historyList.replaceChildren(
+              createStatusNode(window._('Henüz geçmiş kaydı yok.'))
+            );
+            return;
+          }
 
-            const fragment = document.createDocumentFragment();
-            data.forEach(item => {
-              const div = document.createElement('div');
-              div.className = 'list-group-item bg-transparent text-light border-secondary';
+          const fragment = document.createDocumentFragment();
+          data.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'list-group-item bg-transparent text-light border-secondary';
 
-              const header = document.createElement('div');
-              header.className = 'd-flex justify-content-between align-items-center mb-1';
-              header.innerHTML =
-                `<small class="text-info"><i class="fa-regular fa-clock me-1"></i>${item.date}</small>`;
+            const header = document.createElement('div');
+            header.className = 'd-flex justify-content-between align-items-center mb-1';
+            const time = document.createElement('small');
+            time.className = 'text-info';
+            time.append(createIcon('fa-regular fa-clock me-1'), document.createTextNode(item.date || ''));
+            header.appendChild(time);
 
-              const body  = document.createElement('div');
-              body.className = 'history-secret-row';
+            const body = document.createElement('div');
+            body.className = 'history-secret-row';
 
-              const input = Object.assign(document.createElement('input'), {
-                type: 'password', className: 'history-secret-input',
-                value: item.password, readOnly: true,
-              });
-
-              const makeBtn = (title, iconClass, onClick) => {
-                const b = Object.assign(document.createElement('button'), {
-                  type: 'button', title,
-                  className: 'card-icon-btn',
-                  innerHTML: `<i class="${iconClass}"></i>`,
-                });
-                b.addEventListener('click', onClick);
-                return b;
-              };
-
-              const toggleBtn = makeBtn(window._('Göster/Gizle'), 'fa-solid fa-eye', () => {
-                const hidden = input.type === 'password';
-                input.type = hidden ? 'text' : 'password';
-                toggleBtn.querySelector('i').className =
-                  hidden ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
-              });
-
-              const copyBtn = makeBtn(window._('Kopyala'), 'fa-solid fa-copy', () =>
-                copyToClipboard(item.password, copyBtn.querySelector('i'))
-              );
-              copyBtn.className += ' copy-btn-history';
-
-              body.append(input, toggleBtn, copyBtn);
-              div.append(header, body);
-              fragment.appendChild(div);
+            const input = Object.assign(document.createElement('input'), {
+              type: 'password',
+              className: 'history-secret-input',
+              value: item.password || '',
+              readOnly: true,
             });
 
-            historyList.innerHTML = '';
-            historyList.appendChild(fragment);
-          })
-          .catch(() => {
-            if (historyList)
-              historyList.innerHTML =
-                '<div class="p-3 text-center text-danger">' + window._('Yükleme hatası oluştu.') + '</div>';
+            const toggleBtn = createIconButton(window._('Göster/Gizle'), 'fa-solid fa-eye');
+            toggleBtn.addEventListener('click', () => {
+              const hidden = input.type === 'password';
+              input.type = hidden ? 'text' : 'password';
+              toggleBtn.querySelector('i').className =
+                hidden ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+            });
+
+            const copyBtn = createIconButton(window._('Kopyala'), 'fa-solid fa-copy');
+            copyBtn.addEventListener('click', () => copyToClipboard(input.value, copyBtn.querySelector('i')));
+            copyBtn.classList.add('copy-btn-history');
+
+            body.append(input, toggleBtn, copyBtn);
+            div.append(header, body);
+            fragment.appendChild(div);
           });
+
+          historyList.replaceChildren(fragment);
+        } catch {
+          if (historyList) {
+            historyList.replaceChildren(
+              createStatusNode(window._('Yükleme hatası oluştu.'), 'p-3 text-center text-danger')
+            );
+          }
+        }
       });
     });
 
@@ -1002,9 +1090,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.querySelectorAll('.delete-form').forEach(form => {
-      form.addEventListener('submit', (e) => {
+      form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        Swal.fire({
+        const { isConfirmed } = await Swal.fire({
           ...SWAL_BASE,
           title: window._('Emin misiniz?'),
           text: window._('Bu kayıt tamamen silinecek ve geri alınamaz!'),
@@ -1012,70 +1100,72 @@ document.addEventListener('DOMContentLoaded', () => {
           showCancelButton: true,
           confirmButtonText: window._('Evet, Sil!'),
           cancelButtonText: window._('İptal'),
-        }).then(({ isConfirmed }) => {
-          if (!isConfirmed) return;
-          const wrapper = form.closest('.card-wrapper');
-          if (wrapper) {
-            Object.assign(wrapper.style, {
-              transition: 'all 0.3s ease', transform: 'scale(0.95)', opacity: '0',
-            });
-          }
-          apiFetch(form.action, { method: 'POST' })
-            .then(() => {
-              if (wrapper) setTimeout(() => { wrapper.remove(); filterCards(); }, 300);
-              showToast({
-                ...TOAST_BASE, text: window._('Kayıt başarıyla silindi.'), duration: 2500,
-                style: {
-                  ...TOAST_BASE.style,
-                  background:    'rgba(239, 68, 68, 0.14)',
-                  border:        '1px solid rgba(239, 68, 68, 0.28)',
-                  backdropFilter: glassEffectsEnabled() ? 'blur(14px)' : 'none',
-                  borderRadius:  '12px',
-                  boxShadow:     '0 14px 36px rgba(0,0,0,0.28)',
-                  color:         '#fecaca',
-                },
-              });
-            })
-            .catch(() => {
-              if (wrapper) Object.assign(wrapper.style, { transform: '', opacity: '1' });
-            });
         });
+        if (!isConfirmed) return;
+        const wrapper = form.closest('.card-wrapper');
+        if (wrapper) {
+          Object.assign(wrapper.style, {
+            transition: 'all 0.3s ease', transform: 'scale(0.95)', opacity: '0',
+          });
+        }
+        try {
+          const response = await apiFetch(form.action, { method: 'POST' });
+          if (!response?.ok) throw new Error('delete-failed');
+          if (wrapper) setTimeout(() => { wrapper.remove(); filterCards(); }, 300);
+          showToast({
+            ...TOAST_BASE, text: window._('Kayıt başarıyla silindi.'), duration: 2500,
+            style: {
+              ...TOAST_BASE.style,
+              background:    'rgba(239, 68, 68, 0.14)',
+              border:        '1px solid rgba(239, 68, 68, 0.28)',
+              backdropFilter: glassEffectsEnabled() ? 'blur(14px)' : 'none',
+              borderRadius:  '12px',
+              boxShadow:     '0 14px 36px rgba(0,0,0,0.28)',
+              color:         '#fecaca',
+            },
+          });
+        } catch {
+          if (wrapper) Object.assign(wrapper.style, { transform: '', opacity: '1' });
+          showWarningToast(window._('Silme işlemi başarısız oldu.'));
+        }
       });
     });
 
     // Pin Toggle
     document.querySelectorAll('.pin-form').forEach(form => {
-      form.addEventListener('submit', (e) => {
+      form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const icon = form.querySelector('i');
         if (icon) {
           icon.style.transform = 'scale(1.2)';
           setTimeout(() => { icon.style.transform = 'scale(1)'; }, 200);
         }
-        apiFetch(form.action, { method: 'POST' })
-          .then(() => {
-            const wrapper  = form.closest('.card-wrapper');
-            if (!wrapper || !icon) return;
-            const isPinned = wrapper.dataset.pinned === 'true';
-            wrapper.dataset.pinned = isPinned ? 'false' : 'true';
-            if (isPinned) {
-              icon.className = 'fa-regular fa-star card-star-icon card-star-unpinned';
-              icon.style.color = '';
-            } else {
-              icon.className   = 'fa-solid fa-star card-star-icon';
-              icon.style.color = '#f59e0b';
-            }
-            const activeBtn = document.querySelector('#category-filter button.active');
-            if (activeBtn?.dataset.filter === 'favorites') filterCards();
-          });
+        try {
+          const response = await apiFetch(form.action, { method: 'POST' });
+          if (!response?.ok) throw new Error('pin-failed');
+          const wrapper  = form.closest('.card-wrapper');
+          if (!wrapper || !icon) return;
+          const isPinned = wrapper.dataset.pinned === 'true';
+          wrapper.dataset.pinned = isPinned ? 'false' : 'true';
+          if (isPinned) {
+            icon.className = 'fa-regular fa-star card-star-icon card-star-unpinned';
+            icon.style.color = '';
+          } else {
+            icon.className   = 'fa-solid fa-star card-star-icon';
+            icon.style.color = '#f59e0b';
+          }
+          const activeBtn = document.querySelector('#category-filter button.active');
+          if (activeBtn?.dataset.filter === 'favorites') filterCards();
+        } catch {
+          showWarningToast(window._('İşlem tamamlanamadı.'));
+        }
       });
     });
 
     // Tepsi Ayarı
     const trayToggle = document.getElementById('setting-minimize-to-tray');
     if (trayToggle) {
-      apiFetch('/settings/tray')
-        .then(r => r.json())
+      apiJson('/settings/tray')
         .then(data => { trayToggle.checked = data.minimize_to_tray; })
         .catch(() => {});
 
@@ -1129,6 +1219,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (pageGenerator) {
         pageGenerator.classList.toggle('is-collapsed', Boolean(isVisible));
         pageGenerator.setAttribute('aria-hidden', String(Boolean(isVisible)));
+        generateBtn.setAttribute('aria-expanded', String(!isVisible));
       }
       const icon = generateBtn.querySelector('i');
       if (icon) icon.className = isVisible
@@ -1147,6 +1238,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (pageGenerator) {
         pageGenerator.classList.add('is-collapsed');
         pageGenerator.setAttribute('aria-hidden', 'true');
+        generateBtn?.setAttribute('aria-expanded', 'false');
       }
 
       const genIcon = generateBtn?.querySelector('i');

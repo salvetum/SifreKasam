@@ -8,14 +8,14 @@
     <!-- Üst satır: Başlık + Aksiyonlar -->
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="text-4xl kasa-page-title leading-tight">
+            <h1 id="dashboard-title" class="text-4xl kasa-page-title leading-tight">
                 {{ _('ŞifreKasam') }}
             </h1>
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
             <!-- Toplu Seç -->
-            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}"
+            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
                 class="kasa-btn kasa-btn-muted" style="transition:all 0.2s ease;">
                 <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
             </button>
@@ -26,6 +26,7 @@
             </a>
             <!-- Şifre üretici -->
             <button type="button" data-kasa-modal="passwordGeneratorModal" title="{{ _('Şifre Üret') }}"
+                aria-haspopup="dialog" aria-controls="passwordGeneratorModal"
                 class="kasa-btn kasa-btn-muted">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> {{ _('Üretici') }}
             </button>
@@ -36,6 +37,7 @@
             </button>
             <!-- Ayarlar -->
             <button type="button" data-kasa-modal="settingsModal" title="{{ _('Ayarlar') }}"
+                aria-haspopup="dialog" aria-controls="settingsModal"
                 class="kasa-btn kasa-btn-muted">
                 <i class="fa-solid fa-gear"></i> {{ _('Ayarlar') }}
             </button>
@@ -83,28 +85,29 @@
     <!-- Alt satır: Seçim + Filtre + Arama -->
     <div class="flex flex-wrap justify-between items-center gap-3">
         <div class="flex items-center gap-2 flex-wrap">
-            <label class="flex items-center gap-1.5 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" style="display:none;">
+            <label class="flex items-center gap-1.5 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" for="select-all" style="display:none;">
                 <input type="checkbox" id="select-all" style="width:15px;height:15px;accent-color:#7c6ff7;cursor:pointer;filter:brightness(1.2);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);border-radius:3px;">
                 {{ _('Tümünü seç') }}
             </label>
-            <div class="flex flex-wrap gap-1.5" id="category-filter" role="group">
+            <div class="flex flex-wrap gap-1.5" id="category-filter" role="group" aria-label="{{ _('Kayıt filtreleri') }}">
             <button type="button" data-filter="all"
-                class="filter-btn filter-btn-active">{{ _('Tümü') }}</button>
+                class="filter-btn filter-btn-active active" aria-pressed="true">{{ _('Tümü') }}</button>
             <button type="button" data-filter="favorites"
-                class="filter-btn">⭐ {{ _('Favori') }}</button>
+                class="filter-btn" aria-pressed="false">⭐ {{ _('Favori') }}</button>
             <button type="button" data-filter="Website"
-                class="filter-btn">🌐 {{ _('Web') }}</button>
+                class="filter-btn" aria-pressed="false">🌐 {{ _('Web') }}</button>
             <button type="button" data-filter="Application"
-                class="filter-btn">💻 {{ _('Uygulama') }}</button>
+                class="filter-btn" aria-pressed="false">💻 {{ _('Uygulama') }}</button>
             <button type="button" data-filter="CreditCard"
-                class="filter-btn">💳 {{ _('Kart') }}</button>
+                class="filter-btn" aria-pressed="false">💳 {{ _('Kart') }}</button>
             <button type="button" data-filter="SecureNote"
-                class="filter-btn">📝 {{ _('Not') }}</button>
+                class="filter-btn" aria-pressed="false">📝 {{ _('Not') }}</button>
             <button type="button" data-filter="Other"
-                class="filter-btn">📁 {{ _('Diğer') }}</button>
+                class="filter-btn" aria-pressed="false">📁 {{ _('Diğer') }}</button>
         </div>
         </div>
         <div style="flex:1;min-width:200px;max-width:380px;margin-left:auto;">
+            <label for="search-input" class="visually-hidden">{{ _('Kayıt ara') }}</label>
             <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
                 class="w-full px-3 py-2 kasa-field text-sm">
         </div>
@@ -113,8 +116,8 @@
 </header>
 
 <!-- ── TOPLU İŞLEM ARAÇ ÇUBUĞU ──────────────────────────────── -->
-<div id="bulk-toolbar" class="glass rounded-2xl px-4 py-3 shadow-2xl border border-kasa-border-hi flex items-center gap-3 transition-all duration-300" style="position:fixed; bottom:1.5rem; left:50%; z-index:50; display:none; opacity:0; transform:translateX(-50%) translateY(20px);">
-    <span class="text-sm text-kasa-text-muted whitespace-nowrap"><span id="bulk-count">0</span> {{ _('seçili') }}</span>
+<div id="bulk-toolbar" class="glass rounded-2xl px-4 py-3 shadow-2xl border border-kasa-border-hi flex items-center gap-3 transition-all duration-300" role="toolbar" aria-label="{{ _('Toplu işlem araçları') }}" aria-hidden="true" style="position:fixed; bottom:1.5rem; left:50%; z-index:50; display:none; opacity:0; transform:translateX(-50%) translateY(20px);">
+    <span class="text-sm text-kasa-text-muted whitespace-nowrap" aria-live="polite"><span id="bulk-count">0</span> {{ _('seçili') }}</span>
     <div class="w-px h-6 bg-kasa-border"></div>
     <button type="button" id="bulk-category-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
         <i class="fa-solid fa-tag mr-1"></i>{{ _('Kategori') }}
@@ -125,17 +128,18 @@
     <button type="button" id="bulk-delete-btn" class="kasa-btn kasa-btn-danger text-xs px-3 py-1.5">
         <i class="fa-solid fa-trash-can mr-1"></i>{{ _('Sil') }}
     </button>
-    <button type="button" id="bulk-cancel-btn" class="kasa-close-btn text-sm" title="{{ _('İptal') }}">
+    <button type="button" id="bulk-cancel-btn" class="kasa-close-btn text-sm" title="{{ _('İptal') }}" aria-label="{{ _('İptal') }}">
         <i class="fa-solid fa-xmark"></i>
     </button>
 </div>
 
 <!-- ── KART IZGARASI ─────────────────────────────────────────── -->
-<main>
+<main aria-labelledby="dashboard-title">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="card-container">
 
         {% for kayit in kayit_listesi %}
-        <div class="card-wrapper vault-card card-animated"
+        <article class="card-wrapper vault-card card-animated"
+             aria-labelledby="record-title-{{ kayit.id }}"
              data-type="{{ kayit.full_data.type }}"
              data-pinned="{{ 'true' if kayit.full_data.is_pinned else 'false' }}"
              style="animation-delay: {{ [loop.index0, 8]|min * 18 }}ms;">
@@ -148,8 +152,8 @@
                     <!-- Başlık satırı -->
                     <div class="vault-card-header flex justify-between items-start mb-3">
                         <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
-                            <label class="flex items-center justify-center" style="display:none;width:20px;height:20px;flex-shrink:0;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);cursor:pointer;">
-                                <input type="checkbox" class="select-item" value="{{ kayit.id }}" style="width:14px;height:14px;accent-color:#7c6ff7;cursor:pointer;margin:0;filter:brightness(1.2);">
+                            <label class="flex items-center justify-center" for="select-{{ kayit.id }}" style="display:none;width:20px;height:20px;flex-shrink:0;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);cursor:pointer;">
+                                <input type="checkbox" id="select-{{ kayit.id }}" class="select-item" value="{{ kayit.id }}" style="width:14px;height:14px;accent-color:#7c6ff7;cursor:pointer;margin:0;filter:brightness(1.2);">
                             </label>
                             <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm">
                                 {% if kayit.full_data.type == 'Website' %}🌐
@@ -158,9 +162,9 @@
                                 {% elif kayit.full_data.type == 'SecureNote' %}📝
                                 {% else %}📁{% endif %}
                             </span>
-                             <h5 class="font-display font-semibold text-sm truncate m-0 text-kasa-text">
-                                {{ kayit.normalized.baslik }}
-                            </h5>
+                             <h2 id="record-title-{{ kayit.id }}" class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">
+                                 {{ kayit.normalized.baslik }}
+                            </h2>
                             {% if kayit.full_data.expiry_date %}
                             <span class="expiry-badge" data-expiry="{{ kayit.full_data.expiry_date }}"></span>
                             {% endif %}
@@ -255,7 +259,7 @@
                 </div>
 
             </div>
-        </div>
+        </article>
         {% else %}
 
         <!-- Boş durum -->
@@ -272,18 +276,23 @@
 
         {% endfor %}
     </div>
+    <div id="filter-empty-state" class="filter-empty-state" hidden aria-live="polite">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <strong>{{ _('Hiçbir kayıt bulunamadı.') }}</strong>
+        <span>{{ _('Arama veya filtreyi değiştirerek tekrar deneyin.') }}</span>
+    </div>
 </main>
 
 <!-- ─── MODALLER ─────────────────────────────────────────────── -->
 
 <!-- Şifre Üretici Modal -->
-<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" aria-hidden="true" data-target-input="modal-generated-password-display">
+<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="password-generator-title" data-target-input="modal-generated-password-display">
     <div class="modal-dialog modal-dialog-centered generator-modal-dialog">
         <div class="modal-content generator-modal-content">
             <div class="modal-header">
-                <h5 class="modal-title gradient-text fw-bold" style="font-family:'Sora',sans-serif;">
+                <h2 id="password-generator-title" class="modal-title gradient-text fw-bold" style="font-family:'Sora',sans-serif;">
                     {{ _('Güçlü Şifre Üretici') }}
-                </h5>
+                </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -297,9 +306,9 @@
                         </div>
                         <div class="generator-output-row">
                             <input type="text" class="flex-1 px-3 py-2.5 kasa-field text-sm" id="modal-generated-password-display" readonly
-                                placeholder="{{ _('Şifreniz burada görünecek…') }}" style="font-family:monospace;letter-spacing:0.08em;">
+                                placeholder="{{ _('Şifreniz burada görünecek…') }}" aria-label="{{ _('Oluşturulan Şifre') }}" style="font-family:monospace;letter-spacing:0.08em;">
                             <button class="kasa-btn kasa-btn-icon generator-copy-btn"
-                                    type="button" id="modal-copy-generated-password-btn" title="{{ _('Kopyala') }}">
+                                    type="button" id="modal-copy-generated-password-btn" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}">
                                 <i class="fa-solid fa-copy text-sm"></i>
                             </button>
                         </div>
@@ -320,35 +329,38 @@
                             <small class="text-kasa-text-muted">{{ _('Uzunluk') }}</small>
                             <span id="modal-length-display" class="font-bold text-sm">16</span>
                         </div>
+                        <label class="visually-hidden" for="modal-length">{{ _('Şifre Uzunluğu') }}</label>
                         <input type="range" class="w-full mb-3 accent-[#7c6ff7]" min="8" max="32" value="16" id="modal-length">
 
                         <div class="generator-option-grid generator-checkboxes">
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-uppercase">
                                 <input type="checkbox" id="modal-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük Harf') }}
                             </label>
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-lowercase">
                                 <input type="checkbox" id="modal-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük Harf') }}
                             </label>
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-numbers">
                                 <input type="checkbox" id="modal-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}
                             </label>
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer">
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-symbols">
                                 <input type="checkbox" id="modal-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}
                             </label>
                         </div>
                     </section>
 
                     <section class="gen-history-section generator-history-card">
-                        <div class="gen-history-header" onclick="this.parentElement.classList.toggle('gen-history-collapsed')">
-                            <span><i class="fa-regular fa-clock"></i> {{ _('Geçmiş') }}</span>
+                        <div class="gen-history-header">
+                            <button type="button" class="gen-history-toggle" aria-expanded="true" aria-controls="generator-history-body">
+                                <span><i class="fa-regular fa-clock"></i> {{ _('Geçmiş') }}</span>
+                                <i class="fa-solid fa-chevron-down gen-history-chevron"></i>
+                            </button>
                             <div class="gen-history-header-right">
                                 <button type="button" id="generator-history-clear" class="gen-history-clear-btn" title="{{ _('Temizle') }}" style="display:none;">
                                     <i class="fa-solid fa-trash-can"></i> {{ _('Temizle') }}
                                 </button>
-                                <i class="fa-solid fa-chevron-down gen-history-chevron"></i>
                             </div>
                         </div>
-                        <div class="gen-history-body">
+                        <div id="generator-history-body" class="gen-history-body">
                             <div id="generator-history-empty" class="gen-history-empty">
                                 {{ _('Henüz geçmiş yok.') }}
                             </div>
@@ -369,13 +381,13 @@
 </div>
 
 <!-- İçe Aktar Modal -->
-<div class="kasa-modal" id="importModal" tabindex="-1" aria-hidden="true">
+<div class="kasa-modal" id="importModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="import-modal-title">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                <h2 id="import-modal-title" class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
                     <i class="fa-solid fa-upload mr-2" style="color:#7c6ff7;"></i>{{ _('İçe Aktar') }}
-                </h5>
+                </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -402,19 +414,19 @@
 </div>
 
 <!-- Şifre Geçmişi Modal -->
-<div class="kasa-modal" id="historyModal" tabindex="-1">
+<div class="kasa-modal" id="historyModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="history-modal-title">
     <div class="modal-dialog modal-dialog-centered" style="max-height:80vh;">
         <div class="modal-content">
             <div class="modal-header" style="border-bottom:1px solid var(--border);">
-                <h5 class="modal-title fw-semibold" style="font-size:0.95rem;">
+                <h2 id="history-modal-title" class="modal-title fw-semibold" style="font-size:0.95rem;">
                     <i class="fa-solid fa-clock-rotate-left mr-2 text-[#38bdf8]"></i>{{ _('Şifre Geçmişi') }}
-                </h5>
+                </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
             <div class="modal-body p-0">
-                <div class="list-group list-group-flush" id="history-list"></div>
+                <div class="list-group list-group-flush" id="history-list" aria-live="polite"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('Kapat') }}</button>
@@ -424,125 +436,125 @@
 </div>
 
 <!-- Ayarlar Modal -->
-<div class="kasa-modal" id="settingsModal" tabindex="-1" aria-hidden="true">
+<div class="kasa-modal" id="settingsModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="settings-modal-title">
     <div class="modal-dialog modal-dialog-centered settings-modal-dialog">
         <div class="modal-content settings-modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                <h2 id="settings-modal-title" class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
                     <i class="fa-solid fa-gear mr-2" style="color:#7c6ff7;"></i>{{ _('Ayarlar') }}
-                </h5>
+                </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <form action="{{ url_for('save_settings') }}" method="POST" data-settings-form>
+            <form action="{{ url_for('save_settings') }}" method="POST" data-settings-form aria-labelledby="settings-modal-title">
                 <div class="modal-body p-4 space-y-3 settings-body">
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-palette"></i></span>
                         <div>
-                            <h6>{{ _('Görünüm') }}</h6>
+                            <h3 id="settings-section-appearance">{{ _('Görünüm') }}</h3>
                             <p>{{ _('Tema, cam efekti, arkaplan ve vurgu rengini buradan ayarlayın.') }}</p>
                         </div>
                     </div>
                     <!-- Koyu Tema -->
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h6 class="text-sm font-medium mb-0.5">{{ _('Koyu Tema') }}</h6>
+                            <h4 id="setting-theme-title" class="text-sm font-medium mb-0.5">{{ _('Koyu Tema') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüzü koyu renklere çevir.') }}</p>
                         </div>
                         <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" id="theme-toggle" style="width:2.5em;height:1.25em;cursor:pointer;">
+                            <input class="form-check-input" type="checkbox" id="theme-toggle" aria-labelledby="setting-theme-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
                     <!-- Tepsiye Küçült -->
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h6 class="text-sm font-medium mb-0.5">{{ _('Tepsiye Küçült') }}</h6>
+                            <h4 id="setting-tray-title" class="text-sm font-medium mb-0.5">{{ _('Tepsiye Küçült') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kapatınca uygulamayı sistem tepsisinde tut.') }}</p>
                         </div>
                         <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" id="setting-minimize-to-tray" checked style="width:2.5em;height:1.25em;cursor:pointer;">
+                            <input class="form-check-input" type="checkbox" id="setting-minimize-to-tray" checked aria-labelledby="setting-tray-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
                     <!-- Cam Efektleri -->
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h6 class="text-sm font-medium mb-0.5">{{ _('Cam Efektleri') }}</h6>
+                            <h4 id="setting-glass-title" class="text-sm font-medium mb-0.5">{{ _('Cam Efektleri') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Düşük cihazlarda daha akıcı çalışması için bulanıklığı azalt.') }}</p>
                         </div>
                         <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                            <input class="form-check-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h6 class="text-sm font-medium mb-0.5">{{ _('Hareketli Arkaplan') }}</h6>
+                            <h4 id="setting-motion-title" class="text-sm font-medium mb-0.5">{{ _('Hareketli Arkaplan') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arkaplan bloblarını yumuşak şekilde hareket ettir.') }}</p>
                         </div>
                         <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" name="animated_backgrounds_enabled" id="animated-backgrounds-toggle" {% if ANIMATED_BACKGROUNDS_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                            <input class="form-check-input" type="checkbox" name="animated_backgrounds_enabled" id="animated-backgrounds-toggle" {% if ANIMATED_BACKGROUNDS_ENABLED %}checked{% endif %} aria-labelledby="setting-motion-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h6 class="text-sm font-medium mb-0.5">{{ _('Gradient Katmanları') }}</h6>
+                            <h4 id="setting-gradients-title" class="text-sm font-medium mb-0.5">{{ _('Gradient Katmanları') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kartlarda ve arkaplanda renk geçişlerini kullan.') }}</p>
                         </div>
                         <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" name="gradients_enabled" id="gradients-toggle" {% if GRADIENTS_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                            <input class="form-check-input" type="checkbox" name="gradients_enabled" id="gradients-toggle" {% if GRADIENTS_ENABLED %}checked{% endif %} aria-labelledby="setting-gradients-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
                     <!-- Görünüm -->
                     <div class="settings-appearance-card p-3 rounded-xl">
                         <div class="settings-appearance-head">
                             <div>
-                                <h6 class="text-sm font-medium mb-0.5">{{ _('Renk ve Arkaplan') }}</h6>
+                                <h4 class="text-sm font-medium mb-0.5">{{ _('Renk ve Arkaplan') }}</h4>
                                 <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arkaplan stili, ana vurgu rengi ve canlı önizleme.') }}</p>
                             </div>
                             <div id="appearance-preview" class="appearance-preview" aria-hidden="true"></div>
                         </div>
                         <div class="settings-appearance-grid">
-                            <label class="appearance-field">
-                                <span>{{ _('Vurgu Rengi') }}</span>
+                            <div class="appearance-field">
+                                <span id="accent-color-label">{{ _('Vurgu Rengi') }}</span>
                                 <div class="accent-control-row">
-                                    <input type="color" name="accent_color" id="accent-color-input" value="{{ ACCENT_COLOR }}" aria-label="{{ _('Vurgu Rengi') }}">
+                                    <input type="color" name="accent_color" id="accent-color-input" value="{{ ACCENT_COLOR }}" aria-labelledby="accent-color-label">
                                     <input type="text" id="accent-color-text" value="{{ ACCENT_COLOR }}" maxlength="7" class="kasa-field" aria-label="{{ _('Vurgu Rengi Kodu') }}">
                                 </div>
-                            </label>
-                            <label class="appearance-field">
-                                <span>{{ _('Arkaplan') }}</span>
-                                <select name="background_style" id="background-style-select" class="kasa-field">
+                            </div>
+                            <div class="appearance-field">
+                                <span id="background-style-label">{{ _('Arkaplan') }}</span>
+                                <select name="background_style" id="background-style-select" class="kasa-field" aria-labelledby="background-style-label">
                                     <option value="aurora" {% if BACKGROUND_STYLE == 'aurora' %}selected{% endif %}>{{ _('Aurora') }}</option>
                                     <option value="midnight" {% if BACKGROUND_STYLE == 'midnight' %}selected{% endif %}>{{ _('Gece') }}</option>
                                     <option value="mesh" {% if BACKGROUND_STYLE == 'mesh' %}selected{% endif %}>{{ _('Mesh') }}</option>
                                     <option value="plain" {% if BACKGROUND_STYLE == 'plain' %}selected{% endif %}>{{ _('Sade') }}</option>
                                 </select>
-                            </label>
+                            </div>
                         </div>
-                        <div class="accent-preset-row" aria-label="{{ _('Hazır renkler') }}">
-                            <button type="button" data-accent-preset="#7c6ff7" style="--preset:#7c6ff7"><span></span>{{ _('Mor') }}</button>
-                            <button type="button" data-accent-preset="#38bdf8" style="--preset:#38bdf8"><span></span>{{ _('Mavi') }}</button>
-                            <button type="button" data-accent-preset="#22c55e" style="--preset:#22c55e"><span></span>{{ _('Yeşil') }}</button>
-                            <button type="button" data-accent-preset="#f59e0b" style="--preset:#f59e0b"><span></span>{{ _('Amber') }}</button>
-                            <button type="button" data-accent-preset="#f43f5e" style="--preset:#f43f5e"><span></span>{{ _('Rose') }}</button>
-                            <button type="button" data-accent-preset="#14b8a6" style="--preset:#14b8a6"><span></span>{{ _('Turkuaz') }}</button>
-                            <button type="button" data-accent-preset="#6366f1" style="--preset:#6366f1"><span></span>{{ _('İndigo') }}</button>
-                            <button type="button" data-accent-preset="#84cc16" style="--preset:#84cc16"><span></span>{{ _('Lime') }}</button>
+                        <div class="accent-preset-row" role="group" aria-label="{{ _('Hazır renkler') }}">
+                            <button type="button" data-accent-preset="#7c6ff7" aria-pressed="false" style="--preset:#7c6ff7"><span></span>{{ _('Mor') }}</button>
+                            <button type="button" data-accent-preset="#38bdf8" aria-pressed="false" style="--preset:#38bdf8"><span></span>{{ _('Mavi') }}</button>
+                            <button type="button" data-accent-preset="#22c55e" aria-pressed="false" style="--preset:#22c55e"><span></span>{{ _('Yeşil') }}</button>
+                            <button type="button" data-accent-preset="#f59e0b" aria-pressed="false" style="--preset:#f59e0b"><span></span>{{ _('Amber') }}</button>
+                            <button type="button" data-accent-preset="#f43f5e" aria-pressed="false" style="--preset:#f43f5e"><span></span>{{ _('Rose') }}</button>
+                            <button type="button" data-accent-preset="#14b8a6" aria-pressed="false" style="--preset:#14b8a6"><span></span>{{ _('Turkuaz') }}</button>
+                            <button type="button" data-accent-preset="#6366f1" aria-pressed="false" style="--preset:#6366f1"><span></span>{{ _('İndigo') }}</button>
+                            <button type="button" data-accent-preset="#84cc16" aria-pressed="false" style="--preset:#84cc16"><span></span>{{ _('Lime') }}</button>
                         </div>
-                        <div class="background-choice-grid" aria-label="{{ _('Arkaplan seçenekleri') }}">
-                            <button type="button" data-background-option="aurora">
+                        <div class="background-choice-grid" role="group" aria-label="{{ _('Arkaplan seçenekleri') }}">
+                            <button type="button" data-background-option="aurora" aria-pressed="false">
                                 <strong>{{ _('Aurora') }}</strong>
                                 <small>{{ _('Yumuşak renk patlamaları') }}</small>
                             </button>
-                            <button type="button" data-background-option="midnight">
+                            <button type="button" data-background-option="midnight" aria-pressed="false">
                                 <strong>{{ _('Gece') }}</strong>
                                 <small>{{ _('Daha sakin koyu yüzey') }}</small>
                             </button>
-                            <button type="button" data-background-option="mesh">
+                            <button type="button" data-background-option="mesh" aria-pressed="false">
                                 <strong>{{ _('Mesh') }}</strong>
                                 <small>{{ _('Daha canlı çok renkli alan') }}</small>
                             </button>
-                            <button type="button" data-background-option="plain">
+                            <button type="button" data-background-option="plain" aria-pressed="false">
                                 <strong>{{ _('Sade') }}</strong>
                                 <small>{{ _('Düşük dikkat dağıtma') }}</small>
                             </button>
@@ -551,7 +563,7 @@
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-sliders"></i></span>
                         <div>
-                            <h6>{{ _('Davranış') }}</h6>
+                            <h3 id="settings-section-behavior">{{ _('Davranış') }}</h3>
                             <p>{{ _('Kilitleme, pencere ve günlük kullanım tercihleri.') }}</p>
                         </div>
                     </div>
@@ -559,11 +571,11 @@
                     <div class="settings-toggle-card settings-auto-lock-card">
                         <div class="settings-toggle-main">
                             <div class="settings-toggle-copy">
-                                <h6 class="text-sm font-medium mb-0.5">{{ _('Otomatik Kilitleme') }}</h6>
+                                <h4 id="setting-auto-lock-title" class="text-sm font-medium mb-0.5">{{ _('Otomatik Kilitleme') }}</h4>
                                 <p class="text-xs text-kasa-text-muted mb-0">{{ _('Hareketsizlik durumunda kasayı kilitle.') }}</p>
                             </div>
                             <div class="form-check form-switch m-0">
-                                <input class="form-check-input" type="checkbox" name="auto_lock_enabled" id="auto_lock_enabled" {% if AUTO_LOCK_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                                <input class="form-check-input" type="checkbox" name="auto_lock_enabled" id="auto_lock_enabled" {% if AUTO_LOCK_ENABLED %}checked{% endif %} aria-labelledby="setting-auto-lock-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                             </div>
                         </div>
                         <div class="settings-timeout-row">
@@ -575,7 +587,7 @@
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-database"></i></span>
                         <div>
-                            <h6>{{ _('Veri ve Yedekleme') }}</h6>
+                            <h3 id="settings-section-data">{{ _('Veri ve Yedekleme') }}</h3>
                             <p>{{ _('Kasa verilerini içe aktarın veya dışa aktarın.') }}</p>
                         </div>
                     </div>
@@ -590,7 +602,7 @@
                             </span>
                             <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                         </button>
-                        <a href="{{ url_for('export_data') }}"
+                        <a href="{{ url_for('export_data') }}" data-no-loading download
                             class="settings-action-card no-underline">
                             <span class="settings-action-icon settings-action-icon-success"><i class="fa-solid fa-download"></i></span>
                             <span class="settings-action-copy">
@@ -603,17 +615,17 @@
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-language"></i></span>
                         <div>
-                            <h6>{{ _('Dil ve Ağ') }}</h6>
+                            <h3 id="settings-section-language-network">{{ _('Dil ve Ağ') }}</h3>
                             <p>{{ _('Arayüz dili ve yerel ağ erişim ayarları.') }}</p>
                         </div>
                     </div>
                     <!-- Dil Seçici -->
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h6 class="text-sm font-medium mb-0.5">{{ _('Dil') }}</h6>
+                            <h4 id="setting-language-title" class="text-sm font-medium mb-0.5">{{ _('Dil') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüz dilini değiştir.') }}</p>
                         </div>
-                        <select id="settings-language-select" class="text-sm px-2 py-1.5 rounded-lg kasa-field" style="width:auto;min-width:120px;cursor:pointer;">
+                        <select id="settings-language-select" class="text-sm px-2 py-1.5 rounded-lg kasa-field" aria-labelledby="setting-language-title" style="width:auto;min-width:120px;cursor:pointer;">
                             {% for lang in AVAILABLE_LANGS %}
                             <option value="{{ lang.code }}" {% if lang.code == CURRENT_LANG %}selected{% endif %}>
                                 {{ lang.name }}
@@ -625,11 +637,11 @@
                     <!-- LAN Erişimi -->
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h6 class="text-sm font-medium mb-0.5">{{ _('LAN Erişimi') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold align-middle" style="letter-spacing:0.02em;">{{ _('GELİŞTİRME') }}</span></h6>
+                            <h4 id="setting-lan-title" class="text-sm font-medium mb-0.5">{{ _('LAN Erişimi') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold align-middle" style="letter-spacing:0.02em;">{{ _('GELİŞTİRME') }}</span></h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Mobil cihazdan bağlanmak için ağ üzerinden erişime izin ver.') }}</p>
                         </div>
                         <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" name="lan_enabled" id="lan-enabled-toggle" {% if LAN_ENABLED %}checked{% endif %} style="width:2.5em;height:1.25em;cursor:pointer;">
+                            <input class="form-check-input" type="checkbox" name="lan_enabled" id="lan-enabled-toggle" {% if LAN_ENABLED %}checked{% endif %} aria-labelledby="setting-lan-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
                     <div class="lan-warning-card">
@@ -647,7 +659,7 @@
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-shield-halved"></i></span>
                         <div>
-                            <h6>{{ _('Güvenlik') }}</h6>
+                            <h3 id="settings-section-security">{{ _('Güvenlik') }}</h3>
                             <p>{{ _('Ana şifre ve kasa kilidiyle ilgili işlemler.') }}</p>
                         </div>
                     </div>
@@ -741,6 +753,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function setBulkMode(on) {
         bulkMode = on;
         bulkToggleBtn.classList.toggle('bulk-active', on);
+        bulkToggleBtn.setAttribute('aria-pressed', String(on));
         document.querySelectorAll('.select-item').forEach(function (cb) {
             cb.closest('label').style.display = on ? '' : 'none';
         });
@@ -760,6 +773,7 @@ document.addEventListener('DOMContentLoaded', function () {
         bulkCount.textContent = count;
         if (count > 0) {
             bulkToolbar.style.display = 'flex';
+            bulkToolbar.removeAttribute('aria-hidden');
             requestAnimationFrame(function () {
                 bulkToolbar.style.opacity = '1';
                 bulkToolbar.style.transform = 'translateX(-50%) translateY(0)';
@@ -767,6 +781,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             bulkToolbar.style.opacity = '0';
             bulkToolbar.style.transform = 'translateX(-50%) translateY(20px)';
+            bulkToolbar.setAttribute('aria-hidden', 'true');
             setTimeout(function () { if (selected.size === 0) bulkToolbar.style.display = 'none'; }, 300);
         }
         selectAll.checked = count === checkboxes.length && count > 0;
@@ -1001,13 +1016,13 @@ function lockVault() {
 </script>
 
 <!-- Ana Şifre Değiştirme Modal -->
-<div class="kasa-modal" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+<div class="kasa-modal" id="changePasswordModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="change-password-title">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                <h2 id="change-password-title" class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
                     <i class="fa-solid fa-shield-halved mr-2 text-[#f59e0b]"></i>{{ _('Şifreyi Değiştir') }}
-                </h5>
+                </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -1015,18 +1030,18 @@ function lockVault() {
             <div class="modal-body p-4 space-y-3">
                 <form id="changePasswordForm">
                     <div class="mb-3">
-                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5">{{ _('Mevcut Ana Şifre') }}</label>
+                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5" for="cp-old">{{ _('Mevcut Ana Şifre') }}</label>
                         <input type="password" name="old_password" id="cp-old" required placeholder="••••••••"
                             class="w-full px-3 py-2.5 kasa-field text-sm">
                     </div>
                     <hr class="border-kasa-border my-4">
                     <div class="mb-3">
-                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5">{{ _('Yeni Ana Şifre') }}</label>
+                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5" for="cp-new">{{ _('Yeni Ana Şifre') }}</label>
                         <input type="password" name="new_password" id="cp-new" required placeholder="{{ _('Yeni şifre') }}"
                             class="w-full px-3 py-2.5 kasa-field text-sm">
                     </div>
                     <div class="mb-5">
-                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5">{{ _('Yeni Şifre (Tekrar)') }}</label>
+                        <label class="block text-sm font-medium text-kasa-text-muted mb-1.5" for="cp-confirm">{{ _('Yeni Şifre (Tekrar)') }}</label>
                         <input type="password" name="confirm_password" id="cp-confirm" required placeholder="{{ _('Tekrar yazın') }}"
                             class="w-full px-3 py-2.5 kasa-field text-sm">
                     </div>
@@ -1050,19 +1065,20 @@ function lockVault() {
 </div>
 
 <!-- Toplu Kategori Değiştir Modal -->
-<div class="kasa-modal" id="bulkCategoryModal" tabindex="-1" aria-hidden="true">
+<div class="kasa-modal" id="bulkCategoryModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="bulk-category-title">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
+                <h2 id="bulk-category-title" class="modal-title fw-semibold" style="font-family:'Sora',sans-serif;">
                     <i class="fa-solid fa-tag mr-2" style="color:#7c6ff7;"></i>{{ _('Kategori Değiştir') }}
-                </h5>
+                </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
             <div class="modal-body p-4">
                 <p class="text-sm text-kasa-text-muted mb-3"><span id="bulk-category-count">0</span> {{ _('kaydın kategorisi değiştirilecek.') }}</p>
+                <label class="visually-hidden" for="bulk-category-input">{{ _('Yeni kategori adı') }}</label>
                 <input type="text" id="bulk-category-input" placeholder="{{ _('Yeni kategori adı…') }}"
                     class="w-full px-3 py-2.5 kasa-field text-sm">
             </div>
