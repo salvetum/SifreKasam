@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.3 - Main JavaScript
+ * ŞifreKasam v2.3.1 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -473,22 +473,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const copyIconTimers = new WeakMap();
+
   const flashCopyIcon = (iconEl) => {
     if (!iconEl) return;
-    if (!iconEl.dataset.originalClass) {
-      iconEl.dataset.originalClass = iconEl.className;
+    if (!iconEl.dataset.copyOriginalClass || iconEl.dataset.copyOriginalClass.includes('fa-check')) {
+      iconEl.dataset.copyOriginalClass = iconEl.className.includes('fa-check')
+        ? 'fa-solid fa-copy'
+        : iconEl.className;
     }
-    clearTimeout(Number(iconEl.dataset.copyTimer || 0));
+    clearTimeout(copyIconTimers.get(iconEl));
     iconEl.className = 'fa-solid fa-check text-success';
     iconEl.classList.remove('copy-flash');
     void iconEl.offsetWidth;
     iconEl.classList.add('copy-flash');
     showSuccessToast(window._('Kopyalandı!'));
-    iconEl.dataset.copyTimer = String(setTimeout(() => {
-      iconEl.className = iconEl.dataset.originalClass || 'fa-solid fa-copy';
+    copyIconTimers.set(iconEl, setTimeout(() => {
+      iconEl.className = iconEl.dataset.copyOriginalClass || 'fa-solid fa-copy';
       iconEl.classList.remove('copy-flash');
-      delete iconEl.dataset.copyTimer;
-      delete iconEl.dataset.originalClass;
+      copyIconTimers.delete(iconEl);
     }, 650));
   };
 
@@ -958,7 +961,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (filterEmptyState) {
-        filterEmptyState.hidden = cards.length === 0 || visibleCount > 0;
+        const shouldShowEmptyState = cards.length > 0 && visibleCount === 0;
+        filterEmptyState.hidden = !shouldShowEmptyState;
+        filterEmptyState.classList.toggle('is-visible', shouldShowEmptyState);
       }
     };
 
