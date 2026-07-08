@@ -4,7 +4,7 @@
 
 vibecoding ile yapılmıştır (ki projenin ilk amacı buydu).
 
-# ⚠️⚠️⚠️ NOT ⚠️⚠️⚠️
+# ⚠️ NOT
 
 Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 
@@ -23,19 +23,6 @@ Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 - Ana şifrenizi unutursanız kayıtları kurtarmak mümkün olmayabilir.
 - LAN erişimi geliştirme/kolay bağlantı amaçlıdır ve güvenlik riski taşır. Güvenmediğiniz ağlarda kapalı tutun.
 - Repo’ya gerçek veritabanı, yedek, sertifika, anahtar veya kişisel kayıt dosyası yüklemeyin.
-
-## Bilinen hatalar
-
-- Kopyalama logosuna basıldıktan sonra gelen tik simgesinin gitmemesi.
-
-- Dışa aktarma sonucu yükleme ekranında takılı kalma 
-
-- Login ekranındaki ve yükleme ekranındaki görsel hatalar
-
-## Eklenecek / Değişecek şeyler
-
-- Herhangi bir filte uygulandığında eğer bir kayıt yoksa hiç bir şey bulunamadı yazısı
-- HTML, CSS, JS ve PYTHON kodu optimize (ölü kod, tekrar eden kod, performans sorunları, güvenlik sorunları) edilecek
 
 ## Geliştirme
 
