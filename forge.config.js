@@ -8,12 +8,9 @@ const squirrelConfig = {
   owners: 'Salvetum',
   exe: 'SifreKasam.exe',
   setupExe: 'SifreKasamSetup.exe',
+  iconUrl: process.env.SIFREKASAM_ICON_URL || 'https://raw.githubusercontent.com/salvetum/SifreKasam/main/favicon.ico',
   setupIcon: iconPath
 };
-
-if (process.env.SIFREKASAM_ICON_URL) {
-  squirrelConfig.iconUrl = process.env.SIFREKASAM_ICON_URL;
-}
 
 module.exports = {
   packagerConfig: {

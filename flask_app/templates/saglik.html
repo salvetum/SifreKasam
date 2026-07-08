@@ -239,6 +239,7 @@
     font-size: 0.78rem;
     font-weight: 600;
     flex: 1;
+    margin: 0;
   }
   .sr-card-count {
     font-family: var(--mono);
@@ -912,20 +913,20 @@
   }
 </style>
 
-<div class="sr-root">
+<main class="sr-root" aria-labelledby="health-report-title">
 
-  <div class="sr-header">
+  <header class="sr-header">
     <div class="sr-header-left">
-      <h1 class="sr-title">{{ _('Şifre Sağlık Raporu') }}</h1>
+      <h1 id="health-report-title" class="sr-title">{{ _('Şifre Sağlık Raporu') }}</h1>
       <p class="sr-subtitle">{{ _('Kasanızdaki tüm kayıtların güvenlik özeti') }}</p>
     </div>
     <a href="{{ url_for('index') }}" class="sr-back-btn">
       <i class="fa-solid fa-arrow-left" style="font-size:0.7rem;"></i>
       {{ _('Geri Dön') }}
     </a>
-  </div>
+  </header>
 
-  <div class="sr-stats">
+  <section class="sr-stats" aria-label="{{ _('Şifre sağlık özeti') }}">
     <div class="sr-stat" data-accent="red">
       <div class="sr-stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
       <div class="sr-stat-num" id="count-zayif">{{ zayif|length }}</div>
@@ -946,9 +947,9 @@
       <div class="sr-stat-num" id="count-expired">{{ expired|length }}</div>
       <div class="sr-stat-label">{{ _('Süresi Dolmuş') }}</div>
     </div>
-  </div>
+  </section>
 
-  <div class="sr-overview">
+  <section class="sr-overview" aria-label="{{ _('Şifre dağılım oranları') }}">
     <div class="sr-overview-info">
       <div style="font-size:0.75rem; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:1.2rem; text-align:center;">{{ _('Şifre Dağılım Oranları') }}</div>
       <div class="sr-legend">
@@ -979,14 +980,14 @@
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="sr-details">
+  <section class="sr-details" aria-label="{{ _('Detaylı sağlık bulguları') }}">
 
     <div class="sr-card">
       <div class="sr-card-head">
         <div class="sr-card-indicator" style="background:var(--red);"></div>
-        <span class="sr-card-title c-red">{{ _('Zayıf Şifreler') }}</span>
+        <h2 class="sr-card-title c-red">{{ _('Zayıf Şifreler') }}</h2>
         <span class="sr-card-count bg-red-pill">{{ zayif|length }}</span>
       </div>
       <div class="sr-card-body">
@@ -1014,7 +1015,7 @@
     <div class="sr-card">
       <div class="sr-card-head">
         <div class="sr-card-indicator" style="background:var(--amber);"></div>
-        <span class="sr-card-title c-amber">{{ _('Tekrar Eden') }}</span>
+        <h2 class="sr-card-title c-amber">{{ _('Tekrar Eden') }}</h2>
         <span class="sr-card-count bg-amber-pill">{{ tekrar|length }}</span>
       </div>
       <div class="sr-card-body">
@@ -1052,7 +1053,7 @@
     <div class="sr-card">
       <div class="sr-card-head">
         <div class="sr-card-indicator" style="background:var(--sky);"></div>
-        <span class="sr-card-title c-sky">{{ _('Eski Şifreler') }}</span>
+        <h2 class="sr-card-title c-sky">{{ _('Eski Şifreler') }}</h2>
         <span class="sr-card-count bg-sky-pill">{{ eski|length }}</span>
       </div>
       <div class="sr-card-body">
@@ -1082,7 +1083,7 @@
     <div class="sr-card">
       <div class="sr-card-head">
         <div class="sr-card-indicator" style="background:var(--rose);"></div>
-        <span class="sr-card-title c-rose">{{ _('Süresi Dolmuş') }}</span>
+        <h2 class="sr-card-title c-rose">{{ _('Süresi Dolmuş') }}</h2>
         <span class="sr-card-count bg-rose-pill">{{ expired|length }}</span>
       </div>
       <div class="sr-card-body">
@@ -1108,8 +1109,8 @@
       </div>
     </div>
 
-  </div>
-</div>
+  </section>
+</main>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

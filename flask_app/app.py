@@ -7,11 +7,13 @@ import json
 import logging
 import os
 import shutil
+import socket
 import threading
 import time
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+from typing import Any
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -38,9 +40,10 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 SECRET_PLACEHOLDER = '__SECRET__'
 MAX_BULK_IDS = 500
+MAX_IMPORT_RECORDS = 5000
 VALID_RECORD_TYPES = {'Website', 'Application', 'CreditCard', 'SecureNote', 'Other'}
 DEFAULT_CATEGORY = 'Genel'
 DEFAULT_ACCENT_COLOR = '#7c6ff7'
@@ -332,7 +335,8 @@ def _has_existing_vault_data() -> bool:
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
 
-def backup_database():
+def backup_database() -> None:
+    """Var olan SQLite veritabanını güvenli bir yedek dosyasına kopyalar."""
     if not os.path.exists(DB_FILE):
         return
     try:
@@ -343,31 +347,36 @@ def backup_database():
 def new_record_id() -> str:
     return uuid.uuid4().hex
 
-def request_json() -> dict:
+def request_json() -> dict[str, Any]:
+    """JSON body sözlük değilse güvenli biçimde boş dict döndürür."""
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else {}
 
 def normalize_record_type(value: str | None) -> str:
     return value if value in VALID_RECORD_TYPES else 'Other'
 
-def normalize_text(value, fallback: str = '') -> str:
-    return str(value or fallback).strip()
+def normalize_text(value: object | None, fallback: str = '', max_length: int | None = None) -> str:
+    """Form/import verisini string'e çevirir, kırpar ve opsiyonel uzunluk sınırı uygular."""
+    text = str(value if value not in (None, '') else fallback).strip()
+    return text[:max_length] if max_length and len(text) > max_length else text
 
-def normalize_url(value) -> str:
+def normalize_url(value: object | None) -> str:
+    """Sadece http/https URL kabul eder; şema yoksa https ekler."""
     url = normalize_text(value)
     if not url:
         return ''
     parsed = urlparse(url if '://' in url else f'https://{url}')
     if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
         return ''
-    return url
+    return parsed.geturl()
 
 def get_bulk_ids() -> list[str]:
+    """Toplu işlem ID listesini normalize eder, tekrarları ve aşırı uzun listeleri engeller."""
     ids = request_json().get('ids', [])
     if not isinstance(ids, list):
         return []
     normalized = []
-    seen = set()
+    seen: set[str] = set()
     for item in ids:
         record_id = normalize_text(item)
         if record_id and record_id not in seen:
@@ -411,6 +420,19 @@ def normalize_background_style(value) -> str:
     text = str(value or DEFAULT_BACKGROUND_STYLE).strip().lower()
     return text if text in VALID_BACKGROUND_STYLES else DEFAULT_BACKGROUND_STYLE
 
+def safe_int(value: object | None, default: int, minimum: int | None = None,
+             maximum: int | None = None) -> int:
+    """Kullanıcı/env kaynaklı sayıları güvenli aralığa çevirir."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = default
+    if minimum is not None:
+        number = max(minimum, number)
+    if maximum is not None:
+        number = min(maximum, number)
+    return number
+
 def _load_appearance_file() -> dict:
     try:
         if os.path.exists(THEME_FILE):
@@ -421,11 +443,21 @@ def _load_appearance_file() -> dict:
         pass
     return {}
 
-def _save_appearance_file(**updates):
+def _save_appearance_file(**updates: Any) -> None:
+    """Tema ayarlarını atomik JSON yazma ile kaydeder."""
     data = _load_appearance_file()
     data.update(updates)
-    with open(THEME_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f)
+    tmp_file = f"{THEME_FILE}.{uuid.uuid4().hex}.tmp"
+    try:
+        with open(tmp_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp_file, THEME_FILE)
+    finally:
+        if os.path.exists(tmp_file):
+            try:
+                os.unlink(tmp_file)
+            except OSError:
+                pass
 
 def _get_setting(key: str):
     """DB'den ayar okur; bulamazsa None döner."""
@@ -819,7 +851,7 @@ def index():
 
     return render_template('index.html', kayit_listesi=kasa_verileri)
 
-def _parse_expiry(expiry_str: str):
+def _parse_expiry(expiry_str: str | None) -> datetime | None:
     if not expiry_str:
         return None
     try:
@@ -827,16 +859,16 @@ def _parse_expiry(expiry_str: str):
     except ValueError:
         return None
 
-def _record_from_form(fernet, record_id=None):
+def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str, Any]:
     """Form verilerini okuyup (id, Record alanları) döner."""
     record_type = normalize_record_type(request.form.get('kayit_tipi'))
     return dict(
         id                 = record_id or new_record_id(),
         type               = record_type,
-        category           = normalize_text(request.form.get('kategori'), DEFAULT_CATEGORY),
-        title              = normalize_text(request.form.get('isim'), _('Bilinmeyen')),
+        category           = normalize_text(request.form.get('kategori'), DEFAULT_CATEGORY, 120),
+        title              = normalize_text(request.form.get('isim'), _('Bilinmeyen'), 200),
         website_url        = normalize_url(request.form.get('website_url')),
-        login              = normalize_text(request.form.get('login')),
+        login              = normalize_text(request.form.get('login'), max_length=300),
         encrypted_password = safe_encrypt(fernet, request.form.get('password', '')),
         encrypted_comment  = safe_encrypt(fernet, request.form.get('comment', '')),
         expiry_date        = _parse_expiry(request.form.get('expiry_date', '')),
@@ -995,10 +1027,7 @@ def saglik_raporu():
 @app.route('/save_settings', methods=['POST'])
 @login_required
 def save_settings():
-    try:
-        auto_lock_timeout = max(1, min(240, int(request.form.get('auto_lock_timeout', '5'))))
-    except ValueError:
-        auto_lock_timeout = 5
+    auto_lock_timeout = safe_int(request.form.get('auto_lock_timeout'), 5, 1, 240)
     _set_setting('auto_lock_enabled',
                  'true' if request.form.get('auto_lock_enabled') else 'false')
     _set_setting('auto_lock_timeout', str(auto_lock_timeout))
@@ -1038,7 +1067,8 @@ def export_data():
         f"kasa_yedek_{datetime.now().strftime('%Y%m%d')}.json"
     )
 
-def _serialize_records(rows, fernet: Fernet) -> list[dict]:
+def _serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
+    """Kayıtları dışa aktarılabilir plain JSON sözlüklerine dönüştürür."""
     return [{
         'type': r.type, 'category': r.category, 'title': r.title,
         'website_url': r.website_url, 'login': r.login,
@@ -1046,18 +1076,20 @@ def _serialize_records(rows, fernet: Fernet) -> list[dict]:
         'comment':  safe_decrypt(fernet, r.encrypted_comment),
     } for r in rows]
 
-def _send_records_export(data: list[dict], download_name: str):
+def _send_records_export(data: list[dict[str, Any]], download_name: str):
     payload = json.dumps(data, ensure_ascii=False, indent=4).encode('utf-8')
     return send_file(io.BytesIO(payload), mimetype='application/json', as_attachment=True,
                      download_name=download_name)
 
 def _parse_import_record(item: dict, fernet: Fernet) -> Record:
+    """Desteklenen yedek sözlüğünü yeni Record modeline çevirir."""
     title = (item.get('title') or item.get('Website name') or item.get('Application')
              or item.get('Account name') or item.get('SecureNote') or 'Bilinmeyen')
     login_val = normalize_text(item.get('login') or item.get('Login') or
-                               item.get('Login name') or item.get('CreditCard') or '')
+                               item.get('Login name') or item.get('CreditCard') or '', max_length=300)
     password  = normalize_text(item.get('password') or item.get('Password') or '')
-    comment   = normalize_text(item.get('comment') or item.get('Comment') or item.get('SecureNote') or '')
+    comment   = normalize_text(item.get('comment') or item.get('Comment') or item.get('SecureNote') or '',
+                               max_length=5000)
     url       = normalize_url(item.get('website_url') or item.get('Website URL') or '')
     category  = item.get('category') or item.get('Category') or 'Genel'
     rec_type  = (item.get('type') or
@@ -1068,12 +1100,28 @@ def _parse_import_record(item: dict, fernet: Fernet) -> Record:
     return Record(
         id                 = new_record_id(),
         type               = normalize_record_type(rec_type),
-        category           = normalize_text(category, DEFAULT_CATEGORY),
-        title              = normalize_text(title, _('Bilinmeyen')),
+        category           = normalize_text(category, DEFAULT_CATEGORY, 120),
+        title              = normalize_text(title, _('Bilinmeyen'), 200),
         website_url        = url, login=login_val,
         encrypted_password = safe_encrypt(fernet, password),
         encrypted_comment  = safe_encrypt(fernet, comment),
+        expiry_date        = _parse_expiry(normalize_text(item.get('expiry_date') or item.get('Expiry Date'))),
     )
+
+def _parse_import_payload(filename: str, content: str) -> list[dict[str, Any]]:
+    """Yedek dosyasını uzantısına göre çözer ve geçerli kayıt sözlüklerini döndürür."""
+    suffix = os.path.splitext(filename.lower())[1]
+    if suffix in {'.json', '.kasa'}:
+        data = json.loads(content)
+    elif suffix == '.txt':
+        data = parse_old_txt(content)
+    else:
+        raise ValueError('unsupported-import-format')
+
+    if not isinstance(data, list):
+        raise ValueError('invalid-import-payload')
+
+    return [item for item in data[:MAX_IMPORT_RECORDS] if isinstance(item, dict)]
 
 @app.route('/import', methods=['POST'])
 @login_required
@@ -1087,30 +1135,29 @@ def import_data():
     fernet   = get_fernet()
     filename = file.filename.lower()
     try:
-        content = file.read().decode('utf-8')
-        if filename.endswith(('.json', '.kasa')):
-            data = json.loads(content)
-        elif filename.endswith('.txt'):
-            data = parse_old_txt(content)
-        else:
-            return "Desteklenmeyen dosya formatı.", 400
-
-        if not isinstance(data, list):
-            return "Geçersiz yedek formatı.", 400
-
-        for item in data:
-            if isinstance(item, dict):
-                db.session.add(_parse_import_record(item, fernet))
+        content = file.read().decode('utf-8-sig')
+        records = [_parse_import_record(item, fernet)
+                   for item in _parse_import_payload(filename, content)]
+        if not records:
+            return "İçe aktarılacak geçerli kayıt bulunamadı.", 400
         backup_database()
+        db.session.add_all(records)
         db.session.commit()
         return redirect(url_for('index'))
+    except UnicodeDecodeError:
+        return "Dosya UTF-8 olarak okunamadı.", 400
+    except ValueError as e:
+        db.session.rollback()
+        log.warning(f"Import validation error: {e}")
+        return "Geçersiz veya desteklenmeyen yedek dosyası.", 400
     except Exception as e:
         db.session.rollback()
         log.error(f"Import Error: {e}")
         return "İçe aktarma sırasında hata oluştu.", 400
 
-def parse_old_txt(content: str) -> list[dict]:
-    records = []
+def parse_old_txt(content: str) -> list[dict[str, str]]:
+    """Eski TXT yedek formatını kayıt sözlüklerine dönüştürür."""
+    records: list[dict[str, str]] = []
     for block in content.split("---"):
         block = block.strip()
         if not block:
@@ -1182,15 +1229,13 @@ def settings_runtime():
 
 @app.route('/api/lan-info')
 def lan_info():
-    import socket
     ips = []
     # Gerçek ağ arayüzünü bul: 8.8.8.8'e bağlanmayı dene
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(1)
-        s.connect(('8.8.8.8', 53))
-        ips.append(s.getsockname()[0])
-        s.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(1)
+            sock.connect(('8.8.8.8', 53))
+            ips.append(sock.getsockname()[0])
     except Exception:
         pass
     # Fallback: tüm non-127 IP'leri topla
@@ -1206,7 +1251,7 @@ def lan_info():
     return jsonify({
         'hostname': socket.gethostname(),
         'ips': sorted(set(ips)),
-        'port': int(os.environ.get('FLASK_PORT') or os.environ.get('PORT') or 5000),
+        'port': safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535),
         'ssl': os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE),
     })
 
@@ -1277,6 +1322,18 @@ def settings_appearance():
 _reencrypt_state: dict = {}
 _reencrypt_lock = threading.Lock()
 
+def _prune_reencrypt_state(max_entries: int = 20) -> None:
+    """Tamamlanmış/hataya düşmüş eski şifre değişimi işlerini bellekten temizler."""
+    with _reencrypt_lock:
+        if len(_reencrypt_state) <= max_entries:
+            return
+        removable = [
+            task_id for task_id, state in _reencrypt_state.items()
+            if state.get('done') or state.get('error')
+        ]
+        for task_id in removable[:len(_reencrypt_state) - max_entries]:
+            _reencrypt_state.pop(task_id, None)
+
 def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | None):
     try:
         with app.app_context():
@@ -1344,6 +1401,7 @@ def change_password():
 
     task_id = uuid.uuid4().hex
     vault_sid = session.get('vault_session_id')
+    _prune_reencrypt_state()
     threading.Thread(target=_reencrypt_task,
                      args=(task_id, old_pw, new_pw, vault_sid),
                      daemon=True).start()
@@ -1421,7 +1479,7 @@ def _get_server_host() -> str:
 
 if __name__ == '__main__':
     flask_host = _get_server_host()
-    flask_port = int(os.environ.get('FLASK_PORT') or os.environ.get('PORT') or 5000)
+    flask_port = safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535)
     ssl_ctx = (CERT_FILE, KEY_FILE) if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE) else None
     app.run(host=flask_host, port=flask_port, ssl_context=ssl_ctx)
 

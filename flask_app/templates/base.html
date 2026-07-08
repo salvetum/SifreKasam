@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
     <script>
         window.LANG = "{{ CURRENT_LANG }}";
         window.TRANSLATIONS = {{ TRANSLATIONS_JSON|safe }};
@@ -96,7 +97,7 @@
     <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.2 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.3 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -118,19 +119,19 @@
     <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='style.css') }}?v=26" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}?v=28" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
     <!-- 3. Animasyonlu Blob (opsiyonel) -->
     <div class="blob-accent" aria-hidden="true"></div>
 
-    <div class="page-loading-overlay" aria-live="polite" aria-hidden="true">
+    <div class="page-loading-overlay" role="status" aria-live="polite" aria-hidden="true" aria-label="{{ _('Sayfa yükleniyor') }}">
         <div class="page-loading-card">
-            <div class="page-loading-mark"><i class="fa-solid fa-lock"></i></div>
+            <div class="page-loading-mark" aria-hidden="true"><i class="fa-solid fa-lock"></i></div>
             <div>
-                <div class="page-loading-title">Yükleniyor</div>
-                <div class="page-loading-subtitle">Sayfa hazırlanıyor</div>
+                <div class="page-loading-title">{{ _('Yükleniyor') }}</div>
+                <div class="page-loading-subtitle">{{ _('Sayfa hazırlanıyor') }}</div>
             </div>
             <div class="page-loading-track"><div></div></div>
         </div>
@@ -148,7 +149,7 @@
     <script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=6.8" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=7.0" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script>
@@ -202,6 +203,7 @@
             if (e.button === 3 || e.button === 4) {
                 e.preventDefault();
                 document.body.classList.add('is-page-loading');
+                document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'false');
             }
         });
     </script>
@@ -209,17 +211,21 @@
     <!-- Mobil geri tuşu loading loop fix -->
     <script>
         window.addEventListener('pageshow', function (e) {
-            if (e.persisted) document.body.classList.remove('is-page-loading');
+            if (e.persisted) {
+                document.body.classList.remove('is-page-loading');
+                document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'true');
+            }
         });
         window.addEventListener('popstate', function () {
             document.body.classList.remove('is-page-loading');
+            document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'true');
         });
     </script>
 
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script>
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v25';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v27';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>

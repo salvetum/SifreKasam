@@ -1,12 +1,25 @@
 {% extends "base.html" %}
 
+{% block page_shell_class %}entry-login-page-shell{% endblock %}
+
 {% block content %}
 <style>
+    .entry-login-page-shell {
+        width: 100%;
+        max-width: none !important;
+        min-height: 100vh;
+        padding: 0 !important;
+        display: grid;
+    }
+
     .entry-login-wrap {
-        min-height: min(760px, calc(100vh - 5rem));
+        width: 100%;
+        min-height: 100vh;
+        padding: clamp(1rem, 3vw, 2rem);
         display: grid;
         place-items: center;
         position: relative;
+        overflow: hidden;
     }
 
     .entry-login-wrap::before {
@@ -321,7 +334,7 @@
 
     /* Loading ekranıyla görsel uyum katmanı */
     .entry-login-wrap {
-        min-height: min(780px, calc(100vh - 4rem));
+        min-height: 100vh;
     }
 
     .entry-login-wrap::before {
@@ -366,7 +379,7 @@
     }
 
     .entry-login-shell {
-        width: min(980px, calc(100vw - 32px));
+        width: min(980px, calc(100vw - 2rem));
         min-height: 540px;
         border-color: rgba(255,255,255,0.14);
         border-radius: 34px;
@@ -442,6 +455,35 @@
         .entry-login-panel { border-left: 0; border-top: 1px solid var(--border); }
         .entry-login-steps { display: none; }
     }
+
+    @media (min-width: 1280px) {
+        .entry-login-shell {
+            width: min(1120px, calc(100vw - 4rem));
+            min-height: min(620px, calc(100vh - 4rem));
+        }
+    }
+
+    @media (max-height: 720px) and (min-width: 821px) {
+        .entry-login-wrap {
+            padding: 1rem;
+        }
+
+        .entry-login-shell {
+            min-height: min(540px, calc(100vh - 2rem));
+        }
+
+        .entry-login-info {
+            min-height: auto;
+            gap: 1.35rem;
+            padding: 1.75rem;
+        }
+
+        .entry-login-mark {
+            width: 74px;
+            height: 74px;
+            border-radius: 24px;
+        }
+    }
 </style>
 
 <div class="entry-login-wrap">
@@ -483,13 +525,13 @@
             </div>
         </section>
 
-        <section class="entry-login-panel">
+        <section class="entry-login-panel" aria-labelledby="login-card-title">
             <div class="entry-login-card">
-                <div class="entry-login-card-title">{{ _('Kilidi Aç') }}</div>
+                <h2 id="login-card-title" class="entry-login-card-title">{{ _('Kilidi Aç') }}</h2>
                 <p class="entry-login-card-subtitle">{{ _('Ana şifrenizle devam edin.') }}</p>
 
                 {% if error %}
-                <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger">
+                <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger" role="alert">
                     <i class="fa-solid fa-circle-exclamation mr-2"></i>{{ _(error) }}
                 </div>
                 {% endif %}
@@ -498,14 +540,15 @@
                     <label class="sr-only" for="master-password">{{ _('Ana Şifre') }}</label>
                     <input type="password" name="master_password" id="master-password"
                         class="w-full px-4 py-3 text-center text-lg tracking-widest kasa-field"
-                        placeholder="••••••••••••" required autofocus autocomplete="current-password">
+                        placeholder="••••••••••••" required autofocus autocomplete="current-password"
+                        aria-describedby="login-footnote">
 
                     <button type="submit" class="w-full kasa-btn kasa-btn-primary">
                         <i class="fa-solid fa-unlock mr-2"></i>{{ _('Kilidi Aç') }}
                     </button>
                 </form>
 
-                <p class="entry-login-footnote">
+                <p class="entry-login-footnote" id="login-footnote">
                     {{ _('İlk kurulumda girdiğiniz şifre') }}<br>{{ _('otomatik olarak Ana Şifre olur.') }}
                 </p>
             </div>
