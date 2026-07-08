@@ -40,7 +40,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.3.1"
 SECRET_PLACEHOLDER = '__SECRET__'
 MAX_BULK_IDS = 500
 MAX_IMPORT_RECORDS = 5000
