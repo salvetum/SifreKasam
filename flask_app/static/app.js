@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.3.1 - Main JavaScript
+ * ŞifreKasam v2.3.2 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,6 +34,39 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+
+  const filenameFromDisposition = (header, fallback) => {
+    const disposition = header || '';
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1].replace(/"/g, ''));
+
+    const plainMatch = disposition.match(/filename="?([^";]+)"?/i);
+    return plainMatch?.[1] || fallback;
+  };
+
+  const triggerBlobDownload = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = Object.assign(document.createElement('a'), {
+      href: url,
+      download: filename,
+    });
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const downloadFromEndpoint = async (path, fallbackFilename) => {
+    const response = await apiFetch(path);
+    if (!response?.ok) throw new Error(`download-failed:${path}`);
+    const blob = await response.blob();
+    const filename = filenameFromDisposition(
+      response.headers.get('Content-Disposition'),
+      fallbackFilename
+    );
+    triggerBlobDownload(blob, filename);
+  };
 
   const createIcon = (className) => {
     const icon = document.createElement('i');
@@ -392,6 +425,95 @@ document.addEventListener('DOMContentLoaded', () => {
       border:      '1px solid rgba(239, 68, 68, 0.28)',
       color:       '#fecaca',
     },
+  });
+
+  const settingsExportButton = document.getElementById('settings-export-btn');
+  settingsExportButton?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    try {
+      const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      await downloadFromEndpoint(
+        settingsExportButton.getAttribute('href') || '/export',
+        `kasa_yedek_${dateStamp}.json`
+      );
+    } catch (err) {
+      console.error('Export failed:', err);
+      showWarningToast(window._('Dışa aktarma başarısız oldu.'));
+    }
+  });
+
+  const updateCheckButton = document.getElementById('update-check-btn');
+  const updateCheckStatus = document.getElementById('update-check-status');
+  const updateCheckResult = document.getElementById('update-check-result');
+
+  const setUpdateCheckResult = (title, detail, state, releaseUrl = '') => {
+    if (!updateCheckResult) return;
+
+    const copy = document.createElement('div');
+    const strong = document.createElement('strong');
+    const span = document.createElement('span');
+    strong.textContent = title;
+    span.textContent = detail;
+    copy.append(strong, span);
+
+    updateCheckResult.className = `update-check-result ${state}`;
+    updateCheckResult.replaceChildren(copy);
+
+    if (releaseUrl) {
+      const link = Object.assign(document.createElement('a'), {
+        href: releaseUrl,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        textContent: window._('GitHub’da Aç'),
+      });
+      updateCheckResult.appendChild(link);
+    }
+  };
+
+  updateCheckButton?.addEventListener('click', async () => {
+    updateCheckButton.disabled = true;
+    updateCheckButton.classList.add('is-loading');
+    updateCheckResult?.classList.add('hidden');
+    if (updateCheckStatus) updateCheckStatus.textContent = window._('Güncelleme kontrol ediliyor...');
+
+    try {
+      const data = await apiJson('/api/update-check');
+      const currentVersion = `v${data.current_version}`;
+      const latestVersion = `v${data.latest_version}`;
+
+      if (data.has_update) {
+        if (updateCheckStatus) {
+          updateCheckStatus.textContent = `${window._('Yeni sürüm bulundu.')}: ${latestVersion}`;
+        }
+        setUpdateCheckResult(
+          window._('Yeni sürüm bulundu.'),
+          `${window._('Mevcut')}: ${currentVersion} • ${window._('En son')}: ${latestVersion}`,
+          'is-update',
+          data.release_url
+        );
+      } else {
+        if (updateCheckStatus) {
+          updateCheckStatus.textContent = `${window._('Mevcut sürüm')}: ${currentVersion}`;
+        }
+        setUpdateCheckResult(
+          window._('Son sürümdesiniz.'),
+          `${window._('Mevcut')}: ${currentVersion} • ${window._('En son')}: ${latestVersion}`,
+          'is-current',
+          data.release_url
+        );
+      }
+    } catch (err) {
+      console.error('Update check failed:', err);
+      if (updateCheckStatus) updateCheckStatus.textContent = window._('Güncelleme bilgisi alınamadı.');
+      setUpdateCheckResult(
+        window._('Güncelleme bilgisi alınamadı.'),
+        window._('İnternet bağlantınızı kontrol edip tekrar deneyin.'),
+        'is-error'
+      );
+    } finally {
+      updateCheckButton.disabled = false;
+      updateCheckButton.classList.remove('is-loading');
+    }
   });
 
   const settingsForm = document.querySelector('[data-settings-form]');
@@ -956,8 +1078,20 @@ document.addEventListener('DOMContentLoaded', () => {
           category === 'favorites' ? wrapper.dataset.pinned === 'true' :
                                      wrapper.dataset.type === category;
         const isVisible = matchesSearch && matchesCategory;
-        wrapper.style.display = isVisible ? 'block' : 'none';
-        if (isVisible) visibleCount += 1;
+        const wasHidden = wrapper.style.display === 'none';
+
+        if (isVisible) {
+          wrapper.style.display = 'block';
+          if (wasHidden) {
+            wrapper.classList.remove('filter-reveal');
+            void wrapper.offsetWidth;
+            wrapper.classList.add('filter-reveal');
+          }
+          visibleCount += 1;
+        } else {
+          wrapper.classList.remove('filter-reveal');
+          wrapper.style.display = 'none';
+        }
       });
 
       if (filterEmptyState) {

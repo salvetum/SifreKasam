@@ -1,6 +1,7 @@
 const path = require('path');
 
 const iconPath = path.resolve(__dirname, 'favicon.ico');
+const installerLoadingGifPath = path.resolve(__dirname, 'assets', 'installer-loading.gif');
 const squirrelConfig = {
   name: 'SifreKasam',
   title: 'ŞifreKasam',
@@ -9,7 +10,8 @@ const squirrelConfig = {
   exe: 'SifreKasam.exe',
   setupExe: 'SifreKasamSetup.exe',
   iconUrl: process.env.SIFREKASAM_ICON_URL || 'https://raw.githubusercontent.com/salvetum/SifreKasam/main/favicon.ico',
-  setupIcon: iconPath
+  setupIcon: iconPath,
+  loadingGif: installerLoadingGifPath
 };
 
 module.exports = {
