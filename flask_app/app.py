@@ -43,7 +43,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.3.3")
+APP_VERSION = os.environ.get("APP_VERSION", "2.3.4")
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
@@ -54,6 +54,8 @@ DEFAULT_CATEGORY = 'Genel'
 DEFAULT_ACCENT_COLOR = '#7c6ff7'
 DEFAULT_BACKGROUND_STYLE = 'aurora'
 VALID_BACKGROUND_STYLES = {'aurora', 'midnight', 'mesh', 'plain'}
+DEFAULT_GLASS_QUALITY = 'normal'
+VALID_GLASS_QUALITIES = {'low', 'normal', 'high'}
 DEFAULT_ANIMATED_BACKGROUNDS_ENABLED = True
 DEFAULT_GRADIENTS_ENABLED = True
 
@@ -457,6 +459,10 @@ def normalize_background_style(value) -> str:
     text = str(value or DEFAULT_BACKGROUND_STYLE).strip().lower()
     return text if text in VALID_BACKGROUND_STYLES else DEFAULT_BACKGROUND_STYLE
 
+def normalize_glass_quality(value) -> str:
+    text = str(value or DEFAULT_GLASS_QUALITY).strip().lower()
+    return text if text in VALID_GLASS_QUALITIES else DEFAULT_GLASS_QUALITY
+
 def safe_int(value: object | None, default: int, minimum: int | None = None,
              maximum: int | None = None) -> int:
     """Kullanıcı/env kaynaklı sayıları güvenli aralığa çevirir."""
@@ -547,6 +553,15 @@ def get_saved_background_style() -> str:
         pass
     return normalize_background_style(_load_appearance_file().get('background_style'))
 
+def get_glass_quality() -> str:
+    try:
+        v = _get_setting('glass_quality')
+        if v:
+            return normalize_glass_quality(v)
+    except Exception:
+        pass
+    return normalize_glass_quality(_load_appearance_file().get('glass_quality'))
+
 def get_animated_backgrounds_enabled() -> bool:
     try:
         v = _get_setting('animated_backgrounds_enabled')
@@ -596,6 +611,12 @@ def save_background_style(value) -> str:
     _save_appearance_file(background_style=background)
     return background
 
+def save_glass_quality(value) -> str:
+    quality = normalize_glass_quality(value)
+    _set_setting('glass_quality', quality)
+    _save_appearance_file(glass_quality=quality)
+    return quality
+
 def save_animated_backgrounds(value) -> bool:
     enabled = normalize_theme_option(value, DEFAULT_ANIMATED_BACKGROUNDS_ENABLED)
     _set_setting('animated_backgrounds_enabled', str(enabled).lower())
@@ -618,6 +639,7 @@ def inject_globals():
     glass_effects      = True
     accent_color       = DEFAULT_ACCENT_COLOR
     background_style   = DEFAULT_BACKGROUND_STYLE
+    glass_quality      = DEFAULT_GLASS_QUALITY
     animated_backgrounds = DEFAULT_ANIMATED_BACKGROUNDS_ENABLED
     gradients_enabled  = DEFAULT_GRADIENTS_ENABLED
     lan_enabled        = False
@@ -632,6 +654,7 @@ def inject_globals():
         glass_effects = get_glass_effects_enabled()
         accent_color  = get_saved_accent_color()
         background_style = get_saved_background_style()
+        glass_quality = get_glass_quality()
         animated_backgrounds = get_animated_backgrounds_enabled()
         gradients_enabled = get_gradients_enabled()
         le           = _get_setting('lan_enabled')
@@ -650,6 +673,7 @@ def inject_globals():
         'GLASS_EFFECTS_ENABLED': glass_effects,
         'ACCENT_COLOR':          accent_color,
         'BACKGROUND_STYLE':      background_style,
+        'GLASS_QUALITY':         glass_quality,
         'ANIMATED_BACKGROUNDS_ENABLED': animated_backgrounds,
         'GRADIENTS_ENABLED':     gradients_enabled,
         'LAN_ENABLED':           lan_enabled,
@@ -1074,6 +1098,8 @@ def save_settings():
         save_accent_color(request.form.get('accent_color'))
     if 'background_style' in request.form:
         save_background_style(request.form.get('background_style'))
+    if 'glass_quality' in request.form:
+        save_glass_quality(request.form.get('glass_quality'))
     save_animated_backgrounds(
         'true' if request.form.get('animated_backgrounds_enabled') else 'false')
     save_gradients(
@@ -1087,6 +1113,7 @@ def save_settings():
             "glass_effects_enabled": get_glass_effects_enabled(),
             "accent_color": get_saved_accent_color(),
             "background_style": get_saved_background_style(),
+            "glass_quality": get_glass_quality(),
             "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
             "gradients_enabled": get_gradients_enabled(),
             "lan_enabled": _lan_access_enabled(),
@@ -1254,7 +1281,7 @@ def settings_tray():
         db.session.commit()
         return jsonify({"status": "ok"})
     s        = Setting.query.filter_by(key='minimize_to_tray').first()
-    minimize = not s or s.value == 'true'
+    minimize = bool(s and s.value == 'true')
     return jsonify({"minimize_to_tray": minimize})
 
 @app.route('/settings/runtime')
@@ -1351,6 +1378,7 @@ def settings_appearance():
         data = request_json()
         accent = save_accent_color(data.get('accent_color')) if 'accent_color' in data else get_saved_accent_color()
         background = save_background_style(data.get('background_style')) if 'background_style' in data else get_saved_background_style()
+        glass_quality = save_glass_quality(data.get('glass_quality')) if 'glass_quality' in data else get_glass_quality()
         animated_backgrounds = (
             save_animated_backgrounds(data.get('animated_backgrounds_enabled'))
             if 'animated_backgrounds_enabled' in data
@@ -1366,12 +1394,14 @@ def settings_appearance():
             "status": "ok",
             "accent_color": accent,
             "background_style": background,
+            "glass_quality": glass_quality,
             "animated_backgrounds_enabled": animated_backgrounds,
             "gradients_enabled": gradients,
         })
     return jsonify({
         "accent_color": get_saved_accent_color(),
         "background_style": get_saved_background_style(),
+        "glass_quality": get_glass_quality(),
         "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
         "gradients_enabled": get_gradients_enabled(),
     })

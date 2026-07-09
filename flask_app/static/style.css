@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.3.3 — Main Stylesheet
+   ŞifreKasam v2.3.4 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -95,6 +95,40 @@
     --glass-border-hi: rgba(79,145,255,0.28);
 }
 
+html[data-glass-quality="low"] {
+    --glass:          rgba(255,255,255,0.052);
+    --glass-border:   rgba(255,255,255,0.105);
+    --glass-border-hi:rgba(255,255,255,0.20);
+    --glass-blur:     blur(8px);
+    --glass-blur-sm:  blur(4px);
+    --shadow-panel:   0 14px 34px rgba(0,0,0,0.24);
+    --shadow-modal:   0 20px 52px rgba(0,0,0,0.44);
+    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.032));
+}
+
+html[data-glass-quality="high"] {
+    --glass:          rgba(255,255,255,0.075);
+    --glass-border:   rgba(255,255,255,0.15);
+    --glass-border-hi:rgba(255,255,255,0.30);
+    --glass-blur:     blur(24px);
+    --glass-blur-sm:  blur(14px);
+    --shadow-panel:   0 22px 58px rgba(0,0,0,0.32);
+    --shadow-modal:   0 30px 78px rgba(0,0,0,0.56);
+    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.092), rgba(255,255,255,0.04));
+}
+
+html[data-bs-theme="light"][data-glass-quality="low"] {
+    --glass:          rgba(255,255,255,0.82);
+    --glass-border:   rgba(31,41,55,0.10);
+    --glass-border-hi:rgba(79,145,255,0.22);
+}
+
+html[data-bs-theme="light"][data-glass-quality="high"] {
+    --glass:          rgba(255,255,255,0.58);
+    --glass-border:   rgba(31,41,55,0.14);
+    --glass-border-hi:rgba(79,145,255,0.34);
+}
+
 /* ── GLOBAL RESET ────────────────────────────────────────────── */
 *, *::before, *::after {
     box-sizing: border-box;
@@ -165,6 +199,29 @@ html[data-kasa-motion="off"] .blob-accent {
     transform: none !important;
     will-change: auto;
 }
+
+html[data-kasa-low-power="on"] *,
+html[data-kasa-low-power="on"] *::before,
+html[data-kasa-low-power="on"] *::after {
+    animation-play-state: paused !important;
+    transition-duration: 0.001ms !important;
+    will-change: auto !important;
+}
+
+html[data-kasa-low-power="on"] body::before,
+html[data-kasa-low-power="on"] body::after,
+html[data-kasa-low-power="on"] .blob-accent {
+    display: none !important;
+}
+
+html[data-kasa-low-power="on"] .glass,
+html[data-kasa-low-power="on"] .glass-sm,
+html[data-kasa-low-power="on"] .kasa-panel,
+html[data-kasa-low-power="on"] .kasa-modal-content {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
 body::before {
     top: -10%; left: -10%;
     width: 60vw; height: 60vh;
@@ -2998,6 +3055,22 @@ html[data-kasa-motion="on"] .appearance-preview {
     line-height: 1.45;
 }
 
+.export-warning-card {
+    border-color: rgba(239,68,68,0.24);
+    color: #fca5a5;
+    background:
+        radial-gradient(circle at top left, rgba(239,68,68,0.12), transparent 42%),
+        rgba(239,68,68,0.055);
+}
+
+.export-warning-card i {
+    background: rgba(239,68,68,0.11);
+}
+
+.export-warning-card p {
+    color: rgba(254,202,202,0.94);
+}
+
 .settings-body > #lan-info-box.glass-sm {
     display: grid;
     align-items: stretch;
@@ -3293,6 +3366,15 @@ html[data-kasa-motion="on"] .appearance-preview {
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
 }
 
+.settings-select-card {
+    gap: 1rem;
+}
+
+.settings-inline-select {
+    width: min(180px, 42vw);
+    flex: 0 0 auto;
+}
+
 .settings-toggle-main {
     display: flex;
     align-items: center;
@@ -3355,6 +3437,15 @@ html[data-kasa-motion="on"] .appearance-preview {
     }
 
     .settings-timeout-input {
+        width: 100%;
+    }
+
+    .settings-select-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .settings-inline-select {
         width: 100%;
     }
 }

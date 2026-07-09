@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.3.3 - Main JavaScript
+ * ŞifreKasam v2.3.4 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -157,6 +157,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeFeatureEnabled = (attribute) =>
     document.documentElement.getAttribute(attribute) !== 'off';
 
+  const GLASS_QUALITY_OPTIONS = new Set(['low', 'normal', 'high']);
+  const normalizeGlassQuality = (quality) =>
+    GLASS_QUALITY_OPTIONS.has(quality) ? quality : 'normal';
+
+  const applyGlassQuality = (quality) => {
+    const normalizedQuality = normalizeGlassQuality(quality);
+    document.documentElement.setAttribute('data-glass-quality', normalizedQuality);
+    localStorage.setItem('kasa-glass-quality', normalizedQuality);
+    return normalizedQuality;
+  };
+
   const pageLoadingOverlay = document.querySelector('.page-loading-overlay');
   const setPageLoading = (isLoading) => {
     document.body.classList.toggle('is-page-loading', isLoading);
@@ -165,10 +176,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── 1. HEARTBEAT ─────────────────────────────────────────────────────────
 
+  const HEARTBEAT_ACTIVE_INTERVAL_MS = 5000;
+  const HEARTBEAT_LOW_POWER_INTERVAL_MS = 60000;
+  let rendererLowPower = null;
+  let heartbeatTimer = null;
+
+  const setRendererLowPower = (enabled) => {
+    const nextState = Boolean(enabled);
+    if (rendererLowPower === nextState) return;
+    rendererLowPower = nextState;
+    document.documentElement.setAttribute('data-kasa-low-power', nextState ? 'on' : 'off');
+    window.dispatchEvent(new CustomEvent('kasa:low-power-changed', {
+      detail: { enabled: nextState },
+    }));
+  };
+
   const sendHeartbeat = () => apiFetch('/heartbeat', { method: 'POST' });
+
+  const stopHeartbeat = () => {
+    if (!heartbeatTimer) return;
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  };
+
+  const scheduleHeartbeat = () => {
+    stopHeartbeat();
+    heartbeatTimer = window.setInterval(
+      sendHeartbeat,
+      rendererLowPower ? HEARTBEAT_LOW_POWER_INTERVAL_MS : HEARTBEAT_ACTIVE_INTERVAL_MS
+    );
+  };
+
+  window.KASA_SET_LOW_POWER = setRendererLowPower;
+  setRendererLowPower(document.hidden);
   sendHeartbeat();
-  const heartbeatTimer = setInterval(sendHeartbeat, 5000);
-  window.addEventListener('pagehide', () => clearInterval(heartbeatTimer), { once: true });
+  scheduleHeartbeat();
+
+  document.addEventListener('visibilitychange', () => setRendererLowPower(document.hidden));
+  window.addEventListener('kasa:low-power-changed', scheduleHeartbeat);
+  window.addEventListener('pagehide', () => {
+    stopHeartbeat();
+    window.removeEventListener('kasa:low-power-changed', scheduleHeartbeat);
+  }, { once: true });
 
   // ─── 2. SAYFA GEÇİŞ OVERLAY ───────────────────────────────────────────────
 
@@ -263,6 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const backgroundSelect = document.getElementById('background-style-select');
   const backgroundHidden = document.getElementById('background-style-hidden');
   const accentHidden = document.getElementById('accent-color-hidden');
+  const glassQualitySelect = document.getElementById('glass-quality-select');
   const appearancePreview = document.getElementById('appearance-preview');
   const backgroundButtons = document.querySelectorAll('[data-background-option]');
   const accentPresetButtons = document.querySelectorAll('[data-accent-preset]');
@@ -273,6 +323,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let appearanceSaveTimer = 0;
   let accentContrastWarningTimer = 0;
   let lightAccentWarningShown = false;
+
+  if (glassQualitySelect) {
+    glassQualitySelect.value = normalizeGlassQuality(
+      document.documentElement.getAttribute('data-glass-quality')
+    );
+    glassQualitySelect.addEventListener('change', () => {
+      const glassQuality = applyGlassQuality(glassQualitySelect.value);
+      glassQualitySelect.value = glassQuality;
+      apiPost('/settings/appearance', { glass_quality: glassQuality });
+    });
+  }
 
   const queueAccentContrastWarning = (accent) => {
     const normalizedAccent = normalizeHexColor(accent);
@@ -570,6 +631,9 @@ document.addEventListener('DOMContentLoaded', () => {
           document.documentElement.setAttribute('data-glass-effects', value);
           localStorage.setItem('kasa-glass-effects', value);
         }
+        if (data.glass_quality && glassQualitySelect) {
+          glassQualitySelect.value = applyGlassQuality(data.glass_quality);
+        }
         if (typeof data.animated_backgrounds_enabled === 'boolean' && motionToggle) {
           motionToggle.checked = data.animated_backgrounds_enabled;
           applyThemeFeature('data-kasa-motion', 'kasa-animated-backgrounds', data.animated_backgrounds_enabled);
@@ -595,26 +659,41 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const copyIconTimers = new WeakMap();
+  const copyIconStates = new WeakMap();
+
+  const getCopyIconOriginalClass = (iconEl) => {
+    const cleanClass = String(iconEl.className || '')
+      .replace(/\bcopy-flash\b/g, '')
+      .replace(/\btext-success\b/g, '')
+      .trim();
+    if (cleanClass && !cleanClass.includes('fa-check')) return cleanClass;
+
+    const sizeClass = Array.from(iconEl.classList || [])
+      .filter(className => className.startsWith('text-') && className !== 'text-success')
+      .join(' ');
+    return `fa-solid fa-copy${sizeClass ? ` ${sizeClass}` : ''}`;
+  };
 
   const flashCopyIcon = (iconEl) => {
     if (!iconEl) return;
-    if (!iconEl.dataset.copyOriginalClass || iconEl.dataset.copyOriginalClass.includes('fa-check')) {
-      iconEl.dataset.copyOriginalClass = iconEl.className.includes('fa-check')
-        ? 'fa-solid fa-copy'
-        : iconEl.className;
-    }
-    clearTimeout(copyIconTimers.get(iconEl));
-    iconEl.className = 'fa-solid fa-check text-success';
+    const currentState = copyIconStates.get(iconEl);
+    const originalClass = currentState?.originalClass || getCopyIconOriginalClass(iconEl);
+
+    clearTimeout(currentState?.timer);
+    iconEl.className = originalClass.includes('text-')
+      ? originalClass.replace(/\bfa-copy\b/g, 'fa-check').replace(/\btext-success\b/g, '').trim()
+      : 'fa-solid fa-check';
+    iconEl.classList.add('text-success');
     iconEl.classList.remove('copy-flash');
     void iconEl.offsetWidth;
     iconEl.classList.add('copy-flash');
     showSuccessToast(window._('Kopyalandı!'));
-    copyIconTimers.set(iconEl, setTimeout(() => {
-      iconEl.className = iconEl.dataset.copyOriginalClass || 'fa-solid fa-copy';
+    const timer = setTimeout(() => {
+      iconEl.className = originalClass;
       iconEl.classList.remove('copy-flash');
-      copyIconTimers.delete(iconEl);
-    }, 650));
+      copyIconStates.delete(iconEl);
+    }, 850);
+    copyIconStates.set(iconEl, { originalClass, timer });
   };
 
   const copyToClipboard = async (text, iconEl) => {
