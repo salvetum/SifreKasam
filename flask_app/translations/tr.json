@@ -216,5 +216,11 @@
   "İnternet bağlantınızı kontrol edip tekrar deneyin.": "İnternet bağlantınızı kontrol edip tekrar deneyin.",
   "GitHub’da Aç": "GitHub’da Aç",
   "Mevcut": "Mevcut",
-  "En son": "En son"
+  "En son": "En son",
+  "Dışa aktarılan yedek dosyası şifreleri düz metin içerebilir. Dosyayı güvenli bir yerde saklayın ve paylaşmayın.": "Dışa aktarılan yedek dosyası şifreleri düz metin içerebilir. Dosyayı güvenli bir yerde saklayın ve paylaşmayın.",
+  "Cam Kalitesi": "Cam Kalitesi",
+  "Normal": "Normal",
+  "Bulanıklık seviyesini performansa göre ayarla.": "Bulanıklık seviyesini performansa göre ayarla.",
+  "Düşük": "Düşük",
+  "Yüksek": "Yüksek"
 }

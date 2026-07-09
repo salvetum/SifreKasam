@@ -27,6 +27,13 @@
         document.documentElement.setAttribute('data-glass-effects', normalizedGlassEffects);
         localStorage.setItem('kasa-glass-effects', normalizedGlassEffects);
 
+        const normalizeGlassQuality = function (value) {
+            return ['low', 'normal', 'high'].includes(value) ? value : 'normal';
+        };
+        const storedGlassQuality = normalizeGlassQuality(localStorage.getItem('kasa-glass-quality') || "{{ GLASS_QUALITY|default('normal') }}");
+        document.documentElement.setAttribute('data-glass-quality', storedGlassQuality);
+        localStorage.setItem('kasa-glass-quality', storedGlassQuality);
+
         const storedMotion = localStorage.getItem('kasa-animated-backgrounds') || "{{ 'on' if ANIMATED_BACKGROUNDS_ENABLED else 'off' }}";
         const normalizedMotion = storedMotion === 'off' ? 'off' : 'on';
         document.documentElement.setAttribute('data-kasa-motion', normalizedMotion);
@@ -97,7 +104,7 @@
     <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.3.3 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.3.4 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

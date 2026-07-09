@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
-title SifreKasam v2.3.3 - Gelistirme Ortami
+title SifreKasam v2.3.4 - Gelistirme Ortami
 color 0B
 
 echo ===================================================
-echo   SIFREKASAM V2.3.3 - Baslatma ve Derleme Araci
+echo   SIFREKASAM V2.3.4 - Baslatma ve Derleme Araci
 echo ===================================================
 echo.
 

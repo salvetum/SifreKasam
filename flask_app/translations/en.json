@@ -229,5 +229,11 @@
   "İnternet bağlantınızı kontrol edip tekrar deneyin.": "Check your internet connection and try again.",
   "GitHub’da Aç": "Open on GitHub",
   "Mevcut": "Current",
-  "En son": "Latest"
+  "En son": "Latest",
+  "Dışa aktarılan yedek dosyası şifreleri düz metin içerebilir. Dosyayı güvenli bir yerde saklayın ve paylaşmayın.": "Exported backup files may contain passwords in plain text. Store the file securely and do not share it.",
+  "Cam Kalitesi": "Glass Quality",
+  "Normal": "Normal",
+  "Bulanıklık seviyesini performansa göre ayarla.": "Adjust blur level based on performance.",
+  "Düşük": "Low",
+  "Yüksek": "High"
 }

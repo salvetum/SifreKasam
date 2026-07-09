@@ -14,6 +14,8 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.4',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3.4',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.2',
@@ -78,6 +80,7 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
     'sifrekasam',
     'SifreKasam',
+    'sifrekasam-v2.3.4',
     'ŞifreKasam',
     'sifrekasam-v2.3.3',
     'sifrekasam-v2.3.2',
@@ -284,7 +287,11 @@ function createWindow() {
     icon: resolvePath('favicon.ico'),
     backgroundColor: getSavedWindowBackgroundColor(),
     show: true,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: true,
+    },
   });
 
   mainWindow.setMenu(null);
@@ -292,6 +299,7 @@ function createWindow() {
     query: {
       theme:        getSavedTheme(),
       glassEffects: getSavedGlassEffects() ? 'on' : 'off',
+      glassQuality: getSavedGlassQuality(),
       lang:         getSavedLanguage(),
       accent:       getSavedAccentColor(),
       background:   getSavedBackgroundStyle(),
@@ -334,15 +342,23 @@ function createWindow() {
     checkMinimizeToTray()
       .then((shouldMinimize) => {
         if (shouldMinimize) {
+          setRendererLowPower(true);
           mainWindow.hide();
         } else {
           isQuiting = true;
           app.quit();
         }
       })
-      .catch(() => mainWindow.hide());
+      .catch(() => {
+        isQuiting = true;
+        app.quit();
+      });
   });
 
+  mainWindow.on('hide', () => setRendererLowPower(true));
+  mainWindow.on('show', () => setRendererLowPower(false));
+  mainWindow.on('minimize', () => setRendererLowPower(true));
+  mainWindow.on('restore', () => setRendererLowPower(false));
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -361,11 +377,20 @@ function createTray() {
 
 function showMainWindow() {
   if (!mainWindow) return;
+  setRendererLowPower(false);
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.setAlwaysOnTop(true);
   mainWindow.show();
   mainWindow.focus();
   mainWindow.setAlwaysOnTop(false);
+}
+
+function setRendererLowPower(enabled) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const value = enabled ? 'true' : 'false';
+  mainWindow.webContents
+    .executeJavaScript(`window.KASA_SET_LOW_POWER?.(${value});`, true)
+    .catch(() => {});
 }
 
 // ─── FLASK AYARLARI SORGUSU ───────────────────────────────────────────────────
@@ -385,8 +410,8 @@ function checkMinimizeToTray() {
         });
       }
     );
-    req.on('error',   () => resolve(true));
-    req.on('timeout', () => { req.destroy(); resolve(true); });
+    req.on('error',   () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
     req.end();
   });
 }
@@ -639,6 +664,15 @@ function getSavedGlassEffects() {
     const data = readThemeFile();
     return !GLASS_EFFECTS_FALSY.has(String(data?.glass_effects_enabled).toLowerCase());
   } catch (_) { return true; }
+}
+
+function getSavedGlassQuality() {
+  try {
+    const data = readThemeFile();
+    return ['low', 'normal', 'high'].includes(data?.glass_quality)
+      ? data.glass_quality
+      : 'normal';
+  } catch (_) { return 'normal'; }
 }
 
 function getSavedLanguage() {

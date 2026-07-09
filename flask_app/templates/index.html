@@ -466,16 +466,6 @@
                             <input class="form-check-input" type="checkbox" id="theme-toggle" aria-labelledby="setting-theme-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
-                    <!-- Tepsiye Küçült -->
-                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
-                        <div>
-                            <h4 id="setting-tray-title" class="text-sm font-medium mb-0.5">{{ _('Tepsiye Küçült') }}</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kapatınca uygulamayı sistem tepsisinde tut.') }}</p>
-                        </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" id="setting-minimize-to-tray" checked aria-labelledby="setting-tray-title" style="width:2.5em;height:1.25em;cursor:pointer;">
-                        </div>
-                    </div>
                     <!-- Cam Efektleri -->
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
@@ -485,6 +475,17 @@
                         <div class="form-check form-switch m-0">
                             <input class="form-check-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
+                    </div>
+                    <div class="settings-select-card flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h4 id="setting-glass-quality-title" class="text-sm font-medium mb-0.5">{{ _('Cam Kalitesi') }}</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Bulanıklık seviyesini performansa göre ayarla.') }}</p>
+                        </div>
+                        <select name="glass_quality" id="glass-quality-select" class="kasa-field settings-inline-select" aria-labelledby="setting-glass-quality-title">
+                            <option value="low" {% if GLASS_QUALITY == 'low' %}selected{% endif %}>{{ _('Düşük') }}</option>
+                            <option value="normal" {% if GLASS_QUALITY == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
+                            <option value="high" {% if GLASS_QUALITY == 'high' %}selected{% endif %}>{{ _('Yüksek') }}</option>
+                        </select>
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
@@ -584,6 +585,18 @@
                                    class="kasa-field settings-timeout-input">
                         </div>
                     </div>
+                    <!-- Tepsiye Küçült -->
+                    <div class="settings-toggle-card">
+                        <div class="settings-toggle-main">
+                            <div class="settings-toggle-copy">
+                                <h4 id="setting-tray-title" class="text-sm font-medium mb-0.5">{{ _('Tepsiye Küçült') }}</h4>
+                                <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kapatınca uygulamayı sistem tepsisinde tut.') }}</p>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" id="setting-minimize-to-tray" aria-labelledby="setting-tray-title" style="width:2.5em;height:1.25em;cursor:pointer;">
+                            </div>
+                        </div>
+                    </div>
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-database"></i></span>
                         <div>
@@ -611,6 +624,10 @@
                             </span>
                             <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                         </a>
+                    </div>
+                    <div class="lan-warning-card export-warning-card">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <p>{{ _('Dışa aktarılan yedek dosyası şifreleri düz metin içerebilir. Dosyayı güvenli bir yerde saklayın ve paylaşmayın.') }}</p>
                     </div>
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-language"></i></span>
