@@ -217,5 +217,17 @@
   "Ayarlar zaten güncel.": "Settings are already up to date.",
   "Bu renk yazıları veya simgeleri okunmaz yapabilir.": "This color may make text or icons hard to read.",
   "Hiçbir kayıt bulunamadı.": "No records found.",
-  "Arama veya filtreyi değiştirerek tekrar deneyin.": "Try changing the search or filter."
+  "Arama veya filtreyi değiştirerek tekrar deneyin.": "Try changing the search or filter.",
+  "Dışa aktarma başarısız oldu.": "Export failed.",
+  "Sürüm ve güncelleme bilgileri.": "Version and update information.",
+  "Güncellemeyi Kontrol Et": "Check for Updates",
+  "Mevcut sürüm": "Current version",
+  "Güncelleme kontrol ediliyor...": "Checking for updates...",
+  "Yeni sürüm bulundu.": "New version found.",
+  "Son sürümdesiniz.": "You are on the latest version.",
+  "Güncelleme bilgisi alınamadı.": "Could not get update information.",
+  "İnternet bağlantınızı kontrol edip tekrar deneyin.": "Check your internet connection and try again.",
+  "GitHub’da Aç": "Open on GitHub",
+  "Mevcut": "Current",
+  "En son": "Latest"
 }

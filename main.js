@@ -62,6 +62,7 @@ function cleanupApplicationData(currentInstallRoot) {
     'sifrekasam',
     'SifreKasam',
     'ŞifreKasam',
+    'sifrekasam-v2.3.2',
     'sifrekasam-v2.3.1',
     'sifrekasam-v2.3',
     'sifrekasam-v2.2',
@@ -136,39 +137,44 @@ function removeKnownShortcuts(appData, userProfile, publicProfile) {
   });
 }
 
-function removeKnownRegistryKeys() {
-  const uninstallKeys = [
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.1',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3.1',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.2',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.2',
-  ];
+const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam';
+const LEGACY_UNINSTALL_KEYS = [
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.2',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3.2',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.2',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.2',
+];
+const ALL_UNINSTALL_KEYS = [CANONICAL_UNINSTALL_KEY, ...LEGACY_UNINSTALL_KEYS];
 
-  uninstallKeys.forEach(key => {
-    try {
-      spawnSync('reg.exe', ['delete', key, '/f'], { stdio: 'ignore', windowsHide: true });
-    } catch (_) {}
-  });
+function deleteRegistryKey(key) {
+  try {
+    spawnSync('reg.exe', ['delete', key, '/f'], { stdio: 'ignore', windowsHide: true });
+  } catch (_) {}
+}
+
+function writeRegistryValue(key, name, value) {
+  try {
+    spawnSync(
+      'reg.exe',
+      ['add', key, '/v', name, '/t', 'REG_SZ', '/d', value, '/f'],
+      { stdio: 'ignore', windowsHide: true }
+    );
+  } catch (_) {}
+}
+
+function removeKnownRegistryKeys() {
+  ALL_UNINSTALL_KEYS.forEach(deleteRegistryKey);
 }
 
 function updateWindowsUninstallMetadata(installRoot) {
   if (process.platform !== 'win32') return;
 
-  const uninstallKeys = [
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.1',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3.1',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.3',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.2',
-    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.2',
-  ];
   const iconFile = resolvePath('favicon.ico');
   const appIcon = fs.existsSync(iconFile) ? iconFile : `${process.execPath},0`;
   const updateExe = installRoot ? path.join(installRoot, 'Update.exe') : null;
@@ -184,16 +190,9 @@ function updateWindowsUninstallMetadata(installRoot) {
     ] : []),
   ];
 
-  uninstallKeys.forEach(uninstallKey => {
-    values.forEach(([name, value]) => {
-      try {
-        spawnSync(
-          'reg.exe',
-          ['add', uninstallKey, '/v', name, '/t', 'REG_SZ', '/d', value, '/f'],
-          { stdio: 'ignore', windowsHide: true }
-        );
-      } catch (_) {}
-    });
+  LEGACY_UNINSTALL_KEYS.forEach(deleteRegistryKey);
+  values.forEach(([name, value]) => {
+    writeRegistryValue(CANONICAL_UNINSTALL_KEY, name, value);
   });
 }
 
@@ -405,6 +404,7 @@ function startFlaskServer() {
     flaskProcess = spawn(command, args, {
       env: { ...process.env, APP_TOKEN,
              FLASK_SECRET_KEY: APP_TOKEN,
+             APP_VERSION: app.getVersion(),
              FLASK_HOST: flaskHost,
              FLASK_PORT: String(PORT), PORT: String(PORT),
              KASA_RESET_LAN_ON_START: resetSavedLanOnNextStart ? '1' : '0' },

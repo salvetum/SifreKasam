@@ -602,7 +602,7 @@
                             </span>
                             <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                         </button>
-                        <a href="{{ url_for('export_data') }}" data-no-loading download
+                        <a href="{{ url_for('export_data') }}" id="settings-export-btn" data-no-loading download
                             class="settings-action-card no-underline">
                             <span class="settings-action-icon settings-action-icon-success"><i class="fa-solid fa-download"></i></span>
                             <span class="settings-action-copy">
@@ -673,6 +673,24 @@
                         </span>
                         <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                     </button>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-circle-info"></i></span>
+                        <div>
+                            <h3 id="settings-section-app">{{ _('Uygulama') }}</h3>
+                            <p>{{ _('Sürüm ve güncelleme bilgileri.') }}</p>
+                        </div>
+                    </div>
+                    <div class="settings-action-grid settings-action-grid-single">
+                        <button type="button" id="update-check-btn" class="settings-action-card">
+                            <span class="settings-action-icon"><i class="fa-solid fa-rotate"></i></span>
+                            <span class="settings-action-copy">
+                                <strong>{{ _('Güncellemeyi Kontrol Et') }}</strong>
+                                <small id="update-check-status">{{ _('Mevcut sürüm') }}: v{{ APP_VERSION }}</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                        </button>
+                    </div>
+                    <div id="update-check-result" class="update-check-result hidden" aria-live="polite"></div>
                 </div>
                 <div class="modal-footer flex justify-between items-center w-full">
                     <div class="text-xs text-kasa-text-muted text-left">
@@ -701,25 +719,6 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('stat-expired').textContent = data.expired;
         })
         .catch(function () {});
-
-    // ── Güncelleme Kontrolü ──
-    //var currentVersion = '{{ APP_VERSION }}';
-    //var controller = new AbortController();
-    //setTimeout(function () { controller.abort(); }, 5000);
-    //try {
-    //    fetch('https://api.github.com/repos/kaan5/SifreKasaV2/releases/latest', { signal: controller.signal })
-    //        .then(function (r) { return r.json(); })
-    //        .then(function (data) {
-    //            if (data.tag_name && data.tag_name !== currentVersion) {
-    //                showToast({
-    //                    text: 'v' + data.tag_name + ' yayında! kasayı güncellemek için GitHub sayfasını ziyaret edin.',
-    //                    gravity: 'top',
-    //                    duration: 8000
-    //                });
-    //            }
-    //        })
-    //        .catch(function () {});
-    //} catch(e) {}
 
     document.querySelectorAll('.expiry-badge').forEach(function (el) {
         var expiryStr = el.getAttribute('data-expiry');

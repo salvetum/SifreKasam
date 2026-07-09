@@ -204,5 +204,17 @@
   "Ayarlar zaten güncel.": "Ayarlar zaten güncel.",
   "Bu renk yazıları veya simgeleri okunmaz yapabilir.": "Bu renk yazıları veya simgeleri okunmaz yapabilir.",
   "Hiçbir kayıt bulunamadı.": "Hiçbir kayıt bulunamadı.",
-  "Arama veya filtreyi değiştirerek tekrar deneyin.": "Arama veya filtreyi değiştirerek tekrar deneyin."
+  "Arama veya filtreyi değiştirerek tekrar deneyin.": "Arama veya filtreyi değiştirerek tekrar deneyin.",
+  "Dışa aktarma başarısız oldu.": "Dışa aktarma başarısız oldu.",
+  "Sürüm ve güncelleme bilgileri.": "Sürüm ve güncelleme bilgileri.",
+  "Güncellemeyi Kontrol Et": "Güncellemeyi Kontrol Et",
+  "Mevcut sürüm": "Mevcut sürüm",
+  "Güncelleme kontrol ediliyor...": "Güncelleme kontrol ediliyor...",
+  "Yeni sürüm bulundu.": "Yeni sürüm bulundu.",
+  "Son sürümdesiniz.": "Son sürümdesiniz.",
+  "Güncelleme bilgisi alınamadı.": "Güncelleme bilgisi alınamadı.",
+  "İnternet bağlantınızı kontrol edip tekrar deneyin.": "İnternet bağlantınızı kontrol edip tekrar deneyin.",
+  "GitHub’da Aç": "GitHub’da Aç",
+  "Mevcut": "Mevcut",
+  "En son": "En son"
 }

@@ -6,6 +6,7 @@ import io
 import json
 import logging
 import os
+import re
 import shutil
 import socket
 import threading
@@ -24,6 +25,8 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 import ipaddress
 from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from flask import (Flask, Response, abort, jsonify, redirect, render_template,
                    request, send_file, session, url_for)
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
@@ -40,7 +43,9 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = "2.3.1"
+APP_VERSION = os.environ.get("APP_VERSION", "2.3.2")
+UPDATE_REPOSITORY = "salvetum/SifreKasam"
+UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
 MAX_BULK_IDS = 500
 MAX_IMPORT_RECORDS = 5000
@@ -51,6 +56,38 @@ DEFAULT_BACKGROUND_STYLE = 'aurora'
 VALID_BACKGROUND_STYLES = {'aurora', 'midnight', 'mesh', 'plain'}
 DEFAULT_ANIMATED_BACKGROUNDS_ENABLED = True
 DEFAULT_GRADIENTS_ENABLED = True
+
+def _normalize_version(value: str | None) -> str:
+    return str(value or '').strip().lstrip('vV')
+
+def _version_parts(value: str | None) -> tuple[int, ...]:
+    normalized = _normalize_version(value).split('-', 1)[0]
+    numbers = [int(part) for part in re.findall(r'\d+', normalized)]
+    return tuple((numbers + [0, 0, 0])[:3])
+
+def _is_newer_version(latest: str | None, current: str | None) -> bool:
+    latest_parts = _version_parts(latest)
+    current_parts = _version_parts(current)
+    return bool(latest_parts) and latest_parts > current_parts
+
+def _fetch_latest_release() -> dict[str, Any]:
+    req = Request(
+        UPDATE_RELEASE_API,
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': f'SifreKasam/{APP_VERSION}',
+        },
+    )
+    with urlopen(req, timeout=5) as response:
+        payload = response.read().decode('utf-8')
+    data = json.loads(payload)
+    latest_version = _normalize_version(data.get('tag_name') or data.get('name'))
+    return {
+        'latest_version': latest_version,
+        'release_name': data.get('name') or f"v{latest_version}",
+        'release_url': data.get('html_url') or f"https://github.com/{UPDATE_REPOSITORY}/releases",
+        'published_at': data.get('published_at'),
+    }
 
 app.secret_key = FLASK_SECRET_KEY
 app.permanent_session_lifetime = timedelta(minutes=60)
@@ -1225,6 +1262,28 @@ def settings_runtime():
     return jsonify({
         'lan_enabled': _lan_access_enabled(),
         'runtime_lan_enabled': os.environ.get('FLASK_HOST') == '0.0.0.0',
+    })
+
+@app.route('/api/update-check')
+@login_required
+def update_check():
+    try:
+        latest = _fetch_latest_release()
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+        log.warning("Güncelleme kontrolü başarısız: %s", exc)
+        return jsonify({
+            'status': 'error',
+            'message': 'Güncelleme bilgisi alınamadı.',
+            'current_version': _normalize_version(APP_VERSION),
+        }), 502
+
+    latest_version = latest['latest_version']
+    current_version = _normalize_version(APP_VERSION)
+    return jsonify({
+        'status': 'ok',
+        'current_version': current_version,
+        'has_update': _is_newer_version(latest_version, current_version),
+        **latest,
     })
 
 @app.route('/api/lan-info')
