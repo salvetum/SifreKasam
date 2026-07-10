@@ -4,10 +4,6 @@
 
 vibecoding ile yapılmıştır (ki projenin ilk amacı buydu).
 
-# ⚠️ NOT
-
-Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
-
 ## Özellikler
 
 - Yerel veritabanı ve ana şifre ile şifreleme
