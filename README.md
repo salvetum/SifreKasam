@@ -86,57 +86,87 @@ Resmî kaynak dışında indirilen sürümlerde oluşabilecek veri kaybı, zarar
 - İçe/dışa aktarma, trayde çalışmaya devam etme ve otomatik kilitleme seçenekleri
 - Github üzerinden versiyon kontrolü
 
-## Güvenlik Notları
+## ⚠️ Güvenlik Notları
 
-- Bu proje kişisel kullanım için geliştirilmiştir; ticari veya yüksek riskli kullanım için bağımsız güvenlik denetiminden geçmemiştir.
-- Ana şifrenizi unutursanız kayıtları kurtarmak mümkün olmayabilir.
-- LAN erişimi geliştirme/kolay bağlantı amaçlıdır ve güvenlik riski taşır. Güvenmediğiniz ağlarda kapalı tutun.
-- Repo’ya gerçek veritabanı, yedek, sertifika, anahtar veya kişisel kayıt dosyası yüklemeyin.
+> [!WARNING]
+> Bu proje öncelikli olarak kişisel kullanım amacıyla geliştirilmiştir ve bağımsız bir güvenlik denetiminden geçmemiştir.
 
-## Geliştirme
+- Bağımsız bir güvenlik incelemesi yapılmadan ticari veya yüksek riskli kullanım için önerilmez.
+- Ana şifrenizi unutursanız şifrelenmiş kayıtları kurtarmak mümkün olmayabilir.
+- LAN erişimi geliştirme ve kolay yerel bağlantı amacıyla sunulmuştur.
+- Güvenmediğiniz ağlarda LAN erişimini kapalı tutun.
+- Repo'ya gerçek veritabanı, yedek, sertifika, özel anahtar veya kişisel kayıt dosyası yüklemeyin.
 
-Gereksinimler:
+## 🛠️ Geliştirme
 
-- Node.js / npm
+### Gereksinimler
+
+- Node.js
+- npm
 - Python
 - PyInstaller
 
-Kurulum:
+### Repoyu Klonlama
+
+```bash
+git clone https://github.com/salvetum/SifreKasam.git
+cd SifreKasam
+```
+
+### Bağımlılıkları Kurma
 
 ```bash
 npm install
 ```
 
-Geliştirme sırasında Electron uygulamasını başlatmak için:
+### Geliştirme Sürümünü Başlatma
 
 ```bash
 npm start
 ```
 
-Windows paket çıktısı almak için:
+### Windows Paketi Oluşturma
 
 ```bash
 npm run package
 ```
 
-Flask backend tek başına paketlenecekse `flask_app` klasöründe:
+### Flask Backend'i Paketleme
+
+Aşağıdaki komutları `flask_app` klasöründe çalıştırın:
 
 ```bash
+cd flask_app
 pyinstaller app.spec --clean -y
 ```
 
-## Repo’ya Dahil Edilmeyenler
+## 📁 Repo'ya Dahil Edilmeyen Dosyalar
 
-Aşağıdaki dosyalar bilinçli olarak Git dışında tutulur:
+Aşağıdaki dosya ve klasörler bilinçli olarak Git dışında tutulur:
 
-- `node_modules/`
-- `backend/`
-- `out/`
-- `flask_app/build/`
-- `flask_app/dist/`
-- `flask_app/*.db`
-- sertifika, anahtar, yedek ve geçici dosyalar
+```text
+node_modules/
+backend/
+out/
+flask_app/build/
+flask_app/dist/
+flask_app/*.db
+```
 
-## Lisans
+Bunlara ek olarak sertifikalar, özel anahtarlar, yedekler, geçici dosyalar ve kişisel veriler de repo dışında tutulur.
 
-MIT lisansı ile yayınlanır. Detaylar için `LICENSE` dosyasına bakın.
+## 📜 Lisans
+
+Bu proje **MIT Lisansı** altında yayımlanmaktadır.
+
+Detaylar için [`LICENSE`](LICENSE) dosyasına bakabilirsiniz.
+
+---
+
+<div align="center">
+
+ŞifreKasam açık kaynak olarak geliştirilmektedir.
+
+⭐ Projeyi faydalı bulduysanız repoya yıldız bırakabilirsiniz.
+
+</div>
