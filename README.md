@@ -8,8 +8,6 @@ vibecoding ile yapılmıştır (ki projenin ilk amacı buydu).
 
 Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 
-TODO: simge fixi, dışa aktarma güvenlik uyarısı, ram optimazsyonu, ve ayar menüsü değişiklikleri olacak.
-
 ## Özellikler
 
 - Yerel veritabanı ve ana şifre ile şifreleme
