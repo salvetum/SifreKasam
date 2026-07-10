@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.3.4 — Main Stylesheet
+   ŞifreKasam v2.4.0 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -184,11 +184,17 @@ body::before, body::after, .blob-accent {
     content: '';
     position: fixed;
     border-radius: 50%;
-    filter: blur(80px);
+    filter: blur(32px);
     pointer-events: none;
     z-index: -1;
     animation: drift 20s infinite alternate ease-in-out;
     opacity: 0.6;
+    will-change: auto;
+}
+
+html[data-kasa-motion="on"][data-glass-quality="high"] body::before,
+html[data-kasa-motion="on"][data-glass-quality="high"] body::after,
+html[data-kasa-motion="on"][data-glass-quality="high"] .blob-accent {
     will-change: transform;
 }
 
@@ -197,6 +203,15 @@ html[data-kasa-motion="off"] body::after,
 html[data-kasa-motion="off"] .blob-accent {
     animation: none !important;
     transform: none !important;
+    will-change: auto;
+}
+
+html[data-glass-quality="low"] body::before,
+html[data-glass-quality="low"] body::after,
+html[data-glass-quality="low"] .blob-accent {
+    animation: none;
+    filter: blur(20px);
+    transform: none;
     will-change: auto;
 }
 
@@ -217,25 +232,26 @@ html[data-kasa-low-power="on"] .blob-accent {
 html[data-kasa-low-power="on"] .glass,
 html[data-kasa-low-power="on"] .glass-sm,
 html[data-kasa-low-power="on"] .kasa-panel,
+html[data-kasa-low-power="on"] .kasa-modal .modal-content,
 html[data-kasa-low-power="on"] .kasa-modal-content {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
 
 body::before {
-    top: -10%; left: -10%;
-    width: 60vw; height: 60vh;
+    top: -8%; left: -8%;
+    width: 38vw; height: 38vh;
     background: radial-gradient(circle, rgba(124,111,247,0.4) 0%, transparent 70%);
 }
 body::after {
-    bottom: -20%; right: -10%;
-    width: 70vw; height: 70vh;
+    bottom: -12%; right: -8%;
+    width: 42vw; height: 42vh;
     background: radial-gradient(circle, rgba(79,145,255,0.35) 0%, transparent 70%);
     animation-delay: -10s;
 }
 .blob-accent {
     top: 40%; left: 60%;
-    width: 40vw; height: 40vh;
+    width: 30vw; height: 30vh;
     background: radial-gradient(circle, rgba(239,68,68,0.25) 0%, transparent 70%);
     animation-delay: -5s;
 }
@@ -260,10 +276,6 @@ body::after {
 .glass {
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-}
-.glass-sm {
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 /* ── GRADİYAN YAZI ───────────────────────────────────────────── */
 .gradient-text {
@@ -373,8 +385,6 @@ body::after {
     background: rgba(255,255,255,0.055);
     border: var(--border-glass);
     border-radius: var(--radius-sm);
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .kasa-page-title {
@@ -787,8 +797,6 @@ body::after {
     border-radius: var(--radius-sm) !important;
     color: var(--text) !important;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .kasa-field:focus,
@@ -871,8 +879,6 @@ body::after {
     background: rgba(255,255,255,0.06) !important;
     border-color: var(--glass-border) !important;
     color: var(--text-muted) !important;
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
     box-shadow: none !important;
 }
 .btn-outline-secondary:hover {
@@ -884,7 +890,6 @@ body::after {
 
 /* kasa-btn — özel buton sistemi */
 .kasa-btn {
-    will-change: transform;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -904,8 +909,6 @@ body::after {
     cursor: pointer;
     user-select: none;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 22px rgba(0,0,0,0.14);
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
     transition: transform var(--speed) ease, border-color var(--speed) ease,
                 background var(--speed) ease, color var(--speed) ease, box-shadow var(--speed) ease;
 }
@@ -965,8 +968,6 @@ body::after {
     cursor: pointer;
     font-size: 0.9rem;
     text-decoration: none;
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
     transition: all var(--speed) ease;
 }
 .icon-btn:hover {
@@ -993,8 +994,6 @@ body::after {
     cursor: pointer;
     outline: none;
     -webkit-tap-highlight-color: transparent;
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 18px rgba(0,0,0,0.12);
     transition: all var(--speed) ease;
 }
@@ -1058,8 +1057,6 @@ body::after {
     outline: none;
     box-shadow: none;
     -webkit-tap-highlight-color: transparent;
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
     transition: all var(--speed) ease;
 }
 .card-icon-btn:hover { background: var(--surface-hover) !important; color: var(--text); border-color: var(--accent); }
@@ -1107,7 +1104,6 @@ body::after {
    ════════════════════════════════════════════════════════════════ */
 
 .vault-card {
-    will-change: transform;
     border-radius: 16px;
     transition:
         transform 0.22s cubic-bezier(0.16,1,0.3,1),
@@ -1123,6 +1119,11 @@ body::after {
     transform: translateY(-1px) scale(0.998);
 }
 .vault-card-shell  { position: relative; border-radius: 16px; }
+html[data-glass-quality="low"] .vault-card-shell.glass,
+html[data-glass-quality="normal"] .vault-card-shell.glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
 .vault-card-body   { min-height: 240px; }
 .vault-card-header { min-height: 34px; }
 .vault-title-line  { min-width: 0; }
@@ -1235,8 +1236,8 @@ body::after {
     place-items: center;
     padding: 24px;
     background: rgba(8,9,18,0.72);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.16s ease;
@@ -1317,8 +1318,6 @@ body::after {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.45);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
     z-index: -1;
     opacity: 0;
     transition: opacity 0.18s ease;
@@ -1332,7 +1331,6 @@ body::after {
     margin: auto;
     transform: translateY(18px) scale(0.97);
     opacity: 0;
-    will-change: transform, opacity;
     transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), opacity 0.16s ease;
 }
 .kasa-modal.is-open .modal-dialog    { transform: translateY(0) scale(1); opacity: 1; }
@@ -1341,8 +1339,8 @@ body::after {
 .kasa-modal .modal-content {
     isolation: isolate;
     background: linear-gradient(145deg, rgba(22,25,45,0.88), rgba(12,14,28,0.76)) !important;
-    backdrop-filter: blur(24px) !important;
-    -webkit-backdrop-filter: blur(24px) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
     border: var(--border-glass) !important;
     border-top: 1px solid rgba(255,255,255,0.15) !important;
     border-radius: var(--radius);
@@ -1419,8 +1417,6 @@ body::after {
     border-radius: var(--radius-sm) !important;
     overflow: hidden;
     margin-bottom: 0.5rem;
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 .accordion-button {
     background: var(--glass) !important;
@@ -1440,8 +1436,6 @@ body::after {
     background: var(--glass) !important;
     border: var(--border-glass) !important;
     border-radius: var(--radius-sm);
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 /* ── Özel checkbox */
@@ -1645,8 +1639,7 @@ body::after {
 }
 
 .swal2-container {
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background: rgba(0,0,0,0.22) !important;
 }
 
 .swal2-popup.kasa-swal-popup {
@@ -1658,8 +1651,6 @@ body::after {
     box-shadow: 0 24px 64px rgba(0,0,0,0.5) !important;
     border-radius: 18px !important;
     padding: 1.75rem 2rem !important;
-    backdrop-filter: blur(24px) !important;
-    -webkit-backdrop-filter: blur(24px) !important;
 }
 .kasa-swal-title   { color: var(--text) !important;        font-family: var(--font-main) !important; font-size: 1.15rem !important; }
 .kasa-swal-text    { color: var(--text-muted) !important;  font-size: 0.92rem !important; }
@@ -2741,11 +2732,6 @@ html[data-kasa-motion="on"] .appearance-preview {
     background: rgba(255,255,255,0.045);
 }
 
-.accent-preset-row button,
-.background-choice-grid button {
-    will-change: transform;
-}
-
 .accent-preset-row button:hover {
     transform: translateY(-1px);
     border-color: rgba(var(--accent-rgb), 0.34);
@@ -3335,8 +3321,6 @@ html[data-kasa-motion="on"] .appearance-preview {
     background:
         radial-gradient(circle at 70% 72%, rgba(255,255,255,0.25), transparent 36%),
         rgba(255,255,255,0.14);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
 .appearance-preview::after {

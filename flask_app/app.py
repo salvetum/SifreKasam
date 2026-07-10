@@ -27,12 +27,17 @@ import ipaddress
 from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from flask import (Flask, Response, abort, jsonify, redirect, render_template,
-                   request, send_file, session, url_for)
+from flask import (Flask, Response, abort, jsonify, has_request_context,
+                   redirect, render_template, request, send_file, session, url_for)
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
                          login_user, logout_user)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import check_password_hash, generate_password_hash
+
+try:
+    from zxcvbn import zxcvbn as zxcvbn_score
+except ImportError:  # Paket eksikse uygulama açılır; kurulumda zxcvbn kullanılır.
+    zxcvbn_score = None
 
 # ─── UYGULAMA KURULUMU ────────────────────────────────────────────────────────
 
@@ -43,7 +48,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.3.4")
+APP_VERSION = os.environ.get("APP_VERSION", "2.4.0")
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
@@ -308,12 +313,46 @@ def _get_vault_password() -> str | None:
 
 # ─── KRİPTOGRAFİ ──────────────────────────────────────────────────────────────
 
-_SALT = b'kasa_masaustu_salt_12345'
+LEGACY_PBKDF2_SALT = b'kasa_masaustu_salt_12345'
+PBKDF2_SALT_SETTING = 'pbkdf2_salt_b64'
+PBKDF2_ITERATIONS = 600_000
+LEGACY_PBKDF2_ITERATIONS = 100_000
+
+def _derive_key_with_salt(master_password: str, salt: bytes,
+                          iterations: int = PBKDF2_ITERATIONS) -> bytes:
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32,
+                     salt=salt, iterations=iterations)
+    return base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
+
+def _decode_salt(value: str | None) -> bytes | None:
+    try:
+        salt = base64.b64decode(value or '', validate=True)
+        return salt if len(salt) >= 16 else None
+    except Exception:
+        return None
+
+def _get_saved_pbkdf2_salt() -> bytes | None:
+    return _decode_salt(_get_setting(PBKDF2_SALT_SETTING))
+
+def _new_salt_b64() -> str:
+    return base64.b64encode(os.urandom(16)).decode()
+
+def _create_pbkdf2_salt() -> bytes:
+    # Her kurulum için benzersiz salt üreterek offline brute-force maliyetini artırır.
+    salt_b64 = _new_salt_b64()
+    _set_setting(PBKDF2_SALT_SETTING, salt_b64)
+    return base64.b64decode(salt_b64)
 
 def derive_key(master_password: str) -> bytes:
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32,
-                     salt=_SALT, iterations=100_000)
-    return base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
+    salt = _get_saved_pbkdf2_salt()
+    if salt:
+        return _derive_key_with_salt(master_password, salt)
+    # Eski kasalar ilk başarılı girişte migrate edilene kadar legacy salt ile açılır.
+    return _derive_key_with_salt(
+        master_password,
+        LEGACY_PBKDF2_SALT,
+        LEGACY_PBKDF2_ITERATIONS,
+    )
 
 def get_fernet() -> Fernet:
     mp = _get_vault_password()
@@ -331,6 +370,9 @@ def safe_decrypt(fernet: Fernet, value: str) -> str:
 
 def safe_encrypt(fernet: Fernet, value: str) -> str:
     return fernet.encrypt(value.encode()).decode() if value else ""
+
+def strict_decrypt(fernet: Fernet, value: str) -> str:
+    return fernet.decrypt(value.encode()).decode() if value else ""
 
 def _is_legacy_master_hash(value: str) -> bool:
     return len(value or '') == 64 and all(c in '0123456789abcdef' for c in value.lower())
@@ -371,6 +413,46 @@ def _has_existing_vault_data() -> bool:
         return bool(Record.query.first() or PasswordHistory.query.first())
     except Exception:
         return False
+
+def migrate_legacy_pbkdf2_salt(master_password: str) -> bool:
+    if _get_saved_pbkdf2_salt():
+        return False
+
+    # Sabit salt kullanan eski kasaları rastgele salt + yeni iterasyonla yeniden şifreler.
+    new_salt = os.urandom(16)
+    old_fernet = Fernet(_derive_key_with_salt(
+        master_password,
+        LEGACY_PBKDF2_SALT,
+        LEGACY_PBKDF2_ITERATIONS,
+    ))
+    new_fernet = Fernet(_derive_key_with_salt(master_password, new_salt))
+    rows = Record.query.all()
+    hist_rows = PasswordHistory.query.all()
+
+    try:
+        backup_database()
+        for row in rows:
+            row.encrypted_password = safe_encrypt(
+                new_fernet,
+                strict_decrypt(old_fernet, row.encrypted_password),
+            )
+            row.encrypted_comment = safe_encrypt(
+                new_fernet,
+                strict_decrypt(old_fernet, row.encrypted_comment),
+            )
+        for history in hist_rows:
+            history.encrypted_password = safe_encrypt(
+                new_fernet,
+                strict_decrypt(old_fernet, history.encrypted_password),
+            )
+        _set_setting(PBKDF2_SALT_SETTING, base64.b64encode(new_salt).decode())
+        db.session.commit()
+        log.info("Legacy PBKDF2 salt migrasyonu tamamlandı.")
+        return True
+    except Exception:
+        db.session.rollback()
+        log.exception("Legacy PBKDF2 salt migrasyonu geri alındı.")
+        raise
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
 
@@ -426,7 +508,13 @@ def get_bulk_ids() -> list[str]:
     return normalized
 
 def _score_password(pw: str) -> int:
-    """Şifre güç puanını hesaplar (0–4)."""
+    """Return the backend password strength score in the same 0-4 range as zxcvbn.js."""
+    if zxcvbn_score:
+        try:
+            return int(zxcvbn_score(pw or '').get('score', 0))
+        except Exception:
+            log.exception("zxcvbn score calculation failed")
+    # Fallback keeps the app usable if the optional package is missing.
     return sum([
         len(pw) >= 12,
         any(c.isupper() for c in pw),
@@ -665,6 +753,8 @@ def inject_globals():
     current_lang = get_saved_language()
     available_langs = get_available_languages()
     lang_translations = load_translations(current_lang)
+    # Escape closing script tags before embedding translations in inline JS.
+    translations_json = json.dumps(lang_translations, ensure_ascii=False).replace('</', '<\\/')
     return {
         'APP_VERSION':           APP_VERSION,
         'AUTO_LOCK_ENABLED':     auto_lock_enabled,
@@ -679,7 +769,7 @@ def inject_globals():
         'LAN_ENABLED':           lan_enabled,
         'CURRENT_LANG':          current_lang,
         'AVAILABLE_LANGS':       available_langs,
-        'TRANSLATIONS_JSON':     json.dumps(lang_translations, ensure_ascii=False),
+        'TRANSLATIONS_JSON':     translations_json,
         '_':                     _,
     }
 
@@ -703,6 +793,102 @@ def _lan_access_enabled() -> bool:
     except Exception:
         return False
 
+_login_attempts: dict[str, dict[str, float | int]] = {}
+_login_attempts_lock = threading.Lock()
+
+def _login_attempt_key() -> str:
+    # LAN açıkken aynı ağdaki istemciler için IP bazlı brute-force limiti uygular.
+    if _lan_access_enabled():
+        return request.remote_addr or 'unknown'
+    return 'local'
+
+def _login_retry_after(key: str) -> int:
+    with _login_attempts_lock:
+        state = _login_attempts.get(key) or {}
+        retry_after = int(max(0, float(state.get('locked_until', 0)) - time.time()))
+        if retry_after <= 0 and state.get('locked_until'):
+            state.pop('locked_until', None)
+        return retry_after
+
+def _record_login_failure(key: str) -> int:
+    with _login_attempts_lock:
+        state = _login_attempts.setdefault(key, {'failures': 0, 'locked_until': 0.0})
+        failures = int(state.get('failures', 0)) + 1
+        state['failures'] = failures
+        wait_seconds = 300 if failures >= 10 else 30 if failures >= 5 else 0
+        if wait_seconds:
+            state['locked_until'] = max(float(state.get('locked_until', 0)), time.time() + wait_seconds)
+        return int(max(0, float(state.get('locked_until', 0)) - time.time()))
+
+def _reset_login_failures(key: str) -> None:
+    with _login_attempts_lock:
+        _login_attempts.pop(key, None)
+
+def _too_many_attempts_message(seconds: int) -> str:
+    return f"Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin."
+
+def overwrite_and_delete(path: str) -> None:
+    # Eski düz metin yedeklerini migrasyon sonrası diskte bırakmamak için silmeden önce ezer.
+    try:
+        size = os.path.getsize(path)
+    except FileNotFoundError:
+        return
+    with open(path, 'r+b') as f:
+        if size > 0:
+            f.write(os.urandom(size))
+            f.flush()
+            os.fsync(f.fileno())
+    os.remove(path)
+
+_vault_write_locked = threading.Event()
+_VAULT_WRITE_LOCK_MESSAGE = "Ana \u015fifre de\u011fi\u015ftiriliyor, l\u00fctfen bekleyin."
+_VAULT_WRITE_ENDPOINTS = {
+    'ekle_sayfasi', 'duzenle_sayfasi', 'sil_kayit', 'pin_kayit',
+    'import_data', 'bulk_delete', 'bulk_category', 'change_password',
+}
+
+_vault_report_cache: dict[str, dict[str, tuple[float, Any]]] = {}
+_vault_report_cache_lock = threading.Lock()
+_VAULT_REPORT_CACHE_TTL_SECONDS = 20
+
+def _vault_write_lock_response():
+    return jsonify({'error': _VAULT_WRITE_LOCK_MESSAGE}), 409
+
+def _vault_report_cache_key() -> str | None:
+    if not has_request_context():
+        return None
+    return session.get('vault_session_id')
+
+def _get_vault_report_cache(kind: str):
+    key = _vault_report_cache_key()
+    if not key:
+        return None
+    with _vault_report_cache_lock:
+        item = _vault_report_cache.get(key, {}).get(kind)
+        if not item:
+            return None
+        created_at, data = item
+        if time.time() - created_at > _VAULT_REPORT_CACHE_TTL_SECONDS:
+            _vault_report_cache.get(key, {}).pop(kind, None)
+            return None
+        return data
+
+def _set_vault_report_cache(kind: str, data: Any) -> None:
+    key = _vault_report_cache_key()
+    if not key:
+        return
+    with _vault_report_cache_lock:
+        _vault_report_cache.setdefault(key, {})[kind] = (time.time(), data)
+
+def invalidate_vault_report_cache() -> None:
+    # Successful vault writes make stats/health cache stale.
+    key = _vault_report_cache_key()
+    with _vault_report_cache_lock:
+        if key:
+            _vault_report_cache.pop(key, None)
+        else:
+            _vault_report_cache.clear()
+
 def _same_origin_state_change() -> bool:
     if request.method not in {'POST', 'PUT', 'PATCH', 'DELETE'}:
         return True
@@ -719,6 +905,12 @@ def check_token_and_auth():
 
     if not _same_origin_state_change():
         abort(403)
+
+    # Re-encrypt sürerken eski anahtarla yeni veri yazılmasını engeller.
+    if (request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}
+            and endpoint in _VAULT_WRITE_ENDPOINTS
+            and _vault_write_locked.is_set()):
+        return _vault_write_lock_response()
 
     is_local = _is_local_request()
     lan_enabled = _lan_access_enabled()
@@ -829,9 +1021,14 @@ def login():
     if request.method != 'POST':
         return render_template('login.html')
 
+    attempt_key = _login_attempt_key()
+    retry_after = _login_retry_after(attempt_key)
+    if retry_after > 0:
+        return render_template('login.html', error=_too_many_attempts_message(retry_after)), 429
+
     mp = request.form.get('master_password', '').strip()
     if not mp:
-        return render_template('login.html', error="Ana şifre boş olamaz.")
+        return render_template('login.html', error="Ana ?ifre bo? olamaz.")
 
     setting = Setting.query.filter_by(key='master_hash').first()
 
@@ -841,31 +1038,44 @@ def login():
             _clear_vault_password()
             session.clear()
             logout_user()
-            log.warning("Hatalı ana şifre denemesi.")
-            return render_template('login.html', error="Hatalı Ana Şifre!")
+            retry_after = _record_login_failure(attempt_key)
+            log.warning("Hatal? ana ?ifre denemesi.")
+            if retry_after > 0:
+                return render_template('login.html', error=_too_many_attempts_message(retry_after)), 429
+            return render_template('login.html', error="Hatal? Ana ?ifre!")
         if _is_legacy_master_hash(setting.value):
             setting.value = hash_master_password(mp)
             changed = True
         if not _vault_initialized():
             _mark_vault_initialized()
             changed = True
+        try:
+            if migrate_legacy_pbkdf2_salt(mp):
+                changed = False
+        except Exception:
+            return render_template(
+                'login.html',
+                error="Kasa anahtar migrasyonu ba?ar?s?z oldu. Veri g?venli?i i?in giri? durduruldu."
+            ), 500
         if changed:
             db.session.commit()
     else:
         if _vault_initialized() or _has_existing_vault_data():
-            log.error("Ana şifre kaydı bulunamadı; güvenlik nedeniyle yeniden kurulum engellendi.")
+            log.error("Ana ?ifre kayd? bulunamad?; g?venlik nedeniyle yeniden kurulum engellendi.")
             return render_template(
                 'login.html',
-                error="Bu kasa zaten kurulmuş görünüyor. Güvenlik nedeniyle yeni ana şifre belirleme engellendi."
+                error="Bu kasa zaten kurulmu? g?r?n?yor. G?venlik nedeniyle yeni ana ?ifre belirleme engellendi."
             ), 403
-        log.info("İlk kurulum: Ana şifre belirleniyor...")
+        log.info("?lk kurulum: Ana ?ifre belirleniyor...")
         Setting.query.filter_by(key='master_hash').delete()
         db.session.add(Setting(key='master_hash', value=hash_master_password(mp)))
+        _create_pbkdf2_salt()
         _mark_vault_initialized()
         db.session.commit()
         if os.path.exists(TXT_FILE):
             migrate_txt_to_db(mp)
 
+    _reset_login_failures(attempt_key)
     session.permanent = True
     _set_vault_password(mp)
     login_user(User("admin"), remember=False)
@@ -950,6 +1160,7 @@ def ekle_sayfasi():
                 encrypted_password=fields['encrypted_password'],
             ))
         db.session.commit()
+        invalidate_vault_report_cache()
         return redirect(url_for('index'))
     return render_template('ekle.html', title="Yeni Kayıt Ekle", kayit=None)
 
@@ -973,6 +1184,7 @@ def duzenle_sayfasi(kayit_id):
             if key != 'id':
                 setattr(r, key, val)
         db.session.commit()
+        invalidate_vault_report_cache()
         return redirect(url_for('index'))
 
     dec_pass = safe_decrypt(fernet, r.encrypted_password)
@@ -997,6 +1209,7 @@ def sil_kayit(kayit_id):
     backup_database()
     Record.query.filter_by(id=kayit_id).delete()
     db.session.commit()
+    invalidate_vault_report_cache()
     return redirect(url_for('index'))
 
 @app.route('/pin/<kayit_id>', methods=['POST'])
@@ -1006,6 +1219,7 @@ def pin_kayit(kayit_id):
     if r:
         r.is_pinned = 0 if r.is_pinned else 1
         db.session.commit()
+        invalidate_vault_report_cache()
     return redirect(url_for('index'))
 
 @app.route('/gecmis/<kayit_id>')
@@ -1029,6 +1243,10 @@ def get_record_password(kayit_id):
 @app.route('/api/stats')
 @login_required
 def api_stats():
+    cached = _get_vault_report_cache('stats')
+    if cached is not None:
+        return jsonify(cached)
+
     fernet      = get_fernet()
     rows        = Record.query.with_entities(
         Record.id, Record.encrypted_password,
@@ -1051,12 +1269,18 @@ def api_stats():
             if r.expiry_date and r.expiry_date < simdi:
                 expired += 1
 
-    return jsonify({'toplam': len(rows), 'pinned': pinned,
-                    'zayif': zayif, 'eski': eski, 'expired': expired})
+    stats = {'toplam': len(rows), 'pinned': pinned,
+             'zayif': zayif, 'eski': eski, 'expired': expired}
+    _set_vault_report_cache('stats', stats)
+    return jsonify(stats)
 
 @app.route('/saglik')
 @login_required
 def saglik_raporu():
+    cached = _get_vault_report_cache('saglik')
+    if cached is not None:
+        return render_template('saglik.html', **cached)
+
     fernet       = get_fernet()
     rows         = Record.query.with_entities(
         Record.id, Record.title, Record.encrypted_password,
@@ -1082,8 +1306,9 @@ def saglik_raporu():
             expired.append(rec)
 
     tekrar = [g for g in pw_map.values() if len(g) > 1]
-    return render_template('saglik.html', zayif=zayif, tekrar=tekrar,
-                            eski=eski, expired=expired)
+    payload = {'zayif': zayif, 'tekrar': tekrar, 'eski': eski, 'expired': expired}
+    _set_vault_report_cache('saglik', payload)
+    return render_template('saglik.html', **payload)
 
 @app.route('/save_settings', methods=['POST'])
 @login_required
@@ -1207,6 +1432,7 @@ def import_data():
         backup_database()
         db.session.add_all(records)
         db.session.commit()
+        invalidate_vault_report_cache()
         return redirect(url_for('index'))
     except UnicodeDecodeError:
         return "Dosya UTF-8 olarak okunamadı.", 400
@@ -1244,6 +1470,7 @@ def bulk_delete():
     backup_database()
     deleted = Record.query.filter(Record.id.in_(ids)).delete(synchronize_session=False)
     db.session.commit()
+    invalidate_vault_report_cache()
     return jsonify({'status': 'ok', 'deleted': deleted})
 
 @app.route('/api/bulk/category', methods=['POST'])
@@ -1257,6 +1484,7 @@ def bulk_category():
     updated = Record.query.filter(Record.id.in_(ids)).update(
         {'category': category}, synchronize_session=False)
     db.session.commit()
+    invalidate_vault_report_cache()
     return jsonify({'status': 'ok', 'updated': updated})
 
 @app.route('/api/bulk/export', methods=['POST'])
@@ -1424,6 +1652,7 @@ def _prune_reencrypt_state(max_entries: int = 20) -> None:
             _reencrypt_state.pop(task_id, None)
 
 def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | None):
+    _vault_write_locked.set()
     try:
         with app.app_context():
             backup_database()
@@ -1460,10 +1689,11 @@ def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | Non
             if setting:
                 setting.value = new_hash
             db.session.commit()
+            invalidate_vault_report_cache()
             if vault_sid:
                 with _vault_keys_lock:
                     _vault_keys[vault_sid] = new_pw
-            log.info("Ana şifre başarıyla değiştirildi.")
+            log.info("Ana ?ifre ba?ar?yla de?i?tirildi.")
             with _reencrypt_lock:
                 _reencrypt_state[task_id] = {'progress': 100, 'total': total, 'done': True}
 
@@ -1475,6 +1705,9 @@ def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | Non
         log.error(f"Password change error: {e}")
         with _reencrypt_lock:
             _reencrypt_state[task_id] = {'progress': -1, 'error': str(e)}
+    finally:
+        # Keep vault writes blocked until password rotation fully ends.
+        _vault_write_locked.clear()
 
 @app.route('/change-password', methods=['POST'])
 @login_required
@@ -1484,17 +1717,28 @@ def change_password():
     if not old_pw or not new_pw:
         return jsonify({'error': 'Eksik bilgi.'}), 400
 
-    setting = Setting.query.filter_by(key='master_hash').first()
-    if not setting or not verify_master_password(setting.value, old_pw):
-        return jsonify({'error': 'Mevcut şifre hatalı.'}), 403
+    # Lock writes before re-encrypt starts to close the race window.
+    with _reencrypt_lock:
+        if _vault_write_locked.is_set():
+            return _vault_write_lock_response()
+        _vault_write_locked.set()
 
-    task_id = uuid.uuid4().hex
-    vault_sid = session.get('vault_session_id')
-    _prune_reencrypt_state()
-    threading.Thread(target=_reencrypt_task,
-                     args=(task_id, old_pw, new_pw, vault_sid),
-                     daemon=True).start()
-    return jsonify({'task_id': task_id})
+    try:
+        setting = Setting.query.filter_by(key='master_hash').first()
+        if not setting or not verify_master_password(setting.value, old_pw):
+            _vault_write_locked.clear()
+            return jsonify({'error': 'Mevcut \u015fifre hatal\u0131.'}), 403
+
+        task_id = uuid.uuid4().hex
+        vault_sid = session.get('vault_session_id')
+        _prune_reencrypt_state()
+        threading.Thread(target=_reencrypt_task,
+                         args=(task_id, old_pw, new_pw, vault_sid),
+                         daemon=True).start()
+        return jsonify({'task_id': task_id})
+    except Exception:
+        _vault_write_locked.clear()
+        raise
 
 @app.route('/change-password/progress/<task_id>')
 @login_required
@@ -1515,10 +1759,14 @@ def migrate_txt_to_db(mp: str):
         for item in parse_old_txt(content):
             db.session.add(_parse_import_record(item, fernet))
         db.session.commit()
-        os.rename(TXT_FILE, TXT_FILE + ".migrated")
     except Exception as e:
         db.session.rollback()
         log.error(f"Migration error: {e}")
+        return
+    try:
+        overwrite_and_delete(TXT_FILE)
+    except Exception as e:
+        log.error(f"Plaintext migration cleanup error: {e}")
 
 # ─── SSL SERTİFİKASI (self-signed) ─────────────────────────────────────────────
 

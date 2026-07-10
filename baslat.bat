@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
-title SifreKasam v2.3.4 - Gelistirme Ortami
+title SifreKasam v2.4.0 - Gelistirme Ortami
 color 0B
 
 echo ===================================================
-echo   SIFREKASAM V2.3.4 - Baslatma ve Derleme Araci
+echo   SIFREKASAM V2.4.0 - Baslatma ve Derleme Araci
 echo ===================================================
 echo.
 
@@ -41,7 +41,7 @@ call pyinstaller app.spec --clean -y >nul 2>&1
 if !errorlevel! neq 0 (
     echo [UYARI] Python derlemesi basarisiz oldu. "pyinstaller" eksik olabilir.
     echo [*] Eksik paketler otomatik olarak kuruluyor, lutfen bekleyin...
-    call pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login >nul 2>&1
+    call pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login zxcvbn >nul 2>&1
     
     echo [*] Tekrar derleniyor...
     call pyinstaller app.spec --clean -y >nul 2>&1

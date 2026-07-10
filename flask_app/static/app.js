@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.3.4 - Main JavaScript
+ * ŞifreKasam v2.4.0 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,13 +9,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const glassEffectsEnabled = () =>
     document.documentElement.getAttribute('data-glass-effects') !== 'off';
 
+  const notifyVaultWriteLocked = async (response) => {
+    if (!response || ![409, 423].includes(response.status)) return;
+
+    let message = window._('Ana \u015fifre de\u011fi\u015ftiriliyor, i\u015flem bitince tekrar deneyin.');
+    try {
+      const data = await response.clone().json();
+      if (data?.error) message = data.error;
+    } catch (err) {
+      // Non-JSON locked responses use the default warning message.
+    }
+
+    window.dispatchEvent(new CustomEvent('kasa:vault-write-locked', {
+      detail: { message },
+    }));
+  };
+
   const apiFetch = async (path, opts = {}) => {
     try {
-      return await fetch(path, {
+      const response = await fetch(path, {
         ...opts,
         credentials: 'same-origin',
         headers: { ...opts.headers },
       });
+      await notifyVaultWriteLocked(response);
+      return response;
     } catch (err) {
       console.error('API request failed:', err);
       return null;
@@ -486,6 +504,12 @@ document.addEventListener('DOMContentLoaded', () => {
       border:      '1px solid rgba(239, 68, 68, 0.28)',
       color:       '#fecaca',
     },
+  });
+
+  window.addEventListener('kasa:vault-write-locked', (event) => {
+    showWarningToast(
+      event.detail?.message || window._('Ana \u015fifre de\u011fi\u015ftiriliyor, i\u015flem bitince tekrar deneyin.')
+    );
   });
 
   const settingsExportButton = document.getElementById('settings-export-btn');
