@@ -345,6 +345,22 @@ body::after {
 }
 .copy-flash { animation: copyPop 0.28s cubic-bezier(0.16,1,0.3,1) both; }
 
+@keyframes generatorPanelIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.985); filter: blur(5px); }
+    to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes generatorPasswordPulse {
+    0%   { box-shadow: 0 0 0 rgba(var(--accent-rgb), 0); transform: translateY(0); }
+    42%  { box-shadow: 0 0 0 5px rgba(var(--accent-rgb), 0.14); transform: translateY(-1px); }
+    100% { box-shadow: 0 0 0 rgba(var(--accent-rgb), 0); transform: translateY(0); }
+}
+
+@keyframes generatorHistoryIn {
+    from { opacity: 0; transform: translateY(7px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes loadingSlide {
     0%   { transform: translateX(-120%); }
     100% { transform: translateX(340%);  }
@@ -1519,7 +1535,6 @@ html[data-glass-quality="normal"] .vault-card-shell.glass {
 }
 
 .gen-history-collapsed .gen-history-chevron { transform: rotate(-90deg); }
-.gen-history-collapsed .gen-history-body { display: none; }
 
 .gen-history-clear-btn {
     background: none;
@@ -1542,6 +1557,22 @@ html[data-glass-quality="normal"] .vault-card-shell.glass {
     max-height: 280px;
     overflow-y: auto;
     padding: 0 0.75rem 0.75rem;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+        max-height 240ms cubic-bezier(0.16,1,0.3,1),
+        opacity 180ms ease,
+        transform 220ms cubic-bezier(0.16,1,0.3,1),
+        padding 220ms ease;
+}
+
+.gen-history-collapsed .gen-history-body {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
 }
 
 .gen-history-empty {
@@ -1557,10 +1588,17 @@ html[data-glass-quality="normal"] .vault-card-shell.glass {
     border-radius: var(--radius-sm);
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.06);
-    transition: background var(--speed) ease;
+    animation: generatorHistoryIn 0.24s cubic-bezier(0.16,1,0.3,1) both;
+    transition:
+        background var(--speed) ease,
+        border-color var(--speed) ease,
+        transform var(--speed) ease;
 }
 
-.gen-history-item:hover { background: rgba(255,255,255,0.07); }
+.gen-history-item:hover {
+    background: rgba(255,255,255,0.07);
+    transform: translateY(-1px);
+}
 
 .gen-history-pw-row {
     display: grid;
@@ -2439,6 +2477,15 @@ textarea.kasa-field {
     line-height: 1.2;
 }
 
+.kasa-modal.is-open .generator-output-card,
+.kasa-modal.is-open .generator-options-card,
+.kasa-modal.is-open .generator-history-card {
+    animation: generatorPanelIn 0.32s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.kasa-modal.is-open .generator-options-card { animation-delay: 45ms; }
+.kasa-modal.is-open .generator-history-card { animation-delay: 90ms; }
+
 .generator-output-card,
 .generator-options-card,
 .generator-history-card,
@@ -2481,6 +2528,21 @@ textarea.kasa-field {
 .history-secret-input,
 .vault-password-input {
     font-family: var(--font-mono);
+}
+
+.generator-generated #modal-generated-password-display {
+    animation: generatorPasswordPulse 0.46s cubic-bezier(0.16,1,0.3,1) both;
+    border-color: rgba(var(--accent-rgb), 0.38) !important;
+}
+
+.generator-generated .generator-strength-card {
+    animation: softPulse 0.44s ease both;
+}
+
+.generator-generated #modal-strength-bar {
+    transition:
+        width 340ms cubic-bezier(0.16,1,0.3,1),
+        background-color 180ms ease;
 }
 
 .vault-form-page {
@@ -2640,24 +2702,25 @@ html[data-glass-effects="off"] .settings-appearance-card {
 .settings-glass-quality-card {
     overflow: hidden;
     transform-origin: top;
+    transition:
+        max-height 260ms cubic-bezier(0.16,1,0.3,1),
+        opacity 210ms ease,
+        transform 240ms cubic-bezier(0.16,1,0.3,1),
+        padding 220ms ease,
+        margin 220ms ease,
+        border-color 220ms ease;
 }
 
 .settings-glass-quality-card.is-entering {
-    animation: glassQualityIn 0.24s cubic-bezier(0.16,1,0.3,1) both;
+    pointer-events: none;
 }
 
 .settings-glass-quality-card.is-leaving {
-    animation: glassQualityOut 0.18s ease-in both;
-}
-
-@keyframes glassQualityIn {
-    from { opacity: 0; transform: translateY(-8px) scaleY(0.96); }
-    to   { opacity: 1; transform: translateY(0) scaleY(1); }
-}
-
-@keyframes glassQualityOut {
-    from { opacity: 1; transform: translateY(0) scaleY(1); }
-    to   { opacity: 0; transform: translateY(-6px) scaleY(0.96); }
+    margin-top: -0.25rem;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-color: transparent !important;
+    pointer-events: none;
 }
 
 .kasa-modal.is-open .settings-body > * {

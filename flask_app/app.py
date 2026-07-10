@@ -824,8 +824,11 @@ def _reset_login_failures(key: str) -> None:
     with _login_attempts_lock:
         _login_attempts.pop(key, None)
 
+_LOGIN_LOCKED_TEMPLATE = "Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin."
+
 def _too_many_attempts_message(seconds: int) -> str:
-    return f"Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin."
+    # Dinamik sayaç metnini çeviri anahtarından formatlayarak login ekranında dil tutarlılığını korur.
+    return _(_LOGIN_LOCKED_TEMPLATE).format(seconds=max(int(seconds), 0))
 
 def overwrite_and_delete(path: str) -> None:
     # Eski düz metin yedeklerini migrasyon sonrası diskte bırakmamak için silmeden önce ezer.
@@ -1028,7 +1031,7 @@ def login():
 
     mp = request.form.get('master_password', '').strip()
     if not mp:
-        return render_template('login.html', error="Ana ?ifre bo? olamaz.")
+        return render_template('login.html', error="Ana şifre boş olamaz.")
 
     setting = Setting.query.filter_by(key='master_hash').first()
 
@@ -1042,7 +1045,7 @@ def login():
             log.warning("Hatalı ana şifre denemesi.")
             if retry_after > 0:
                 return render_template('login.html', error=_too_many_attempts_message(retry_after), retry_after=retry_after), 429
-            return render_template('login.html', error="Hatalı Ana şifre!")
+            return render_template('login.html', error="Hatalı Ana Şifre!")
         if _is_legacy_master_hash(setting.value):
             setting.value = hash_master_password(mp)
             changed = True
