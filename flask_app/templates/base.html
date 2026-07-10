@@ -126,7 +126,7 @@
     <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='style.css') }}?v=31" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}?v=32" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -156,7 +156,7 @@
     <script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=7.4" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=7.5" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script>
@@ -232,7 +232,7 @@
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script>
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v30';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v31';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>

@@ -9,6 +9,7 @@
   "Kurulum tamamlanana kadar LAN erişimi kapalıdır. Lütfen masaüstü uygulamasından kurulumu tamamlayın.": "LAN access is disabled until setup is complete. Please complete setup from the desktop app.",
   "Hatalı Ana Şifre!": "Wrong Master Password!",
   "Ana şifre boş olamaz.": "Master password cannot be empty.",
+  "Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin.": "Too many failed attempts. Try again in {seconds} seconds.",
   "Yükleniyor": "Loading",
   "Yükleniyor...": "Loading...",
   "Yükleniyor…": "Loading…",

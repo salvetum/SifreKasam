@@ -531,8 +531,13 @@
                 <p class="entry-login-card-subtitle">{{ _('Ana şifrenizle devam edin.') }}</p>
 
                 {% if error %}
-                <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger" role="alert" id="login-error-alert" data-retry-after="{{ retry_after or 0 }}">
-                    <i class="fa-solid fa-circle-exclamation mr-2"></i><span id="login-error-text">{{ _(error) }}</span>
+                <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger"
+                     role="alert"
+                     id="login-error-alert"
+                     data-retry-after="{{ retry_after or 0 }}"
+                     data-retry-template="{{ _('Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin.') }}">
+                    <i class="fa-solid fa-circle-exclamation mr-2"></i>
+                    <span id="login-error-text">{{ _(error) }}</span>
                 </div>
                 {% endif %}
 
@@ -568,5 +573,46 @@ document.getElementById('login-language-select')?.addEventListener('change', fun
         window.location.href = '{{ url_for("login") }}';
     }).catch(function () { location.reload(); });
 });
+
+const loginErrorAlert = document.getElementById('login-error-alert');
+const loginErrorText = document.getElementById('login-error-text');
+
+if (loginErrorAlert && loginErrorText) {
+    let secondsLeft = parseInt(
+        loginErrorAlert.dataset.retryAfter || '0',
+        10
+    );
+
+    if (secondsLeft > 0) {
+        const retryTemplate = loginErrorAlert.dataset.retryTemplate || loginErrorText.textContent;
+        let countdownTimer = null;
+
+        const updateCountdownText = () => {
+            const visibleSeconds = String(Math.max(secondsLeft, 0));
+            loginErrorText.textContent = retryTemplate.includes('{seconds}')
+                ? retryTemplate.replace('{seconds}', visibleSeconds)
+                : loginErrorText.textContent.replace(/\d+/, visibleSeconds);
+
+            if (secondsLeft <= 0) {
+                if (countdownTimer !== null) {
+                    clearInterval(countdownTimer);
+                }
+
+                loginErrorAlert.remove();
+                return;
+            }
+
+            secondsLeft--;
+        };
+
+        updateCountdownText();
+
+        countdownTimer = setInterval(
+            updateCountdownText,
+            1000
+        );
+    }
+}
+
 </script>
 {% endblock %}

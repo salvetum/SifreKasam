@@ -335,10 +335,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const glassToggle = document.getElementById('glass-effects-toggle');
   const glassQualityCard = document.getElementById('glass-quality-card');
   const glassQualitySelect = document.getElementById('glass-quality-select');
+  let glassQualityAnimationTimer = null;
+
+  const clearGlassQualityInlineStyles = () => {
+    if (!glassQualityCard) return;
+    glassQualityCard.style.maxHeight = '';
+    glassQualityCard.style.opacity = '';
+    glassQualityCard.style.transform = '';
+  };
 
   const syncGlassQualityVisibility = (enabled, animate = true) => {
     if (!glassQualityCard) return;
     const shouldShow = Boolean(enabled);
+    clearTimeout(glassQualityAnimationTimer);
     glassQualityCard.setAttribute('aria-hidden', String(!shouldShow));
     if (glassQualitySelect) {
       glassQualitySelect.disabled = !shouldShow;
@@ -348,10 +357,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shouldShow) {
       glassQualityCard.hidden = false;
       glassQualityCard.classList.remove('is-leaving');
-      if (animate) {
-        glassQualityCard.classList.add('is-entering');
-        setTimeout(() => glassQualityCard.classList.remove('is-entering'), 260);
+      if (!animate) {
+        glassQualityCard.classList.remove('is-entering');
+        clearGlassQualityInlineStyles();
+        return;
       }
+      glassQualityCard.classList.add('is-entering');
+      glassQualityCard.style.maxHeight = '0px';
+      glassQualityCard.style.opacity = '0';
+      glassQualityCard.style.transform = 'translateY(-8px) scaleY(0.97)';
+      requestAnimationFrame(() => {
+        glassQualityCard.style.maxHeight = `${glassQualityCard.scrollHeight}px`;
+        glassQualityCard.style.opacity = '1';
+        glassQualityCard.style.transform = 'translateY(0) scaleY(1)';
+      });
+      glassQualityAnimationTimer = setTimeout(() => {
+        glassQualityCard.classList.remove('is-entering');
+        clearGlassQualityInlineStyles();
+      }, 280);
       return;
     }
 
@@ -362,11 +385,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    glassQualityCard.style.maxHeight = `${glassQualityCard.scrollHeight}px`;
+    glassQualityCard.style.opacity = '1';
+    glassQualityCard.style.transform = 'translateY(0) scaleY(1)';
     glassQualityCard.classList.add('is-leaving');
-    setTimeout(() => {
+    requestAnimationFrame(() => {
+      glassQualityCard.style.maxHeight = '0px';
+      glassQualityCard.style.opacity = '0';
+      glassQualityCard.style.transform = 'translateY(-8px) scaleY(0.97)';
+    });
+    glassQualityAnimationTimer = setTimeout(() => {
       glassQualityCard.hidden = true;
       glassQualityCard.classList.remove('is-leaving');
-    }, 180);
+      clearGlassQualityInlineStyles();
+    }, 260);
   };
 
   if (glassToggle) {
@@ -1067,6 +1099,7 @@ document.addEventListener('DOMContentLoaded', () => {
       symbols: $('include-symbols'),
     };
     const targetInputId = container.dataset.targetInput || 'page-password';
+    let generatedAnimationTimer = null;
 
     if (lengthEl && lengthDisplay) {
       lengthEl.addEventListener('input', () => {
@@ -1104,6 +1137,15 @@ document.addEventListener('DOMContentLoaded', () => {
         window.updateStrengthMeter(password, modalBar, modalLabel);
 
       if (typeof addToGeneratorHistory === 'function') addToGeneratorHistory(password);
+      if (containerId !== 'pageGenerator') {
+        clearTimeout(generatedAnimationTimer);
+        container.classList.remove('generator-generated');
+        void container.offsetWidth;
+        container.classList.add('generator-generated');
+        generatedAnimationTimer = setTimeout(() => {
+          container.classList.remove('generator-generated');
+        }, 520);
+      }
     };
 
     generateBtn?.addEventListener('click', () => {
