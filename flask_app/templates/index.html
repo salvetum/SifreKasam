@@ -281,6 +281,18 @@
         <strong>{{ _('Hiçbir kayıt bulunamadı.') }}</strong>
         <span>{{ _('Arama veya filtreyi değiştirerek tekrar deneyin.') }}</span>
     </div>
+    <nav id="card-pagination" class="card-pagination" hidden aria-label="{{ _('Kayıt sayfaları') }}">
+        <div class="card-pagination-summary" id="card-pagination-summary" aria-live="polite"></div>
+        <div class="card-pagination-actions">
+            <button type="button" id="card-page-prev" class="kasa-btn kasa-btn-muted">
+                <i class="fa-solid fa-chevron-left"></i>{{ _('Önceki') }}
+            </button>
+            <div id="card-page-numbers" class="card-page-numbers" aria-label="{{ _('Sayfa numaraları') }}"></div>
+            <button type="button" id="card-page-next" class="kasa-btn kasa-btn-muted">
+                {{ _('Sonraki') }}<i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </nav>
 </main>
 
 <!-- ─── MODALLER ─────────────────────────────────────────────── -->
@@ -782,10 +794,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     bulkToggleBtn.addEventListener('click', function () { setBulkMode(!bulkMode); });
-    var checkboxes = document.querySelectorAll('.select-item');
+    function getVisibleCheckboxes() {
+        return Array.from(document.querySelectorAll('.card-wrapper:not([hidden]) .select-item'));
+    }
 
     function updateBulkUI() {
         var count = selected.size;
+        var visibleCheckboxes = getVisibleCheckboxes();
         bulkCount.textContent = count;
         if (count > 0) {
             bulkToolbar.style.display = 'flex';
@@ -800,7 +815,8 @@ document.addEventListener('DOMContentLoaded', function () {
             bulkToolbar.setAttribute('aria-hidden', 'true');
             setTimeout(function () { if (selected.size === 0) bulkToolbar.style.display = 'none'; }, 300);
         }
-        selectAll.checked = count === checkboxes.length && count > 0;
+        selectAll.checked = visibleCheckboxes.length > 0 && visibleCheckboxes.every(function (cb) { return selected.has(cb.value); });
+        selectAll.indeterminate = !selectAll.checked && visibleCheckboxes.some(function (cb) { return selected.has(cb.value); });
     }
 
     document.querySelectorAll('.select-item').forEach(function (cb) {
@@ -812,13 +828,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('select-all').addEventListener('change', function () {
-        document.querySelectorAll('.select-item').forEach(function (cb) {
+        getVisibleCheckboxes().forEach(function (cb) {
             cb.checked = this.checked;
             if (this.checked) selected.add(cb.value);
             else selected.delete(cb.value);
         }, this);
         updateBulkUI();
     });
+
+    window.addEventListener('kasa:cards-page-changed', updateBulkUI);
 
     document.getElementById('bulk-cancel-btn').addEventListener('click', function () {
         document.querySelectorAll('.select-item').forEach(function (cb) {

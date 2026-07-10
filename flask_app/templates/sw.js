@@ -1,4 +1,4 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v31';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v34';
 const ASSETS = [
   '{{ url_for("static", filename="style.css") }}',
   '{{ url_for("static", filename="tailwind-lite.css") }}',
@@ -9,9 +9,6 @@ const ASSETS = [
   '{{ url_for("static", filename="app.js") }}',
   '{{ url_for("static", filename="sweetalert2.all.min.js") }}',
   '{{ url_for("static", filename="toastify.min.js") }}',
-  '{{ url_for("static", filename="chart.umd.min.js") }}',
-  '{{ url_for("static", filename="zxcvbn.js") }}',
-  '{{ url_for("static", filename="bootstrap.bundle.min.js") }}',
   '{{ url_for("static", filename="fonts/sora.woff2") }}',
   '{{ url_for("static", filename="fonts/jetbrains-mono.woff2") }}',
   '{{ url_for("static", filename="icons/icon-192.svg") }}',

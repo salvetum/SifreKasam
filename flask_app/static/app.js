@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.4.3 - Main JavaScript
+ * ŞifreKasam v2.5.0 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,6 +8,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const glassEffectsEnabled = () =>
     document.documentElement.getAttribute('data-glass-effects') !== 'off';
+
+  const scriptLoadCache = new Map();
+
+  const loadScriptOnce = (src) => {
+    if (!src) return Promise.reject(new Error('missing-script-src'));
+    if (scriptLoadCache.has(src)) return scriptLoadCache.get(src);
+
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing?.dataset.loaded === 'true') return Promise.resolve(existing);
+
+    const promise = new Promise((resolve, reject) => {
+      const script = existing || document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        script.dataset.loaded = 'true';
+        resolve(script);
+      };
+      script.onerror = () => reject(new Error(`script-load-failed:${src}`));
+      if (!existing) document.head.appendChild(script);
+    });
+
+    scriptLoadCache.set(src, promise);
+    return promise;
+  };
+
+  const ensureZxcvbn = async () => {
+    if (typeof zxcvbn !== 'undefined') return true;
+    try {
+      await loadScriptOnce(window.KASA_STATIC_URLS?.zxcvbn || '/static/zxcvbn.js');
+      return typeof zxcvbn !== 'undefined';
+    } catch (err) {
+      console.error('zxcvbn load failed:', err);
+      return false;
+    }
+  };
 
   const notifyVaultWriteLocked = async (response) => {
     if (!response || ![409, 423].includes(response.status)) return;
@@ -1023,13 +1060,21 @@ document.addEventListener('DOMContentLoaded', () => {
     { width: '100%', color: '#38bdf8', text: 'Çok Güçlü' },
   ];
 
-  window.updateStrengthMeter = (password, barEl, labelEl) => {
-    if (!barEl || !labelEl || typeof zxcvbn === 'undefined') return;
+  window.updateStrengthMeter = async (password, barEl, labelEl) => {
+    if (!barEl || !labelEl) return;
     if (!password) {
       barEl.style.width = '0%';
       barEl.style.backgroundColor = 'transparent';
       labelEl.innerText = '';
       return;
+    }
+    if (typeof zxcvbn === 'undefined') {
+      labelEl.innerText = window._('Analiz hazırlanıyor…');
+      const loaded = await ensureZxcvbn();
+      if (!loaded) {
+        labelEl.innerText = window._('Analiz kullanılamıyor');
+        return;
+      }
     }
     const { score, crack_times_display } = zxcvbn(password);
     const level     = STRENGTH_LEVELS[score];
@@ -1047,8 +1092,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const strengthText  = document.getElementById('password-strength-text');
   if (pagePassword && strengthBar && strengthText) {
     pagePassword.addEventListener('input', () =>
-      window.updateStrengthMeter(pagePassword.value, strengthBar, strengthText));
-    window.updateStrengthMeter(pagePassword.value, strengthBar, strengthText);
+      void window.updateStrengthMeter(pagePassword.value, strengthBar, strengthText));
+    void window.updateStrengthMeter(pagePassword.value, strengthBar, strengthText);
   }
 
   // ─── 8. ŞİFRE ÜRETECİ ────────────────────────────────────────────────────
@@ -1134,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const modalBar   = $('strength-bar');
       const modalLabel = $('strength-label');
       if (modalBar && modalLabel && typeof window.updateStrengthMeter === 'function')
-        window.updateStrengthMeter(password, modalBar, modalLabel);
+        void window.updateStrengthMeter(password, modalBar, modalLabel);
 
       if (typeof addToGeneratorHistory === 'function') addToGeneratorHistory(password);
       if (containerId !== 'pageGenerator') {
@@ -1170,13 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    if (containerId !== 'pageGenerator') {
-      try {
-        generatePassword();
-      } catch (err) {
-        console.error('Password generation failed:', err);
-      }
-    }
+    return generatePassword;
   }
 
   // ─── 8b. ÜRETİCİ GEÇMİŞİ ────────────────────────────────────────────────
@@ -1307,19 +1346,24 @@ document.addEventListener('DOMContentLoaded', () => {
     button.setAttribute('aria-expanded', String(!collapsed));
   });
 
-  document.querySelector('[data-kasa-modal="passwordGeneratorModal"]')?.addEventListener('click', () => {
-    setTimeout(renderGeneratorHistory, 50);
-  });
-
-  const genModalObserver = new MutationObserver(() => {
-    const modal = document.getElementById('passwordGeneratorModal');
-    if (modal?.classList.contains('is-visible')) renderGeneratorHistory();
-  });
-  const genModal = document.getElementById('passwordGeneratorModal');
-  if (genModal) genModalObserver.observe(genModal, { attributes: true, attributeFilter: ['class'] });
-
-  setupPasswordGenerator('passwordGeneratorModal', 'modal-');
+  const modalGeneratePassword = setupPasswordGenerator('passwordGeneratorModal', 'modal-');
   setupPasswordGenerator('pageGenerator', 'page-');
+
+  document.querySelector('[data-kasa-modal="passwordGeneratorModal"]')?.addEventListener('click', () => {
+    setTimeout(() => {
+      const output = document.getElementById('modal-generated-password-display');
+      if (!output?.value) {
+        try {
+          modalGeneratePassword?.();
+        } catch (err) {
+          console.error('Password generation failed:', err);
+          showWarningToast(window._('Güvenli rastgele üretici kullanılamıyor.'));
+        }
+      } else {
+        renderGeneratorHistory();
+      }
+    }, 50);
+  });
 
   const modalCopyGenBtn = document.getElementById('modal-copy-generated-password-btn');
   modalCopyGenBtn?.addEventListener('click', () => {
@@ -1334,49 +1378,157 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput   = document.getElementById('search-input');
     const categoryBtns  = document.querySelectorAll('#category-filter button');
     const filterEmptyState = document.getElementById('filter-empty-state');
+    const paginationNav = document.getElementById('card-pagination');
+    const paginationSummary = document.getElementById('card-pagination-summary');
+    const pagePrevButton = document.getElementById('card-page-prev');
+    const pageNextButton = document.getElementById('card-page-next');
+    const pageNumbers = document.getElementById('card-page-numbers');
+    const CARD_PAGE_SIZE = 50;
+    let currentCardPage = 1;
+    let cardCache = [];
     const getCards = () => Array.from(document.querySelectorAll('.card-wrapper'));
 
-    const filterCards = () => {
-      const term     = searchInput?.value.toLowerCase().trim() || '';
+    const normalizeSearchText = (value) =>
+      String(value || '').toLocaleLowerCase(window.LANG || 'tr').trim();
+
+    const createCardCacheItem = (wrapper) => ({
+      wrapper,
+      searchText: normalizeSearchText(wrapper.textContent),
+      type: wrapper.dataset.type || '',
+      pinned: wrapper.dataset.pinned === 'true',
+    });
+
+    const rebuildCardCache = () => {
+      cardCache = getCards().map(createCardCacheItem);
+    };
+
+    const updateCachedCard = (wrapper) => {
+      const index = cardCache.findIndex(item => item.wrapper === wrapper);
+      if (index >= 0) cardCache[index] = createCardCacheItem(wrapper);
+    };
+
+    const setCardVisible = (wrapper, visible, animate = false) => {
+      const wasHidden = wrapper.hidden || wrapper.style.display === 'none';
+      wrapper.hidden = !visible;
+      wrapper.style.display = visible ? 'block' : 'none';
+
+      if (visible && animate && wasHidden) {
+        wrapper.classList.remove('filter-reveal');
+        void wrapper.offsetWidth;
+        wrapper.classList.add('filter-reveal');
+      } else if (!visible) {
+        wrapper.classList.remove('filter-reveal');
+      }
+    };
+
+    const createPageControl = (page, label = String(page), isActive = false) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `card-page-btn${isActive ? ' active' : ''}`;
+      button.textContent = label;
+      button.setAttribute('aria-label', `${window._('Sayfa')} ${page}`);
+      button.setAttribute('aria-current', isActive ? 'page' : 'false');
+      button.addEventListener('click', () => {
+        currentCardPage = page;
+        filterCards({ preservePage: true, animate: true, scrollToGrid: true });
+      });
+      return button;
+    };
+
+    const createPageDots = () => {
+      const dots = document.createElement('span');
+      dots.className = 'card-page-dots';
+      dots.textContent = '…';
+      return dots;
+    };
+
+    const renderPagination = (matchedCount, pageCount, startIndex, endIndex) => {
+      if (!paginationNav || !paginationSummary || !pageNumbers) return;
+
+      const shouldShow = cardCache.length > CARD_PAGE_SIZE && matchedCount > 0;
+      paginationNav.hidden = !shouldShow;
+      if (!shouldShow) return;
+
+      paginationSummary.textContent = `${startIndex + 1}-${endIndex} / ${matchedCount} ${window._('kayıt gösteriliyor')}`;
+
+      if (pagePrevButton) {
+        pagePrevButton.disabled = currentCardPage <= 1;
+        pagePrevButton.setAttribute('aria-disabled', String(currentCardPage <= 1));
+      }
+      if (pageNextButton) {
+        pageNextButton.disabled = currentCardPage >= pageCount;
+        pageNextButton.setAttribute('aria-disabled', String(currentCardPage >= pageCount));
+      }
+
+      pageNumbers.replaceChildren();
+      const pages = new Set([1, pageCount]);
+      for (let page = currentCardPage - 1; page <= currentCardPage + 1; page++) {
+        if (page >= 1 && page <= pageCount) pages.add(page);
+      }
+      const orderedPages = Array.from(pages).sort((a, b) => a - b);
+      orderedPages.forEach((page, index) => {
+        if (index > 0 && page - orderedPages[index - 1] > 1) {
+          pageNumbers.appendChild(createPageDots());
+        }
+        pageNumbers.appendChild(createPageControl(page, String(page), page === currentCardPage));
+      });
+    };
+
+    const filterCards = ({ preservePage = false, animate = false, scrollToGrid = false } = {}) => {
+      const term = normalizeSearchText(searchInput?.value || '');
       const activeBtn = document.querySelector('#category-filter button.active');
       const category  = activeBtn?.dataset.filter || 'all';
-      const cards = getCards();
-      let visibleCount = 0;
-
-      cards.forEach(wrapper => {
-        const matchesSearch   = wrapper.textContent.toLowerCase().includes(term);
+      const matchedCards = cardCache.filter(({ searchText, type, pinned }) => {
+        const matchesSearch = !term || searchText.includes(term);
         const matchesCategory =
           category === 'all'       ? true :
-          category === 'favorites' ? wrapper.dataset.pinned === 'true' :
-                                     wrapper.dataset.type === category;
-        const isVisible = matchesSearch && matchesCategory;
-        const wasHidden = wrapper.style.display === 'none';
-
-        if (isVisible) {
-          wrapper.style.display = 'block';
-          if (wasHidden) {
-            wrapper.classList.remove('filter-reveal');
-            void wrapper.offsetWidth;
-            wrapper.classList.add('filter-reveal');
-          }
-          visibleCount += 1;
-        } else {
-          wrapper.classList.remove('filter-reveal');
-          wrapper.style.display = 'none';
-        }
+          category === 'favorites' ? pinned :
+                                     type === category;
+        return matchesSearch && matchesCategory;
       });
+      const pageCount = Math.max(1, Math.ceil(matchedCards.length / CARD_PAGE_SIZE));
+      currentCardPage = preservePage ? Math.min(currentCardPage, pageCount) : 1;
+      const startIndex = (currentCardPage - 1) * CARD_PAGE_SIZE;
+      const endIndex = Math.min(startIndex + CARD_PAGE_SIZE, matchedCards.length);
+      const visibleWrappers = new Set(
+        matchedCards.slice(startIndex, endIndex).map(item => item.wrapper)
+      );
+
+      cardCache.forEach(({ wrapper }) =>
+        setCardVisible(wrapper, visibleWrappers.has(wrapper), animate)
+      );
 
       if (filterEmptyState) {
-        const shouldShowEmptyState = cards.length > 0 && visibleCount === 0;
+        const shouldShowEmptyState = cardCache.length > 0 && matchedCards.length === 0;
         filterEmptyState.hidden = !shouldShowEmptyState;
         filterEmptyState.classList.toggle('is-visible', shouldShowEmptyState);
       }
+
+      renderPagination(matchedCards.length, pageCount, startIndex, endIndex);
+      window.dispatchEvent(new CustomEvent('kasa:cards-page-changed'));
+      if (scrollToGrid) {
+        document.getElementById('card-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     };
+
+    rebuildCardCache();
+    filterCards({ preservePage: false, animate: false });
 
     let searchTimeout;
     searchInput?.addEventListener('input', () => {
       clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(filterCards, 150);
+      searchTimeout = setTimeout(() => filterCards({ preservePage: false, animate: true }), 120);
+    });
+
+    pagePrevButton?.addEventListener('click', () => {
+      if (currentCardPage <= 1) return;
+      currentCardPage -= 1;
+      filterCards({ preservePage: true, animate: true, scrollToGrid: true });
+    });
+
+    pageNextButton?.addEventListener('click', () => {
+      currentCardPage += 1;
+      filterCards({ preservePage: true, animate: true, scrollToGrid: true });
     });
 
     categoryBtns.forEach(btn => {
@@ -1389,7 +1541,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.classList.remove('btn-outline-secondary');
         btn.classList.add('active', 'btn-primary');
         btn.setAttribute('aria-pressed', 'true');
-        filterCards();
+        filterCards({ preservePage: false, animate: true });
       });
     });
 
@@ -1522,7 +1674,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const response = await apiFetch(form.action, { method: 'POST' });
           if (!response?.ok) throw new Error('delete-failed');
-          if (wrapper) setTimeout(() => { wrapper.remove(); filterCards(); }, 300);
+          if (wrapper) {
+            setTimeout(() => {
+              wrapper.remove();
+              rebuildCardCache();
+              filterCards({ preservePage: true, animate: true });
+            }, 300);
+          }
           showToast({
             ...TOAST_BASE, text: window._('Kayıt başarıyla silindi.'), duration: 2500,
             style: {
@@ -1565,8 +1723,9 @@ document.addEventListener('DOMContentLoaded', () => {
             icon.className   = 'fa-solid fa-star card-star-icon';
             icon.style.color = '#f59e0b';
           }
+          updateCachedCard(wrapper);
           const activeBtn = document.querySelector('#category-filter button.active');
-          if (activeBtn?.dataset.filter === 'favorites') filterCards();
+          if (activeBtn?.dataset.filter === 'favorites') filterCards({ preservePage: true, animate: true });
         } catch {
           showWarningToast(window._('İşlem tamamlanamadı.'));
         }

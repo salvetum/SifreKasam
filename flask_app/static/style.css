@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.4.3 — Main Stylesheet
+   ŞifreKasam v2.5.0 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -3633,6 +3633,117 @@ html[data-bs-theme="light"][data-kasa-gradient="off"] .settings-toggle-card,
 html[data-bs-theme="light"][data-kasa-gradient="off"] .settings-action-card {
     border-color: rgba(var(--accent-rgb), 0.18) !important;
     background: rgba(var(--accent-rgb), 0.045) !important;
+}
+
+/* === Card Pagination === */
+.card-pagination {
+    width: min(100%, 760px);
+    margin: 1.35rem auto 0;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.18);
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.09), transparent 42%),
+        rgba(255,255,255,0.045);
+    box-shadow: 0 14px 34px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.card-pagination[hidden] {
+    display: none !important;
+}
+
+.card-pagination-summary {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.card-pagination-actions,
+.card-page-numbers {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.card-pagination-actions .kasa-btn {
+    min-height: 34px;
+    padding: 0.42rem 0.7rem;
+    font-size: 0.76rem;
+}
+
+.card-pagination-actions .kasa-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.card-page-btn,
+.card-page-dots {
+    min-width: 34px;
+    height: 34px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.card-page-btn {
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(255,255,255,0.045);
+    color: var(--text-muted);
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background 160ms ease,
+        color 160ms ease;
+}
+
+.card-page-btn:hover,
+.card-page-btn:focus-visible {
+    border-color: rgba(var(--accent-rgb), 0.34);
+    background: rgba(var(--accent-rgb), 0.10);
+    color: var(--text);
+    transform: translateY(-1px);
+}
+
+.card-page-btn.active {
+    border-color: rgba(var(--accent-rgb), 0.48);
+    background: rgba(var(--accent-rgb), 0.18);
+    color: var(--text);
+    box-shadow: 0 10px 22px rgba(var(--accent-rgb), 0.12);
+}
+
+.card-page-dots {
+    color: var(--text-muted);
+    opacity: 0.72;
+}
+
+html[data-glass-effects="off"] .card-pagination,
+html[data-kasa-gradient="off"] .card-pagination {
+    border-color: rgba(var(--accent-rgb), 0.24) !important;
+    background: rgba(var(--accent-rgb), 0.07) !important;
+}
+
+@media (max-width: 720px) {
+    .card-pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .card-pagination-summary {
+        text-align: center;
+    }
+
+    .card-pagination-actions {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
 }
 
 /* === Filter Empty State === */
