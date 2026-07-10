@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.4.0 — Main Stylesheet
+   ŞifreKasam v2.4.2 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -184,7 +184,7 @@ body::before, body::after, .blob-accent {
     content: '';
     position: fixed;
     border-radius: 50%;
-    filter: blur(32px);
+    filter: blur(24px);
     pointer-events: none;
     z-index: -1;
     animation: drift 20s infinite alternate ease-in-out;
@@ -210,7 +210,7 @@ html[data-glass-quality="low"] body::before,
 html[data-glass-quality="low"] body::after,
 html[data-glass-quality="low"] .blob-accent {
     animation: none;
-    filter: blur(20px);
+    filter: blur(14px);
     transform: none;
     will-change: auto;
 }
@@ -240,18 +240,18 @@ html[data-kasa-low-power="on"] .kasa-modal-content {
 
 body::before {
     top: -8%; left: -8%;
-    width: 38vw; height: 38vh;
+    width: 32vw; height: 32vh;
     background: radial-gradient(circle, rgba(124,111,247,0.4) 0%, transparent 70%);
 }
 body::after {
     bottom: -12%; right: -8%;
-    width: 42vw; height: 42vh;
+    width: 36vw; height: 36vh;
     background: radial-gradient(circle, rgba(79,145,255,0.35) 0%, transparent 70%);
     animation-delay: -10s;
 }
 .blob-accent {
     top: 40%; left: 60%;
-    width: 30vw; height: 30vh;
+    width: 24vw; height: 24vh;
     background: radial-gradient(circle, rgba(239,68,68,0.25) 0%, transparent 70%);
     animation-delay: -5s;
 }
@@ -2635,6 +2635,29 @@ html[data-glass-effects="off"] .settings-appearance-card {
 .settings-body > .glass-sm:not(.settings-appearance-card) h4,
 .settings-body > .glass-sm:not(.settings-appearance-card) p {
     text-align: left;
+}
+
+.settings-glass-quality-card {
+    overflow: hidden;
+    transform-origin: top;
+}
+
+.settings-glass-quality-card.is-entering {
+    animation: glassQualityIn 0.24s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.settings-glass-quality-card.is-leaving {
+    animation: glassQualityOut 0.18s ease-in both;
+}
+
+@keyframes glassQualityIn {
+    from { opacity: 0; transform: translateY(-8px) scaleY(0.96); }
+    to   { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+@keyframes glassQualityOut {
+    from { opacity: 1; transform: translateY(0) scaleY(1); }
+    to   { opacity: 0; transform: translateY(-6px) scaleY(0.96); }
 }
 
 .kasa-modal.is-open .settings-body > * {

@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.4.0 - Main JavaScript
+ * ŞifreKasam v2.4.2 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -194,19 +194,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── 1. HEARTBEAT ─────────────────────────────────────────────────────────
 
-  const HEARTBEAT_ACTIVE_INTERVAL_MS = 5000;
+  const HEARTBEAT_ACTIVE_INTERVAL_MS = 15000;
   const HEARTBEAT_LOW_POWER_INTERVAL_MS = 60000;
+  const RENDERER_IDLE_LOW_POWER_MS = 45000;
+  const IDLE_ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'input'];
   let rendererLowPower = null;
+  let systemLowPower = document.hidden;
+  let idleLowPower = false;
   let heartbeatTimer = null;
+  let idleLowPowerTimer = null;
 
-  const setRendererLowPower = (enabled) => {
-    const nextState = Boolean(enabled);
+  const stopIdleLowPowerTimer = () => {
+    if (!idleLowPowerTimer) return;
+    clearTimeout(idleLowPowerTimer);
+    idleLowPowerTimer = null;
+  };
+
+  const applyRendererLowPower = () => {
+    const nextState = systemLowPower || idleLowPower;
     if (rendererLowPower === nextState) return;
     rendererLowPower = nextState;
     document.documentElement.setAttribute('data-kasa-low-power', nextState ? 'on' : 'off');
     window.dispatchEvent(new CustomEvent('kasa:low-power-changed', {
       detail: { enabled: nextState },
     }));
+  };
+
+  const scheduleIdleLowPower = () => {
+    stopIdleLowPowerTimer();
+    if (systemLowPower || document.hidden) return;
+    idleLowPowerTimer = window.setTimeout(() => {
+      idleLowPower = true;
+      applyRendererLowPower();
+    }, RENDERER_IDLE_LOW_POWER_MS);
+  };
+
+  const resetIdleLowPower = () => {
+    if (systemLowPower || document.hidden) return;
+    idleLowPower = false;
+    applyRendererLowPower();
+    scheduleIdleLowPower();
+  };
+
+  const setRendererLowPower = (enabled) => {
+    systemLowPower = Boolean(enabled);
+    if (systemLowPower) {
+      stopIdleLowPowerTimer();
+    } else {
+      idleLowPower = false;
+      scheduleIdleLowPower();
+    }
+    applyRendererLowPower();
   };
 
   const sendHeartbeat = () => apiFetch('/heartbeat', { method: 'POST' });
@@ -231,9 +269,16 @@ document.addEventListener('DOMContentLoaded', () => {
   scheduleHeartbeat();
 
   document.addEventListener('visibilitychange', () => setRendererLowPower(document.hidden));
+  IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
+    window.addEventListener(eventName, resetIdleLowPower, { passive: true });
+  });
   window.addEventListener('kasa:low-power-changed', scheduleHeartbeat);
   window.addEventListener('pagehide', () => {
     stopHeartbeat();
+    stopIdleLowPowerTimer();
+    IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
+      window.removeEventListener(eventName, resetIdleLowPower);
+    });
     window.removeEventListener('kasa:low-power-changed', scheduleHeartbeat);
   }, { once: true });
 
@@ -288,14 +333,52 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const glassToggle = document.getElementById('glass-effects-toggle');
+  const glassQualityCard = document.getElementById('glass-quality-card');
+  const glassQualitySelect = document.getElementById('glass-quality-select');
+
+  const syncGlassQualityVisibility = (enabled, animate = true) => {
+    if (!glassQualityCard) return;
+    const shouldShow = Boolean(enabled);
+    glassQualityCard.setAttribute('aria-hidden', String(!shouldShow));
+    if (glassQualitySelect) {
+      glassQualitySelect.disabled = !shouldShow;
+      glassQualitySelect.tabIndex = shouldShow ? 0 : -1;
+    }
+
+    if (shouldShow) {
+      glassQualityCard.hidden = false;
+      glassQualityCard.classList.remove('is-leaving');
+      if (animate) {
+        glassQualityCard.classList.add('is-entering');
+        setTimeout(() => glassQualityCard.classList.remove('is-entering'), 260);
+      }
+      return;
+    }
+
+    glassQualityCard.classList.remove('is-entering');
+    if (!animate || glassQualityCard.hidden) {
+      glassQualityCard.hidden = true;
+      glassQualityCard.classList.remove('is-leaving');
+      return;
+    }
+
+    glassQualityCard.classList.add('is-leaving');
+    setTimeout(() => {
+      glassQualityCard.hidden = true;
+      glassQualityCard.classList.remove('is-leaving');
+    }, 180);
+  };
+
   if (glassToggle) {
     glassToggle.checked =
       document.documentElement.getAttribute('data-glass-effects') !== 'off';
+    syncGlassQualityVisibility(glassToggle.checked, false);
 
     glassToggle.addEventListener('change', () => {
       const value = glassToggle.checked ? 'on' : 'off';
       document.documentElement.setAttribute('data-glass-effects', value);
       localStorage.setItem('kasa-glass-effects', value);
+      syncGlassQualityVisibility(glassToggle.checked);
       apiPost('/settings/glass-effects', { enabled: glassToggle.checked });
     });
   }
@@ -330,7 +413,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const backgroundSelect = document.getElementById('background-style-select');
   const backgroundHidden = document.getElementById('background-style-hidden');
   const accentHidden = document.getElementById('accent-color-hidden');
-  const glassQualitySelect = document.getElementById('glass-quality-select');
   const appearancePreview = document.getElementById('appearance-preview');
   const backgroundButtons = document.querySelectorAll('[data-background-option]');
   const accentPresetButtons = document.querySelectorAll('[data-accent-preset]');
@@ -654,6 +736,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const value = data.glass_effects_enabled ? 'on' : 'off';
           document.documentElement.setAttribute('data-glass-effects', value);
           localStorage.setItem('kasa-glass-effects', value);
+          syncGlassQualityVisibility(data.glass_effects_enabled, false);
         }
         if (data.glass_quality && glassQualitySelect) {
           glassQualitySelect.value = applyGlassQuality(data.glass_quality);
@@ -683,41 +766,85 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const copyIconStates = new WeakMap();
+  const copyButtonStates = new WeakMap();
+  const COPY_ICON_RESET_MS = 850;
 
-  const getCopyIconOriginalClass = (iconEl) => {
-    const cleanClass = String(iconEl.className || '')
-      .replace(/\bcopy-flash\b/g, '')
-      .replace(/\btext-success\b/g, '')
-      .trim();
-    if (cleanClass && !cleanClass.includes('fa-check')) return cleanClass;
+  const getCopyButton = (iconEl) => iconEl?.closest?.('button') || iconEl;
 
-    const sizeClass = Array.from(iconEl.classList || [])
-      .filter(className => className.startsWith('text-') && className !== 'text-success')
-      .join(' ');
-    return `fa-solid fa-copy${sizeClass ? ` ${sizeClass}` : ''}`;
+  const getCopyIconSizeClasses = (iconEl) => Array.from(iconEl?.classList || [])
+    .filter(className => (
+      className !== 'text-success'
+      && (className.startsWith('text-') || /^fa-(xs|sm|lg|xl|2x)$/.test(className))
+    ));
+
+  const buildCopyIconHtml = (iconEl) => {
+    const classes = Array.from(iconEl?.classList || [])
+      .map(className => className === 'fa-check' ? 'fa-copy' : className)
+      .filter(className => !['copy-flash', 'text-success'].includes(className));
+
+    if (!classes.includes('fa-copy')) classes.push('fa-copy');
+    if (!classes.includes('fa-solid') && !classes.includes('fa-regular')) {
+      classes.unshift('fa-solid');
+    }
+
+    const originalIcon = document.createElement('i');
+    originalIcon.className = [...new Set(classes)].join(' ') || 'fa-solid fa-copy';
+    return originalIcon.outerHTML;
+  };
+
+  const getCopyButtonOriginalHtml = (button, iconEl, currentState) => {
+    if (button.dataset.copyOriginalHtml) return button.dataset.copyOriginalHtml;
+    if (currentState?.originalHtml) return currentState.originalHtml;
+
+    const iconIsFlashing = iconEl?.classList?.contains('fa-check')
+      || iconEl?.classList?.contains('copy-flash')
+      || iconEl?.classList?.contains('text-success');
+    const originalHtml = iconIsFlashing ? buildCopyIconHtml(iconEl) : button.innerHTML;
+    button.dataset.copyOriginalHtml = originalHtml;
+    return originalHtml;
+  };
+
+  const resetCopyButtonIcon = (button, originalHtml) => {
+    if (!button?.isConnected) return;
+    button.innerHTML = originalHtml || button.dataset.copyOriginalHtml || '<i class="fa-solid fa-copy"></i>';
+    delete button.dataset.copyResetAt;
+    copyButtonStates.delete(button);
+  };
+
+  const resetStuckCopyButtons = () => {
+    const now = Date.now();
+    document.querySelectorAll('button[data-copy-original-html]').forEach((button) => {
+      const resetAt = Number(button.dataset.copyResetAt || 0);
+      if (resetAt && now >= resetAt && button.querySelector('i.fa-check')) {
+        resetCopyButtonIcon(button);
+      }
+    });
   };
 
   const flashCopyIcon = (iconEl) => {
-    if (!iconEl) return;
-    const currentState = copyIconStates.get(iconEl);
-    const originalClass = currentState?.originalClass || getCopyIconOriginalClass(iconEl);
+    const button = getCopyButton(iconEl);
+    if (!button) return;
 
+    const currentState = copyButtonStates.get(button);
+    const originalHtml = getCopyButtonOriginalHtml(button, iconEl, currentState);
     clearTimeout(currentState?.timer);
-    iconEl.className = originalClass.includes('text-')
-      ? originalClass.replace(/\bfa-copy\b/g, 'fa-check').replace(/\btext-success\b/g, '').trim()
-      : 'fa-solid fa-check';
-    iconEl.classList.add('text-success');
-    iconEl.classList.remove('copy-flash');
-    void iconEl.offsetWidth;
-    iconEl.classList.add('copy-flash');
-    showSuccessToast(window._('Kopyalandı!'));
-    const timer = setTimeout(() => {
-      iconEl.className = originalClass;
-      iconEl.classList.remove('copy-flash');
-      copyIconStates.delete(iconEl);
-    }, 850);
-    copyIconStates.set(iconEl, { originalClass, timer });
+
+    const checkIcon = document.createElement('i');
+    checkIcon.className = ['fa-solid', 'fa-check', 'text-success', 'copy-flash', ...getCopyIconSizeClasses(iconEl)]
+      .filter(Boolean)
+      .join(' ');
+    button.replaceChildren(checkIcon);
+
+    button.dataset.copyResetAt = String(Date.now() + COPY_ICON_RESET_MS + 250);
+    const timer = setTimeout(() => resetCopyButtonIcon(button, originalHtml), COPY_ICON_RESET_MS);
+    setTimeout(resetStuckCopyButtons, COPY_ICON_RESET_MS + 500);
+    copyButtonStates.set(button, { originalHtml, timer });
+
+    try {
+      showSuccessToast(window._('Kopyaland\u0131!'));
+    } catch (err) {
+      console.warn('Copy toast failed:', err);
+    }
   };
 
   const copyToClipboard = async (text, iconEl) => {
