@@ -36,6 +36,33 @@ Keep your data on your device and protect it using a master password.
 
 > This project was initially created to experiment with AI-assisted development and *vibe coding*.
 
+## 📸 Screenshots
+
+<div align="center">
+
+### Main Page
+
+<img src="assets/base.png" width="850" alt="ŞifreKasam main page">
+
+<br><br>
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <strong>Password Generator</strong>
+      <br><br>
+      <img src="assets/passgen.png" width="420" alt="ŞifreKasam password generator screen">
+    </td>
+    <td align="center" width="50%">
+      <strong>Settings Menu</strong>
+      <br><br>
+      <img src="assets/settings.gif" width="420" alt="ŞifreKasam settings menu">
+    </td>
+  </tr>
+</table>
+
+</div>
+
 ## Download Source and Security Warning
 
 Official and trusted distributions of this software are published only through the following repository:
