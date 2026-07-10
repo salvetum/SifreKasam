@@ -531,8 +531,8 @@
                 <p class="entry-login-card-subtitle">{{ _('Ana şifrenizle devam edin.') }}</p>
 
                 {% if error %}
-                <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger" role="alert">
-                    <i class="fa-solid fa-circle-exclamation mr-2"></i>{{ _(error) }}
+                <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger" role="alert" id="login-error-alert" data-retry-after="{{ retry_after or 0 }}">
+                    <i class="fa-solid fa-circle-exclamation mr-2"></i><span id="login-error-text">{{ _(error) }}</span>
                 </div>
                 {% endif %}
 

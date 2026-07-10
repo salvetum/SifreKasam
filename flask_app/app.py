@@ -48,7 +48,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.4.2")
+APP_VERSION = os.environ.get("APP_VERSION", "2.4.3")
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
@@ -1024,7 +1024,7 @@ def login():
     attempt_key = _login_attempt_key()
     retry_after = _login_retry_after(attempt_key)
     if retry_after > 0:
-        return render_template('login.html', error=_too_many_attempts_message(retry_after)), 429
+        return render_template('login.html', error=_too_many_attempts_message(retry_after), retry_after=retry_after), 429
 
     mp = request.form.get('master_password', '').strip()
     if not mp:
@@ -1039,10 +1039,10 @@ def login():
             session.clear()
             logout_user()
             retry_after = _record_login_failure(attempt_key)
-            log.warning("Hatal? ana ?ifre denemesi.")
+            log.warning("Hatalı ana şifre denemesi.")
             if retry_after > 0:
-                return render_template('login.html', error=_too_many_attempts_message(retry_after)), 429
-            return render_template('login.html', error="Hatal? Ana ?ifre!")
+                return render_template('login.html', error=_too_many_attempts_message(retry_after), retry_after=retry_after), 429
+            return render_template('login.html', error="Hatalı Ana şifre!")
         if _is_legacy_master_hash(setting.value):
             setting.value = hash_master_password(mp)
             changed = True
@@ -1055,18 +1055,18 @@ def login():
         except Exception:
             return render_template(
                 'login.html',
-                error="Kasa anahtar migrasyonu ba?ar?s?z oldu. Veri g?venli?i i?in giri? durduruldu."
+                error="Kasa anahtar migrasyonu başarısız oldu. Veri güvenliği için giriş durduruldu."
             ), 500
         if changed:
             db.session.commit()
     else:
         if _vault_initialized() or _has_existing_vault_data():
-            log.error("Ana ?ifre kayd? bulunamad?; g?venlik nedeniyle yeniden kurulum engellendi.")
+            log.error("Ana şifre kaydı bulunamadı; güvenlik nedeniyle yeniden kurulum engellendi.")
             return render_template(
                 'login.html',
-                error="Bu kasa zaten kurulmu? g?r?n?yor. G?venlik nedeniyle yeni ana ?ifre belirleme engellendi."
+                error="Bu kasa zaten kurulmuş görünüyor. Güvenlik nedeniyle yeni ana şifre belirleme engellendi."
             ), 403
-        log.info("?lk kurulum: Ana ?ifre belirleniyor...")
+        log.info("İlk kurulum: Ana şifre belirleniyor...")
         Setting.query.filter_by(key='master_hash').delete()
         db.session.add(Setting(key='master_hash', value=hash_master_password(mp)))
         _create_pbkdf2_salt()
