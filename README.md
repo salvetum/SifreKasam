@@ -36,6 +36,33 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
 
 > Bu proje, yapay zekâ destekli geliştirme ve *vibe coding* sürecini deneyimlemek amacıyla başlatılmıştır.
 
+## 📸 Ekran Görüntüleri
+
+<div align="center">
+
+### Ana Sayfa
+
+<img src="assets/base.png" width="850" alt="ŞifreKasam ana sayfa">
+
+<br><br>
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <strong>Şifre Oluşturucu</strong>
+      <br><br>
+      <img src="assets/passgen.png" width="420" alt="ŞifreKasam şifre oluşturucu ekranı">
+    </td>
+    <td align="center" width="50%">
+      <strong>Ayarlar Menüsü</strong>
+      <br><br>
+      <img src="assets/settings.gif" width="420" alt="ŞifreKasam ayarlar menüsü">
+    </td>
+  </tr>
+</table>
+
+</div>
+
 ## İndirme Kaynağı ve Güvenlik Uyarısı
 
 Bu yazılımın resmî ve güvenilir dağıtımları yalnızca aşağıdaki bağlantı üzerinden yayımlanmaktadır:
