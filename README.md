@@ -13,9 +13,9 @@ Bu proje'ye yeni özellikler eklenmeyecektir, fakat bug fixleri olabilir.
 - Yerel veritabanı ve ana şifre ile şifreleme
 - Kayıt ekleme, düzenleme, silme ve favorileme
 - Şifre oluşturucu ve şifre sağlığı ekranı
-- Türkçe/İngilizce dil desteği
-- Koyu/açık tema, glass efektleri, vurgu rengi ve arkaplan ayarları
-- İçe/dışa aktarma ve otomatik kilitleme seçenekleri
+- Türkçe / İngilizce dil desteği
+- Koyu tema, glass efektleri, vurgu rengi ve arkaplan ayarları
+- İçe/dışa aktarma, trayde çalışmaya devam etme ve otomatik kilitleme seçenekleri
 
 ## Güvenlik Notları
 
