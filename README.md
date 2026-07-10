@@ -25,6 +25,7 @@ Resmî kaynak dışında indirilen sürümlerde oluşabilecek veri kaybı, zarar
 - Türkçe / İngilizce dil desteği
 - Koyu ve açık tema, glass efektleri, vurgu rengi ve arkaplan ayarları
 - İçe/dışa aktarma, trayde çalışmaya devam etme ve otomatik kilitleme seçenekleri
+- Github üzerinden versiyon kontrolü
 
 ## Güvenlik Notları
 
