@@ -16,7 +16,7 @@ fi
 
 # 2. Python Bağımlılıkları
 echo "[*] Python bağımlılıkları kontrol ediliyor..."
-pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login -q 2>/dev/null || {
+pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login zxcvbn -q 2>/dev/null || {
     echo "[HATA] pip install başarısız!"
     exit 1
 }
@@ -37,7 +37,7 @@ cd flask_app
 
 pyinstaller app.spec --clean -y 2>&1 || {
     echo "[UYARI] Derleme başarısız, yeniden deneniyor..."
-    pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login -q
+    pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login zxcvbn -q
     pyinstaller app.spec --clean -y 2>&1 || {
         echo "[HATA] Derleme başarısız oldu!"
         exit 1
