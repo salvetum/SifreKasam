@@ -14,6 +14,10 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.4.2',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.4.2',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.4.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.4.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.4.0',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.4.0',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.3.4',
@@ -82,6 +86,8 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
     'sifrekasam',
     'SifreKasam',
+    'sifrekasam-v2.4.2',
+    'sifrekasam-v2.4.1',
     'sifrekasam-v2.4.0',
     'sifrekasam-v2.3.4',
     'ŞifreKasam',
@@ -214,6 +220,7 @@ const RETRY_INTERVAL_MS = 500;
 
 const PROTOCOL            = 'https';
 const GLASS_EFFECTS_FALSY = new Set(['false', '0', 'off', 'disabled']);
+const MEMORY_TRIM_INTERVAL_MS = 5 * 60 * 1000;
 
 // ─── UYGULAMA DURUMU ──────────────────────────────────────────────────────────
 
@@ -225,6 +232,9 @@ let isQuiting    = false;
 let lanRuntimeEnabled = false;
 let resetSavedLanOnNextStart = true;
 let isRestartingFlask = false;
+let memoryTrimTimer = null;
+
+app.commandLine.appendSwitch('disable-http-cache');
 
 // ─── TEK ÖRNEK KİLİDİ ────────────────────────────────────────────────────────
 
@@ -265,6 +275,7 @@ async function onAppReady() {
     PORT = await findFreePort();
     createWindow();
     createTray();
+    startMemoryTrimTimer();
     await startFlaskServer();
 
     if (mainWindow) {
@@ -358,9 +369,16 @@ function createWindow() {
       });
   });
 
-  mainWindow.on('hide', () => setRendererLowPower(true));
+  mainWindow.webContents.on('did-finish-load', trimRendererMemory);
+  mainWindow.on('hide', () => {
+    setRendererLowPower(true);
+    trimRendererMemory();
+  });
   mainWindow.on('show', () => setRendererLowPower(false));
-  mainWindow.on('minimize', () => setRendererLowPower(true));
+  mainWindow.on('minimize', () => {
+    setRendererLowPower(true);
+    trimRendererMemory();
+  });
   mainWindow.on('restore', () => setRendererLowPower(false));
   mainWindow.on('closed', () => { mainWindow = null; });
 }
@@ -394,6 +412,23 @@ function setRendererLowPower(enabled) {
   mainWindow.webContents
     .executeJavaScript(`window.KASA_SET_LOW_POWER?.(${value});`, true)
     .catch(() => {});
+}
+
+function trimRendererMemory() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.session.clearCache().catch(() => {});
+}
+
+function startMemoryTrimTimer() {
+  stopMemoryTrimTimer();
+  memoryTrimTimer = setInterval(trimRendererMemory, MEMORY_TRIM_INTERVAL_MS);
+  if (typeof memoryTrimTimer.unref === 'function') memoryTrimTimer.unref();
+}
+
+function stopMemoryTrimTimer() {
+  if (!memoryTrimTimer) return;
+  clearInterval(memoryTrimTimer);
+  memoryTrimTimer = null;
 }
 
 // ─── FLASK AYARLARI SORGUSU ───────────────────────────────────────────────────
@@ -605,7 +640,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('will-quit', shutdownFlask);
+app.on('will-quit', () => {
+  stopMemoryTrimTimer();
+  shutdownFlask();
+});
 
 function shutdownFlask() {
   if (!flaskProcess) return;

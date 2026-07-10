@@ -476,12 +476,12 @@
                             <input class="form-check-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title" style="width:2.5em;height:1.25em;cursor:pointer;">
                         </div>
                     </div>
-                    <div class="settings-select-card flex items-center justify-between p-3 rounded-xl glass-sm">
+                    <div id="glass-quality-card" class="settings-select-card settings-glass-quality-card flex items-center justify-between p-3 rounded-xl glass-sm" aria-hidden="{{ 'false' if GLASS_EFFECTS_ENABLED else 'true' }}" {% if not GLASS_EFFECTS_ENABLED %}hidden{% endif %}>
                         <div>
                             <h4 id="setting-glass-quality-title" class="text-sm font-medium mb-0.5">{{ _('Cam Kalitesi') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Bulanıklık seviyesini performansa göre ayarla.') }}</p>
                         </div>
-                        <select name="glass_quality" id="glass-quality-select" class="kasa-field settings-inline-select" aria-labelledby="setting-glass-quality-title">
+                        <select name="glass_quality" id="glass-quality-select" class="kasa-field settings-inline-select" aria-labelledby="setting-glass-quality-title" {% if not GLASS_EFFECTS_ENABLED %}disabled{% endif %}>
                             <option value="low" {% if GLASS_QUALITY == 'low' %}selected{% endif %}>{{ _('Düşük') }}</option>
                             <option value="normal" {% if GLASS_QUALITY == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
                             <option value="high" {% if GLASS_QUALITY == 'high' %}selected{% endif %}>{{ _('Yüksek') }}</option>
