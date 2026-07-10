@@ -10,7 +10,7 @@ vibecoding ile yapılmıştır (ki projenin ilk amacı buydu).
 - Kayıt ekleme, düzenleme, silme ve favorileme
 - Şifre oluşturucu ve şifre sağlığı ekranı
 - Türkçe / İngilizce dil desteği
-- Koyu tema, glass efektleri, vurgu rengi ve arkaplan ayarları
+- Koyu ve açık tema, glass efektleri, vurgu rengi ve arkaplan ayarları
 - İçe/dışa aktarma, trayde çalışmaya devam etme ve otomatik kilitleme seçenekleri
 
 ## Güvenlik Notları
