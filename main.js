@@ -14,6 +14,8 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.0',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.0',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.4.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.4.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.4.2',
@@ -36,8 +38,6 @@ const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.2',
 ];
 const ALL_UNINSTALL_KEYS = [CANONICAL_UNINSTALL_KEY, ...LEGACY_UNINSTALL_KEYS];
-
-// Self-signed SSL sertifika hatalarını Chromium konsol log'undan gizle
 
 // ─── SQUIRREL KURULUM HANDLER (EN ÜSTTE OLMALI) ──────────────────────────────
 
@@ -88,6 +88,7 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
     'sifrekasam',
     'SifreKasam',
+    'sifrekasam-v2.5.0',
     'sifrekasam-v2.4.3',
     'sifrekasam-v2.4.2',
     'sifrekasam-v2.4.1',
@@ -224,6 +225,15 @@ const RETRY_INTERVAL_MS = 500;
 const PROTOCOL            = 'https';
 const GLASS_EFFECTS_FALSY = new Set(['false', '0', 'off', 'disabled']);
 const MEMORY_TRIM_INTERVAL_MS = 5 * 60 * 1000;
+const HISTORY_NAVIGATION_KEYS = new Set(['BrowserBack', 'BrowserForward']);
+const SSL_NOISE_PATTERNS = [
+  'ERR_CERT_AUTHORITY_INVALID',
+  'ERR_CERT_COMMON_NAME_INVALID',
+  'ERR_CERT_DATE_INVALID',
+  'ERR_CERT_INVALID',
+  'certificate',
+  'SSL',
+];
 
 // ─── UYGULAMA DURUMU ──────────────────────────────────────────────────────────
 
@@ -236,8 +246,10 @@ let lanRuntimeEnabled = false;
 let resetSavedLanOnNextStart = true;
 let isRestartingFlask = false;
 let memoryTrimTimer = null;
+let hasReportedLocalCertificateNoise = false;
 
 app.commandLine.appendSwitch('disable-http-cache');
+app.commandLine.appendSwitch('disable-spell-checking');
 
 // ─── TEK ÖRNEK KİLİDİ ────────────────────────────────────────────────────────
 
@@ -257,6 +269,10 @@ if (!gotTheLock) {
   app.on('certificate-error', (event, _webContents, url, _error, _certificate, callback) => {
     if (url.startsWith(`https://${HOST}:`)) {
       event.preventDefault();
+      if (!hasReportedLocalCertificateNoise) {
+        hasReportedLocalCertificateNoise = true;
+        console.warn('Yerel self-signed SSL sertifikası kabul edildi; tekrar eden Chromium sertifika logları susturuldu.');
+      }
       callback(true);
     } else {
       callback(false);
@@ -307,6 +323,9 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: !app.isPackaged,
+      spellcheck: false,
+      enableWebSQL: false,
       backgroundThrottling: false, // Arka planda düşük güç modunu kendimiz yönetiyoruz böylece siyah ekran problemi gidiyor (umarım).
     },
   });
@@ -332,6 +351,44 @@ function createWindow() {
       }
     } catch (_) {}
     return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || !validatedURL?.startsWith(`https://${HOST}:`)) return;
+    const description = String(errorDescription || '');
+    const isCertificateNoise = errorCode === -202
+      || errorCode === -201
+      || SSL_NOISE_PATTERNS.some((pattern) => description.includes(pattern));
+    if (!isCertificateNoise) return;
+
+    event.preventDefault();
+    if (!hasReportedLocalCertificateNoise) {
+      hasReportedLocalCertificateNoise = true;
+      console.warn(`Yerel self-signed SSL uyarısı bir kez susturuldu (${errorCode}: ${description}).`);
+    }
+  });
+
+  mainWindow.webContents.on('console-message', (event, _level, message, _line, sourceId) => {
+    const text = String(message || '');
+    const source = String(sourceId || '');
+    const isLocalCertificateNoise = source.startsWith(`${PROTOCOL}://${HOST}:`)
+      && SSL_NOISE_PATTERNS.some((pattern) => text.includes(pattern));
+    if (!isLocalCertificateNoise) return;
+
+    event.preventDefault();
+    if (!hasReportedLocalCertificateNoise) {
+      hasReportedLocalCertificateNoise = true;
+      console.warn('Yerel self-signed SSL konsol uyarıları tekrar etmeyecek şekilde susturuldu.');
+    }
+  });
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const key = input.key || '';
+    const isHistoryKey = HISTORY_NAVIGATION_KEYS.has(key)
+      || (input.alt && (key === 'ArrowLeft' || key === 'ArrowRight'));
+    if (input.type === 'keyDown' && isHistoryKey) {
+      event.preventDefault();
+    }
   });
 
   // Her isteğe APP_TOKEN header'ı ekle

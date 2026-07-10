@@ -8,6 +8,9 @@
         window.LANG = "{{ CURRENT_LANG }}";
         window.TRANSLATIONS = {{ TRANSLATIONS_JSON|safe }};
         window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson|safe }};
+        window.KASA_STATIC_URLS = {
+            zxcvbn: "{{ url_for('static', filename='zxcvbn.js') }}?v=1",
+        };
         window._ = function (key) {
             return window.TRANSLATIONS[key] || key;
         };
@@ -104,7 +107,7 @@
     <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.4.3 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.5.0 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -126,7 +129,7 @@
     <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='style.css') }}?v=32" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}?v=34" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -151,12 +154,9 @@
     <!-- JS Libraries -->
     <script src="{{ url_for('static', filename='sweetalert2.all.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='toastify.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='chart.umd.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='zxcvbn.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=7.5" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=7.8" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script>
@@ -204,35 +204,48 @@
         });
     </script>
 
-    <!-- Mouse4/Mouse5 (ileri/geri) tuşlarında loading -->
+    <!-- Mouse4/Mouse5 history tuşlarını engelle; aksi halde loading overlay siyah ekranda kalabiliyor. -->
     <script>
-        document.addEventListener('auxclick', function (e) {
+        function clearPageLoadingOverlay() {
+            document.body.classList.remove('is-page-loading');
+            document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'true');
+        }
+
+        function blockMouseHistoryButton(e) {
             if (e.button === 3 || e.button === 4) {
                 e.preventDefault();
-                document.body.classList.add('is-page-loading');
-                document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'false');
+                e.stopImmediatePropagation();
+                sessionStorage.setItem('kasa-block-mouse-history', '1');
+                clearPageLoadingOverlay();
+                setTimeout(function () {
+                    sessionStorage.removeItem('kasa-block-mouse-history');
+                }, 700);
             }
+        }
+
+        ['mousedown', 'mouseup', 'auxclick'].forEach(function (eventName) {
+            document.addEventListener(eventName, blockMouseHistoryButton, true);
         });
     </script>
 
     <!-- Mobil geri tuşu loading loop fix -->
     <script>
         window.addEventListener('pageshow', function (e) {
-            if (e.persisted) {
-                document.body.classList.remove('is-page-loading');
-                document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'true');
-            }
+            clearPageLoadingOverlay();
         });
         window.addEventListener('popstate', function () {
-            document.body.classList.remove('is-page-loading');
-            document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'true');
+            clearPageLoadingOverlay();
+            if (sessionStorage.getItem('kasa-block-mouse-history') === '1') {
+                sessionStorage.removeItem('kasa-block-mouse-history');
+                history.forward();
+            }
         });
     </script>
 
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script>
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v31';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v34';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>
