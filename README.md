@@ -4,6 +4,19 @@
 
 vibecoding ile yapılmıştır (ki projenin ilk amacı buydu).
 
+## İndirme Kaynağı ve Güvenlik Uyarısı
+
+Bu yazılımın resmî ve güvenilir dağıtımları yalnızca aşağıdaki bağlantı üzerinden yayımlanmaktadır:
+
+**https://github.com/salvetum/SifreKasam**
+
+Bu bağlantı dışında bulunan üçüncü taraf sitelerden, dosya paylaşım platformlarından, yeniden yüklenmiş paketlerden veya değiştirilmiş sürümlerden indirilen dosyaların güvenliği, bütünlüğü ve güncelliği garanti edilmez.
+
+Resmî kaynak dışında indirilen sürümlerde oluşabilecek veri kaybı, zararlı yazılım, hesap güvenliği sorunları, sistem arızaları veya diğer zararlardan proje geliştiricisi sorumlu değildir.
+
+İndirme yapmadan önce bağlantının resmî kaynağa ait olduğunu kontrol etmeniz önerilir.
+
+
 ## Özellikler
 
 - Yerel veritabanı ve ana şifre ile şifreleme
