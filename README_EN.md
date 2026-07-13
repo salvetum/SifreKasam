@@ -87,6 +87,7 @@ Before downloading, make sure the address belongs to the official GitHub reposit
 - Continue running in the system tray
 - Automatic locking options
 - Version checking through GitHub
+> NOTE: No new features **will be added**. However, changes or bug fixes **may still be made**.
 
 ## Security Notes
 
