@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -47,7 +47,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.5.2")
+APP_VERSION = os.environ.get("APP_VERSION", "2.5.3")
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
@@ -106,17 +106,21 @@ app.config.update(
 
 # ─── VERİ YOLU AYARLARI ───────────────────────────────────────────────────────
 
+def _ensure_private_data_dir(path: str) -> str:
+    os.makedirs(path, exist_ok=True)
+    try:
+        os.chmod(path, 0o700)
+    except OSError as exc:
+        log.warning("Veri dizini izinleri sıkılaştırılamadı: %s", exc)
+    return path
+
 def get_data_dir() -> str:
     if os.name == 'nt':
         appdata = os.environ.get('APPDATA')
         if appdata:
-            path = os.path.join(appdata, '.SifrekasamV2')
-            os.makedirs(path, exist_ok=True)
-            return path
+            return _ensure_private_data_dir(os.path.join(appdata, '.SifrekasamV2'))
     xdg = os.environ.get('XDG_CONFIG_HOME') or os.path.join(os.path.expanduser('~'), '.config')
-    path = os.path.join(xdg, 'sifrekasam')
-    os.makedirs(path, exist_ok=True)
-    return path
+    return _ensure_private_data_dir(os.path.join(xdg, 'sifrekasam'))
 
 DATA_DIR  = get_data_dir()
 DB_FILE   = os.path.join(DATA_DIR, 'sifreler.db')
@@ -319,6 +323,9 @@ LEGACY_PBKDF2_SALT = b'kasa_masaustu_salt_12345'
 PBKDF2_SALT_SETTING = 'pbkdf2_salt_b64'
 PBKDF2_ITERATIONS = 600_000
 LEGACY_PBKDF2_ITERATIONS = 100_000
+RECORD_METADATA_PREFIX = 'sifrekasam:v1:'
+RECORD_METADATA_SETTING = 'record_metadata_encryption_v1'
+RECORD_METADATA_FIELDS = ('title', 'website_url', 'login')
 
 def _derive_key_with_salt(master_password: str, salt: bytes,
                           iterations: int = PBKDF2_ITERATIONS) -> bytes:
@@ -375,6 +382,45 @@ def safe_encrypt(fernet: Fernet, value: str) -> str:
 
 def strict_decrypt(fernet: Fernet, value: str) -> str:
     return fernet.decrypt(value.encode()).decode() if value else ""
+
+def encrypt_metadata(fernet: Fernet, value: str) -> str:
+    return RECORD_METADATA_PREFIX + safe_encrypt(fernet, value) if value else ""
+
+def decrypt_metadata(fernet: Fernet, value: str) -> str:
+    if not value or not value.startswith(RECORD_METADATA_PREFIX):
+        return value or ""
+    return safe_decrypt(fernet, value[len(RECORD_METADATA_PREFIX):])
+
+def strict_decrypt_metadata(fernet: Fernet, value: str) -> str:
+    if not value or not value.startswith(RECORD_METADATA_PREFIX):
+        return value or ""
+    return strict_decrypt(fernet, value[len(RECORD_METADATA_PREFIX):])
+
+def _metadata_value_for_migration(fernet: Fernet, value: str) -> tuple[str, bool]:
+    if not value or not value.startswith(RECORD_METADATA_PREFIX):
+        return value or "", False
+    try:
+        return strict_decrypt_metadata(fernet, value), True
+    except InvalidToken:
+        return value, False
+
+def _reencrypt_record(record: Record, old_fernet: Fernet, new_fernet: Fernet,
+                      allow_legacy_prefix: bool = False) -> None:
+    record.encrypted_password = safe_encrypt(
+        new_fernet,
+        strict_decrypt(old_fernet, record.encrypted_password),
+    )
+    record.encrypted_comment = safe_encrypt(
+        new_fernet,
+        strict_decrypt(old_fernet, record.encrypted_comment),
+    )
+    for field in RECORD_METADATA_FIELDS:
+        encrypted_value = getattr(record, field) or ''
+        if allow_legacy_prefix:
+            plaintext, _ = _metadata_value_for_migration(old_fernet, encrypted_value)
+        else:
+            plaintext = strict_decrypt_metadata(old_fernet, encrypted_value)
+        setattr(record, field, encrypt_metadata(new_fernet, plaintext))
 
 def _is_legacy_master_hash(value: str) -> bool:
     return len(value or '') == 64 and all(c in '0123456789abcdef' for c in value.lower())
@@ -434,14 +480,7 @@ def migrate_legacy_pbkdf2_salt(master_password: str) -> bool:
     try:
         backup_database()
         for row in rows:
-            row.encrypted_password = safe_encrypt(
-                new_fernet,
-                strict_decrypt(old_fernet, row.encrypted_password),
-            )
-            row.encrypted_comment = safe_encrypt(
-                new_fernet,
-                strict_decrypt(old_fernet, row.encrypted_comment),
-            )
+            _reencrypt_record(row, old_fernet, new_fernet, allow_legacy_prefix=True)
         for history in hist_rows:
             history.encrypted_password = safe_encrypt(
                 new_fernet,
@@ -449,6 +488,7 @@ def migrate_legacy_pbkdf2_salt(master_password: str) -> bool:
             )
         _set_setting(PBKDF2_SALT_SETTING, base64.b64encode(new_salt).decode())
         db.session.commit()
+        _refresh_database_backup()
         log.info("Legacy PBKDF2 salt migrasyonu tamamlandı.")
         return True
     except Exception:
@@ -466,6 +506,44 @@ def backup_database() -> None:
         shutil.copy2(DB_FILE, DB_FILE + ".backup")
     except Exception as e:
         log.warning(f"Yedekleme hatası: {e}")
+
+def _refresh_database_backup() -> None:
+    """Başarılı migrasyon sonrası düz metin içerebilen eski yedeği şifreli DB ile yeniler."""
+    backup_path = DB_FILE + ".backup"
+    try:
+        overwrite_and_delete(backup_path)
+    except OSError as exc:
+        log.warning("Eski migrasyon yedeği güvenli biçimde temizlenemedi: %s", exc)
+        return
+    backup_database()
+
+def migrate_plaintext_record_metadata(fernet: Fernet) -> bool:
+    if _get_setting(RECORD_METADATA_SETTING) == 'true':
+        return False
+
+    rows = Record.query.all()
+    try:
+        backup_database()
+        db.session.execute(db.text("PRAGMA secure_delete=ON"))
+        for row in rows:
+            for field in RECORD_METADATA_FIELDS:
+                current_value = getattr(row, field) or ''
+                plaintext, already_encrypted = _metadata_value_for_migration(
+                    fernet,
+                    current_value,
+                )
+                if not already_encrypted:
+                    setattr(row, field, encrypt_metadata(fernet, plaintext))
+        _set_setting(RECORD_METADATA_SETTING, 'true')
+        db.session.commit()
+        _refresh_database_backup()
+        invalidate_vault_report_cache()
+        log.info("Kayıt metadata şifreleme migrasyonu tamamlandı.")
+        return True
+    except Exception:
+        db.session.rollback()
+        log.exception("Kayıt metadata şifreleme migrasyonu geri alındı.")
+        raise
 
 def new_record_id() -> str:
     return uuid.uuid4().hex
@@ -755,8 +833,6 @@ def inject_globals():
     current_lang = get_saved_language()
     available_langs = get_available_languages()
     lang_translations = load_translations(current_lang)
-    # Escape closing script tags before embedding translations in inline JS.
-    translations_json = json.dumps(lang_translations, ensure_ascii=False).replace('</', '<\\/')
     return {
         'APP_VERSION':           APP_VERSION,
         'AUTO_LOCK_ENABLED':     auto_lock_enabled,
@@ -771,7 +847,7 @@ def inject_globals():
         'LAN_ENABLED':           lan_enabled,
         'CURRENT_LANG':          current_lang,
         'AVAILABLE_LANGS':       available_langs,
-        'TRANSLATIONS_JSON':     translations_json,
+        'TRANSLATIONS':          lang_translations,
         '_':                     _,
     }
 
@@ -797,6 +873,9 @@ def _lan_access_enabled() -> bool:
 
 _login_attempts: dict[str, dict[str, float | int]] = {}
 _login_attempts_lock = threading.Lock()
+LOGIN_LOCK_THRESHOLD = 5
+LOGIN_LOCK_BASE_SECONDS = 30
+LOGIN_LOCK_MAX_SECONDS = 30 * 60
 
 def _login_attempt_key() -> str:
     # LAN açıkken aynı ağdaki istemciler için IP bazlı brute-force limiti uygular.
@@ -812,12 +891,19 @@ def _login_retry_after(key: str) -> int:
             state.pop('locked_until', None)
         return retry_after
 
+def _login_backoff_seconds(failures: int) -> int:
+    """Başarısız girişler sürdükçe bekleme süresini 30 dakikaya kadar katlar."""
+    if failures < LOGIN_LOCK_THRESHOLD:
+        return 0
+    exponent = failures - LOGIN_LOCK_THRESHOLD
+    return min(LOGIN_LOCK_BASE_SECONDS * (2 ** exponent), LOGIN_LOCK_MAX_SECONDS)
+
 def _record_login_failure(key: str) -> int:
     with _login_attempts_lock:
         state = _login_attempts.setdefault(key, {'failures': 0, 'locked_until': 0.0})
         failures = int(state.get('failures', 0)) + 1
         state['failures'] = failures
-        wait_seconds = 300 if failures >= 10 else 30 if failures >= 5 else 0
+        wait_seconds = _login_backoff_seconds(failures)
         if wait_seconds:
             state['locked_until'] = max(float(state.get('locked_until', 0)), time.time() + wait_seconds)
         return int(max(0, float(state.get('locked_until', 0)) - time.time()))
@@ -1060,6 +1146,7 @@ def login():
 
     if setting and setting.value:
         changed = False
+        migration_committed = False
         if not verify_master_password(setting.value, mp):
             _clear_vault_password()
             session.clear()
@@ -1077,13 +1164,17 @@ def login():
             changed = True
         try:
             if migrate_legacy_pbkdf2_salt(mp):
-                changed = False
+                migration_committed = True
+            # Düz metin metadata, geçerli kasa anahtarıyla tek seferlik şifrelenir.
+            current_fernet = Fernet(derive_key(mp))
+            if migrate_plaintext_record_metadata(current_fernet):
+                migration_committed = True
         except Exception:
             return render_template(
                 'login.html',
-                error="Kasa anahtar migrasyonu başarısız oldu. Veri güvenliği için giriş durduruldu."
+                error="Kasa güvenlik migrasyonu başarısız oldu. Veri güvenliği için giriş durduruldu."
             ), 500
-        if changed:
+        if changed and not migration_committed:
             db.session.commit()
     else:
         if _vault_initialized() or _has_existing_vault_data():
@@ -1096,6 +1187,8 @@ def login():
         Setting.query.filter_by(key='master_hash').delete()
         db.session.add(Setting(key='master_hash', value=hash_master_password(mp)))
         _create_pbkdf2_salt()
+        # Yeni kasalarda metadata ilk kayıttan itibaren şifreli yazılır.
+        _set_setting(RECORD_METADATA_SETTING, 'true')
         _mark_vault_initialized()
         db.session.commit()
         if os.path.exists(TXT_FILE):
@@ -1118,30 +1211,33 @@ def index():
 
     kasa_verileri = []
     for r in rows:
+        title = decrypt_metadata(fernet, r.title)
+        website_url = decrypt_metadata(fernet, r.website_url)
+        login_value = decrypt_metadata(fernet, r.login)
         dec_comm = safe_decrypt(fernet, r.encrypted_comment)
 
         if r.type == 'CreditCard':
             detaylar = {k: v for k, v in [
-                ('Kart Numarası', r.login), ('CVV / Şifre', SECRET_PLACEHOLDER if r.encrypted_password else '')
+                ('Kart Numarası', login_value), ('CVV / Şifre', SECRET_PLACEHOLDER if r.encrypted_password else '')
             ] if v}
         elif r.type == 'SecureNote':
             detaylar = {'Not': dec_comm} if dec_comm else {}
         else:
             detaylar = {k: v for k, v in [
                 ('Kategori',       r.category),
-                ('Kullanıcı Adı',  r.login),
+                ('Kullanıcı Adı',  login_value),
                 ('Şifre',          SECRET_PLACEHOLDER if r.encrypted_password else ''),
-                ('İnternet Adresi', r.website_url),
+                ('İnternet Adresi', website_url),
                 ('Not',            dec_comm),
             ] if v}
 
         kasa_verileri.append({
             'id': r.id,
-            'normalized': {'baslik': r.title, 'detaylar': detaylar},
+            'normalized': {'baslik': title, 'detaylar': detaylar},
             'full_data': {
                 'id': r.id, 'type': r.type, 'category': r.category,
-                'title': r.title, 'website_url': r.website_url,
-                'login': r.login, 'is_pinned': r.is_pinned,
+                'title': title, 'website_url': website_url,
+                'login': login_value, 'is_pinned': r.is_pinned,
                 'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
             },
         })
@@ -1163,9 +1259,12 @@ def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str,
         id                 = record_id or new_record_id(),
         type               = record_type,
         category           = normalize_text(request.form.get('kategori'), DEFAULT_CATEGORY, 120),
-        title              = normalize_text(request.form.get('isim'), _('Bilinmeyen'), 200),
-        website_url        = normalize_url(request.form.get('website_url')),
-        login              = normalize_text(request.form.get('login'), max_length=300),
+        title              = encrypt_metadata(
+            fernet, normalize_text(request.form.get('isim'), _('Bilinmeyen'), 200)),
+        website_url        = encrypt_metadata(
+            fernet, normalize_url(request.form.get('website_url'))),
+        login              = encrypt_metadata(
+            fernet, normalize_text(request.form.get('login'), max_length=300)),
         encrypted_password = safe_encrypt(fernet, request.form.get('password', '')),
         encrypted_comment  = safe_encrypt(fernet, request.form.get('comment', '')),
         expiry_date        = _parse_expiry(request.form.get('expiry_date', '')),
@@ -1226,14 +1325,16 @@ def duzenle_sayfasi(kayit_id):
 
     dec_pass = safe_decrypt(fernet, r.encrypted_password)
     dec_comm = safe_decrypt(fernet, r.encrypted_comment)
+    title = decrypt_metadata(fernet, r.title)
     mapped_data = {
         'type': r.type, 'Category': r.category,
-        'Website name':  r.title if r.type == 'Website'     else '',
-        'Application':   r.title if r.type == 'Application' else '',
-        'Account name':  r.title if r.type == 'Other'       else '',
-        'CreditCard':    r.title if r.type == 'CreditCard'  else '',
-        'SecureNote':    r.title if r.type == 'SecureNote'  else '',
-        'Website URL': r.website_url, 'Login': r.login,
+        'Website name':  title if r.type == 'Website'     else '',
+        'Application':   title if r.type == 'Application' else '',
+        'Account name':  title if r.type == 'Other'       else '',
+        'CreditCard':    title if r.type == 'CreditCard'  else '',
+        'SecureNote':    title if r.type == 'SecureNote'  else '',
+        'Website URL': decrypt_metadata(fernet, r.website_url),
+        'Login': decrypt_metadata(fernet, r.login),
         'Password': dec_pass, 'Comment': dec_comm,
         'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
     }
@@ -1300,7 +1401,7 @@ def _build_vault_report_payloads() -> tuple[dict[str, int], dict[str, list]]:
         if not pw:
             continue
 
-        rec = {'id': r.id, 'title': r.title}
+        rec = {'id': r.id, 'title': decrypt_metadata(fernet, r.title)}
         if _score_password(pw) < 4:
             zayif += 1
             zayif_records.append(rec)
@@ -1397,8 +1498,10 @@ def export_data():
 def _serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
     """Kayıtları dışa aktarılabilir plain JSON sözlüklerine dönüştürür."""
     return [{
-        'type': r.type, 'category': r.category, 'title': r.title,
-        'website_url': r.website_url, 'login': r.login,
+        'type': r.type, 'category': r.category,
+        'title': decrypt_metadata(fernet, r.title),
+        'website_url': decrypt_metadata(fernet, r.website_url),
+        'login': decrypt_metadata(fernet, r.login),
         'password': safe_decrypt(fernet, r.encrypted_password),
         'comment':  safe_decrypt(fernet, r.encrypted_comment),
         'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
@@ -1453,8 +1556,10 @@ def _parse_import_record(item: dict, fernet: Fernet) -> Record:
         id                 = new_record_id(),
         type               = normalize_record_type(rec_type),
         category           = normalize_text(category, DEFAULT_CATEGORY, 120),
-        title              = normalize_text(title, _('Bilinmeyen'), 200),
-        website_url        = url, login=login_val,
+        title              = encrypt_metadata(
+            fernet, normalize_text(title, _('Bilinmeyen'), 200)),
+        website_url        = encrypt_metadata(fernet, url),
+        login              = encrypt_metadata(fernet, login_val),
         encrypted_password = safe_encrypt(fernet, password),
         encrypted_comment  = safe_encrypt(fernet, comment),
         expiry_date        = _parse_expiry(normalize_text(item.get('expiry_date') or item.get('Expiry Date'))),
@@ -1753,8 +1858,7 @@ def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | Non
 
             for row in rows:
                 # Çözme hatasında placeholder yazmak yerine tüm işlemi geri al.
-                row.encrypted_password = safe_encrypt(new_fernet, strict_decrypt(old_fernet, row.encrypted_password))
-                row.encrypted_comment  = safe_encrypt(new_fernet, strict_decrypt(old_fernet, row.encrypted_comment))
+                _reencrypt_record(row, old_fernet, new_fernet)
                 done += 1
                 _update_progress()
 

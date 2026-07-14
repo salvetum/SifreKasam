@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.2 - Main JavaScript
+ * ŞifreKasam v2.5.3 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -864,13 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const getCopyButton = (iconEl) => iconEl?.closest?.('button') || iconEl;
 
-  const getCopyIconSizeClasses = (iconEl) => Array.from(iconEl?.classList || [])
-    .filter(className => (
-      className !== 'text-success'
-      && (className.startsWith('text-') || /^fa-(xs|sm|lg|xl|2x)$/.test(className))
-    ));
-
-  const buildCopyIconHtml = (iconEl) => {
+  const getOriginalCopyIconClassName = (iconEl) => {
     const classes = Array.from(iconEl?.classList || [])
       .map(className => className === 'fa-check' ? 'fa-copy' : className)
       .filter(className => !['copy-flash', 'text-success'].includes(className));
@@ -880,35 +874,23 @@ document.addEventListener('DOMContentLoaded', () => {
       classes.unshift('fa-solid');
     }
 
-    const originalIcon = document.createElement('i');
-    originalIcon.className = [...new Set(classes)].join(' ') || 'fa-solid fa-copy';
-    return originalIcon.outerHTML;
+    return [...new Set(classes)].join(' ') || 'fa-solid fa-copy';
   };
 
-  const getCopyButtonOriginalHtml = (button, iconEl, currentState) => {
-    if (button.dataset.copyOriginalHtml) return button.dataset.copyOriginalHtml;
-    if (currentState?.originalHtml) return currentState.originalHtml;
-
-    const iconIsFlashing = iconEl?.classList?.contains('fa-check')
-      || iconEl?.classList?.contains('copy-flash')
-      || iconEl?.classList?.contains('text-success');
-    const originalHtml = iconIsFlashing ? buildCopyIconHtml(iconEl) : button.innerHTML;
-    button.dataset.copyOriginalHtml = originalHtml;
-    return originalHtml;
-  };
-
-  const resetCopyButtonIcon = (button, originalHtml) => {
+  const resetCopyButtonIcon = (button) => {
     if (!button?.isConnected) return;
-    button.innerHTML = originalHtml || button.dataset.copyOriginalHtml || '<i class="fa-solid fa-copy"></i>';
+    const state = copyButtonStates.get(button);
+    const icon = state?.icon?.isConnected ? state.icon : button.querySelector('i');
+    if (icon) icon.className = state?.originalClassName || getOriginalCopyIconClassName(icon);
     delete button.dataset.copyResetAt;
     copyButtonStates.delete(button);
   };
 
   const resetStuckCopyButtons = () => {
     const now = Date.now();
-    document.querySelectorAll('button[data-copy-original-html]').forEach((button) => {
+    document.querySelectorAll('button[data-copy-reset-at]').forEach((button) => {
       const resetAt = Number(button.dataset.copyResetAt || 0);
-      if (resetAt && now >= resetAt && button.querySelector('i.fa-check')) {
+      if (resetAt && now >= resetAt) {
         resetCopyButtonIcon(button);
       }
     });
@@ -919,19 +901,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!button) return;
 
     const currentState = copyButtonStates.get(button);
-    const originalHtml = getCopyButtonOriginalHtml(button, iconEl, currentState);
+    const icon = iconEl?.isConnected ? iconEl : button.querySelector('i');
+    if (!icon) return;
+    const originalClassName = currentState?.originalClassName || getOriginalCopyIconClassName(icon);
     clearTimeout(currentState?.timer);
 
-    const checkIcon = document.createElement('i');
-    checkIcon.className = ['fa-solid', 'fa-check', 'text-success', 'copy-flash', ...getCopyIconSizeClasses(iconEl)]
+    icon.className = originalClassName
+      .split(/\s+/)
+      .map(className => className === 'fa-copy' ? 'fa-check' : className)
       .filter(Boolean)
+      .concat('text-success', 'copy-flash')
+      .filter((className, index, classes) => classes.indexOf(className) === index)
       .join(' ');
-    button.replaceChildren(checkIcon);
 
     button.dataset.copyResetAt = String(Date.now() + COPY_ICON_RESET_MS + 250);
-    const timer = setTimeout(() => resetCopyButtonIcon(button, originalHtml), COPY_ICON_RESET_MS);
+    const timer = setTimeout(() => resetCopyButtonIcon(button), COPY_ICON_RESET_MS);
     setTimeout(resetStuckCopyButtons, COPY_ICON_RESET_MS + 500);
-    copyButtonStates.set(button, { originalHtml, timer });
+    copyButtonStates.set(button, { icon, originalClassName, timer });
 
     try {
       showSuccessToast(window._('Kopyaland\u0131!'));
@@ -961,6 +947,28 @@ document.addEventListener('DOMContentLoaded', () => {
       showWarningToast(window._('Kopyalama başarısız oldu.'));
     }
   };
+
+  const importForm = document.getElementById('import-form');
+  const importSubmitButton = document.getElementById('import-submit');
+  importForm?.addEventListener('submit', (event) => {
+    if (importForm.dataset.submitting === 'true') {
+      event.preventDefault();
+      return;
+    }
+
+    importForm.dataset.submitting = 'true';
+    importForm.setAttribute('aria-busy', 'true');
+    if (importSubmitButton) {
+      const spinner = document.createElement('i');
+      spinner.className = 'fa-solid fa-spinner fa-spin mr-2';
+      importSubmitButton.disabled = true;
+      importSubmitButton.setAttribute('aria-disabled', 'true');
+      importSubmitButton.replaceChildren(
+        spinner,
+        document.createTextNode(window._('İçe aktarılıyor…')),
+      );
+    }
+  });
 
   // ─── 5. ŞİFRE GÖSTER / KOPYAla BUTONLARI ─────────────────────────────────
 
@@ -1407,8 +1415,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const pagePrevButton = document.getElementById('card-page-prev');
     const pageNextButton = document.getElementById('card-page-next');
     const pageNumbers = document.getElementById('card-page-numbers');
+    const pageJumpInput = document.getElementById('card-page-input');
+    const pageJumpButton = document.getElementById('card-page-go');
     const CARD_PAGE_SIZE = 50;
     let currentCardPage = 1;
+    let currentCardPageCount = 1;
     let cardCache = [];
     const getCards = () => Array.from(document.querySelectorAll('.card-wrapper'));
 
@@ -1429,6 +1440,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateCachedCard = (wrapper) => {
       const index = cardCache.findIndex(item => item.wrapper === wrapper);
       if (index >= 0) cardCache[index] = createCardCacheItem(wrapper);
+    };
+
+    const goToCardPage = (requestedPage) => {
+      const normalizedPage = String(requestedPage ?? '').trim();
+      if (!normalizedPage) return;
+      const numericPage = Number(normalizedPage);
+      if (!Number.isFinite(numericPage)) return;
+
+      currentCardPage = Math.min(
+        Math.max(Math.trunc(numericPage), 1),
+        currentCardPageCount,
+      );
+      if (pageJumpInput) pageJumpInput.value = '';
+      filterCards({ preservePage: true, animate: true, scrollToGrid: true });
     };
 
     const setCardVisible = (wrapper, visible, animate = false) => {
@@ -1452,10 +1477,7 @@ document.addEventListener('DOMContentLoaded', () => {
       button.textContent = label;
       button.setAttribute('aria-label', `${window._('Sayfa')} ${page}`);
       button.setAttribute('aria-current', isActive ? 'page' : 'false');
-      button.addEventListener('click', () => {
-        currentCardPage = page;
-        filterCards({ preservePage: true, animate: true, scrollToGrid: true });
-      });
+      button.addEventListener('click', () => goToCardPage(page));
       return button;
     };
 
@@ -1471,6 +1493,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const shouldShow = cardCache.length > CARD_PAGE_SIZE && matchedCount > 0;
       paginationNav.hidden = !shouldShow;
+      currentCardPageCount = pageCount;
+      if (pageJumpInput) pageJumpInput.max = String(pageCount);
       if (!shouldShow) return;
 
       paginationSummary.textContent = `${startIndex + 1}-${endIndex} / ${matchedCount} ${window._('kayıt gösteriliyor')}`;
@@ -1546,13 +1570,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     pagePrevButton?.addEventListener('click', () => {
       if (currentCardPage <= 1) return;
-      currentCardPage -= 1;
-      filterCards({ preservePage: true, animate: true, scrollToGrid: true });
+      goToCardPage(currentCardPage - 1);
     });
 
     pageNextButton?.addEventListener('click', () => {
-      currentCardPage += 1;
-      filterCards({ preservePage: true, animate: true, scrollToGrid: true });
+      goToCardPage(currentCardPage + 1);
+    });
+
+    const submitPageJump = () => goToCardPage(pageJumpInput?.value);
+    pageJumpButton?.addEventListener('click', submitPageJump);
+    pageJumpInput?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      submitPageJump();
     });
 
     categoryBtns.forEach(btn => {

@@ -184,7 +184,9 @@
         this.dataset.submitted = 'true';
         const btn = document.getElementById('save-btn');
         if (btn) {
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>' + _('Kaydediliyor…');
+            const spinner = document.createElement('i');
+            spinner.className = 'fa-solid fa-spinner fa-spin mr-2';
+            btn.replaceChildren(spinner, document.createTextNode(_('Kaydediliyor…')));
             btn.style.pointerEvents = 'none';
             btn.style.opacity = '0.7';
         }
