@@ -233,5 +233,15 @@
   "Normal": "Normal",
   "Bulanıklık seviyesini performansa göre ayarla.": "Bulanıklık seviyesini performansa göre ayarla.",
   "Düşük": "Düşük",
-  "Yüksek": "Yüksek"
+  "Yüksek": "Yüksek",
+  "ŞifreKasam formatı": "ŞifreKasam formatı",
+  "Yedek dosyası formatını seçin.": "Yedek dosyası formatını seçin.",
+  "ŞifreKasam Yedeği": "ŞifreKasam Yedeği",
+  "Uygulamaya özel, yeniden içe aktarılabilir yedek.": "Uygulamaya özel, yeniden içe aktarılabilir yedek.",
+  "JSON Yedeği": "JSON Yedeği",
+  "Yapılandırılmış ve taşınabilir veri formatı.": "Yapılandırılmış ve taşınabilir veri formatı.",
+  "Metin Yedeği": "Metin Yedeği",
+  "Okunabilir eski metin formatı.": "Okunabilir eski metin formatı.",
+  "Ana şifre güncelleniyor": "Ana şifre güncelleniyor",
+  "Yedek formatını seçin ve indirin.": "Yedek formatını seçin ve indirin."
 }

@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.5.1 — Main Stylesheet
+   ŞifreKasam v2.5.2 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -1676,8 +1676,52 @@ html[data-glass-quality="normal"] .vault-card-shell.glass {
     to   { opacity: 0; transform: scale(0.95) translateY(8px); }
 }
 
+@keyframes kasaLockModalIn {
+    0%   { opacity: 0; transform: translateY(22px) scale(0.9); filter: blur(7px); }
+    68%  { opacity: 1; transform: translateY(-2px) scale(1.015); filter: blur(0); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes kasaLockModalOut {
+    from { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    to   { opacity: 0; transform: translateY(12px) scale(0.95); filter: blur(5px); }
+}
+
+@keyframes kasaLockBackdropIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes kasaLockBackdropOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+@keyframes kasaLockIconIn {
+    0%   { opacity: 0; transform: scale(0.55) rotate(-10deg); }
+    70%  { opacity: 1; transform: scale(1.08) rotate(2deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+.kasa-lock-modal-enter {
+    animation: kasaLockModalIn 320ms cubic-bezier(0.16,1,0.3,1) both !important;
+    transform-origin: center;
+}
+
+.kasa-lock-modal-exit {
+    animation: kasaLockModalOut 180ms ease-in both !important;
+    transform-origin: center;
+}
+
+.kasa-lock-backdrop-enter { animation: kasaLockBackdropIn 220ms ease-out both !important; }
+.kasa-lock-backdrop-exit  { animation: kasaLockBackdropOut 180ms ease-in both !important; }
+
+.kasa-lock-modal-enter .swal2-icon {
+    animation: kasaLockIconIn 360ms 70ms cubic-bezier(0.16,1,0.3,1) both;
+}
+
 .swal2-container {
-    background: rgba(0,0,0,0.22) !important;
+    background: rgba(0,0,0,0.45) !important;
 }
 
 .swal2-popup.kasa-swal-popup {
@@ -1967,7 +2011,11 @@ html[data-bs-theme="light"][data-glass-effects="off"] .generator-panel {
 }
 [data-bs-theme="light"] .kasa-swal-title { color: var(--text) !important; }
 [data-bs-theme="light"] .kasa-swal-text  { color: var(--text-muted) !important; }
-[data-bs-theme="light"] .swal2-container { backdrop-filter: none; -webkit-backdrop-filter: none; }
+[data-bs-theme="light"] .swal2-container {
+    background: rgba(238,242,255,0.58) !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
 
 [data-bs-theme="light"] .kasa-checkbox {
     background: rgba(255,255,255,0.78);

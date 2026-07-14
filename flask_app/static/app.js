@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.1 - Main JavaScript
+ * ŞifreKasam v2.5.2 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -225,10 +225,27 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const pageLoadingOverlay = document.querySelector('.page-loading-overlay');
-  const setPageLoading = (isLoading) => {
+  const pageLoadingTitle = pageLoadingOverlay?.querySelector('.page-loading-title');
+  const pageLoadingSubtitle = pageLoadingOverlay?.querySelector('.page-loading-subtitle');
+  const defaultLoadingCopy = {
+    title: pageLoadingTitle?.textContent || '',
+    subtitle: pageLoadingSubtitle?.textContent || '',
+  };
+  const setPageLoading = (isLoading, copy = {}) => {
+    if (pageLoadingTitle) {
+      pageLoadingTitle.textContent = isLoading && copy.title
+        ? copy.title
+        : defaultLoadingCopy.title;
+    }
+    if (pageLoadingSubtitle) {
+      pageLoadingSubtitle.textContent = isLoading && copy.subtitle
+        ? copy.subtitle
+        : defaultLoadingCopy.subtitle;
+    }
     document.body.classList.toggle('is-page-loading', isLoading);
     pageLoadingOverlay?.setAttribute('aria-hidden', String(!isLoading));
   };
+  window.KASA_SET_PAGE_LOADING = setPageLoading;
 
   // ─── 1. HEARTBEAT ─────────────────────────────────────────────────────────
 
@@ -664,19 +681,25 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   });
 
-  const settingsExportButton = document.getElementById('settings-export-btn');
-  settingsExportButton?.addEventListener('click', async (event) => {
-    event.preventDefault();
-    try {
+  document.querySelectorAll('[data-export-format]').forEach(exportButton => {
+    exportButton.addEventListener('click', async (event) => {
+      event.preventDefault();
+      const exportFormat = exportButton.dataset.exportFormat || 'json';
       const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      await downloadFromEndpoint(
-        settingsExportButton.getAttribute('href') || '/export',
-        `kasa_yedek_${dateStamp}.json`
-      );
-    } catch (err) {
-      console.error('Export failed:', err);
-      showWarningToast(window._('Dışa aktarma başarısız oldu.'));
-    }
+      exportButton.disabled = true;
+      try {
+        await downloadFromEndpoint(
+          exportButton.dataset.exportUrl || `/export?format=${encodeURIComponent(exportFormat)}`,
+          `sifrekasam_yedek_${dateStamp}.${exportFormat}`
+        );
+        window.kasaModalKapat?.('exportModal');
+      } catch (err) {
+        console.error('Export failed:', err);
+        showWarningToast(window._('Dışa aktarma başarısız oldu.'));
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
   });
 
   const updateCheckButton = document.getElementById('update-check-btn');
