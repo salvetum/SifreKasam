@@ -1,4 +1,4 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v35';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v37';
 const ASSETS = [
   '{{ url_for("static", filename="style.css") }}',
   '{{ url_for("static", filename="tailwind-lite.css") }}',

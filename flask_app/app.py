@@ -47,7 +47,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.5.1")
+APP_VERSION = os.environ.get("APP_VERSION", "2.5.2")
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
@@ -1386,10 +1386,12 @@ def save_settings():
 def export_data():
     fernet = get_fernet()
     rows   = Record.query.all()
+    export_format = _requested_export_format()
 
     return _send_records_export(
         _serialize_records(rows, fernet),
-        f"kasa_yedek_{datetime.now().strftime('%Y%m%d')}.json"
+        f"sifrekasam_yedek_{datetime.now().strftime('%Y%m%d')}",
+        export_format,
     )
 
 def _serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
@@ -1399,12 +1401,37 @@ def _serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
         'website_url': r.website_url, 'login': r.login,
         'password': safe_decrypt(fernet, r.encrypted_password),
         'comment':  safe_decrypt(fernet, r.encrypted_comment),
+        'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
     } for r in rows]
 
-def _send_records_export(data: list[dict[str, Any]], download_name: str):
-    payload = json.dumps(data, ensure_ascii=False, indent=4).encode('utf-8')
-    return send_file(io.BytesIO(payload), mimetype='application/json', as_attachment=True,
-                     download_name=download_name)
+def _requested_export_format() -> str:
+    export_format = normalize_text(request.args.get('format', 'json')).lower()
+    return export_format if export_format in {'json', 'kasa', 'txt'} else 'json'
+
+def _serialize_records_txt(data: list[dict[str, Any]]) -> bytes:
+    fields = ('type', 'category', 'title', 'website_url', 'login',
+              'password', 'comment', 'expiry_date')
+    blocks = []
+    for item in data:
+        lines = [
+            f"{field}: {json.dumps(str(item.get(field) or ''), ensure_ascii=False)}"
+            for field in fields
+        ]
+        blocks.append('\n'.join(lines))
+    return '\n---\n'.join(blocks).encode('utf-8')
+
+def _send_records_export(data: list[dict[str, Any]], base_name: str,
+                         export_format: str = 'json'):
+    if export_format == 'txt':
+        payload = _serialize_records_txt(data)
+        mimetype = 'text/plain; charset=utf-8'
+    else:
+        payload = json.dumps(data, ensure_ascii=False, indent=4).encode('utf-8')
+        mimetype = ('application/vnd.sifrekasam.backup+json'
+                    if export_format == 'kasa' else 'application/json')
+
+    return send_file(io.BytesIO(payload), mimetype=mimetype, as_attachment=True,
+                     download_name=f'{base_name}.{export_format}')
 
 def _parse_import_record(item: dict, fernet: Fernet) -> Record:
     """Desteklenen yedek sözlüğünü yeni Record modeline çevirir."""
@@ -1492,8 +1519,16 @@ def parse_old_txt(content: str) -> list[dict[str, str]]:
         for line in block.splitlines():
             if ':' in line:
                 key, _, val = line.partition(':')
-                data[key.strip()] = val.strip()
-        if data and any(k in data for k in ('Website name', 'Application', 'Login')):
+                value = val.strip()
+                if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+                    try:
+                        value = json.loads(value)
+                    except json.JSONDecodeError:
+                        pass
+                data[key.strip()] = str(value)
+        if data and any(k in data for k in (
+                'title', 'Website name', 'Application', 'Account name',
+                'CreditCard', 'SecureNote', 'Login')):
             records.append(data)
     return records
 
@@ -1534,7 +1569,8 @@ def bulk_export():
     rows = Record.query.filter(Record.id.in_(ids)).all()
     return _send_records_export(
         _serialize_records(rows, fernet),
-        f"toplu_export_{datetime.now().strftime('%Y%m%d')}.json"
+        f"toplu_export_{datetime.now().strftime('%Y%m%d')}",
+        _requested_export_format(),
     )
 
 @app.route('/settings/tray', methods=['GET', 'POST'])

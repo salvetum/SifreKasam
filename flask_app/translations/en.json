@@ -246,5 +246,15 @@
   "Normal": "Normal",
   "Bulanıklık seviyesini performansa göre ayarla.": "Adjust blur level based on performance.",
   "Düşük": "Low",
-  "Yüksek": "High"
+  "Yüksek": "High",
+  "ŞifreKasam formatı": "ŞifreKasam format",
+  "Yedek dosyası formatını seçin.": "Choose a backup file format.",
+  "ŞifreKasam Yedeği": "ŞifreKasam Backup",
+  "Uygulamaya özel, yeniden içe aktarılabilir yedek.": "An app-specific backup that can be imported again.",
+  "JSON Yedeği": "JSON Backup",
+  "Yapılandırılmış ve taşınabilir veri formatı.": "A structured and portable data format.",
+  "Metin Yedeği": "Text Backup",
+  "Okunabilir eski metin formatı.": "A readable legacy text format.",
+  "Ana şifre güncelleniyor": "Updating master password",
+  "Yedek formatını seçin ve indirin.": "Choose a backup format and download it."
 }
