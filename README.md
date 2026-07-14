@@ -118,6 +118,7 @@ cd SifreKasam
 
 ```bash
 npm install
+python -m pip install -r flask_app/requirements.txt
 ```
 
 ### Geliştirme Sürümünü Başlatma

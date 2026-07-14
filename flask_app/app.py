@@ -13,7 +13,6 @@ import threading
 import time
 import uuid
 from datetime import datetime, timedelta
-from functools import wraps
 from typing import Any
 
 from cryptography.fernet import Fernet
@@ -48,7 +47,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.5.0")
+APP_VERSION = os.environ.get("APP_VERSION", "2.5.1")
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
@@ -290,6 +289,8 @@ def _set_vault_password(master_password: str):
         if old_sid:
             _vault_keys.pop(old_sid, None)
         _vault_keys[new_sid] = master_password
+    if old_sid:
+        _remove_vault_report_cache(old_sid)
     session['vault_session_id'] = new_sid
 
 def _clear_vault_password():
@@ -298,6 +299,7 @@ def _clear_vault_password():
     if sid:
         with _vault_keys_lock:
             _vault_keys.pop(sid, None)
+        _remove_vault_report_cache(sid)
 
 def _get_vault_password() -> str | None:
     sid = session.get('vault_session_id')
@@ -862,6 +864,12 @@ def _vault_report_cache_key() -> str | None:
         return None
     return session.get('vault_session_id')
 
+def _remove_vault_report_cache(key: str | None) -> None:
+    if not key:
+        return
+    with _vault_report_cache_lock:
+        _vault_report_cache.pop(key, None)
+
 def _get_vault_report_cache(kind: str):
     key = _vault_report_cache_key()
     if not key:
@@ -886,10 +894,10 @@ def _set_vault_report_cache(kind: str, data: Any) -> None:
 def invalidate_vault_report_cache() -> None:
     # Successful vault writes make stats/health cache stale.
     key = _vault_report_cache_key()
-    with _vault_report_cache_lock:
-        if key:
-            _vault_report_cache.pop(key, None)
-        else:
+    if key:
+        _remove_vault_report_cache(key)
+    else:
+        with _vault_report_cache_lock:
             _vault_report_cache.clear()
 
 def _same_origin_state_change() -> bool:
@@ -945,6 +953,21 @@ def add_security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
     response.headers.setdefault('X-Frame-Options', 'DENY')
     response.headers.setdefault('Referrer-Policy', 'same-origin')
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        "default-src 'self' data: blob:; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "worker-src 'self' blob:; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    )
+    response.headers.setdefault(
+        'Permissions-Policy',
+        'camera=(), microphone=(), geolocation=()',
+    )
     if request.endpoint != 'static':
         response.headers['Cache-Control'] = 'no-store, max-age=0'
         response.headers['Pragma'] = 'no-cache'
@@ -1148,6 +1171,17 @@ def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str,
         expiry_date        = _parse_expiry(request.form.get('expiry_date', '')),
     )
 
+def _delete_records_and_history(record_ids: list[str]) -> int:
+    """Kayıtlarla birlikte artık erişilemeyecek şifre geçmişini de siler."""
+    if not record_ids:
+        return 0
+    PasswordHistory.query.filter(
+        PasswordHistory.record_id.in_(record_ids)
+    ).delete(synchronize_session=False)
+    return Record.query.filter(
+        Record.id.in_(record_ids)
+    ).delete(synchronize_session=False)
+
 @app.route('/ekle', methods=['GET', 'POST'])
 @login_required
 def ekle_sayfasi():
@@ -1210,7 +1244,7 @@ def duzenle_sayfasi(kayit_id):
 @login_required
 def sil_kayit(kayit_id):
     backup_database()
-    Record.query.filter_by(id=kayit_id).delete()
+    _delete_records_and_history([kayit_id])
     db.session.commit()
     invalidate_vault_report_cache()
     return redirect(url_for('index'))
@@ -1243,6 +1277,51 @@ def get_record_password(kayit_id):
     r = db.get_or_404(Record, kayit_id)
     return jsonify({'password': safe_decrypt(fernet, r.encrypted_password)})
 
+def _build_vault_report_payloads() -> tuple[dict[str, int], dict[str, list]]:
+    """Stats ve sağlık verisini tek decrypt/score geçişinde üretir."""
+    fernet      = get_fernet()
+    rows        = Record.query.with_entities(
+        Record.id, Record.title, Record.encrypted_password,
+        Record.updated_at, Record.is_pinned, Record.expiry_date
+    ).all()
+
+    simdi       = datetime.utcnow()
+    alti_ay_once = simdi - timedelta(days=180)
+    pinned = zayif = eski = expired = 0
+    zayif_records: list[dict[str, str]] = []
+    eski_records: list[dict[str, Any]] = []
+    expired_records: list[dict[str, str]] = []
+    pw_map: dict[str, list[dict[str, str]]] = {}
+
+    for r in rows:
+        if r.is_pinned:
+            pinned += 1
+        pw = safe_decrypt(fernet, r.encrypted_password)
+        if not pw:
+            continue
+
+        rec = {'id': r.id, 'title': r.title}
+        if _score_password(pw) < 4:
+            zayif += 1
+            zayif_records.append(rec)
+        pw_map.setdefault(pw, []).append(rec)
+        if r.updated_at and r.updated_at < alti_ay_once:
+            eski += 1
+            eski_records.append({**rec, 'days': (simdi - r.updated_at).days})
+        if r.expiry_date and r.expiry_date < simdi:
+            expired += 1
+            expired_records.append(rec)
+
+    stats = {'toplam': len(rows), 'pinned': pinned,
+             'zayif': zayif, 'eski': eski, 'expired': expired}
+    health = {
+        'zayif': zayif_records,
+        'tekrar': [group for group in pw_map.values() if len(group) > 1],
+        'eski': eski_records,
+        'expired': expired_records,
+    }
+    return stats, health
+
 @app.route('/api/stats')
 @login_required
 def api_stats():
@@ -1250,31 +1329,9 @@ def api_stats():
     if cached is not None:
         return jsonify(cached)
 
-    fernet      = get_fernet()
-    rows        = Record.query.with_entities(
-        Record.id, Record.encrypted_password,
-        Record.updated_at, Record.is_pinned, Record.expiry_date
-    ).all()
-
-    simdi       = datetime.utcnow()
-    alti_ay_once = simdi - timedelta(days=180)
-    pinned = zayif = eski = expired = 0
-
-    for r in rows:
-        if r.is_pinned:
-            pinned += 1
-        pw = safe_decrypt(fernet, r.encrypted_password)
-        if pw:
-            if _score_password(pw) < 4:
-                zayif += 1
-            if r.updated_at and r.updated_at < alti_ay_once:
-                eski += 1
-            if r.expiry_date and r.expiry_date < simdi:
-                expired += 1
-
-    stats = {'toplam': len(rows), 'pinned': pinned,
-             'zayif': zayif, 'eski': eski, 'expired': expired}
+    stats, health = _build_vault_report_payloads()
     _set_vault_report_cache('stats', stats)
+    _set_vault_report_cache('saglik', health)
     return jsonify(stats)
 
 @app.route('/saglik')
@@ -1284,34 +1341,10 @@ def saglik_raporu():
     if cached is not None:
         return render_template('saglik.html', **cached)
 
-    fernet       = get_fernet()
-    rows         = Record.query.with_entities(
-        Record.id, Record.title, Record.encrypted_password,
-        Record.updated_at, Record.expiry_date
-    ).all()
-
-    simdi        = datetime.utcnow()
-    alti_ay_once = simdi - timedelta(days=180)
-    zayif, eski, expired = [], [], []
-    pw_map: dict[str, list] = {}
-
-    for r in rows:
-        pw = safe_decrypt(fernet, r.encrypted_password)
-        if not pw:
-            continue
-        rec = {'id': r.id, 'title': r.title}
-        if _score_password(pw) < 4:
-            zayif.append(rec)
-        pw_map.setdefault(pw, []).append(rec)
-        if r.updated_at and r.updated_at < alti_ay_once:
-            eski.append({**rec, 'days': (simdi - r.updated_at).days})
-        if r.expiry_date and r.expiry_date < simdi:
-            expired.append(rec)
-
-    tekrar = [g for g in pw_map.values() if len(g) > 1]
-    payload = {'zayif': zayif, 'tekrar': tekrar, 'eski': eski, 'expired': expired}
-    _set_vault_report_cache('saglik', payload)
-    return render_template('saglik.html', **payload)
+    stats, health = _build_vault_report_payloads()
+    _set_vault_report_cache('stats', stats)
+    _set_vault_report_cache('saglik', health)
+    return render_template('saglik.html', **health)
 
 @app.route('/save_settings', methods=['POST'])
 @login_required
@@ -1471,7 +1504,7 @@ def bulk_delete():
     if not ids:
         return jsonify({'status': 'error', 'message': 'ID listesi boş.'}), 400
     backup_database()
-    deleted = Record.query.filter(Record.id.in_(ids)).delete(synchronize_session=False)
+    deleted = _delete_records_and_history(ids)
     db.session.commit()
     invalidate_vault_report_cache()
     return jsonify({'status': 'ok', 'deleted': deleted})
@@ -1480,7 +1513,7 @@ def bulk_delete():
 @login_required
 def bulk_category():
     ids      = get_bulk_ids()
-    category = normalize_text(request_json().get('category'))
+    category = normalize_text(request_json().get('category'), max_length=120)
     if not ids or not category:
         return jsonify({'status': 'error', 'message': 'ID ve kategori gerekli.'}), 400
     backup_database()
@@ -1641,6 +1674,7 @@ def settings_appearance():
 
 _reencrypt_state: dict = {}
 _reencrypt_lock = threading.Lock()
+_REENCRYPT_ERROR_MESSAGE = "Kayıtlardan biri çözülemedi. Ana şifre değişikliği geri alındı."
 
 def _prune_reencrypt_state(max_entries: int = 20) -> None:
     """Tamamlanmış/hataya düşmüş eski şifre değişimi işlerini bellekten temizler."""
@@ -1656,8 +1690,10 @@ def _prune_reencrypt_state(max_entries: int = 20) -> None:
 
 def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | None):
     _vault_write_locked.set()
+    error_message = _REENCRYPT_ERROR_MESSAGE
     try:
         with app.app_context():
+            error_message = _(_REENCRYPT_ERROR_MESSAGE)
             backup_database()
             old_fernet = Fernet(derive_key(old_pw))
             new_fernet = Fernet(derive_key(new_pw))
@@ -1671,20 +1707,23 @@ def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | Non
             def _update_progress():
                 with _reencrypt_lock:
                     _reencrypt_state[task_id] = {
-                        'progress': int(done / total * 100) if total else 100,
+                        # Commit tamamlanmadan frontend'e yüzde 100 bildirme.
+                        'progress': min(99, int(done / total * 100)) if total else 99,
                         'total': total,
+                        'done': False,
                     }
 
             _update_progress()
 
             for row in rows:
-                row.encrypted_password = safe_encrypt(new_fernet, safe_decrypt(old_fernet, row.encrypted_password))
-                row.encrypted_comment  = safe_encrypt(new_fernet, safe_decrypt(old_fernet, row.encrypted_comment))
+                # Çözme hatasında placeholder yazmak yerine tüm işlemi geri al.
+                row.encrypted_password = safe_encrypt(new_fernet, strict_decrypt(old_fernet, row.encrypted_password))
+                row.encrypted_comment  = safe_encrypt(new_fernet, strict_decrypt(old_fernet, row.encrypted_comment))
                 done += 1
                 _update_progress()
 
             for h in hist_rows:
-                h.encrypted_password = safe_encrypt(new_fernet, safe_decrypt(old_fernet, h.encrypted_password))
+                h.encrypted_password = safe_encrypt(new_fernet, strict_decrypt(old_fernet, h.encrypted_password))
                 done += 1
                 _update_progress()
 
@@ -1695,19 +1734,25 @@ def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | Non
             invalidate_vault_report_cache()
             if vault_sid:
                 with _vault_keys_lock:
-                    _vault_keys[vault_sid] = new_pw
+                    # Kullanıcı işlem sırasında çıkış yaptıysa silinmiş anahtarı yeniden ekleme.
+                    if _vault_keys.get(vault_sid) == old_pw:
+                        _vault_keys[vault_sid] = new_pw
             log.info("Ana ?ifre ba?ar?yla de?i?tirildi.")
             with _reencrypt_lock:
                 _reencrypt_state[task_id] = {'progress': 100, 'total': total, 'done': True}
 
-    except Exception as e:
+    except Exception:
         try:
             db.session.rollback()
         except Exception:
             pass
-        log.error(f"Password change error: {e}")
+        log.exception("Password change error")
         with _reencrypt_lock:
-            _reencrypt_state[task_id] = {'progress': -1, 'error': str(e)}
+            _reencrypt_state[task_id] = {
+                'progress': -1,
+                'done': False,
+                'error': error_message,
+            }
     finally:
         # Keep vault writes blocked until password rotation fully ends.
         _vault_write_locked.clear()
@@ -1718,7 +1763,7 @@ def change_password():
     old_pw = request.form.get('old_password', '')
     new_pw = request.form.get('new_password', '')
     if not old_pw or not new_pw:
-        return jsonify({'error': 'Eksik bilgi.'}), 400
+        return jsonify({'error': _('Eksik bilgi.')}), 400
 
     # Lock writes before re-encrypt starts to close the race window.
     with _reencrypt_lock:
@@ -1726,21 +1771,32 @@ def change_password():
             return _vault_write_lock_response()
         _vault_write_locked.set()
 
+    task_id = None
     try:
         setting = Setting.query.filter_by(key='master_hash').first()
         if not setting or not verify_master_password(setting.value, old_pw):
             _vault_write_locked.clear()
-            return jsonify({'error': 'Mevcut \u015fifre hatal\u0131.'}), 403
+            return jsonify({'error': _('Mevcut şifre hatalı.')}), 403
 
         task_id = uuid.uuid4().hex
         vault_sid = session.get('vault_session_id')
         _prune_reencrypt_state()
+        # Polling ilk istekte görevi yanlışlıkla tamamlanmış sanmasın.
+        with _reencrypt_lock:
+            _reencrypt_state[task_id] = {
+                'progress': 0,
+                'total': 0,
+                'done': False,
+            }
         threading.Thread(target=_reencrypt_task,
                          args=(task_id, old_pw, new_pw, vault_sid),
                          daemon=True).start()
         return jsonify({'task_id': task_id})
     except Exception:
         _vault_write_locked.clear()
+        if task_id:
+            with _reencrypt_lock:
+                _reencrypt_state.pop(task_id, None)
         raise
 
 @app.route('/change-password/progress/<task_id>')
@@ -1748,7 +1804,9 @@ def change_password():
 def change_password_progress(task_id):
     with _reencrypt_lock:
         state = _reencrypt_state.get(task_id)
-    return jsonify(state or {'progress': 100, 'done': True})
+    if state is None:
+        return jsonify({'error': _('Şifre değiştirme görevi bulunamadı.')}), 404
+    return jsonify(dict(state))
 
 # ─── MİGRASYON ────────────────────────────────────────────────────────────────
 

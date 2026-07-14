@@ -176,6 +176,8 @@
   "Ağ bağlantısı bulunamadı": "No network connection",
   "Eksik bilgi.": "Missing information.",
   "Mevcut şifre hatalı.": "Current password is incorrect.",
+  "Kayıtlardan biri çözülemedi. Ana şifre değişikliği geri alındı.": "A record could not be decrypted. The master password change was rolled back.",
+  "Şifre değiştirme görevi bulunamadı.": "The password change task could not be found.",
   "Şifre Çözülemedi": "Could not decrypt",
   "Desteklenmeyen dosya formatı.": "Unsupported file format.",
   "Bilinmeyen": "Unknown",
