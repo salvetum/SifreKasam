@@ -85,7 +85,7 @@ Resmî kaynak dışında indirilen sürümlerde oluşabilecek veri kaybı, zarar
 - Koyu ve açık tema, glass efektleri, vurgu rengi ve arkaplan ayarları
 - İçe/dışa aktarma, trayde çalışmaya devam etme ve otomatik kilitleme seçenekleri
 - Github üzerinden versiyon kontrolü
-> NOT: Yeni özellikler **gelmeyecektir**. Fakat Değişiklikler veya bug fixleri **olabilir** .
+> NOT: Yeni özellikler **gelmeyecektir**. Fakat Değişiklikler veya bug fixleri **olabilir**.
 
 ## ⚠️ Güvenlik Notları
 
