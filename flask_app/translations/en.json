@@ -256,5 +256,9 @@
   "Metin Yedeği": "Text Backup",
   "Okunabilir eski metin formatı.": "A readable legacy text format.",
   "Ana şifre güncelleniyor": "Updating master password",
-  "Yedek formatını seçin ve indirin.": "Choose a backup format and download it."
+  "Yedek formatını seçin ve indirin.": "Choose a backup format and download it.",
+  "LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.": "When LAN mode is enabled, devices on the same network can attempt to sign in. Use it only on trusted networks; enabling this feature means you accept this risk.",
+  "İçe aktarılıyor…": "Importing…",
+  "Sayfaya git": "Go to page",
+  "Git": "Go"
 }

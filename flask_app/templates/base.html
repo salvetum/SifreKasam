@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark light">
     <script>
-        window.LANG = "{{ CURRENT_LANG }}";
-        window.TRANSLATIONS = {{ TRANSLATIONS_JSON|safe }};
-        window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson|safe }};
+        window.LANG = {{ CURRENT_LANG|tojson }};
+        window.TRANSLATIONS = {{ TRANSLATIONS|tojson }};
+        window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson }};
         window.KASA_STATIC_URLS = {
             zxcvbn: "{{ url_for('static', filename='zxcvbn.js') }}?v=1",
         };
@@ -107,7 +107,7 @@
     <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.5.2 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.5.3 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -129,7 +129,7 @@
     <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='style.css') }}?v=37" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}?v=39" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -156,7 +156,7 @@
     <script src="{{ url_for('static', filename='toastify.min.js') }}" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=8.1" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=8.2" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script>
