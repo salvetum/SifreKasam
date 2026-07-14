@@ -16,7 +16,7 @@ fi
 
 # 2. Python Bağımlılıkları
 echo "[*] Python bağımlılıkları kontrol ediliyor..."
-pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login zxcvbn -q 2>/dev/null || {
+pip install -r flask_app/requirements.txt -q 2>/dev/null || {
     echo "[HATA] pip install başarısız!"
     exit 1
 }
@@ -37,7 +37,7 @@ cd flask_app
 
 pyinstaller app.spec --clean -y 2>&1 || {
     echo "[UYARI] Derleme başarısız, yeniden deneniyor..."
-    pip install pyinstaller flask cryptography Flask-SQLAlchemy Flask-Login zxcvbn -q
+    pip install -r requirements.txt -q
     pyinstaller app.spec --clean -y 2>&1 || {
         echo "[HATA] Derleme başarısız oldu!"
         exit 1
@@ -51,7 +51,7 @@ cd ..
 echo ""
 echo "[2/3] Derlenen dosyalar ana dizine taşınıyor..."
 rm -rf backend
-mv flask_app/dist/app backend
+mv flask_app/dist/SifreKasam backend
 echo "[OK] Dosyalar taşındı."
 
 # 6. AppImage Paketleme

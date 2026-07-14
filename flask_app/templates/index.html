@@ -970,27 +970,48 @@ document.getElementById('changePasswordForm').addEventListener('submit', functio
             return r.json();
         })
         .then(function (data) {
-            var poll = setInterval(function () {
+            function resetPasswordChangeUi(message) {
+                if (message) {
+                    showToast({ text: message, gravity: 'top' });
+                }
+                btn.disabled = false;
+                btn.innerHTML = _('Şifreyi Güncelle ve Re-encrypt Et');
+            }
+
+            function pollPasswordChange() {
                 fetch('/change-password/progress/' + data.task_id)
-                    .then(function (r) { return r.json(); })
+                    .then(function (r) {
+                        return r.json().then(function (payload) {
+                            if (!r.ok) {
+                                throw new Error(payload.error || _('Bir hata oluştu.'));
+                            }
+                            return payload;
+                        });
+                    })
                     .then(function (p) {
                         if (p.progress >= 0) {
                             document.getElementById('cp-bar').style.width = p.progress + '%';
                             document.getElementById('cp-pct').textContent = p.progress + '%';
                         }
-                        if (p.progress === 100 || p.done) {
-                            clearInterval(poll);
+                        if (p.progress === -1 || p.error) {
+                            resetPasswordChangeUi(_('Hata: ') + (p.error || _('Bilinmeyen hata')));
+                            return;
+                        }
+                        if (p.done === true) {
+                            document.getElementById('cp-bar').style.width = '100%';
+                            document.getElementById('cp-pct').textContent = '100%';
                             window.kasaModalKapat('changePasswordModal');
                             window.location.href = '/logout';
+                            return;
                         }
-                        if (p.progress === -1) {
-                            clearInterval(poll);
-                            showToast({ text: _('Hata: ') + (p.error || _('Bilinmeyen hata')), gravity: 'top' });
-                            btn.disabled = false;
-                            btn.innerHTML = _('Şifreyi Güncelle ve Re-encrypt Et');
-                        }
+                        window.setTimeout(pollPasswordChange, 250);
+                    })
+                    .catch(function (err) {
+                        resetPasswordChangeUi(err.message);
                     });
-            }, 200);
+            }
+
+            pollPasswordChange();
         })
         .catch(function (err) {
             showToast({ text: err.message, gravity: 'top' });

@@ -15,6 +15,7 @@ flask_app/*.db.backup
 flask_app/*.sqlite
 flask_app/*.sqlite3
 flask_app/*.txt
+!flask_app/requirements.txt
 flask_app/*.pem
 flask_app/*.key
 flask_app/*.crt

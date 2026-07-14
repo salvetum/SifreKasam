@@ -1,7 +1,7 @@
 {
-  "name": "sifrekasam-v2.5.0",
+  "name": "sifrekasam-v2.5.1",
   "productName": "ŞifreKasam",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "ŞifreKasam masaüstü şifre yöneticisi",
   "main": "main.js",
   "scripts": {
@@ -20,6 +20,6 @@
     "@electron-forge/cli": "^7.4.0",
     "@electron-forge/maker-squirrel": "^7.4.0",
     "@electron-forge/maker-zip": "^7.4.0",
-    "electron": "^42.4.0"
+    "electron": "^42.6.1"
   }
 }

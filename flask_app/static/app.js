@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.0 - Main JavaScript
+ * ŞifreKasam v2.5.1 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     scriptLoadCache.set(src, promise);
+    promise.catch(() => scriptLoadCache.delete(src));
     return promise;
   };
 

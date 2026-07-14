@@ -14,6 +14,8 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.0',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.0',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.4.3',
@@ -88,6 +90,7 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
     'sifrekasam',
     'SifreKasam',
+    'sifrekasam-v2.5.1',
     'sifrekasam-v2.5.0',
     'sifrekasam-v2.4.3',
     'sifrekasam-v2.4.2',
@@ -224,7 +227,6 @@ const RETRY_INTERVAL_MS = 500;
 
 const PROTOCOL            = 'https';
 const GLASS_EFFECTS_FALSY = new Set(['false', '0', 'off', 'disabled']);
-const MEMORY_TRIM_INTERVAL_MS = 5 * 60 * 1000;
 const HISTORY_NAVIGATION_KEYS = new Set(['BrowserBack', 'BrowserForward']);
 const SSL_NOISE_PATTERNS = [
   'ERR_CERT_AUTHORITY_INVALID',
@@ -245,10 +247,8 @@ let isQuiting    = false;
 let lanRuntimeEnabled = false;
 let resetSavedLanOnNextStart = true;
 let isRestartingFlask = false;
-let memoryTrimTimer = null;
 let hasReportedLocalCertificateNoise = false;
 
-app.commandLine.appendSwitch('disable-http-cache');
 app.commandLine.appendSwitch('disable-spell-checking');
 
 // ─── TEK ÖRNEK KİLİDİ ────────────────────────────────────────────────────────
@@ -294,7 +294,6 @@ async function onAppReady() {
     PORT = await findFreePort();
     createWindow();
     createTray();
-    startMemoryTrimTimer();
     await startFlaskServer();
 
     if (mainWindow) {
@@ -429,15 +428,12 @@ function createWindow() {
       });
   });
 
-  mainWindow.webContents.on('did-finish-load', trimRendererMemory);
   mainWindow.on('hide', () => {
     setRendererLowPower(true);
-    trimRendererMemory();
   });
   mainWindow.on('show', () => setRendererLowPower(false));
   mainWindow.on('minimize', () => {
     setRendererLowPower(true);
-    trimRendererMemory();
   });
   mainWindow.on('restore', () => setRendererLowPower(false));
   mainWindow.on('closed', () => { mainWindow = null; });
@@ -472,23 +468,6 @@ function setRendererLowPower(enabled) {
   mainWindow.webContents
     .executeJavaScript(`window.KASA_SET_LOW_POWER?.(${value});`, true)
     .catch(() => {});
-}
-
-function trimRendererMemory() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.session.clearCache().catch(() => {});
-}
-
-function startMemoryTrimTimer() {
-  stopMemoryTrimTimer();
-  memoryTrimTimer = setInterval(trimRendererMemory, MEMORY_TRIM_INTERVAL_MS);
-  if (typeof memoryTrimTimer.unref === 'function') memoryTrimTimer.unref();
-}
-
-function stopMemoryTrimTimer() {
-  if (!memoryTrimTimer) return;
-  clearInterval(memoryTrimTimer);
-  memoryTrimTimer = null;
 }
 
 // ─── FLASK AYARLARI SORGUSU ───────────────────────────────────────────────────
@@ -701,7 +680,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-  stopMemoryTrimTimer();
   shutdownFlask();
 });
 
