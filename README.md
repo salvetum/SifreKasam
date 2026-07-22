@@ -25,6 +25,8 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
 [⬇️ Son Sürümü İndir](https://github.com/salvetum/SifreKasam/releases/latest)
 &nbsp;•&nbsp;
 [🐛 Hata Bildir](https://github.com/salvetum/SifreKasam/issues)
+&nbsp;•&nbsp;
+[📜 THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 </div>
 
