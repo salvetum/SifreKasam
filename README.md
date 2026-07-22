@@ -163,6 +163,9 @@ Bu proje **MIT Lisansı** altında yayımlanmaktadır.
 
 Detaylar için [`LICENSE`](LICENSE) dosyasına bakabilirsiniz.
 
+Kullanılan üçüncü taraf bileşenleri ve lisans bildirimleri için
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) dosyasını inceleyebilirsiniz.
+
 ---
 
 <div align="center">
