@@ -26,7 +26,7 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
 &nbsp;•&nbsp;
 [🐛 Hata Bildir](https://github.com/salvetum/SifreKasam/issues)
 &nbsp;•&nbsp;
-[📜 THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+[📜 Üçüncü Taraf Lisansları](THIRD_PARTY_NOTICES.md)
 
 </div>
 
@@ -165,8 +165,7 @@ Bu proje **MIT Lisansı** altında yayımlanmaktadır.
 
 Detaylar için [`LICENSE`](LICENSE) dosyasına bakabilirsiniz.
 
-Kullanılan üçüncü taraf bileşenleri ve lisans bildirimleri için
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) dosyasını inceleyebilirsiniz.
+Kullanılan üçüncü taraf bileşenleri ve lisans bildirimleri için, [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) dosyasını inceleyebilirsiniz.
 
 ---
 
