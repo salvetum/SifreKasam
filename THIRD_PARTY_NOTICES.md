@@ -56,6 +56,7 @@ terms must also be followed.
 | Font Awesome Free | 7.0.1 | Code: MIT; icons: CC BY 4.0; fonts: SIL OFL 1.1 | Copyright 2025 Fonticons, Inc. <https://fontawesome.com/license/free> |
 | Sora typeface | Bundled webfont | SIL OFL 1.1 | <https://github.com/sora-xor/sora-font> |
 | JetBrains Mono typeface | Bundled webfont | SIL OFL 1.1 | <https://github.com/JetBrains/JetBrainsMono> |
+| Space Grotesk | 2.0.0 | SIL OFL 1.1 | Copyright Florian Karsten Studio. Full license: `flask_app/static/fonts/space-grotesk-OFL.txt`. <https://github.com/floriankarsten/space-grotesk> |
 
 ## Build-Time Tools
 
@@ -69,22 +70,6 @@ application source owned by ŞifreKasam.
 | Electron Forge Squirrel Maker | 7.11.2 | MIT | <https://github.com/electron/forge> |
 | Electron Forge ZIP Maker | 7.11.2 | MIT | <https://github.com/electron/forge> |
 
-## Font License Requiring Verification
-
-The repository currently contains
-`flask_app/static/fonts/Agrandir-GrandHeavy.otf`. Agrandir is a Pangram Pangram
-Foundry typeface distributed under commercial / trial license terms; no
-redistributable open-source license for this font file was found in the
-repository.
-
-Before publicly redistributing a build containing this file, the distributor
-must verify that an appropriate license has been obtained and that embedding
-and redistribution are permitted. If that cannot be verified, replace or
-remove the font before the next public build.
-
-Official product and licensing page:
-<https://pangrampangram.com/products/agrandir-grand>
-
 ## Common License Texts
 
 - MIT: <https://opensource.org/license/mit>
@@ -94,4 +79,3 @@ Official product and licensing page:
 - Creative Commons Attribution 4.0: <https://creativecommons.org/licenses/by/4.0/legalcode>
 - Python Software Foundation License 2.0: <https://docs.python.org/3/license.html>
 - MIT No Attribution: <https://opensource.org/license/mit-0>
-

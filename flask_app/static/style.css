@@ -1,12 +1,12 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.5.3 — Main Stylesheet
+   ŞifreKasam v2.5.4 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
 @font-face {
-    font-family: 'Agrandir';
-    src: url('fonts/Agrandir-GrandHeavy.otf') format('opentype');
-    font-weight: 800;
+    font-family: 'Space Grotesk';
+    src: url('fonts/space-grotesk.woff2') format('woff2');
+    font-weight: 300 700;
     font-style: normal;
     font-display: swap;
 }
@@ -58,7 +58,7 @@
 
     /* Tipografi */
     --font-main:    'Sora', sans-serif;
-    --font-display: 'Agrandir', var(--font-main);
+    --font-display: 'Space Grotesk', var(--font-main);
     --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
     /* Şekil & Hız */
