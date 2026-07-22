@@ -25,6 +25,8 @@ Keep your data on your device and protect it using a master password.
 [⬇️ Download Latest Release](https://github.com/salvetum/SifreKasam/releases/latest)
 &nbsp;•&nbsp;
 [🐛 Report a Bug](https://github.com/salvetum/SifreKasam/issues)
+&nbsp;•&nbsp;
+[📜 THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 </div>
 
