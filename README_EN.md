@@ -26,7 +26,7 @@ Keep your data on your device and protect it using a master password.
 &nbsp;•&nbsp;
 [🐛 Report a Bug](https://github.com/salvetum/SifreKasam/issues)
 &nbsp;•&nbsp;
-[📜 THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+[📜 Third Party Notices](THIRD_PARTY_NOTICES.md)
 
 </div>
 
@@ -165,6 +165,8 @@ Certificates, private keys, backups, temporary files, and personal data are also
 This project is released under the **MIT License**.
 
 See the [`LICENSE`](LICENSE) file for details.
+
+For third-party components used and license notices, you can review the [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) file.
 
 ---
 
