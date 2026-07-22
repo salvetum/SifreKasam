@@ -42,23 +42,23 @@ Keep your data on your device and protect it using a master password.
 
 <div align="center">
 
-### Main Page
+### Main Page /// will be added soon.
 
-<img src="assets/base.png" width="850" alt="ŞifreKasam main page">
+<img src="." width="850" alt="ŞifreKasam main page">
 
 <br><br>
 
 <table>
   <tr>
     <td align="center" width="50%">
-      <strong>Password Generator</strong>
+      <strong>Password Generator /// will be added soon.</strong>
       <br><br>
-      <img src="assets/passgen.png" width="420" alt="ŞifreKasam password generator screen">
+      <img src="." width="420" alt="ŞifreKasam password generator screen">
     </td>
     <td align="center" width="50%">
-      <strong>Settings Menu</strong>
+      <strong>Settings Menu /// will be added soon.</strong>
       <br><br>
-      <img src="assets/settings.gif" width="420" alt="ŞifreKasam settings menu">
+      <img src="." width="420" alt="ŞifreKasam settings menu">
     </td>
   </tr>
 </table>
