@@ -42,23 +42,23 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
 
 <div align="center">
 
-### Ana Sayfa
+### Ana Sayfa /// Yakında eklenecek.
 
-<img src="assets/base.png" width="850" alt="ŞifreKasam ana sayfa">
+<img src="." width="850" alt="ŞifreKasam ana sayfa">
 
 <br><br>
 
 <table>
   <tr>
     <td align="center" width="50%">
-      <strong>Şifre Oluşturucu</strong>
+      <strong>Şifre Oluşturucu /// Yakında eklenecek.</strong>
       <br><br>
-      <img src="assets/passgen.png" width="420" alt="ŞifreKasam şifre oluşturucu ekranı">
+      <img src="." width="420" alt="ŞifreKasam şifre oluşturucu ekranı">
     </td>
     <td align="center" width="50%">
-      <strong>Ayarlar Menüsü</strong>
+      <strong>Ayarlar Menüsü /// Yakında eklenecek.</strong>
       <br><br>
-      <img src="assets/settings.gif" width="420" alt="ŞifreKasam ayarlar menüsü">
+      <img src="." width="420" alt="ŞifreKasam ayarlar menüsü">
     </td>
   </tr>
 </table>
