@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.5 - Main JavaScript
+ * ŞifreKasam v2.5.6 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
