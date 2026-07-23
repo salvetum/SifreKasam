@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ? background
       : 'aurora';
     const accent2 = mixColor(normalizedAccent);
-    window.KASA_SET_RUNTIME_STYLE?.('appearance', `:root {
+    window.KASA_SET_RUNTIME_STYLE?.('appearance', `html:root {
       --accent: ${normalizedAccent};
       --accent-2: ${accent2};
       --accent-rgb: ${hexToRgb(normalizedAccent)};

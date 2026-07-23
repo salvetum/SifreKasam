@@ -89,7 +89,7 @@
             const normalizedAccent = normalizeHexColor(accent, "{{ ACCENT_COLOR|default('#7c6ff7') }}");
             const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain'].includes(background) ? background : "{{ BACKGROUND_STYLE|default('aurora') }}";
             const accent2 = mixColor(normalizedAccent, '#38bdf8', 0.45);
-            window.KASA_SET_RUNTIME_STYLE('appearance', `:root {
+            window.KASA_SET_RUNTIME_STYLE('appearance', `html:root {
                 --accent: ${normalizedAccent};
                 --accent-2: ${accent2};
                 --accent-rgb: ${hexToRgb(normalizedAccent)};
@@ -184,7 +184,7 @@
     <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.1" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.2" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script nonce="{{ csp_nonce }}">
@@ -273,7 +273,7 @@
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script nonce="{{ csp_nonce }}">
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v49';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v50';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>

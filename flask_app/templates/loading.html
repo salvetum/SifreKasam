@@ -93,7 +93,7 @@
             document.documentElement.setAttribute('data-kasa-motion', motion);
             document.documentElement.setAttribute('data-kasa-animations', animations);
             document.documentElement.setAttribute('data-kasa-gradient', gradients);
-            document.getElementById('loading-runtime-styles').textContent = `:root {
+            document.getElementById('loading-runtime-styles').textContent = `html:root {
                 --accent: ${accent};
                 --accent-2: ${accent2};
                 --accent-rgb: ${hexToRgb(accent)};
