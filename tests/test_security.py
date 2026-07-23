@@ -152,6 +152,18 @@ class MetadataMigrationTests(unittest.TestCase):
                 patch.object(app_module, "_has_existing_vault_data", return_value=True):
             self.assertFalse(app_module._is_first_setup())
 
+    def test_vault_marker_is_written_only_after_explicit_finalize(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="sifrekasam-marker-") as temp_dir:
+            marker_path = Path(temp_dir) / "vault.initialized"
+            with patch.object(app_module, "VAULT_INIT_FILE", str(marker_path)):
+                app_module._mark_vault_initialized()
+                self.assertFalse(marker_path.exists())
+                app_module.db.session.commit()
+                app_module._write_vault_initialized_marker()
+
+            self.assertTrue(marker_path.exists())
+        self.assertEqual(app_module._get_setting("vault_initialized"), "true")
+
     def test_plaintext_metadata_migration_encrypts_existing_records(self) -> None:
         record_id = self.add_plaintext_record()
 
@@ -203,6 +215,32 @@ class MetadataMigrationTests(unittest.TestCase):
         self.assertEqual(app_module.decrypt_metadata(self.fernet, record.title), "Imported Account")
         self.assertEqual(app_module.decrypt_metadata(self.fernet, record.website_url), "https://imported.example")
         self.assertEqual(app_module.decrypt_metadata(self.fernet, record.login), "imported-user")
+
+    def test_password_history_skips_consecutive_duplicates(self) -> None:
+        record = app_module.Record(
+            id="history-record",
+            type="Website",
+            category="Genel",
+            title=app_module.encrypt_metadata(self.fernet, "History Account"),
+            encrypted_password=app_module.safe_encrypt(self.fernet, "first-password"),
+        )
+        app_module.db.session.add(record)
+        app_module.db.session.commit()
+
+        self.assertTrue(app_module._append_password_history(
+            record.id, record.encrypted_password, self.fernet))
+        app_module.db.session.commit()
+        self.assertFalse(app_module._append_password_history(
+            record.id, record.encrypted_password, self.fernet))
+        self.assertEqual(app_module.PasswordHistory.query.filter_by(
+            record_id=record.id).count(), 1)
+
+        next_password = app_module.safe_encrypt(self.fernet, "second-password")
+        self.assertTrue(app_module._append_password_history(
+            record.id, next_password, self.fernet))
+        app_module.db.session.commit()
+        self.assertEqual(app_module.PasswordHistory.query.filter_by(
+            record_id=record.id).count(), 2)
 
     def test_legacy_salt_migration_preserves_and_encrypts_metadata(self) -> None:
         master_password = "legacy-master-password"

@@ -728,11 +728,17 @@ html[data-kasa-animations="off"] *::after {
 }
 
 .vault-form-panel {
+    position: relative;
+    z-index: 0;
     display: grid;
     align-content: start;
     gap: 1rem;
     padding: 1rem;
     border-radius: 20px;
+}
+
+.vault-form-panel.has-open-select-layer {
+    z-index: 100;
 }
 
 .vault-section-head {
@@ -4090,6 +4096,10 @@ html[data-glass-effects="off"] .settings-appearance-card {
     animation: settingsItemIn 280ms var(--ease-out) both;
 }
 
+.kasa-modal.is-open .settings-panel.active > .settings-glass-quality-card:not(.is-collapsed) {
+    animation: settingsGlassQualityIn 300ms var(--ease-out) 66ms backwards;
+}
+
 .kasa-modal.is-open .settings-panel.active > *:nth-child(2) { animation-delay: 22ms; }
 .kasa-modal.is-open .settings-panel.active > *:nth-child(3) { animation-delay: 44ms; }
 .kasa-modal.is-open .settings-panel.active > *:nth-child(n+4) { animation-delay: 66ms; }
@@ -4097,6 +4107,19 @@ html[data-glass-effects="off"] .settings-appearance-card {
 @keyframes settingsItemIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes settingsGlassQualityIn {
+    from {
+        opacity: 0;
+        clip-path: inset(0 72% 0 0 round 16px);
+        transform: translateX(-18px) scaleX(0.9);
+    }
+    to {
+        opacity: 1;
+        clip-path: inset(0 0 0 0 round 16px);
+        transform: translateX(0) scaleX(1);
+    }
 }
 
 .settings-appearance-card {
@@ -4954,6 +4977,13 @@ html[data-kasa-motion="on"] .appearance-preview {
 .generator-strength-card {
     border-color: rgba(var(--accent-rgb), 0.16);
     background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        rgba(255,255,255,0.045);
+}
+
+.generator-options-card {
+    background:
+        radial-gradient(ellipse at left center, rgba(var(--accent-rgb), 0.16), transparent 44%),
         radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
         rgba(255,255,255,0.045);
 }

@@ -146,7 +146,7 @@
     <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='style.css') }}?v=52" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}?v=54" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -184,7 +184,7 @@
     <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.5" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.7" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script nonce="{{ csp_nonce }}">
@@ -202,12 +202,25 @@
         {% if AUTO_LOCK_ENABLED %}
         let idleTime = 0;
         const lockThreshold = {{ AUTO_LOCK_TIMEOUT }};
+        let automaticLockPending = false;
+        function lockVaultAndRedirect() {
+            if (automaticLockPending) return;
+            automaticLockPending = true;
+            fetch('{{ url_for("lock") }}', { method: 'POST' })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('lock-failed');
+                    window.location.replace('{{ url_for("login") }}');
+                })
+                .catch(function () {
+                    automaticLockPending = false;
+                    idleTime = 0;
+                    clearPageLoadingOverlay();
+                });
+        }
         function timerIncrement() {
             idleTime++;
             if (idleTime >= lockThreshold) {
-                fetch('{{ url_for("lock") }}', { method: 'POST' })
-                .then(() => { window.location.href = '{{ url_for("login") }}'; })
-                .catch(() => { window.location.href = '{{ url_for("login") }}'; });
+                lockVaultAndRedirect();
             }
         }
         let idleInterval = setInterval(timerIncrement, 60000);
@@ -224,9 +237,16 @@
             if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
                 e.preventDefault();
                 if (window.location.pathname !== '{{ url_for("login") }}') {
-                    fetch('{{ url_for("lock") }}', { method: 'POST' })
-                    .then(function () { window.location.href = '{{ url_for("login") }}'; })
-                    .catch(function () { window.location.href = '{{ url_for("login") }}'; });
+                    if (typeof lockVaultAndRedirect === 'function') {
+                        lockVaultAndRedirect();
+                    } else {
+                        fetch('{{ url_for("lock") }}', { method: 'POST' })
+                            .then(function (response) {
+                                if (!response.ok) throw new Error('lock-failed');
+                                window.location.replace('{{ url_for("login") }}');
+                            })
+                            .catch(function () {});
+                    }
                 }
             }
         });
@@ -273,7 +293,7 @@
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script nonce="{{ csp_nonce }}">
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v53';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v56';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>
