@@ -349,7 +349,7 @@
                             <span id="modal-length-display" class="font-bold text-sm">16</span>
                         </div>
                         <label class="visually-hidden" for="modal-length">{{ _('Şifre Uzunluğu') }}</label>
-                        <input type="range" class="w-full mb-3 accent-[#7c6ff7]" min="8" max="32" value="16" id="modal-length">
+                        <input type="range" class="generator-length-range w-full mb-3" min="8" max="32" value="16" id="modal-length">
 
                         <div class="generator-option-grid generator-checkboxes">
                             <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-uppercase">
@@ -418,7 +418,25 @@
                 <form id="import-form" action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data">
                     <div class="mb-4">
                         <label for="import-file" class="block text-sm font-medium text-kasa-text-muted mb-2">{{ _('Dosya Seçin') }}</label>
-                        <input type="file" class="w-full px-3 py-2.5 kasa-field text-sm" id="import-file" name="file" accept=".json,.kasa,.txt" required>
+                        <input type="file" class="import-file-input" id="import-file" name="file"
+                            accept=".json,.kasa,.txt" required>
+                        <label for="import-file" id="import-drop-zone" class="import-drop-zone" role="button"
+                            tabindex="0" data-max-bytes="{{ config.get('MAX_CONTENT_LENGTH', 5242880) }}">
+                            <span class="import-drop-icon" aria-hidden="true">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </span>
+                            <span class="import-drop-copy">
+                                <strong>{{ _('Dosyayı buraya sürükleyin') }}</strong>
+                                <small>{{ _('veya bilgisayarınızdan seçin') }}</small>
+                            </span>
+                            <span class="import-browse-button">
+                                <i class="fa-regular fa-folder-open"></i>
+                                {{ _('Dosya Seç') }}
+                            </span>
+                            <span id="import-file-name" class="import-file-name" aria-live="polite">
+                                {{ _('Dosya seçilmedi') }}
+                            </span>
+                        </label>
                         <div class="mt-3 p-3 kasa-panel-soft text-xs text-kasa-text-muted leading-loose">
                             <i class="fa-solid fa-circle-info mr-1 text-[#38bdf8]"></i>
                             <strong class="text-kasa-text">.kasa</strong> — {{ _('ŞifreKasam formatı') }} &nbsp;·&nbsp;
@@ -594,14 +612,71 @@
                         <div class="settings-appearance-grid">
                             <div class="appearance-field">
                                 <span id="accent-color-label">{{ _('Vurgu Rengi') }}</span>
-                                <div class="accent-control-row">
-                                    <input type="color" name="accent_color" id="accent-color-input" value="{{ ACCENT_COLOR }}" aria-labelledby="accent-color-label">
-                                    <input type="text" id="accent-color-text" value="{{ ACCENT_COLOR }}" maxlength="7" class="kasa-field" aria-label="{{ _('Vurgu Rengi Kodu') }}">
+                                <div class="accent-control-row custom-color-picker" id="accent-color-picker">
+                                    <input type="hidden" name="accent_color" id="accent-color-input" value="{{ ACCENT_COLOR }}">
+                                    <button type="button" id="accent-color-trigger" class="color-picker-trigger"
+                                        aria-haspopup="dialog" aria-expanded="false" aria-controls="accent-color-popover"
+                                        aria-label="{{ _('Renk seçiciyi aç') }}">
+                                        <span id="accent-color-swatch" class="color-picker-trigger-swatch" aria-hidden="true"></span>
+                                        <span class="color-picker-trigger-copy">
+                                            <strong id="accent-color-trigger-value">{{ ACCENT_COLOR }}</strong>
+                                            <small>{{ _('Renk seçiciyi aç') }}</small>
+                                        </span>
+                                        <i class="fa-solid fa-palette" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" id="accent-color-scrim" class="color-picker-scrim"
+                                        aria-label="{{ _('Renk seçiciyi kapat') }}" hidden></button>
+                                    <div id="accent-color-popover" class="color-picker-popover" role="dialog"
+                                        aria-modal="false" aria-labelledby="accent-color-picker-title" hidden>
+                                        <div class="color-picker-header">
+                                            <div>
+                                                <h5 id="accent-color-picker-title">{{ _('Vurgu Rengi') }}</h5>
+                                                <p>{{ _('Ton, doygunluk ve parlaklığı ayarlayın.') }}</p>
+                                            </div>
+                                            <button type="button" id="accent-color-close" class="kasa-close-btn"
+                                                aria-label="{{ _('Renk seçiciyi kapat') }}">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </div>
+                                        <div class="color-picker-current">
+                                            <span id="accent-color-preview" aria-hidden="true"></span>
+                                            <div>
+                                                <strong id="accent-color-picker-value">{{ ACCENT_COLOR }}</strong>
+                                                <output id="accent-color-rgb" aria-live="polite">RGB</output>
+                                            </div>
+                                        </div>
+                                        <label class="color-picker-slider" for="accent-hue-input">
+                                            <span><strong>{{ _('Ton') }}</strong><output id="accent-hue-value">0°</output></span>
+                                            <input type="range" id="accent-hue-input" min="0" max="360" step="1" value="0">
+                                        </label>
+                                        <label class="color-picker-slider" for="accent-saturation-input">
+                                            <span><strong>{{ _('Doygunluk') }}</strong><output id="accent-saturation-value">0%</output></span>
+                                            <input type="range" id="accent-saturation-input" min="0" max="100" step="1" value="0">
+                                        </label>
+                                        <label class="color-picker-slider" for="accent-brightness-input">
+                                            <span><strong>{{ _('Parlaklık') }}</strong><output id="accent-brightness-value">0%</output></span>
+                                            <input type="range" id="accent-brightness-input" min="0" max="100" step="1" value="0">
+                                        </label>
+                                        <div class="color-picker-code-row">
+                                            <label for="accent-color-text">
+                                                <span>HEX</span>
+                                                <input type="text" id="accent-color-text" value="{{ ACCENT_COLOR }}"
+                                                    maxlength="7" pattern="#?[0-9a-fA-F]{6}" class="kasa-field"
+                                                    aria-label="{{ _('Vurgu Rengi Kodu') }}">
+                                            </label>
+                                            <button type="button" id="accent-color-reset" class="kasa-btn kasa-btn-muted"
+                                                data-default-accent="#7c6ff7">
+                                                <i class="fa-solid fa-arrow-rotate-left"></i>
+                                                {{ _('Varsayılana Dön') }}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="appearance-field">
                                 <span id="background-style-label">{{ _('Arkaplan') }}</span>
-                                <select name="background_style" id="background-style-select" class="kasa-field" aria-labelledby="background-style-label">
+                                <select name="background_style" id="background-style-select" class="kasa-field"
+                                    aria-labelledby="background-style-label" data-custom-select>
                                     <option value="aurora" {% if BACKGROUND_STYLE == 'aurora' %}selected{% endif %}>{{ _('Aurora') }}</option>
                                     <option value="midnight" {% if BACKGROUND_STYLE == 'midnight' %}selected{% endif %}>{{ _('Gece') }}</option>
                                     <option value="mesh" {% if BACKGROUND_STYLE == 'mesh' %}selected{% endif %}>{{ _('Mesh') }}</option>
@@ -650,26 +725,6 @@
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h4 id="setting-glass-title" class="text-sm font-medium mb-0.5">{{ _('Cam Efektleri') }}</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Bulanık cam yüzeylerini aç veya kapat.') }}</p>
-                        </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input settings-switch-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title">
-                        </div>
-                    </div>
-                    <div id="glass-quality-card" class="settings-select-card settings-glass-quality-card flex items-center justify-between p-3 rounded-xl glass-sm{% if not GLASS_EFFECTS_ENABLED %} is-collapsed{% endif %}" aria-hidden="{{ 'false' if GLASS_EFFECTS_ENABLED else 'true' }}">
-                        <div>
-                            <h4 id="setting-glass-quality-title" class="text-sm font-medium mb-0.5">{{ _('Cam Kalitesi') }}</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Bulanıklık seviyesini performansa göre ayarla.') }}</p>
-                        </div>
-                        <select name="glass_quality" id="glass-quality-select" class="kasa-field settings-inline-select" aria-labelledby="setting-glass-quality-title" {% if not GLASS_EFFECTS_ENABLED %}disabled{% endif %}>
-                            <option value="low" {% if GLASS_QUALITY == 'low' %}selected{% endif %}>{{ _('Düşük') }}</option>
-                            <option value="normal" {% if GLASS_QUALITY == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
-                            <option value="high" {% if GLASS_QUALITY == 'high' %}selected{% endif %}>{{ _('Yüksek') }}</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
-                        <div>
                             <h4 id="setting-motion-title" class="text-sm font-medium mb-0.5">{{ _('Hareketli Arkaplan') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arkaplan bloblarını yumuşak şekilde hareket ettir.') }}</p>
                         </div>
@@ -685,6 +740,28 @@
                         <div class="form-check form-switch m-0">
                             <input class="form-check-input settings-switch-input" type="checkbox" name="interface_animations_enabled" id="interface-animations-toggle" {% if INTERFACE_ANIMATIONS_ENABLED %}checked{% endif %} aria-labelledby="setting-interface-animations-title">
                         </div>
+                    </div>
+                    <div id="glass-effects-card" class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h4 id="setting-glass-title" class="text-sm font-medium mb-0.5">{{ _('Cam Efektleri') }}</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Bulanık cam yüzeylerini aç veya kapat.') }}</p>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input settings-switch-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title">
+                        </div>
+                    </div>
+                    <div id="glass-quality-card" class="settings-select-card settings-glass-quality-card flex items-center justify-between p-3 rounded-xl glass-sm{% if not GLASS_EFFECTS_ENABLED %} is-collapsed{% endif %}" aria-hidden="{{ 'false' if GLASS_EFFECTS_ENABLED else 'true' }}">
+                        <div>
+                            <h4 id="setting-glass-quality-title" class="text-sm font-medium mb-0.5">{{ _('Cam Kalitesi') }}</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Bulanıklık seviyesini performansa göre ayarla.') }}</p>
+                        </div>
+                        <select name="glass_quality" id="glass-quality-select"
+                            class="kasa-field settings-inline-select" aria-labelledby="setting-glass-quality-title"
+                            data-custom-select {% if not GLASS_EFFECTS_ENABLED %}disabled{% endif %}>
+                            <option value="low" {% if GLASS_QUALITY == 'low' %}selected{% endif %}>{{ _('Düşük') }}</option>
+                            <option value="normal" {% if GLASS_QUALITY == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
+                            <option value="high" {% if GLASS_QUALITY == 'high' %}selected{% endif %}>{{ _('Yüksek') }}</option>
+                        </select>
                     </div>
                     </section>
                     <section id="settings-panel-behavior" class="settings-panel" role="tabpanel"
@@ -709,8 +786,19 @@
                         </div>
                         <div class="settings-timeout-row">
                             <label class="text-xs text-kasa-text-muted" for="auto_lock_timeout">{{ _('Zaman Aşımı (Dakika)') }}</label>
-                            <input type="number" name="auto_lock_timeout" id="auto_lock_timeout" min="1" max="60" value="{{ AUTO_LOCK_TIMEOUT }}"
-                                   class="kasa-field settings-timeout-input">
+                            <div class="settings-number-stepper" data-number-stepper>
+                                <input type="number" name="auto_lock_timeout" id="auto_lock_timeout" min="1" max="60"
+                                    step="1" value="{{ AUTO_LOCK_TIMEOUT }}" inputmode="numeric"
+                                    class="kasa-field settings-timeout-input">
+                                <button type="button" data-step-direction="up"
+                                    aria-label="{{ _('Bir dakika artır') }}">
+                                    <i class="fa-solid fa-chevron-up"></i>
+                                </button>
+                                <button type="button" data-step-direction="down"
+                                    aria-label="{{ _('Bir dakika azalt') }}">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <!-- Tepsiye Küçült -->
@@ -737,7 +825,7 @@
                     </div>
                     <!-- İçe/Dışa Aktar Butonları -->
                     <div class="settings-action-grid">
-                        <button type="button" data-kasa-close data-kasa-modal="importModal"
+                        <button type="button" data-kasa-modal="importModal"
                             class="settings-action-card">
                             <span class="settings-action-icon"><i class="fa-solid fa-upload"></i></span>
                             <span class="settings-action-copy">
@@ -746,7 +834,7 @@
                             </span>
                             <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                         </button>
-                        <button type="button" id="settings-export-btn" data-kasa-close data-kasa-modal="exportModal"
+                        <button type="button" id="settings-export-btn" data-kasa-modal="exportModal"
                             class="settings-action-card">
                             <span class="settings-action-icon settings-action-icon-success"><i class="fa-solid fa-download"></i></span>
                             <span class="settings-action-copy">
@@ -776,7 +864,9 @@
                             <h4 id="setting-language-title" class="text-sm font-medium mb-0.5">{{ _('Dil') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüz dilini değiştir.') }}</p>
                         </div>
-                        <select id="settings-language-select" class="text-sm px-2 py-1.5 rounded-lg kasa-field settings-language-select" aria-labelledby="setting-language-title">
+                        <select id="settings-language-select"
+                            class="text-sm px-2 py-1.5 rounded-lg kasa-field settings-language-select"
+                            aria-labelledby="setting-language-title" data-custom-select>
                             {% for lang in AVAILABLE_LANGS %}
                             <option value="{{ lang.code }}" {% if lang.code == CURRENT_LANG %}selected{% endif %}>
                                 {{ lang.name }}

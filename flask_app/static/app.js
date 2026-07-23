@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.6 - Main JavaScript
+ * ŞifreKasam v2.5.7 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -165,6 +165,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const hexToChannels = (hex) =>
     hexToRgb(hex).split(',').map(channel => Number(channel.trim()));
+
+  const hexToHsv = (hex) => {
+    const [red, green, blue] = hexToChannels(hex).map(channel => channel / 255);
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+    let hue = 0;
+
+    if (delta) {
+      if (max === red) hue = 60 * (((green - blue) / delta) % 6);
+      else if (max === green) hue = 60 * (((blue - red) / delta) + 2);
+      else hue = 60 * (((red - green) / delta) + 4);
+    }
+
+    if (hue < 0) hue += 360;
+    return {
+      hue: Math.round(hue),
+      saturation: Math.round(max === 0 ? 0 : (delta / max) * 100),
+      brightness: Math.round(max * 100),
+    };
+  };
+
+  const hsvToHex = (hue, saturation, brightness) => {
+    const normalizedHue = ((Number(hue) % 360) + 360) % 360;
+    const normalizedSaturation = Math.min(100, Math.max(0, Number(saturation))) / 100;
+    const normalizedBrightness = Math.min(100, Math.max(0, Number(brightness))) / 100;
+    const chroma = normalizedBrightness * normalizedSaturation;
+    const match = normalizedBrightness - chroma;
+    const section = normalizedHue / 60;
+    const secondary = chroma * (1 - Math.abs((section % 2) - 1));
+    const channels = section < 1 ? [chroma, secondary, 0]
+      : section < 2 ? [secondary, chroma, 0]
+        : section < 3 ? [0, chroma, secondary]
+          : section < 4 ? [0, secondary, chroma]
+            : section < 5 ? [secondary, 0, chroma]
+              : [chroma, 0, secondary];
+    return `#${channels
+      .map(channel => Math.round((channel + match) * 255).toString(16).padStart(2, '0'))
+      .join('')}`;
+  };
 
   const accentLooksTooLight = (hex) => {
     const [red, green, blue] = hexToChannels(hex);
@@ -426,6 +466,221 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isInternal) setPageLoading(true);
   });
 
+  // ─── 2b. ÖZEL FORM KONTROLLERİ ───────────────────────────────────────────
+
+  const customSelectStates = [];
+
+  const closeCustomSelect = (state, restoreFocus = false) => {
+    if (!state || (!state.openRequested && !state.wrapper.classList.contains('is-open'))) return;
+    state.openRequested = false;
+    state.wrapper.classList.remove('is-open');
+    state.host?.classList.remove('has-open-select');
+    state.trigger.setAttribute('aria-expanded', 'false');
+    clearTimeout(state.closeTimer);
+    state.closeTimer = setTimeout(() => {
+      if (!state.wrapper.classList.contains('is-open')) state.menu.hidden = true;
+    }, 140);
+    if (restoreFocus) state.trigger.focus({ preventScroll: true });
+  };
+
+  const closeCustomSelects = (exceptState = null) => {
+    customSelectStates.forEach(state => {
+      if (state !== exceptState) closeCustomSelect(state);
+    });
+  };
+
+  document.querySelectorAll('select[data-custom-select]').forEach((select, index) => {
+    if (select.dataset.customSelectReady === 'true') return;
+    select.dataset.customSelectReady = 'true';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'kasa-custom-select';
+    ['settings-inline-select', 'settings-language-select'].forEach(className => {
+      if (select.classList.contains(className)) wrapper.classList.add(className);
+    });
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'kasa-custom-select-trigger';
+    trigger.id = `${select.id || `custom-select-${index}`}-trigger`;
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    const labelledBy = select.getAttribute('aria-labelledby');
+    const label = select.getAttribute('aria-label');
+    if (labelledBy) trigger.setAttribute('aria-labelledby', labelledBy);
+    else if (label) trigger.setAttribute('aria-label', label);
+
+    const valueNode = document.createElement('span');
+    valueNode.className = 'kasa-custom-select-value';
+    const chevron = createIcon('fa-solid fa-chevron-down');
+    chevron.setAttribute('aria-hidden', 'true');
+    trigger.append(valueNode, chevron);
+
+    const menu = document.createElement('div');
+    menu.className = 'kasa-custom-select-menu';
+    menu.id = `${trigger.id}-menu`;
+    menu.setAttribute('role', 'listbox');
+    menu.setAttribute('aria-labelledby', trigger.id);
+    menu.hidden = true;
+    trigger.setAttribute('aria-controls', menu.id);
+
+    const optionButtons = Array.from(select.options).map(option => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'kasa-custom-select-option';
+      button.dataset.value = option.value;
+      button.setAttribute('role', 'option');
+      button.disabled = option.disabled;
+
+      const optionText = document.createElement('span');
+      optionText.textContent = option.textContent.trim();
+      const check = createIcon('fa-solid fa-check');
+      check.setAttribute('aria-hidden', 'true');
+      button.append(optionText, check);
+      menu.appendChild(button);
+      return button;
+    });
+
+    select.before(wrapper);
+    wrapper.append(select, trigger, menu);
+    select.classList.add('kasa-custom-select-source');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+
+    const state = {
+      select,
+      wrapper,
+      trigger,
+      menu,
+      optionButtons,
+      closeTimer: 0,
+      openRequested: false,
+      host: wrapper.closest('.glass-sm, .settings-appearance-card, .vault-field'),
+    };
+    customSelectStates.push(state);
+
+    const syncCustomSelect = () => {
+      const selectedOption = select.selectedOptions[0] || select.options[0];
+      valueNode.textContent = selectedOption?.textContent.trim() || '';
+      trigger.disabled = select.disabled;
+      wrapper.classList.toggle('is-disabled', select.disabled);
+      optionButtons.forEach((button, optionIndex) => {
+        const selected = select.options[optionIndex]?.selected === true;
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-selected', String(selected));
+      });
+      if (select.disabled) closeCustomSelect(state);
+    };
+
+    const openCustomSelect = (focusSelected = false) => {
+      if (select.disabled) return;
+      if (wrapper.classList.contains('is-open')) {
+        closeCustomSelect(state);
+        return;
+      }
+      closeCustomSelects(state);
+      clearTimeout(state.closeTimer);
+      state.openRequested = true;
+      menu.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+      state.host?.classList.add('has-open-select');
+      requestAnimationFrame(() => {
+        if (!state.openRequested) return;
+        wrapper.classList.add('is-open');
+        if (focusSelected) {
+          (optionButtons.find(button => button.classList.contains('is-selected'))
+            || optionButtons.find(button => !button.disabled))?.focus({ preventScroll: true });
+        }
+      });
+    };
+
+    trigger.addEventListener('click', () => openCustomSelect(false));
+    trigger.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        openCustomSelect(true);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCustomSelect(state);
+      }
+    });
+
+    optionButtons.forEach((button, optionIndex) => {
+      button.addEventListener('click', () => {
+        if (button.disabled) return;
+        select.value = select.options[optionIndex].value;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        closeCustomSelect(state, true);
+      });
+      button.addEventListener('keydown', event => {
+        const enabledOptions = optionButtons.filter(optionButton => !optionButton.disabled);
+        const currentIndex = enabledOptions.indexOf(button);
+        let nextIndex = currentIndex;
+        if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % enabledOptions.length;
+        else if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + enabledOptions.length) % enabledOptions.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = enabledOptions.length - 1;
+        else if (event.key === 'Escape') {
+          event.preventDefault();
+          closeCustomSelect(state, true);
+          return;
+        } else {
+          return;
+        }
+        event.preventDefault();
+        enabledOptions[nextIndex]?.focus({ preventScroll: true });
+      });
+    });
+
+    select.addEventListener('change', syncCustomSelect);
+    wrapper.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (!wrapper.contains(document.activeElement)) closeCustomSelect(state);
+      }, 0);
+    });
+    select.kasaSyncCustomSelect = syncCustomSelect;
+    new MutationObserver(syncCustomSelect).observe(select, {
+      attributes: true,
+      attributeFilter: ['disabled'],
+    });
+    syncCustomSelect();
+  });
+
+  document.addEventListener('click', event => {
+    if (!(event.target instanceof Element) || !event.target.closest('.kasa-custom-select')) {
+      closeCustomSelects();
+    }
+  });
+
+  document.querySelectorAll('.kasa-modal').forEach(modal => {
+    modal.addEventListener('kasa:modal-closing', () => closeCustomSelects());
+  });
+
+  document.querySelectorAll('[data-number-stepper]').forEach(stepper => {
+    const input = stepper.querySelector('input[type="number"]');
+    if (!input) return;
+
+    const clampInput = () => {
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const fallback = Number.isFinite(min) ? min : 0;
+      const value = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : fallback;
+      input.value = String(Math.min(Number.isFinite(max) ? max : value, Math.max(fallback, value)));
+    };
+
+    stepper.querySelectorAll('[data-step-direction]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (button.dataset.stepDirection === 'up') input.stepUp();
+        else input.stepDown();
+        clampInput();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+    input.addEventListener('change', clampInput);
+  });
+
   // ─── 3. TEMA & EFEKT TOGGLE'LARI ──────────────────────────────────────────
 
   const themeToggleBtn = document.getElementById('theme-toggle');
@@ -464,7 +719,10 @@ document.addEventListener('DOMContentLoaded', () => {
     glassQualityCard.setAttribute('aria-hidden', String(!shouldShow));
     if (glassQualitySelect) {
       glassQualitySelect.disabled = !shouldShow;
-      glassQualitySelect.tabIndex = shouldShow ? 0 : -1;
+      glassQualitySelect.tabIndex = glassQualitySelect.dataset.customSelectReady === 'true'
+        ? -1
+        : (shouldShow ? 0 : -1);
+      glassQualitySelect.kasaSyncCustomSelect?.();
     }
 
     glassQualityCard.classList.toggle('is-no-transition', !animate);
@@ -524,6 +782,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const accentInput = document.getElementById('accent-color-input');
   const accentTextInput = document.getElementById('accent-color-text');
+  const accentColorPicker = document.getElementById('accent-color-picker');
+  const accentColorTrigger = document.getElementById('accent-color-trigger');
+  const accentColorPopover = document.getElementById('accent-color-popover');
+  const accentColorScrim = document.getElementById('accent-color-scrim');
+  const accentColorClose = document.getElementById('accent-color-close');
+  const accentColorReset = document.getElementById('accent-color-reset');
+  const accentColorTriggerValue = document.getElementById('accent-color-trigger-value');
+  const accentColorPickerValue = document.getElementById('accent-color-picker-value');
+  const accentColorRgb = document.getElementById('accent-color-rgb');
+  const accentHueInput = document.getElementById('accent-hue-input');
+  const accentSaturationInput = document.getElementById('accent-saturation-input');
+  const accentBrightnessInput = document.getElementById('accent-brightness-input');
+  const accentHueValue = document.getElementById('accent-hue-value');
+  const accentSaturationValue = document.getElementById('accent-saturation-value');
+  const accentBrightnessValue = document.getElementById('accent-brightness-value');
+  const settingsModal = document.getElementById('settingsModal');
   const backgroundSelect = document.getElementById('background-style-select');
   const backgroundHidden = document.getElementById('background-style-hidden');
   const accentHidden = document.getElementById('accent-color-hidden');
@@ -537,14 +811,22 @@ document.addEventListener('DOMContentLoaded', () => {
   let appearanceSaveTimer = 0;
   let accentContrastWarningTimer = 0;
   let lightAccentWarningShown = false;
+  let colorPickerCloseTimer = 0;
+  let colorPickerState = hexToHsv(currentAppearance.accent);
+
+  if (settingsModal && accentColorScrim && accentColorPopover) {
+    settingsModal.append(accentColorScrim, accentColorPopover);
+  }
 
   if (glassQualitySelect) {
     glassQualitySelect.value = normalizeGlassQuality(
       document.documentElement.getAttribute('data-glass-quality')
     );
+    glassQualitySelect.kasaSyncCustomSelect?.();
     glassQualitySelect.addEventListener('change', () => {
       const glassQuality = applyGlassQuality(glassQualitySelect.value);
       glassQualitySelect.value = glassQuality;
+      glassQualitySelect.kasaSyncCustomSelect?.();
       apiPost('/settings/appearance', { glass_quality: glassQuality });
     });
   }
@@ -565,11 +847,69 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 320);
   };
 
-  const syncAppearanceControls = (accent, background) => {
+  const setColorPickerOpen = (open) => {
+    if (!accentColorPicker || !accentColorPopover || !accentColorTrigger) return;
+    clearTimeout(colorPickerCloseTimer);
+    accentColorTrigger.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+      accentColorPopover.hidden = false;
+      if (accentColorScrim) accentColorScrim.hidden = false;
+      requestAnimationFrame(() => {
+        accentColorPicker.classList.add('is-open');
+        accentColorScrim?.classList.add('is-open');
+        accentColorPopover.classList.add('is-open');
+        accentHueInput?.focus({ preventScroll: true });
+      });
+      return;
+    }
+
+    accentColorPicker.classList.remove('is-open');
+    accentColorScrim?.classList.remove('is-open');
+    accentColorPopover.classList.remove('is-open');
+    colorPickerCloseTimer = setTimeout(() => {
+      accentColorPopover.hidden = true;
+      if (accentColorScrim) accentColorScrim.hidden = true;
+    }, 180);
+  };
+
+  const syncColorPickerControls = (accent, preservePickerState = false) => {
+    if (!accentColorPicker) return;
+    const normalizedAccent = normalizeHexColor(accent);
+    const pickerColor = preservePickerState
+      ? { ...colorPickerState }
+      : hexToHsv(normalizedAccent);
+    colorPickerState = pickerColor;
+    const hueColor = hsvToHex(pickerColor.hue, 100, 100);
+    const fullBrightnessColor = hsvToHex(pickerColor.hue, pickerColor.saturation, 100);
+
+    if (accentHueInput) accentHueInput.value = String(pickerColor.hue);
+    if (accentSaturationInput) accentSaturationInput.value = String(pickerColor.saturation);
+    if (accentBrightnessInput) accentBrightnessInput.value = String(pickerColor.brightness);
+    if (accentHueValue) accentHueValue.value = `${pickerColor.hue}°`;
+    if (accentSaturationValue) accentSaturationValue.value = `${pickerColor.saturation}%`;
+    if (accentBrightnessValue) accentBrightnessValue.value = `${pickerColor.brightness}%`;
+    if (accentColorTriggerValue) accentColorTriggerValue.textContent = normalizedAccent;
+    if (accentColorPickerValue) accentColorPickerValue.textContent = normalizedAccent;
+    if (accentColorRgb) accentColorRgb.value = `RGB ${hexToRgb(normalizedAccent)}`;
+    window.KASA_SET_RUNTIME_STYLE?.(
+      'accent-color-picker',
+      `#accent-color-picker, #accent-color-popover {
+        --picker-color: ${normalizedAccent};
+        --picker-hue: ${hueColor};
+        --picker-full-brightness: ${fullBrightnessColor};
+      }`
+    );
+  };
+
+  const syncAppearanceControls = (accent, background, preservePickerState = false) => {
     if (accentInput) accentInput.value = normalizeHexColor(accent);
     if (accentTextInput) accentTextInput.value = normalizeHexColor(accent);
     if (accentHidden) accentHidden.value = normalizeHexColor(accent);
-    if (backgroundSelect) backgroundSelect.value = background;
+    if (backgroundSelect) {
+      backgroundSelect.value = background;
+      backgroundSelect.kasaSyncCustomSelect?.();
+    }
     if (backgroundHidden) backgroundHidden.value = background;
     if (appearancePreview) {
       window.KASA_SET_RUNTIME_STYLE?.(
@@ -578,6 +918,7 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       appearancePreview.dataset.previewBackground = background;
     }
+    syncColorPickerControls(accent, preservePickerState);
     backgroundButtons.forEach(btn => {
       const isActive = btn.dataset.backgroundOption === background;
       btn.classList.toggle('is-active', isActive);
@@ -590,9 +931,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const updateAppearance = (accent, background, persist = true) => {
+  const updateAppearance = (accent, background, persist = true, preservePickerState = false) => {
     const next = applyAppearance(accent, background);
-    syncAppearanceControls(next.accent, next.background);
+    syncAppearanceControls(next.accent, next.background, preservePickerState);
     queueAccentContrastWarning(next.accent);
     if (persist) {
       clearTimeout(appearanceSaveTimer);
@@ -611,14 +952,58 @@ document.addEventListener('DOMContentLoaded', () => {
   if (accentInput || accentTextInput || backgroundSelect) {
     syncAppearanceControls(currentAppearance.accent, currentAppearance.background);
 
-    accentInput?.addEventListener('input', () =>
-      updateAppearance(accentInput.value, backgroundSelect?.value || currentAppearance.background)
-    );
-    accentTextInput?.addEventListener('change', () =>
-      updateAppearance(accentTextInput.value, backgroundSelect?.value || currentAppearance.background)
-    );
+    accentColorTrigger?.addEventListener('click', () => {
+      setColorPickerOpen(accentColorTrigger.getAttribute('aria-expanded') !== 'true');
+    });
+    accentColorScrim?.addEventListener('click', () => setColorPickerOpen(false));
+    accentColorClose?.addEventListener('click', () => setColorPickerOpen(false));
+    accentColorReset?.addEventListener('click', () => {
+      updateAppearance(
+        accentColorReset.dataset.defaultAccent || '#7c6ff7',
+        backgroundSelect?.value || currentAppearance.background
+      );
+    });
+    [accentHueInput, accentSaturationInput, accentBrightnessInput].forEach(input => {
+      input?.addEventListener('input', () => {
+        colorPickerState = {
+          hue: Number(accentHueInput?.value || 0),
+          saturation: Number(accentSaturationInput?.value || 0),
+          brightness: Number(accentBrightnessInput?.value || 0),
+        };
+        updateAppearance(
+          hsvToHex(
+            colorPickerState.hue,
+            colorPickerState.saturation,
+            colorPickerState.brightness
+          ),
+          backgroundSelect?.value || currentAppearance.background,
+          true,
+          true
+        );
+      });
+    });
+    accentTextInput?.addEventListener('input', () => {
+      if (/^#?[0-9a-fA-F]{6}$/.test(accentTextInput.value.trim())) {
+        updateAppearance(
+          accentTextInput.value,
+          backgroundSelect?.value || currentAppearance.background
+        );
+      }
+    });
+    accentTextInput?.addEventListener('change', () => {
+      const fallback = accentInput?.value || currentAppearance.accent;
+      updateAppearance(
+        normalizeHexColor(accentTextInput.value, fallback),
+        backgroundSelect?.value || currentAppearance.background
+      );
+    });
     backgroundSelect?.addEventListener('change', () =>
-      updateAppearance(accentInput?.value || currentAppearance.accent, backgroundSelect.value)
+      updateAppearance(
+        accentInput?.value || currentAppearance.accent,
+        backgroundSelect.value,
+        true,
+        true
+      )
     );
 
     accentPresetButtons.forEach(btn => {
@@ -628,8 +1013,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     backgroundButtons.forEach(btn => {
       btn.addEventListener('click', () =>
-        updateAppearance(accentInput?.value || currentAppearance.accent, btn.dataset.backgroundOption)
+        updateAppearance(
+          accentInput?.value || currentAppearance.accent,
+          btn.dataset.backgroundOption,
+          true,
+          true
+        )
       );
+    });
+    settingsModal?.addEventListener('kasa:modal-closing', () => {
+      setColorPickerOpen(false);
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && accentColorTrigger?.getAttribute('aria-expanded') === 'true') {
+        event.stopPropagation();
+        setColorPickerOpen(false);
+        accentColorTrigger.focus({ preventScroll: true });
+      }
     });
   }
 
@@ -713,6 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
           `sifrekasam_yedek_${dateStamp}.${exportFormat}`
         );
         window.kasaModalKapat?.('exportModal');
+        window.kasaModalKapat?.('settingsModal');
       } catch (err) {
         console.error('Export failed:', err);
         showWarningToast(window._('Dışa aktarma başarısız oldu.'));
@@ -947,6 +1348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (data.glass_quality && glassQualitySelect) {
           glassQualitySelect.value = applyGlassQuality(data.glass_quality);
+          glassQualitySelect.kasaSyncCustomSelect?.();
         }
         if (typeof data.animated_backgrounds_enabled === 'boolean' && motionToggle) {
           motionToggle.checked = data.animated_backgrounds_enabled;
@@ -1068,6 +1470,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const importForm = document.getElementById('import-form');
   const importSubmitButton = document.getElementById('import-submit');
+  const importFileInput = document.getElementById('import-file');
+  const importDropZone = document.getElementById('import-drop-zone');
+  const importFileName = document.getElementById('import-file-name');
+  const supportedImportExtensions = new Set(['.json', '.kasa', '.txt']);
+
+  const resetImportFile = () => {
+    if (importFileInput) importFileInput.value = '';
+    if (importFileName) importFileName.textContent = window._('Dosya seçilmedi');
+    importDropZone?.classList.remove('has-file');
+  };
+
+  const useImportFile = (file) => {
+    if (!file || !importFileInput) return false;
+    const extensionIndex = file.name.lastIndexOf('.');
+    const extension = extensionIndex >= 0 ? file.name.slice(extensionIndex).toLowerCase() : '';
+    const maxBytes = Number(importDropZone?.dataset.maxBytes) || (5 * 1024 * 1024);
+
+    if (!supportedImportExtensions.has(extension)) {
+      resetImportFile();
+      showWarningToast(window._('Yalnızca .kasa, .json veya .txt dosyaları içe aktarılabilir.'));
+      return false;
+    }
+    if (file.size > maxBytes) {
+      resetImportFile();
+      showWarningToast(window._('Dosya boyutu 5 MB sınırını aşıyor.'));
+      return false;
+    }
+
+    if (importFileInput.files?.[0] !== file) {
+      try {
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        importFileInput.files = transfer.files;
+      } catch {
+        showWarningToast(window._('Dosya seçilemedi. Lütfen seçim düğmesini kullanın.'));
+        return false;
+      }
+    }
+
+    if (importFileName) {
+      const fileSize = file.size < 1024 * 1024
+        ? `${Math.max(1, Math.round(file.size / 1024))} KB`
+        : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+      importFileName.textContent = `${file.name} · ${fileSize}`;
+    }
+    importDropZone?.classList.add('has-file');
+    return true;
+  };
+
+  importFileInput?.addEventListener('change', () => {
+    const file = importFileInput.files?.[0];
+    if (file) useImportFile(file);
+    else resetImportFile();
+  });
+  importDropZone?.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      importFileInput?.click();
+    }
+  });
+  ['dragenter', 'dragover'].forEach(eventName => {
+    importDropZone?.addEventListener(eventName, event => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      importDropZone.classList.add('is-dragging');
+    });
+  });
+  importDropZone?.addEventListener('dragleave', event => {
+    if (!importDropZone.contains(event.relatedTarget)) {
+      importDropZone.classList.remove('is-dragging');
+    }
+  });
+  importDropZone?.addEventListener('drop', event => {
+    event.preventDefault();
+    importDropZone.classList.remove('is-dragging');
+    useImportFile(event.dataTransfer.files?.[0]);
+  });
+
   importForm?.addEventListener('submit', (event) => {
     if (importForm.dataset.submitting === 'true') {
       event.preventDefault();
@@ -1136,8 +1616,13 @@ document.addEventListener('DOMContentLoaded', () => {
   window.kasaModalAc = (modalId) => {
     const modal = document.getElementById(modalId);
     if (!modal) return;
+    const visibleModals = Array.from(document.querySelectorAll('.kasa-modal.is-visible'))
+      .filter(visibleModal => visibleModal !== modal);
+    visibleModals.forEach(visibleModal => visibleModal.classList.remove('is-top-modal'));
     document.body.classList.add('kasa-modal-open');
-    modal.classList.remove('is-closing', 'is-open');
+    modal.classList.remove('is-closing', 'is-open', 'is-stacked-modal');
+    modal.classList.toggle('is-stacked-modal', visibleModals.length > 0);
+    modal.classList.add('is-top-modal');
     modal.classList.add('is-visible');
     modal.setAttribute('aria-hidden', 'false');
     requestAnimationFrame(() => modal.classList.add('is-open'));
@@ -1146,15 +1631,21 @@ document.addEventListener('DOMContentLoaded', () => {
   window.kasaModalKapat = (modalId) => {
     const modal = document.getElementById(modalId);
     if (!modal) return;
+    modal.dispatchEvent(new CustomEvent('kasa:modal-closing'));
     const transitionsDisabled = document.documentElement.getAttribute('data-kasa-animations') === 'off'
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     modal.classList.remove('is-open');
     modal.classList.add('is-closing');
     setTimeout(() => {
-      modal.classList.remove('is-visible', 'is-closing');
+      modal.classList.remove('is-visible', 'is-closing', 'is-top-modal', 'is-stacked-modal');
       modal.setAttribute('aria-hidden', 'true');
-      if (!document.querySelector('.kasa-modal.is-visible'))
+      const remainingModals = Array.from(document.querySelectorAll('.kasa-modal.is-visible'));
+      if (!remainingModals.length) {
         document.body.classList.remove('kasa-modal-open');
+      } else {
+        remainingModals.forEach(remainingModal => remainingModal.classList.remove('is-top-modal'));
+        remainingModals[remainingModals.length - 1].classList.add('is-top-modal');
+      }
     }, transitionsDisabled ? 0 : 280);
   };
 
@@ -1298,9 +1789,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let generatedAnimationTimer = null;
 
     if (lengthEl && lengthDisplay) {
-      lengthEl.addEventListener('input', () => {
+      const syncLengthControl = () => {
         lengthDisplay.textContent = lengthEl.value;
-      });
+        const min = Number(lengthEl.min) || 0;
+        const max = Number(lengthEl.max) || 100;
+        const value = Number(lengthEl.value) || min;
+        const progress = max > min
+          ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+          : 0;
+        window.KASA_SET_RUNTIME_STYLE?.(
+          `password-generator-range-${lengthEl.id}`,
+          `#${lengthEl.id} { --generator-range-progress: ${progress}%; }`
+        );
+      };
+      lengthEl.addEventListener('input', syncLengthControl);
+      syncLengthControl();
     }
 
     const generatePassword = () => {

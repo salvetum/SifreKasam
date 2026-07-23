@@ -30,7 +30,7 @@
             <div class="vault-form-row vault-form-row-two">
                 <div class="vault-field">
                     <label for="kayit_tipi">{{ _('Kayıt Tipi') }}</label>
-                    <select name="kayit_tipi" id="kayit_tipi" required class="kasa-field">
+                    <select name="kayit_tipi" id="kayit_tipi" required class="kasa-field" data-custom-select>
                         <option value="Website"    {% if kayit and kayit.full_data['Website name'] %}selected{% endif %}>🌐 {{ _('Website') }}</option>
                         <option value="Application"{% if kayit and kayit.full_data['Application'] %}selected{% endif %}>💻 {{ _('Uygulama') }}</option>
                         <option value="CreditCard" {% if kayit and kayit.full_data['CreditCard'] %}selected{% endif %}>💳 {{ _('Kredi Kartı') }}</option>

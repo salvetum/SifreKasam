@@ -279,5 +279,21 @@
   "Tasarruf modu": "Tasarruf modu",
   "ŞifreKasam arka planda kaynak kullanımını azaltıyor.": "ŞifreKasam arka planda kaynak kullanımını azaltıyor.",
   "Tasarruf modundan çıkılıyor": "Tasarruf modundan çıkılıyor",
-  "Kartlar ve arayüz yeniden hazırlanıyor.": "Kartlar ve arayüz yeniden hazırlanıyor."
+  "Kartlar ve arayüz yeniden hazırlanıyor.": "Kartlar ve arayüz yeniden hazırlanıyor.",
+  "Renk seçiciyi aç": "Renk seçiciyi aç",
+  "Renk seçiciyi kapat": "Renk seçiciyi kapat",
+  "Ton, doygunluk ve parlaklığı ayarlayın.": "Ton, doygunluk ve parlaklığı ayarlayın.",
+  "Ton": "Ton",
+  "Doygunluk": "Doygunluk",
+  "Parlaklık": "Parlaklık",
+  "Varsayılana Dön": "Varsayılana Dön",
+  "Dosyayı buraya sürükleyin": "Dosyayı buraya sürükleyin",
+  "veya bilgisayarınızdan seçin": "veya bilgisayarınızdan seçin",
+  "Dosya Seç": "Dosya Seç",
+  "Dosya seçilmedi": "Dosya seçilmedi",
+  "Yalnızca .kasa, .json veya .txt dosyaları içe aktarılabilir.": "Yalnızca .kasa, .json veya .txt dosyaları içe aktarılabilir.",
+  "Dosya boyutu 5 MB sınırını aşıyor.": "Dosya boyutu 5 MB sınırını aşıyor.",
+  "Dosya seçilemedi. Lütfen seçim düğmesini kullanın.": "Dosya seçilemedi. Lütfen seçim düğmesini kullanın.",
+  "Bir dakika artır": "Bir dakika artır",
+  "Bir dakika azalt": "Bir dakika azalt"
 }

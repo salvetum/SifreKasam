@@ -1,60 +1,117 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
+chcp 65001 >nul
 
-title SifreKasam - Kurucu Derleme Araci
-color 0A
+title SifreKasam - Kurucu Olusturma
+color 0B
 
-echo ======================================================
-echo          KASA - KURUCU OLUSTURMA ARACI
-echo ======================================================
-echo.
-
-:: 1. Backend kontrolu
-if not exist "backend\SifreKasam.exe" (
+pushd "%~dp0" >nul 2>&1
+if errorlevel 1 (
     color 0C
-    echo [!] HATA: backend\SifreKasam.exe bulunamadi.
-    echo Lutfen once 'baslat.bat' calistirarak backend uygulamasini derleyin.
-    echo Veya 'baslat.bat' icinde hata alip almadiginizi kontrol edin.
+    echo [HATA] Proje klasorune gecilemedi.
     pause
     exit /b 1
 )
 
-:: 2. Eski Build Temizligi (Daha temiz bir derleme icin)
-echo [*] Eski derleme artikalari temizleniyor...
-if exist "out" (
-    rmdir /s /q "out"
-)
-
-:: 3. Electron Forge Islemi
-echo [*] Electron Forge 'make' islemi baslatiliyor...
-echo [!] Lutfen bekleyin, bu islem bilgisayar hizina bagli olarak birkac dakika surebilir.
-echo ------------------------------------------------------
+echo ======================================================
+echo          SIFREKASAM - KURUCU OLUSTURMA
+echo ======================================================
 echo.
 
-call npm run make
+if exist "venv\Scripts\activate.bat" (
+    echo [1/4] Sanal ortam etkinlestiriliyor...
+    call "venv\Scripts\activate.bat"
+) else (
+    echo [1/4] Sanal ortam bulunamadi; sistem Python'u kullanilacak.
+)
 
-:: 4. Sonuc Kontrolu
-if !errorlevel! neq 0 (
+where python >nul 2>&1
+if errorlevel 1 (
+    color 0C
+    echo [HATA] Python bulunamadi. Backend derlenemez.
+    goto :fail
+)
+
+python -c "import PyInstaller" >nul 2>&1
+if errorlevel 1 (
+    echo PyInstaller bulunamadi; Python bagimliliklari kuruluyor...
+    python -m pip install -r "flask_app\requirements.txt"
+    if errorlevel 1 (
+        color 0C
+        echo [HATA] Python bagimliliklari kurulamadi.
+        goto :fail
+    )
+)
+
+where node >nul 2>&1
+if errorlevel 1 (
+    color 0C
+    echo [HATA] Node.js bulunamadi. Once Node.js kurun.
+    goto :fail
+)
+
+where npm >nul 2>&1
+if errorlevel 1 (
+    color 0C
+    echo [HATA] npm bulunamadi. Node.js kurulumunu kontrol edin.
+    goto :fail
+)
+
+if not exist "node_modules\" (
+    echo [2/4] Node bagimliliklari kuruluyor...
+    call npm ci
+    if errorlevel 1 (
+        color 0C
+        echo [HATA] npm ci islemi basarisiz oldu.
+        goto :fail
+    )
+) else (
+    echo [2/4] Node bagimliliklari hazir.
+)
+
+echo [3/4] Eski Electron ciktilari temizleniyor...
+set "KASA_PROJECT_ROOT=%CD%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$root = [IO.Path]::GetFullPath($env:KASA_PROJECT_ROOT);" ^
+    "$target = [IO.Path]::GetFullPath((Join-Path $root 'out'));" ^
+    "if (-not $target.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Guvenli olmayan temizleme hedefi.' };" ^
+    "if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }"
+if errorlevel 1 (
+    color 0C
+    echo [HATA] Eski ciktilar guvenli sekilde temizlenemedi.
+    goto :fail
+)
+
+echo [4/4] Backend ve Electron kurucusu olusturuluyor...
+echo Bu islem birkac dakika surebilir.
+echo ------------------------------------------------------
+call npm run make
+if errorlevel 1 (
     color 0C
     echo.
-    echo ======================================================
-    echo [!] HATA: Kurucu olusturulurken bir sorun olustu.
-    echo Electron Forge kisminda bir bagimlilik hatasi olabilir.
-    echo ======================================================
-    pause
-    exit /b 1
+    echo [HATA] Kurucu olusturulamadi. Yukaridaki hata mesajini kontrol edin.
+    goto :fail
+)
+
+set "SETUP_PATH=%CD%\out\make\squirrel.windows\x64\SifreKasamSetup.exe"
+if not exist "%SETUP_PATH%" (
+    color 0C
+    echo [HATA] Derleme tamamlandi ancak SifreKasamSetup.exe bulunamadi.
+    goto :fail
 )
 
 color 0A
 echo.
 echo ======================================================
-echo [OK] KURUCU BASARIYLA OLUSTURULDU!
-echo.
-echo Kurucu dosyanizi (Setup.exe) su klasorde bulabilirsiniz:
-echo %cd%\out\make\squirrel.windows\x64\
-echo.
-echo Klasor aciliyor...
-explorer "%cd%\out\make\squirrel.windows\x64"
+echo [OK] Kurucu basariyla olusturuldu.
+echo %SETUP_PATH%
 echo ======================================================
-echo.
+start "" explorer "%CD%\out\make\squirrel.windows\x64"
+popd
 pause
+exit /b 0
+
+:fail
+popd
+pause
+exit /b 1
