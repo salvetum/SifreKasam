@@ -3,7 +3,7 @@
 {% block page_shell_class %}kasa-health-page-shell{% endblock %}
 
 {% block content %}
-<style>
+<style nonce="{{ csp_nonce }}">
   :root {
     --red:     #ff4d4d;
     --amber:   #ffb340;
@@ -963,7 +963,7 @@
       <p class="sr-subtitle">{{ _('Kasanızdaki tüm kayıtların güvenlik özeti') }}</p>
     </div>
     <a href="{{ url_for('index') }}" class="sr-back-btn">
-      <i class="fa-solid fa-arrow-left" style="font-size:0.7rem;"></i>
+      <i class="fa-solid fa-arrow-left sr-icon-back"></i>
       {{ _('Geri Dön') }}
     </a>
   </header>
@@ -993,30 +993,30 @@
 
   <section class="sr-overview" aria-label="{{ _('Şifre dağılım oranları') }}">
     <div class="sr-overview-info">
-      <div style="font-size:0.75rem; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:1.2rem; text-align:center;">{{ _('Şifre Dağılım Oranları') }}</div>
+      <div class="sr-distribution-title">{{ _('Şifre Dağılım Oranları') }}</div>
       <div class="sr-legend">
         <div class="sr-legend-item">
-          <div class="sr-legend-dot" style="background:var(--red);"></div>
+          <div class="sr-legend-dot sr-tone-red"></div>
           <span class="sr-legend-name">{{ _('Zayıf Şifreler') }}</span>
           <span class="sr-legend-val" id="leg-zayif">—</span>
         </div>
         <div class="sr-legend-item">
-          <div class="sr-legend-dot" style="background:var(--amber);"></div>
+          <div class="sr-legend-dot sr-tone-amber"></div>
           <span class="sr-legend-name">{{ _('Tekrar Eden') }}</span>
           <span class="sr-legend-val" id="leg-tekrar">—</span>
         </div>
         <div class="sr-legend-item">
-          <div class="sr-legend-dot" style="background:var(--sky);"></div>
+          <div class="sr-legend-dot sr-tone-sky"></div>
           <span class="sr-legend-name">{{ _('Eski Şifreler') }}</span>
           <span class="sr-legend-val" id="leg-eski">—</span>
         </div>
         <div class="sr-legend-item">
-          <div class="sr-legend-dot" style="background:var(--rose);"></div>
+          <div class="sr-legend-dot sr-tone-rose"></div>
           <span class="sr-legend-name">{{ _('Süresi Dolmuş') }}</span>
           <span class="sr-legend-val" id="leg-expired">—</span>
         </div>
         <div class="sr-legend-item">
-          <div class="sr-legend-dot" style="background:var(--green);"></div>
+          <div class="sr-legend-dot sr-tone-green"></div>
           <span class="sr-legend-name">{{ _('Güvenli Şifre Oranı') }}</span>
           <span class="sr-legend-val" id="leg-safe">—</span>
         </div>
@@ -1028,7 +1028,7 @@
 
     <div class="sr-card">
       <div class="sr-card-head">
-        <div class="sr-card-indicator" style="background:var(--red);"></div>
+        <div class="sr-card-indicator sr-tone-red"></div>
         <h2 class="sr-card-title c-red">{{ _('Zayıf Şifreler') }}</h2>
         <span class="sr-card-count bg-red-pill">{{ zayif|length }}</span>
       </div>
@@ -1041,7 +1041,7 @@
             <span>{{ item.title }}</span>
           </div>
           <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
-            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right sr-icon-arrow"></i>
           </a>
         </div>
         {% endfor %}
@@ -1056,7 +1056,7 @@
 
     <div class="sr-card">
       <div class="sr-card-head">
-        <div class="sr-card-indicator" style="background:var(--amber);"></div>
+        <div class="sr-card-indicator sr-tone-amber"></div>
         <h2 class="sr-card-title c-amber">{{ _('Tekrar Eden') }}</h2>
         <span class="sr-card-count bg-amber-pill">{{ tekrar|length }}</span>
       </div>
@@ -1066,8 +1066,8 @@
         <details class="sr-reuse-group" {% if loop.first %}open{% endif %}>
           <summary class="sr-reuse-summary">
             <span class="sr-reuse-left">
-              <i class="fa-solid fa-copy" style="font-size:0.65rem; flex-shrink:0;"></i>
-              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ _('Aynı şifre grubu') }}</span>
+              <i class="fa-solid fa-copy sr-icon-copy"></i>
+              <span class="sr-truncate-label">{{ _('Aynı şifre grubu') }}</span>
             </span>
             <span class="sr-reuse-badge">{{ grup|length }}×</span>
           </summary>
@@ -1076,7 +1076,7 @@
             <div class="sr-reuse-item">
               <span class="sr-reuse-item-name">{{ item.title }}</span>
               <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
-            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right sr-icon-arrow"></i>
           </a>
             </div>
             {% endfor %}
@@ -1094,7 +1094,7 @@
 
     <div class="sr-card">
       <div class="sr-card-head">
-        <div class="sr-card-indicator" style="background:var(--sky);"></div>
+        <div class="sr-card-indicator sr-tone-sky"></div>
         <h2 class="sr-card-title c-sky">{{ _('Eski Şifreler') }}</h2>
         <span class="sr-card-count bg-sky-pill">{{ eski|length }}</span>
       </div>
@@ -1109,7 +1109,7 @@
           </div>
           <span class="sr-item-tag">{{ item.days }}g</span>
           <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
-            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right sr-icon-arrow"></i>
           </a>
         </div>
         {% endfor %}
@@ -1124,7 +1124,7 @@
 
     <div class="sr-card">
       <div class="sr-card-head">
-        <div class="sr-card-indicator" style="background:var(--rose);"></div>
+        <div class="sr-card-indicator sr-tone-rose"></div>
         <h2 class="sr-card-title c-rose">{{ _('Süresi Dolmuş') }}</h2>
         <span class="sr-card-count bg-rose-pill">{{ expired|length }}</span>
       </div>
@@ -1138,7 +1138,7 @@
             <span>{{ item.title }}</span>
           </div>
           <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
-            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right" style="font-size:0.6rem;"></i>
+            {{ _('Düzenle') }} <i class="fa-solid fa-arrow-right sr-icon-arrow"></i>
           </a>
         </div>
         {% endfor %}
@@ -1154,7 +1154,7 @@
   </section>
 </main>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 document.addEventListener('DOMContentLoaded', function () {
   const z = parseInt(document.getElementById('count-zayif').innerText)   || 0;
   const t = parseInt(document.getElementById('count-tekrar').innerText)  || 0;

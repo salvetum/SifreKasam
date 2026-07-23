@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import socket
 import threading
@@ -26,7 +27,7 @@ import ipaddress
 from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from flask import (Flask, Response, abort, jsonify, has_request_context,
+from flask import (Flask, Response, abort, g, jsonify, has_request_context,
                    redirect, render_template, request, send_file, session, url_for)
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
                          login_user, logout_user)
@@ -463,6 +464,17 @@ def _has_existing_vault_data() -> bool:
     except Exception:
         return False
 
+def _is_first_setup() -> bool:
+    """Yalnızca daha önce kurulmamış, ana şifresiz kasaları ilk kurulum sayar."""
+    try:
+        master_setting = Setting.query.filter_by(key='master_hash').first()
+        if master_setting and master_setting.value:
+            return False
+        return not _vault_initialized() and not _has_existing_vault_data()
+    except Exception:
+        # Durum belirlenemiyorsa yeniden şifre oluşturmayı teşvik etmemek için güvenli tarafta kal.
+        return False
+
 def migrate_legacy_pbkdf2_salt(master_password: str) -> bool:
     if _get_saved_pbkdf2_salt():
         return False
@@ -870,6 +882,7 @@ def inject_globals():
         'CURRENT_LANG':          current_lang,
         'AVAILABLE_LANGS':       available_langs,
         'TRANSLATIONS':          lang_translations,
+        'csp_nonce':             getattr(g, 'csp_nonce', ''),
         '_':                     _,
     }
 
@@ -1019,6 +1032,8 @@ def _same_origin_state_change() -> bool:
 
 @app.before_request
 def check_token_and_auth():
+    # Her yanıt için ayrı nonce kullanarak yalnızca onaylı inline blokları çalıştır.
+    g.csp_nonce = secrets.token_urlsafe()
     token = request.headers.get('X-App-Token')
     endpoint = request.endpoint
 
@@ -1058,14 +1073,16 @@ def check_token_and_auth():
 
 @app.after_request
 def add_security_headers(response):
+    csp_nonce = getattr(g, 'csp_nonce', '')
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
     response.headers.setdefault('X-Frame-Options', 'DENY')
     response.headers.setdefault('Referrer-Policy', 'same-origin')
     response.headers.setdefault(
         'Content-Security-Policy',
         "default-src 'self' data: blob:; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        f"script-src 'self' 'nonce-{csp_nonce}'; "
+        f"style-src 'self' 'nonce-{csp_nonce}'; "
+        "script-src-attr 'none'; style-src-attr 'none'; "
         "img-src 'self' data: blob:; "
         "font-src 'self' data:; "
         "connect-src 'self'; "
@@ -1152,17 +1169,21 @@ def logout():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    first_setup = _is_first_setup()
     if request.method != 'POST':
-        return render_template('login.html')
+        return render_template('login.html', first_setup=first_setup)
 
     attempt_key = _login_attempt_key()
     retry_after = _login_retry_after(attempt_key)
     if retry_after > 0:
-        return render_template('login.html', error=_too_many_attempts_message(retry_after), retry_after=retry_after), 429
+        return render_template(
+            'login.html', error=_too_many_attempts_message(retry_after),
+            retry_after=retry_after, first_setup=first_setup,
+        ), 429
 
     mp = request.form.get('master_password', '').strip()
     if not mp:
-        return render_template('login.html', error="Ana şifre boş olamaz.")
+        return render_template('login.html', error="Ana şifre boş olamaz.", first_setup=first_setup)
 
     setting = Setting.query.filter_by(key='master_hash').first()
 
@@ -1176,8 +1197,11 @@ def login():
             retry_after = _record_login_failure(attempt_key)
             log.warning("Hatalı ana şifre denemesi.")
             if retry_after > 0:
-                return render_template('login.html', error=_too_many_attempts_message(retry_after), retry_after=retry_after), 429
-            return render_template('login.html', error="Hatalı Ana Şifre!")
+                return render_template(
+                    'login.html', error=_too_many_attempts_message(retry_after),
+                    retry_after=retry_after, first_setup=first_setup,
+                ), 429
+            return render_template('login.html', error="Hatalı Ana Şifre!", first_setup=first_setup)
         if _is_legacy_master_hash(setting.value):
             setting.value = hash_master_password(mp)
             changed = True
@@ -1194,7 +1218,8 @@ def login():
         except Exception:
             return render_template(
                 'login.html',
-                error="Kasa güvenlik migrasyonu başarısız oldu. Veri güvenliği için giriş durduruldu."
+                error="Kasa güvenlik migrasyonu başarısız oldu. Veri güvenliği için giriş durduruldu.",
+                first_setup=first_setup,
             ), 500
         if changed and not migration_committed:
             db.session.commit()
@@ -1203,7 +1228,8 @@ def login():
             log.error("Ana şifre kaydı bulunamadı; güvenlik nedeniyle yeniden kurulum engellendi.")
             return render_template(
                 'login.html',
-                error="Bu kasa zaten kurulmuş görünüyor. Güvenlik nedeniyle yeni ana şifre belirleme engellendi."
+                error="Bu kasa zaten kurulmuş görünüyor. Güvenlik nedeniyle yeni ana şifre belirleme engellendi.",
+                first_setup=False,
             ), 403
         log.info("İlk kurulum: Ana şifre belirleniyor...")
         Setting.query.filter_by(key='master_hash').delete()

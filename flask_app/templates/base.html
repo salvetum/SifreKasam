@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark light">
-    <script>
+    <style nonce="{{ csp_nonce }}" id="kasa-runtime-styles"></style>
+    <script nonce="{{ csp_nonce }}">
         window.LANG = {{ CURRENT_LANG|tojson }};
         window.TRANSLATIONS = {{ TRANSLATIONS|tojson }};
         window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson }};
@@ -13,6 +14,15 @@
         };
         window._ = function (key) {
             return window.TRANSLATIONS[key] || key;
+        };
+
+        const kasaRuntimeStyles = new Map();
+        window.KASA_SET_RUNTIME_STYLE = function (key, cssText) {
+            const runtimeStyle = document.getElementById('kasa-runtime-styles');
+            if (!runtimeStyle || !key) return;
+            if (cssText) kasaRuntimeStyles.set(key, cssText);
+            else kasaRuntimeStyles.delete(key);
+            runtimeStyle.textContent = Array.from(kasaRuntimeStyles.values()).join('\n');
         };
 
         const storedTheme = localStorage.getItem('kasa-theme') || "{{ SAVED_THEME }}";
@@ -79,10 +89,12 @@
             const normalizedAccent = normalizeHexColor(accent, "{{ ACCENT_COLOR|default('#7c6ff7') }}");
             const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain'].includes(background) ? background : "{{ BACKGROUND_STYLE|default('aurora') }}";
             const accent2 = mixColor(normalizedAccent, '#38bdf8', 0.45);
-            document.documentElement.style.setProperty('--accent', normalizedAccent);
-            document.documentElement.style.setProperty('--accent-2', accent2);
-            document.documentElement.style.setProperty('--accent-rgb', hexToRgb(normalizedAccent));
-            document.documentElement.style.setProperty('--accent-2-rgb', hexToRgb(accent2));
+            window.KASA_SET_RUNTIME_STYLE('appearance', `:root {
+                --accent: ${normalizedAccent};
+                --accent-2: ${accent2};
+                --accent-rgb: ${hexToRgb(normalizedAccent)};
+                --accent-2-rgb: ${hexToRgb(accent2)};
+            }`);
             document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
             localStorage.setItem('kasa-accent', normalizedAccent);
             localStorage.setItem('kasa-background', normalizedBackground);
@@ -102,7 +114,7 @@
             }
         }
     </script>
-    <style>
+    <style nonce="{{ csp_nonce }}">
         html.kasa-first-load { opacity: 0; }
         html.kasa-first-load-enter {
             opacity: 1;
@@ -134,7 +146,7 @@
     <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='style.css') }}?v=48" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}?v=49" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -168,14 +180,14 @@
     </div>
 
     <!-- JS Libraries -->
-    <script src="{{ url_for('static', filename='sweetalert2.all.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='toastify.min.js') }}" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='sweetalert2.all.min.js') }}" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=9.0" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.1" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         if (document.documentElement.classList.contains('kasa-first-load')) {
             requestAnimationFrame(function () {
                 requestAnimationFrame(function () {
@@ -186,7 +198,7 @@
     </script>
 
     <!-- Auto-lock Script -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         {% if AUTO_LOCK_ENABLED %}
         let idleTime = 0;
         const lockThreshold = {{ AUTO_LOCK_TIMEOUT }};
@@ -207,7 +219,7 @@
     </script>
 
     <!-- Kısayol: Ctrl+L ile kilit -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener('keydown', function (e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
                 e.preventDefault();
@@ -221,7 +233,7 @@
     </script>
 
     <!-- Mouse4/Mouse5 history tuşlarını engelle; aksi halde loading overlay siyah ekranda kalabiliyor. -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function clearPageLoadingOverlay() {
             document.body.classList.remove('is-page-loading');
             document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'true');
@@ -245,7 +257,7 @@
     </script>
 
     <!-- Mobil geri tuşu loading loop fix -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         window.addEventListener('pageshow', function (e) {
             clearPageLoadingOverlay();
         });
@@ -259,9 +271,9 @@
     </script>
 
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v48';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v49';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>

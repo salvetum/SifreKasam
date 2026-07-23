@@ -6,9 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── SABİTLER & YARDIMCILAR ───────────────────────────────────────────────
 
-  const glassEffectsEnabled = () =>
-    document.documentElement.getAttribute('data-glass-effects') !== 'off';
-
   const scriptLoadCache = new Map();
 
   const loadScriptOnce = (src) => {
@@ -106,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
       href: url,
       download: filename,
     });
-    anchor.style.display = 'none';
+    anchor.className = 'kasa-download-anchor';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -192,10 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
       ? background
       : 'aurora';
     const accent2 = mixColor(normalizedAccent);
-    document.documentElement.style.setProperty('--accent', normalizedAccent);
-    document.documentElement.style.setProperty('--accent-2', accent2);
-    document.documentElement.style.setProperty('--accent-rgb', hexToRgb(normalizedAccent));
-    document.documentElement.style.setProperty('--accent-2-rgb', hexToRgb(accent2));
+    window.KASA_SET_RUNTIME_STYLE?.('appearance', `:root {
+      --accent: ${normalizedAccent};
+      --accent-2: ${accent2};
+      --accent-rgb: ${hexToRgb(normalizedAccent)};
+      --accent-2-rgb: ${hexToRgb(accent2)};
+    }`);
     document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
     localStorage.setItem('kasa-accent', normalizedAccent);
     localStorage.setItem('kasa-background', normalizedBackground);
@@ -290,11 +289,11 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelector('.settings-workspace'),
     ].filter(Boolean);
 
-    repaintTargets.forEach(target => { target.style.visibility = 'hidden'; });
+    repaintTargets.forEach(target => target.classList.add('kasa-repaint-hidden'));
     pageShell.classList.remove('kasa-renderer-repaint');
     void pageShell.offsetHeight;
     requestAnimationFrame(() => {
-      repaintTargets.forEach(target => { target.style.removeProperty('visibility'); });
+      repaintTargets.forEach(target => target.classList.remove('kasa-repaint-hidden'));
       pageShell.classList.add('kasa-renderer-repaint');
       window.dispatchEvent(new Event('resize'));
       requestAnimationFrame(() => pageShell.classList.remove('kasa-renderer-repaint'));
@@ -573,7 +572,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (backgroundSelect) backgroundSelect.value = background;
     if (backgroundHidden) backgroundHidden.value = background;
     if (appearancePreview) {
-      appearancePreview.style.setProperty('--preview-accent', normalizeHexColor(accent));
+      window.KASA_SET_RUNTIME_STYLE?.(
+        'appearance-preview',
+        `#appearance-preview { --preview-accent: ${normalizeHexColor(accent)}; }`
+      );
       appearancePreview.dataset.previewBackground = background;
     }
     backgroundButtons.forEach(btn => {
@@ -683,31 +685,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const TOAST_BASE = {
     duration: 2000, close: false,
     gravity: 'bottom', position: 'right', stopOnFocus: true,
-    style: {
-      borderRadius: '8px',
-      fontFamily: "'Sora', sans-serif",
-      fontWeight: '500',
-    },
   };
 
   const showSuccessToast = (text) => showToast({
     ...TOAST_BASE, text, className: 'kasa-toast kasa-toast-success',
-    style: {
-      ...TOAST_BASE.style,
-      background: 'rgba(34, 197, 94, 0.15)',
-      border: '1px solid rgba(34, 197, 94, 0.30)',
-      color: '#bbf7d0',
-    },
   });
 
   const showWarningToast = (text) => showToast({
     ...TOAST_BASE, text, role: 'alert', className: 'kasa-toast kasa-toast-warning',
-    style: {
-      ...TOAST_BASE.style,
-      background:  'rgba(239, 68, 68, 0.14)',
-      border:      '1px solid rgba(239, 68, 68, 0.28)',
-      color:       '#fecaca',
-    },
   });
 
   window.addEventListener('kasa:vault-write-locked', (event) => {
@@ -1068,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
           value: text,
           readOnly: true,
         });
-        textarea.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+        textarea.className = 'kasa-clipboard-fallback';
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand('copy');
@@ -1151,7 +1136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.kasaModalAc = (modalId) => {
     const modal = document.getElementById(modalId);
     if (!modal) return;
-    document.body.style.overflow = 'hidden';
+    document.body.classList.add('kasa-modal-open');
     modal.classList.remove('is-closing', 'is-open');
     modal.classList.add('is-visible');
     modal.setAttribute('aria-hidden', 'false');
@@ -1169,7 +1154,7 @@ document.addEventListener('DOMContentLoaded', () => {
       modal.classList.remove('is-visible', 'is-closing');
       modal.setAttribute('aria-hidden', 'true');
       if (!document.querySelector('.kasa-modal.is-visible'))
-        document.body.style.overflow = '';
+        document.body.classList.remove('kasa-modal-open');
     }, transitionsDisabled ? 0 : 280);
   };
 
@@ -1220,18 +1205,18 @@ document.addEventListener('DOMContentLoaded', () => {
       .trim();
 
   const STRENGTH_LEVELS = [
-    { width: '20%',  color: '#ef4444', text: 'Çok Zayıf' },
-    { width: '40%',  color: '#ef4444', text: 'Zayıf'     },
-    { width: '60%',  color: '#f59e0b', text: 'Orta'      },
-    { width: '80%',  color: '#22c55e', text: 'Güçlü'     },
-    { width: '100%', color: '#38bdf8', text: 'Çok Güçlü' },
+    { className: 'strength-level-0', text: 'Çok Zayıf' },
+    { className: 'strength-level-1', text: 'Zayıf' },
+    { className: 'strength-level-2', text: 'Orta' },
+    { className: 'strength-level-3', text: 'Güçlü' },
+    { className: 'strength-level-4', text: 'Çok Güçlü' },
   ];
+  const STRENGTH_CLASS_NAMES = STRENGTH_LEVELS.map(level => level.className);
 
   window.updateStrengthMeter = async (password, barEl, labelEl) => {
     if (!barEl || !labelEl) return;
+    barEl.classList.remove(...STRENGTH_CLASS_NAMES);
     if (!password) {
-      barEl.style.width = '0%';
-      barEl.style.backgroundColor = 'transparent';
       labelEl.innerText = '';
       return;
     }
@@ -1247,8 +1232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const level     = STRENGTH_LEVELS[score];
     const crackTime = translateTime(crack_times_display.offline_slow_hashing_1e4_per_second);
 
-    barEl.style.width           = level.width;
-    barEl.style.backgroundColor = level.color;
+    barEl.classList.add(level.className);
     labelEl.innerText = crackTime
       ? `${level.text} · ${window._('tahmini dayanım:')} ${crackTime}`
       : level.text;
@@ -1431,8 +1415,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const history = getGeneratorHistory();
 
-    if (empty) empty.style.display = history.length ? 'none' : 'block';
-    if (clearBtn) clearBtn.style.display = history.length ? 'inline-flex' : 'none';
+    if (empty) empty.hidden = history.length > 0;
+    if (clearBtn) clearBtn.hidden = history.length === 0;
 
     list.replaceChildren();
     history.forEach((item, index) => {
@@ -1633,9 +1617,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const setCardVisible = (wrapper, visible, animate = false) => {
-      const wasHidden = wrapper.hidden || wrapper.style.display === 'none';
+      const wasHidden = wrapper.hidden;
       wrapper.hidden = !visible;
-      wrapper.style.display = visible ? 'block' : 'none';
 
       if (visible && animate && wasHidden) {
         wrapper.classList.remove('filter-reveal');
@@ -1836,8 +1819,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const fragment = document.createDocumentFragment();
           data.forEach((item, index) => {
             const div = document.createElement('div');
-            div.className = 'list-group-item history-entry';
-            div.style.setProperty('--history-delay', `${Math.min(index, 8) * 24}ms`);
+            div.className = `list-group-item history-entry history-delay-${Math.min(index, 8)}`;
 
             const header = document.createElement('div');
             header.className = 'history-entry-header';
@@ -1896,23 +1878,17 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelButton: 'kasa-btn kasa-btn-muted',
       },
       willOpen: (popup, container) => {
-        popup.style.cssText    += ';opacity:0;transform:scale(0.92) translateY(16px)';
-        container.style.background = 'transparent';
+        popup.classList.add('kasa-swal-enter');
+        container.classList.add('kasa-swal-container');
       },
       didOpen: (popup, container) => {
         void container.offsetHeight;
-        popup.style.transition = 'opacity 0.28s cubic-bezier(0.16,1,0.3,1), transform 0.28s cubic-bezier(0.16,1,0.3,1)';
-        popup.style.opacity    = '1';
-        popup.style.transform  = 'scale(1) translateY(0)';
-        container.style.transition  = 'background 0.25s ease';
-        container.style.background  = 'rgba(0,0,0,0.42)';
+        popup.classList.add('is-open');
+        container.classList.add('is-open');
       },
       willClose: (popup, container, done) => {
-        popup.style.transition = 'opacity 0.15s ease-in, transform 0.15s ease-in';
-        popup.style.opacity    = '0';
-        popup.style.transform  = 'scale(0.95) translateY(8px)';
-        container.style.transition = 'background 0.15s ease-in';
-        container.style.background = 'transparent';
+        popup.classList.add('is-closing');
+        container.classList.add('is-closing');
         setTimeout(done, 150);
       },
     };
@@ -1931,11 +1907,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (!isConfirmed) return;
         const wrapper = form.closest('.card-wrapper');
-        if (wrapper) {
-          Object.assign(wrapper.style, {
-            transition: 'all 0.3s ease', transform: 'scale(0.95)', opacity: '0',
-          });
-        }
+        wrapper?.classList.add('is-removing');
         try {
           const response = await apiFetch(form.action, { method: 'POST' });
           if (!response?.ok) throw new Error('delete-failed');
@@ -1947,19 +1919,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 300);
           }
           showToast({
-            ...TOAST_BASE, text: window._('Kayıt başarıyla silindi.'), duration: 2500,
-            style: {
-              ...TOAST_BASE.style,
-              background:    'rgba(239, 68, 68, 0.14)',
-              border:        '1px solid rgba(239, 68, 68, 0.28)',
-              backdropFilter: glassEffectsEnabled() ? 'blur(14px)' : 'none',
-              borderRadius:  '12px',
-              boxShadow:     '0 14px 36px rgba(0,0,0,0.28)',
-              color:         '#fecaca',
-            },
+            ...TOAST_BASE,
+            text: window._('Kayıt başarıyla silindi.'),
+            duration: 2500,
+            className: 'kasa-toast kasa-toast-warning',
           });
         } catch {
-          if (wrapper) Object.assign(wrapper.style, { transform: '', opacity: '1' });
+          wrapper?.classList.remove('is-removing');
           showWarningToast(window._('Silme işlemi başarısız oldu.'));
         }
       });
@@ -1980,7 +1946,7 @@ document.addEventListener('DOMContentLoaded', () => {
           icon.className = isPinned
             ? 'fa-solid fa-star card-star-icon'
             : 'fa-regular fa-star card-star-icon card-star-unpinned';
-          icon.style.color = isPinned ? '#f59e0b' : '';
+          icon.classList.toggle('is-pinned', isPinned);
           button.setAttribute('aria-pressed', String(isPinned));
           button.classList.remove('is-favoriting', 'is-unfavoriting');
           if (animate) {
@@ -2084,11 +2050,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleFormFields = () => {
       const config = FIELD_CONFIGS[kayitTipiSelect.value] || FIELD_CONFIGS.default;
 
-      if (urlGroup)      urlGroup.style.display      = kayitTipiSelect.value === 'Website' ? '' : 'none';
-      if (loginGroup)    loginGroup.style.display     = config.showLogin    ? '' : 'none';
-      if (passwordGroup) passwordGroup.style.display  = config.showPassword ? '' : 'none';
-      if (kategoriGroup) kategoriGroup.style.display  = config.showKategori ? '' : 'none';
-      if (strengthCard)  strengthCard.style.display   = config.showPassword ? '' : 'none';
+      if (urlGroup)      urlGroup.hidden      = kayitTipiSelect.value !== 'Website';
+      if (loginGroup)    loginGroup.hidden    = !config.showLogin;
+      if (passwordGroup) passwordGroup.hidden = !config.showPassword;
+      if (kategoriGroup) kategoriGroup.hidden = !config.showKategori;
+      if (strengthCard)  strengthCard.hidden  = !config.showPassword;
       if (pageGenerator) {
         pageGenerator.classList.add('is-collapsed');
         pageGenerator.setAttribute('aria-hidden', 'true');

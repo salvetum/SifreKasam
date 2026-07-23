@@ -54,7 +54,7 @@
                     class="kasa-field">
             </div>
 
-            <div class="vault-field" id="website_url_group" style="display:none;">
+            <div class="vault-field" id="website_url_group" hidden>
                 <label for="website_url">{{ _('Website URL') }}</label>
                 <input type="text" name="website_url" id="website_url" placeholder="https://…"
                     value="{{ kayit.full_data['Website URL'] if kayit and 'Website URL' in kayit.full_data }}"
@@ -104,7 +104,7 @@
                 </div>
                 <div class="vault-strength">
                     <div class="h-1.5 rounded-full bg-kasa-border-hi overflow-hidden" id="password-strength-container">
-                        <div id="password-strength-bar" class="progress-bar h-full rounded-full transition-all duration-300" style="width:0%"></div>
+                        <div id="password-strength-bar" class="progress-bar strength-meter-fill h-full rounded-full transition-all duration-300"></div>
                     </div>
                     <small id="password-strength-text" class="text-kasa-text-muted text-xs"></small>
                 </div>
@@ -178,7 +178,7 @@
     </form>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     document.getElementById('ekle-form').addEventListener('submit', function (e) {
         if (this.dataset.submitted) { e.preventDefault(); return; }
         this.dataset.submitted = 'true';
@@ -187,8 +187,8 @@
             const spinner = document.createElement('i');
             spinner.className = 'fa-solid fa-spinner fa-spin mr-2';
             btn.replaceChildren(spinner, document.createTextNode(_('Kaydediliyor…')));
-            btn.style.pointerEvents = 'none';
-            btn.style.opacity = '0.7';
+            btn.disabled = true;
+            btn.classList.add('is-submitting');
         }
     });
 </script>

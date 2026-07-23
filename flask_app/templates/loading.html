@@ -7,7 +7,8 @@
     <meta name="theme-color" content="#080912">
     <meta name="color-scheme" content="dark light">
     <title>ŞifreKasam - Yükleniyor</title>
-    <script>
+    <style nonce="{{ csp_nonce }}" id="loading-runtime-styles"></style>
+    <script nonce="{{ csp_nonce }}">
         const copy = {
             tr: {
                 badge: 'Yerel ve güvenli',
@@ -92,10 +93,12 @@
             document.documentElement.setAttribute('data-kasa-motion', motion);
             document.documentElement.setAttribute('data-kasa-animations', animations);
             document.documentElement.setAttribute('data-kasa-gradient', gradients);
-            document.documentElement.style.setProperty('--accent', accent);
-            document.documentElement.style.setProperty('--accent-2', accent2);
-            document.documentElement.style.setProperty('--accent-rgb', hexToRgb(accent));
-            document.documentElement.style.setProperty('--accent-2-rgb', hexToRgb(accent2));
+            document.getElementById('loading-runtime-styles').textContent = `:root {
+                --accent: ${accent};
+                --accent-2: ${accent2};
+                --accent-rgb: ${hexToRgb(accent)};
+                --accent-2-rgb: ${hexToRgb(accent2)};
+            }`;
 
             localStorage.setItem('kasa-theme', theme);
             localStorage.setItem('kasa-glass-effects', glass);
@@ -138,7 +141,7 @@
             return new Promise((resolve) => setTimeout(resolve, 240));
         }
     </script>
-    <style>
+    <style nonce="{{ csp_nonce }}">
         * { box-sizing: border-box; }
 
         .loading-sr-only {
