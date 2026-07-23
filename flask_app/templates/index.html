@@ -1115,8 +1115,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('bulk-delete-btn').addEventListener('click', function () {
+        var button = this;
         var ids = Array.from(selected);
-        if (ids.length === 0) return;
+        if (ids.length === 0 || button.disabled) return;
         Swal.fire({
             title: ids.length + ' ' + _('kaydı sil?'),
             text: _('Bu işlem geri alınamaz.'),
@@ -1134,34 +1135,46 @@ document.addEventListener('DOMContentLoaded', function () {
                 confirmButton: 'kasa-btn kasa-btn-danger',
                 cancelButton: 'kasa-btn kasa-btn-muted'
             }
-        }).then(function (res) {
-            if (res.isConfirmed) {
-                fetch('/api/bulk/delete', {
+        }).then(async function (res) {
+            if (!res.isConfirmed) return;
+            button.disabled = true;
+            try {
+                var response = await window.KASA_API_FETCH('/api/bulk/delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ids: ids })
-                }).then(function () { window.location.reload(); });
+                });
+                if (!response || !response.ok) throw new Error('bulk-delete-failed');
+                window.location.reload();
+            } catch (error) {
+                window.KASA_SHOW_WARNING_TOAST(_('Hata oluştu.'));
+            } finally {
+                button.disabled = false;
             }
         });
     });
 
-    document.getElementById('bulk-export-btn').addEventListener('click', function () {
+    document.getElementById('bulk-export-btn').addEventListener('click', async function () {
+        var button = this;
         var ids = Array.from(selected);
-        if (ids.length === 0) return;
-        fetch('/api/bulk/export', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: ids })
-        }).then(function (r) { return r.blob(); }).then(function (blob) {
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'toplu_export.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        });
+        if (ids.length === 0 || button.disabled) return;
+        button.disabled = true;
+        try {
+            var response = await window.KASA_API_FETCH('/api/bulk/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids })
+            });
+            if (!response || !response.ok) throw new Error('bulk-export-failed');
+            window.KASA_TRIGGER_BLOB_DOWNLOAD(
+                await response.blob(),
+                'toplu_export.json'
+            );
+        } catch (error) {
+            window.KASA_SHOW_WARNING_TOAST(_('Dışa aktarma başarısız oldu.'));
+        } finally {
+            button.disabled = false;
+        }
     });
 
     document.getElementById('bulk-category-btn').addEventListener('click', function () {
@@ -1172,17 +1185,26 @@ document.addEventListener('DOMContentLoaded', function () {
     window.kasaModalAc('bulkCategoryModal');
 });
 
-    document.getElementById('bulk-category-apply').addEventListener('click', function () {
+    document.getElementById('bulk-category-apply').addEventListener('click', async function () {
+        var button = this;
         var category = document.getElementById('bulk-category-input').value.trim();
         if (!category) { showToast({ text: _('Lütfen bir kategori girin.'), gravity: 'top' }); return; }
-        fetch('/api/bulk/category', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: window._bulkIds, category: category })
-        }).then(function (r) {
-            if (r.ok) { window.kasaModalKapat('bulkCategoryModal'); window.location.reload(); }
-            else { showToast(_('Hata oluştu.'), 'error'); }
-        });
+        if (button.disabled) return;
+        button.disabled = true;
+        try {
+            var response = await window.KASA_API_FETCH('/api/bulk/category', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: window._bulkIds, category: category })
+            });
+            if (!response || !response.ok) throw new Error('bulk-category-failed');
+            window.kasaModalKapat('bulkCategoryModal');
+            window.location.reload();
+        } catch (error) {
+            window.KASA_SHOW_WARNING_TOAST(_('Hata oluştu.'));
+        } finally {
+            button.disabled = false;
+        }
     });
 });
 

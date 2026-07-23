@@ -366,6 +366,18 @@ async function onAppReady() {
 
     if (mainWindow) {
       try {
+        const loadingLanguage = await mainWindow.webContents.executeJavaScript(
+          "localStorage.getItem('kasa-lang') || ''",
+          true
+        );
+        if (['tr', 'en'].includes(loadingLanguage)) {
+          await requestBackendJson('/settings/language', {
+            method: 'POST',
+            body: { language: loadingLanguage },
+          });
+        }
+      } catch (_) { /* Loading ekranı tercihi yoksa kayıtlı backend dili kullanılır. */ }
+      try {
         await mainWindow.webContents.executeJavaScript('transitionToApp()');
       } catch (_) { /* loading.html henüz yüklenmemiş olabilir */ }
       mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
@@ -419,6 +431,26 @@ function createWindow() {
       }
     } catch (_) {}
     return { action: 'deny' };
+  });
+
+  // Ana uygulama penceresinin yerel kasa arayüzünden ayrılmasını engelle.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch (_) {
+      event.preventDefault();
+      return;
+    }
+    const isLocalAppUrl = parsedUrl.protocol === `${PROTOCOL}:`
+      && parsedUrl.hostname === HOST
+      && Number(parsedUrl.port) === PORT;
+    if (isLocalAppUrl) return;
+
+    event.preventDefault();
+    if (['https:', 'http:', 'mailto:'].includes(parsedUrl.protocol)) {
+      shell.openExternal(url).catch(() => {});
+    }
   });
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
@@ -585,7 +617,7 @@ function startFlaskServer() {
 
     console.log(`Flask baslatiliyor: ${command} ${args.join(' ')} (${flaskHost}:${PORT})`);
 
-    flaskProcess = spawn(command, args, {
+    const spawnedProcess = spawn(command, args, {
       env: { ...process.env, APP_TOKEN,
              FLASK_SECRET_KEY: APP_TOKEN,
              APP_VERSION: app.getVersion(),
@@ -594,24 +626,35 @@ function startFlaskServer() {
              KASA_RESET_LAN_ON_START: resetSavedLanOnNextStart ? '1' : '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    flaskProcess = spawnedProcess;
     resetSavedLanOnNextStart = false;
+    let startupComplete = false;
 
     let stderrBuffer = '';
-    flaskProcess.stdout.on('data', () => {});
-    flaskProcess.stderr.on('data', (data) => {
+    spawnedProcess.stdout.on('data', () => {});
+    spawnedProcess.stderr.on('data', (data) => {
       stderrBuffer += data.toString();
       if (stderrBuffer.length > 4096) stderrBuffer = stderrBuffer.slice(-4096);
     });
 
-    flaskProcess.on('error', (err) =>
+    spawnedProcess.on('error', (err) =>
       reject(new Error(`Flask baslatilamadi (spawn hatası): ${err.message}\nKomut: ${command}`))
     );
-    flaskProcess.on('exit', (code) => {
-      if (code !== 0 && code !== null)
-        reject(new Error(`Flask beklenmedik cikis (kod ${code}):\n${stderrBuffer}`));
+    spawnedProcess.on('exit', (code, signal) => {
+      if (flaskProcess === spawnedProcess) flaskProcess = null;
+      const exitDetail = `kod ${code ?? 'yok'}, sinyal ${signal || 'yok'}`;
+      const error = new Error(`Flask beklenmedik cikis (${exitDetail}):\n${stderrBuffer}`);
+      if (!startupComplete) {
+        reject(error);
+      } else if (!isQuiting && !isRestartingFlask) {
+        showFriendlyFatalError('BCK', error, 'ŞifreKasam arka plan hizmeti beklenmedik şekilde durdu.');
+      }
     });
 
-    waitForPort(resolve, reject);
+    waitForPort(() => {
+      startupComplete = true;
+      resolve();
+    }, reject);
   });
 }
 
@@ -759,6 +802,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  isQuiting = true;
   shutdownFlask();
 });
 

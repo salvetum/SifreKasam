@@ -451,12 +451,25 @@ def _vault_initialized() -> bool:
 
 def _mark_vault_initialized():
     _set_setting('vault_initialized', 'true')
+
+def _write_vault_initialized_marker() -> None:
+    """DB commit tamamlandıktan sonra ilk kurulum işaretini atomik olarak yazar."""
     payload = {
         'initialized': True,
         'created_at': datetime.utcnow().isoformat(timespec='seconds') + 'Z',
     }
-    with open(VAULT_INIT_FILE, 'w', encoding='utf-8') as f:
-        json.dump(payload, f)
+    tmp_file = VAULT_INIT_FILE + '.tmp'
+    try:
+        with open(tmp_file, 'w', encoding='utf-8') as f:
+            json.dump(payload, f)
+        os.replace(tmp_file, VAULT_INIT_FILE)
+    except OSError as exc:
+        log.warning("Kasa kurulum işareti yazılamadı: %s", exc)
+        try:
+            if os.path.exists(tmp_file):
+                os.remove(tmp_file)
+        except OSError:
+            pass
 
 def _has_existing_vault_data() -> bool:
     try:
@@ -1190,6 +1203,7 @@ def login():
     if setting and setting.value:
         changed = False
         migration_committed = False
+        write_init_marker = False
         if not verify_master_password(setting.value, mp):
             _clear_vault_password()
             session.clear()
@@ -1208,6 +1222,7 @@ def login():
         if not _vault_initialized():
             _mark_vault_initialized()
             changed = True
+            write_init_marker = True
         try:
             if migrate_legacy_pbkdf2_salt(mp):
                 migration_committed = True
@@ -1223,6 +1238,8 @@ def login():
             ), 500
         if changed and not migration_committed:
             db.session.commit()
+        if write_init_marker:
+            _write_vault_initialized_marker()
     else:
         if _vault_initialized() or _has_existing_vault_data():
             log.error("Ana şifre kaydı bulunamadı; güvenlik nedeniyle yeniden kurulum engellendi.")
@@ -1238,7 +1255,17 @@ def login():
         # Yeni kasalarda metadata ilk kayıttan itibaren şifreli yazılır.
         _set_setting(RECORD_METADATA_SETTING, 'true')
         _mark_vault_initialized()
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            log.exception("İlk kasa kurulumu tamamlanamadı.")
+            return render_template(
+                'login.html',
+                error="İlk kurulum tamamlanamadı. Lütfen tekrar deneyin.",
+                first_setup=True,
+            ), 500
+        _write_vault_initialized_marker()
         if os.path.exists(TXT_FILE):
             migrate_txt_to_db(mp)
 
@@ -1329,6 +1356,35 @@ def _delete_records_and_history(record_ids: list[str]) -> int:
         Record.id.in_(record_ids)
     ).delete(synchronize_session=False)
 
+def _append_password_history(record_id: str, encrypted_password: str,
+                             fernet: Fernet) -> bool:
+    """Yalnızca önceki kayıttan farklı ve çözülebilir parolaları geçmişe ekler."""
+    if not encrypted_password:
+        return False
+    try:
+        password = strict_decrypt(fernet, encrypted_password)
+    except Exception:
+        log.warning("Çözülemeyen parola geçmişe eklenmedi: %s", record_id)
+        return False
+
+    latest = PasswordHistory.query.filter_by(record_id=record_id).order_by(
+        PasswordHistory.created_at.desc(),
+        PasswordHistory.id.desc(),
+    ).first()
+    if latest:
+        try:
+            latest_password = strict_decrypt(fernet, latest.encrypted_password)
+        except Exception:
+            latest_password = None
+        if latest_password is not None and latest_password == password:
+            return False
+
+    db.session.add(PasswordHistory(
+        record_id=record_id,
+        encrypted_password=encrypted_password,
+    ))
+    return True
+
 @app.route('/ekle', methods=['GET', 'POST'])
 @login_required
 def ekle_sayfasi():
@@ -1338,11 +1394,6 @@ def ekle_sayfasi():
         backup_database()
         new_record = Record(**fields)
         db.session.add(new_record)
-        if fields['encrypted_password']:
-            db.session.add(PasswordHistory(
-                record_id=fields['id'],
-                encrypted_password=fields['encrypted_password'],
-            ))
         db.session.commit()
         invalidate_vault_report_cache()
         return redirect(url_for('index'))
@@ -1359,10 +1410,7 @@ def duzenle_sayfasi(kayit_id):
         new_password = request.form.get('password', '')
         fields = _record_from_form(fernet, record_id=kayit_id)
         if r.encrypted_password and fields['encrypted_password'] and new_password != old_password:
-            db.session.add(PasswordHistory(
-                record_id=kayit_id,
-                encrypted_password=r.encrypted_password,
-            ))
+            _append_password_history(kayit_id, r.encrypted_password, fernet)
         backup_database()
         for key, val in fields.items():
             if key != 'id':
@@ -1412,12 +1460,22 @@ def pin_kayit(kayit_id):
 @login_required
 def get_gecmis(kayit_id):
     fernet = get_fernet()
+    record = db.get_or_404(Record, kayit_id)
+    current_password = safe_decrypt(fernet, record.encrypted_password)
     rows   = PasswordHistory.query.filter_by(record_id=kayit_id)\
                                   .order_by(PasswordHistory.created_at.desc()).all()
-    return jsonify([{
-        'password': safe_decrypt(fernet, r.encrypted_password),
-        'date':     r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else '',
-    } for r in rows])
+    history = []
+    previous_password = None
+    for row in rows:
+        password = safe_decrypt(fernet, row.encrypted_password)
+        if password == current_password or password == previous_password:
+            continue
+        history.append({
+            'password': password,
+            'date': row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '',
+        })
+        previous_password = password
+    return jsonify(history)
 
 @app.route('/api/record/<kayit_id>/password')
 @login_required

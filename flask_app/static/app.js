@@ -478,7 +478,10 @@ document.addEventListener('DOMContentLoaded', () => {
     state.trigger.setAttribute('aria-expanded', 'false');
     clearTimeout(state.closeTimer);
     state.closeTimer = setTimeout(() => {
-      if (!state.wrapper.classList.contains('is-open')) state.menu.hidden = true;
+      if (!state.wrapper.classList.contains('is-open')) {
+        state.menu.hidden = true;
+        state.layerHost?.classList.remove('has-open-select-layer');
+      }
     }, 140);
     if (restoreFocus) state.trigger.focus({ preventScroll: true });
   };
@@ -556,6 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
       closeTimer: 0,
       openRequested: false,
       host: wrapper.closest('.glass-sm, .settings-appearance-card, .vault-field'),
+      layerHost: wrapper.closest('.vault-form-panel'),
     };
     customSelectStates.push(state);
 
@@ -584,6 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
       menu.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
       state.host?.classList.add('has-open-select');
+      state.layerHost?.classList.add('has-open-select-layer');
       requestAnimationFrame(() => {
         if (!state.openRequested) return;
         wrapper.classList.add('is-open');
@@ -1094,6 +1099,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const showWarningToast = (text) => showToast({
     ...TOAST_BASE, text, role: 'alert', className: 'kasa-toast kasa-toast-warning',
   });
+
+  // Eski template scriptleri için tek ve tutarlı toast/API köprüsü.
+  window.showToast = (options, type = '') => {
+    const normalized = typeof options === 'string'
+      ? { ...TOAST_BASE, text: options }
+      : { ...TOAST_BASE, ...(options || {}) };
+    if (type === 'error' || normalized.type === 'error') {
+      normalized.role = 'alert';
+      normalized.className = 'kasa-toast kasa-toast-warning';
+    }
+    showToast(normalized);
+  };
+  window.KASA_API_FETCH = apiFetch;
+  window.KASA_SHOW_WARNING_TOAST = showWarningToast;
+  window.KASA_TRIGGER_BLOB_DOWNLOAD = triggerBlobDownload;
 
   window.addEventListener('kasa:vault-write-locked', (event) => {
     showWarningToast(
