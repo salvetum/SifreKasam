@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import stat
 import sys
 import tempfile
@@ -21,6 +22,47 @@ os.environ["XDG_CONFIG_HOME"] = str(RUNTIME_DIR)
 sys.path.insert(0, str(ROOT / "flask_app"))
 
 import app as app_module  # noqa: E402
+
+
+class ContentSecurityPolicyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+
+    def test_csp_uses_request_nonce_without_unsafe_inline(self) -> None:
+        response = self.client.get('/login')
+        policy = response.headers.get('Content-Security-Policy', '')
+        nonce_match = re.search(r"script-src 'self' 'nonce-([^']+)'", policy)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("'unsafe-inline'", policy)
+        self.assertIsNotNone(nonce_match)
+        self.assertIn(f"style-src 'self' 'nonce-{nonce_match.group(1)}'", policy)
+        self.assertIn("script-src-attr 'none'", policy)
+        self.assertIn("style-src-attr 'none'", policy)
+
+        html = response.get_data(as_text=True)
+        nonce_attribute = f'nonce="{nonce_match.group(1)}"'
+        self.assertIn('window.LANG', html)
+        self.assertIn('window.TRANSLATIONS', html)
+        self.assertTrue(all(nonce_attribute in tag for tag in re.findall(r'<script\b[^>]*>', html)))
+        self.assertTrue(all(nonce_attribute in tag for tag in re.findall(r'<style\b[^>]*>', html)))
+
+    def test_csp_nonce_changes_for_each_request(self) -> None:
+        first = self.client.get('/login').headers['Content-Security-Policy']
+        second = self.client.get('/login').headers['Content-Security-Policy']
+        first_nonce = re.search(r"'nonce-([^']+)'", first).group(1)
+        second_nonce = re.search(r"'nonce-([^']+)'", second).group(1)
+
+        self.assertNotEqual(first_nonce, second_nonce)
+
+    def test_first_setup_guidance_is_rendered_only_for_new_vaults(self) -> None:
+        with patch.object(app_module, "_is_first_setup", return_value=True):
+            first_setup_html = self.client.get('/login').get_data(as_text=True)
+        with patch.object(app_module, "_is_first_setup", return_value=False):
+            existing_vault_html = self.client.get('/login').get_data(as_text=True)
+
+        self.assertIn('id="first-setup-guidance"', first_setup_html)
+        self.assertNotIn('id="first-setup-guidance"', existing_vault_html)
 
 
 class SecurityUnitTests(unittest.TestCase):
@@ -86,6 +128,29 @@ class MetadataMigrationTests(unittest.TestCase):
         app_module.db.session.add(record)
         app_module.db.session.commit()
         return record.id
+
+    def test_first_setup_detection_fails_closed_for_existing_vaults(self) -> None:
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False):
+            self.assertTrue(app_module._is_first_setup())
+
+        app_module.db.session.add(app_module.Setting(
+            key="master_hash",
+            value=app_module.hash_master_password("existing-password"),
+        ))
+        app_module.db.session.commit()
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False):
+            self.assertFalse(app_module._is_first_setup())
+
+        app_module.Setting.query.filter_by(key="master_hash").delete()
+        app_module.db.session.commit()
+        with patch.object(app_module, "_vault_initialized", return_value=True), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False):
+            self.assertFalse(app_module._is_first_setup())
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=True):
+            self.assertFalse(app_module._is_first_setup())
 
     def test_plaintext_metadata_migration_encrypts_existing_records(self) -> None:
         record_id = self.add_plaintext_record()

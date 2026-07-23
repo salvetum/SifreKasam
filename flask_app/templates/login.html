@@ -3,7 +3,7 @@
 {% block page_shell_class %}entry-login-page-shell{% endblock %}
 
 {% block content %}
-<style>
+<style nonce="{{ csp_nonce }}">
     .entry-login-page-shell {
         width: 100%;
         max-width: none !important;
@@ -225,12 +225,63 @@
         margin-bottom: 1.25rem;
     }
 
-    .entry-login-footnote {
-        margin-top: 1rem;
+    .entry-login-card.is-first-setup {
+        width: min(430px, 100%);
+    }
+
+    .entry-first-setup-guide {
+        display: grid;
+        gap: 0.65rem;
+        margin-bottom: 1rem;
+        padding: 0.9rem;
+        border: 1px solid rgba(var(--accent-rgb), 0.24);
+        border-radius: 16px;
+        background:
+            radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.11), transparent 44%),
+            rgba(255,255,255,0.045);
         color: var(--text-muted);
         font-size: 0.74rem;
-        line-height: 1.6;
-        text-align: center;
+        line-height: 1.5;
+    }
+
+    .entry-first-setup-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        width: max-content;
+        color: var(--accent-2);
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .entry-first-setup-guide ul {
+        display: grid;
+        gap: 0.3rem;
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+
+    .entry-first-setup-optional {
+        margin: 0;
+        color: var(--text-muted);
+    }
+
+    .entry-first-setup-warning {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin: 0;
+        padding-top: 0.6rem;
+        border-top: 1px solid rgba(245,158,11,0.18);
+        color: #fcd34d;
+        font-weight: 650;
+    }
+
+    .entry-first-setup-warning i {
+        margin-top: 0.15rem;
+        flex: 0 0 auto;
     }
 
     [data-bs-theme="dark"] .entry-login-pill,
@@ -266,10 +317,6 @@
     [data-bs-theme="dark"] .entry-login-card-subtitle {
         color: rgba(226,232,240,0.78);
         font-weight: 500;
-    }
-
-    [data-bs-theme="dark"] .entry-login-footnote {
-        color: rgba(226,232,240,0.68);
     }
 
     [data-bs-theme="dark"] .entry-login-card .kasa-field {
@@ -486,6 +533,7 @@
     }
 </style>
 
+{% set first_setup_active = first_setup|default(false) %}
 <div class="entry-login-wrap">
     <main class="entry-login-shell">
         <section class="entry-login-info" aria-label="{{ _('Kasa') }}">
@@ -526,9 +574,13 @@
         </section>
 
         <section class="entry-login-panel" aria-labelledby="login-card-title">
-            <div class="entry-login-card">
-                <h2 id="login-card-title" class="entry-login-card-title">{{ _('Kilidi Aç') }}</h2>
-                <p class="entry-login-card-subtitle">{{ _('Ana şifrenizle devam edin.') }}</p>
+            <div class="entry-login-card{% if first_setup_active %} is-first-setup{% endif %}">
+                <h2 id="login-card-title" class="entry-login-card-title">
+                    {{ _('Ana Şifre Oluştur') if first_setup_active else _('Kilidi Aç') }}
+                </h2>
+                <p class="entry-login-card-subtitle">
+                    {{ _('Yeni kasanız için bir ana şifre belirleyin.') if first_setup_active else _('Ana şifrenizle devam edin.') }}
+                </p>
 
                 {% if error %}
                 <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger"
@@ -541,27 +593,44 @@
                 </div>
                 {% endif %}
 
+                {% if first_setup_active %}
+                <aside class="entry-first-setup-guide" id="first-setup-guidance" aria-labelledby="first-setup-title">
+                    <strong class="entry-first-setup-kicker" id="first-setup-title">
+                        <i class="fa-solid fa-shield-halved"></i>{{ _('İlk Kurulum') }}
+                    </strong>
+                    <ul>
+                        <li>{{ _('En az 12 karakter kullanmanız tavsiye edilir.') }}</li>
+                        <li>{{ _('Büyük ve küçük harf, sayı ve özel karakterleri birlikte kullanın.') }}</li>
+                    </ul>
+                    <p class="entry-first-setup-optional">
+                        {{ _('Bu öneriler zorunlu değildir; ancak uzun ve benzersiz bir şifre kasanızı daha iyi korur.') }}
+                    </p>
+                    <p class="entry-first-setup-warning">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>{{ _('Şifrenizi güvenli bir yere yazmanız tavsiye edilir. Ana şifrenizi unutursanız kasayı kurtarmak mümkün değildir.') }}</span>
+                    </p>
+                </aside>
+                {% endif %}
+
                 <form method="POST" class="space-y-4" data-loading-form>
                     <label class="sr-only" for="master-password">{{ _('Ana Şifre') }}</label>
                     <input type="password" name="master_password" id="master-password"
                         class="w-full px-4 py-3 text-center text-lg tracking-widest kasa-field"
-                        placeholder="••••••••••••" required autofocus autocomplete="current-password"
-                        aria-describedby="login-footnote">
+                        placeholder="••••••••••••" required autofocus
+                        autocomplete="{{ 'new-password' if first_setup_active else 'current-password' }}"
+                        {% if first_setup_active %}aria-describedby="first-setup-guidance"{% endif %}>
 
                     <button type="submit" class="w-full kasa-btn kasa-btn-primary">
-                        <i class="fa-solid fa-unlock mr-2"></i>{{ _('Kilidi Aç') }}
+                        <i class="fa-solid {{ 'fa-key' if first_setup_active else 'fa-unlock' }} mr-2"></i>
+                        {{ _('Ana Şifreyi Oluştur') if first_setup_active else _('Kilidi Aç') }}
                     </button>
                 </form>
-
-                <p class="entry-login-footnote" id="login-footnote">
-                    {{ _('İlk kurulumda girdiğiniz şifre') }}<br>{{ _('otomatik olarak Ana Şifre olur.') }}
-                </p>
             </div>
         </section>
     </main>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 document.getElementById('login-language-select')?.addEventListener('change', function () {
     var lang = this.value;
     localStorage.setItem('kasa-lang', lang);

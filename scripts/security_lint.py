@@ -10,14 +10,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES_DIR = ROOT / "flask_app" / "templates"
 FIRST_PARTY_JAVASCRIPT = (ROOT / "flask_app" / "static" / "app.js",)
+CSP_SOURCE = ROOT / "flask_app" / "app.py"
 
 TEMPLATE_RULES = (
     (re.compile(r"\|\s*safe\b"), "Jinja |safe filtresi auto-escape korumasını devre dışı bırakır"),
+    (re.compile(r"\sstyle\s*="), "Inline style attribute yerine CSS sınıfı kullanın"),
+    (re.compile(r"\son[a-z]+\s*="), "Inline event handler yerine addEventListener kullanın"),
+    (re.compile(r"<script(?![^>]*\bnonce=)"), "Script etiketi request nonce değeri taşımalıdır"),
+    (re.compile(r"<style(?![^>]*\bnonce=)"), "Style etiketi request nonce değeri taşımalıdır"),
+)
+CSP_RULES = (
+    (re.compile(r"['\"]unsafe-inline['\"]"), "CSP içinde unsafe-inline kullanılamaz"),
 )
 JAVASCRIPT_RULES = (
     (re.compile(r"\.(?:innerHTML|outerHTML)\b"), "HTML string sink yerine textContent/DOM API kullanın"),
     (re.compile(r"\binsertAdjacentHTML\s*\("), "insertAdjacentHTML kullanıcı verisini XSS'e açabilir"),
     (re.compile(r"\bdocument\.write\s*\("), "document.write güvenli olmayan bir HTML sink'idir"),
+    (re.compile(r"\.style(?:\.|\s*=)"), "CSP style-src-attr koruması için classList veya nonce'lu stylesheet kullanın"),
+    (re.compile(r"setAttribute\s*\(\s*['\"]style['\"]"), "Dinamik style attribute CSP tarafından engellenir"),
 )
 
 
@@ -38,6 +48,7 @@ def main() -> int:
         findings.extend(scan_file(template_path, TEMPLATE_RULES + JAVASCRIPT_RULES))
     for javascript_path in FIRST_PARTY_JAVASCRIPT:
         findings.extend(scan_file(javascript_path, JAVASCRIPT_RULES))
+    findings.extend(scan_file(CSP_SOURCE, CSP_RULES))
 
     if findings:
         print("Güvenlik lint hataları:", file=sys.stderr)
