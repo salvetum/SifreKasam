@@ -293,5 +293,21 @@
   "Tasarruf modu": "Power-saving mode",
   "ŞifreKasam arka planda kaynak kullanımını azaltıyor.": "ŞifreKasam is reducing resource usage in the background.",
   "Tasarruf modundan çıkılıyor": "Leaving power-saving mode",
-  "Kartlar ve arayüz yeniden hazırlanıyor.": "Cards and the interface are being restored."
+  "Kartlar ve arayüz yeniden hazırlanıyor.": "Cards and the interface are being restored.",
+  "Renk seçiciyi aç": "Open color picker",
+  "Renk seçiciyi kapat": "Close color picker",
+  "Ton, doygunluk ve parlaklığı ayarlayın.": "Adjust hue, saturation, and brightness.",
+  "Ton": "Hue",
+  "Doygunluk": "Saturation",
+  "Parlaklık": "Brightness",
+  "Varsayılana Dön": "Reset to Default",
+  "Dosyayı buraya sürükleyin": "Drag your file here",
+  "veya bilgisayarınızdan seçin": "or choose it from your computer",
+  "Dosya Seç": "Choose File",
+  "Dosya seçilmedi": "No file selected",
+  "Yalnızca .kasa, .json veya .txt dosyaları içe aktarılabilir.": "Only .kasa, .json, or .txt files can be imported.",
+  "Dosya boyutu 5 MB sınırını aşıyor.": "The file exceeds the 5 MB size limit.",
+  "Dosya seçilemedi. Lütfen seçim düğmesini kullanın.": "The file could not be selected. Please use the choose button.",
+  "Bir dakika artır": "Increase by one minute",
+  "Bir dakika azalt": "Decrease by one minute"
 }
