@@ -1,12 +1,14 @@
 {
-  "name": "sifrekasam-v2.5.4",
+  "name": "sifrekasam-v2.5.5",
   "productName": "ŞifreKasam",
-  "version": "2.5.4",
+  "version": "2.5.5",
   "description": "ŞifreKasam masaüstü şifre yöneticisi",
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
+    "build:backend": "node scripts/build-backend.js",
+    "premake": "npm run build:backend",
     "make": "electron-forge make"
   },
   "keywords": [],

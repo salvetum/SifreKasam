@@ -10,10 +10,62 @@ const crypto = require('crypto');
 const kill   = require('tree-kill');
 const { spawn, spawnSync } = require('child_process');
 
+let fatalErrorShown = false;
+
+function createUserErrorCode(area, error) {
+  const detail = error instanceof Error
+    ? `${error.name}:${error.message}`
+    : String(error || 'unknown');
+  const suffix = crypto.createHash('sha256').update(`${area}:${detail}`).digest('hex').slice(0, 6).toUpperCase();
+  return `SK-${area}-${suffix}`;
+}
+
+function writeFatalDiagnostic(code, error) {
+  try {
+    const logsDir = app.getPath('logs');
+    fs.mkdirSync(logsDir, { recursive: true });
+    const detail = error instanceof Error ? (error.stack || error.message) : String(error || 'unknown');
+    fs.appendFileSync(
+      path.join(logsDir, 'sifrekasam-errors.log'),
+      `[${new Date().toISOString()}] ${code}\n${detail}\n\n`,
+      'utf8'
+    );
+  } catch (_) {}
+}
+
+function showFriendlyFatalError(area, error, message = 'Kurulum veya başlatma işlemi tamamlanamadı.') {
+  if (fatalErrorShown) return;
+  fatalErrorShown = true;
+  const code = createUserErrorCode(area, error);
+  writeFatalDiagnostic(code, error);
+  console.error(`[${code}]`, error);
+
+  const showDialog = () => {
+    dialog.showMessageBoxSync({
+      type: 'error',
+      title: 'ŞifreKasam',
+      message,
+      detail: `Hata kodu: ${code}\n\nLütfen bu kodu geliştiriciye bildirin.`,
+      buttons: ['Tamam'],
+      defaultId: 0,
+      noLink: true,
+    });
+    app.exit(1);
+  };
+
+  if (app.isReady()) showDialog();
+  else app.whenReady().then(showDialog).catch(() => app.exit(1));
+}
+
+process.on('uncaughtException', (error) => showFriendlyFatalError('UCP', error));
+process.on('unhandledRejection', (reason) => showFriendlyFatalError('UPR', reason));
+
 const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam';
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.5',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.5',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.4',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.4',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.3',
@@ -96,6 +148,7 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
     'sifrekasam',
     'SifreKasam',
+    'sifrekasam-v2.5.5',
     'sifrekasam-v2.5.4',
     'sifrekasam-v2.5.3',
     'sifrekasam-v2.5.2',
@@ -257,6 +310,7 @@ let lanRuntimeEnabled = false;
 let resetSavedLanOnNextStart = true;
 let isRestartingFlask = false;
 let hasReportedLocalCertificateNoise = false;
+let rendererLowPowerRequested = false;
 
 app.commandLine.appendSwitch('disable-spell-checking');
 
@@ -291,8 +345,7 @@ if (!gotTheLock) {
   app.whenReady()
     .then(onAppReady)
     .catch((err) => {
-      dialog.showErrorBox('Başlatma Hatası', err.message);
-      app.quit();
+      showFriendlyFatalError('BAS', err);
     });
 }
 
@@ -314,8 +367,8 @@ async function onAppReady() {
     }
   } catch (err) {
     const isSquirrel = process.argv.some(arg => arg.startsWith('--squirrel-'));
-    if (!isSquirrel) dialog.showErrorBox('Sunucu Başlatılamadı', err.message);
-    app.quit();
+    if (isSquirrel) app.exit(1);
+    else showFriendlyFatalError('SRV', err, 'ŞifreKasam hizmeti başlatılamadı.');
   }
 }
 
@@ -344,6 +397,7 @@ function createWindow() {
       theme:        getSavedTheme(),
       glassEffects: getSavedGlassEffects() ? 'on' : 'off',
       glassQuality: getSavedGlassQuality(),
+      animations:   getSavedInterfaceAnimations() ? 'on' : 'off',
       lang:         getSavedLanguage(),
       accent:       getSavedAccentColor(),
       background:   getSavedBackgroundStyle(),
@@ -463,19 +517,29 @@ function createTray() {
 
 function showMainWindow() {
   if (!mainWindow) return;
-  setRendererLowPower(false);
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.setAlwaysOnTop(true);
   mainWindow.show();
+  setRendererLowPower(false);
   mainWindow.focus();
   mainWindow.setAlwaysOnTop(false);
 }
 
 function setRendererLowPower(enabled) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const value = enabled ? 'true' : 'false';
+  const nextState = Boolean(enabled);
+  const wasLowPower = rendererLowPowerRequested;
+  rendererLowPowerRequested = nextState;
+
+  if (!nextState && (wasLowPower || mainWindow.isVisible())
+      && typeof mainWindow.webContents.invalidate === 'function') {
+    mainWindow.webContents.invalidate();
+  }
+  const script = nextState
+    ? 'window.KASA_SET_LOW_POWER?.(true);'
+    : 'window.KASA_RESUME_RENDERER?.();';
   mainWindow.webContents
-    .executeJavaScript(`window.KASA_SET_LOW_POWER?.(${value});`, true)
+    .executeJavaScript(script, true)
     .catch(() => {});
 }
 
@@ -761,6 +825,13 @@ function getSavedGlassQuality() {
       ? data.glass_quality
       : 'normal';
   } catch (_) { return 'normal'; }
+}
+
+function getSavedInterfaceAnimations() {
+  try {
+    const data = readThemeFile();
+    return !GLASS_EFFECTS_FALSY.has(String(data?.interface_animations_enabled).toLowerCase());
+  } catch (_) { return true; }
 }
 
 function getSavedLanguage() {

@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.4 - Main JavaScript
+ * ŞifreKasam v2.5.5 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -258,6 +258,48 @@ document.addEventListener('DOMContentLoaded', () => {
   let idleLowPower = false;
   let heartbeatTimer = null;
   let idleLowPowerTimer = null;
+  let rendererResumeTimer = null;
+  const powerSaveOverlay = document.querySelector('.power-save-overlay');
+  const powerSaveTitle = powerSaveOverlay?.querySelector('[data-power-save-title]');
+  const powerSaveSubtitle = powerSaveOverlay?.querySelector('[data-power-save-subtitle]');
+  const pageShell = document.getElementById('kasa-page-shell');
+
+  const setPowerSaveOverlay = (active, restoring = false) => {
+    if (!powerSaveOverlay) return;
+    if (powerSaveTitle) {
+      powerSaveTitle.textContent = restoring
+        ? window._('Tasarruf modundan çıkılıyor')
+        : window._('Tasarruf modu');
+    }
+    if (powerSaveSubtitle) {
+      powerSaveSubtitle.textContent = restoring
+        ? window._('Kartlar ve arayüz yeniden hazırlanıyor.')
+        : window._('ŞifreKasam arka planda kaynak kullanımını azaltıyor.');
+    }
+    powerSaveOverlay.classList.toggle('is-active', active);
+    powerSaveOverlay.classList.toggle('is-restoring', active && restoring);
+    powerSaveOverlay.setAttribute('aria-hidden', String(!active));
+  };
+
+  const forceRendererRepaint = () => {
+    if (!pageShell) return;
+    const repaintTargets = [
+      document.getElementById('card-container'),
+      document.getElementById('stats-bar'),
+      document.querySelector('.sr-root'),
+      document.querySelector('.settings-workspace'),
+    ].filter(Boolean);
+
+    repaintTargets.forEach(target => { target.style.visibility = 'hidden'; });
+    pageShell.classList.remove('kasa-renderer-repaint');
+    void pageShell.offsetHeight;
+    requestAnimationFrame(() => {
+      repaintTargets.forEach(target => { target.style.removeProperty('visibility'); });
+      pageShell.classList.add('kasa-renderer-repaint');
+      window.dispatchEvent(new Event('resize'));
+      requestAnimationFrame(() => pageShell.classList.remove('kasa-renderer-repaint'));
+    });
+  };
 
   const stopIdleLowPowerTimer = () => {
     if (!idleLowPowerTimer) return;
@@ -295,11 +337,27 @@ document.addEventListener('DOMContentLoaded', () => {
     systemLowPower = Boolean(enabled);
     if (systemLowPower) {
       stopIdleLowPowerTimer();
+      clearTimeout(rendererResumeTimer);
+      setPowerSaveOverlay(true, false);
     } else {
       idleLowPower = false;
       scheduleIdleLowPower();
     }
     applyRendererLowPower();
+  };
+
+  const resumeRenderer = () => {
+    if (document.hidden) return;
+    clearTimeout(rendererResumeTimer);
+    setPowerSaveOverlay(true, true);
+    systemLowPower = false;
+    idleLowPower = false;
+    applyRendererLowPower();
+    scheduleIdleLowPower();
+    requestAnimationFrame(() => requestAnimationFrame(forceRendererRepaint));
+    rendererResumeTimer = window.setTimeout(() => {
+      setPowerSaveOverlay(false, false);
+    }, 420);
   };
 
   const sendHeartbeat = () => apiFetch('/heartbeat', { method: 'POST' });
@@ -319,11 +377,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.KASA_SET_LOW_POWER = setRendererLowPower;
+  window.KASA_RESUME_RENDERER = resumeRenderer;
   setRendererLowPower(document.hidden);
   sendHeartbeat();
   scheduleHeartbeat();
 
-  document.addEventListener('visibilitychange', () => setRendererLowPower(document.hidden));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) setRendererLowPower(true);
+    else resumeRenderer();
+  });
   IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
     window.addEventListener(eventName, resetIdleLowPower, { passive: true });
   });
@@ -331,6 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('pagehide', () => {
     stopHeartbeat();
     stopIdleLowPowerTimer();
+    clearTimeout(rendererResumeTimer);
     IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
       window.removeEventListener(eventName, resetIdleLowPower);
     });
@@ -390,70 +453,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const glassToggle = document.getElementById('glass-effects-toggle');
   const glassQualityCard = document.getElementById('glass-quality-card');
   const glassQualitySelect = document.getElementById('glass-quality-select');
-  let glassQualityAnimationTimer = null;
-
-  const clearGlassQualityInlineStyles = () => {
-    if (!glassQualityCard) return;
-    glassQualityCard.style.maxHeight = '';
-    glassQualityCard.style.opacity = '';
-    glassQualityCard.style.transform = '';
-  };
+  let glassQualitySyncFrame = 0;
 
   const syncGlassQualityVisibility = (enabled, animate = true) => {
     if (!glassQualityCard) return;
+    animate = animate
+      && document.documentElement.getAttribute('data-kasa-animations') !== 'off'
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const shouldShow = Boolean(enabled);
-    clearTimeout(glassQualityAnimationTimer);
+    cancelAnimationFrame(glassQualitySyncFrame);
     glassQualityCard.setAttribute('aria-hidden', String(!shouldShow));
     if (glassQualitySelect) {
       glassQualitySelect.disabled = !shouldShow;
       glassQualitySelect.tabIndex = shouldShow ? 0 : -1;
     }
 
-    if (shouldShow) {
-      glassQualityCard.hidden = false;
-      glassQualityCard.classList.remove('is-leaving');
-      if (!animate) {
-        glassQualityCard.classList.remove('is-entering');
-        clearGlassQualityInlineStyles();
-        return;
-      }
-      glassQualityCard.classList.add('is-entering');
-      glassQualityCard.style.maxHeight = '0px';
-      glassQualityCard.style.opacity = '0';
-      glassQualityCard.style.transform = 'translateY(-8px) scaleY(0.97)';
-      requestAnimationFrame(() => {
-        glassQualityCard.style.maxHeight = `${glassQualityCard.scrollHeight}px`;
-        glassQualityCard.style.opacity = '1';
-        glassQualityCard.style.transform = 'translateY(0) scaleY(1)';
+    glassQualityCard.classList.toggle('is-no-transition', !animate);
+    glassQualityCard.classList.toggle('is-collapsed', !shouldShow);
+    if (!animate) {
+      glassQualitySyncFrame = requestAnimationFrame(() => {
+        glassQualityCard.classList.remove('is-no-transition');
       });
-      glassQualityAnimationTimer = setTimeout(() => {
-        glassQualityCard.classList.remove('is-entering');
-        clearGlassQualityInlineStyles();
-      }, 280);
-      return;
     }
-
-    glassQualityCard.classList.remove('is-entering');
-    if (!animate || glassQualityCard.hidden) {
-      glassQualityCard.hidden = true;
-      glassQualityCard.classList.remove('is-leaving');
-      return;
-    }
-
-    glassQualityCard.style.maxHeight = `${glassQualityCard.scrollHeight}px`;
-    glassQualityCard.style.opacity = '1';
-    glassQualityCard.style.transform = 'translateY(0) scaleY(1)';
-    glassQualityCard.classList.add('is-leaving');
-    requestAnimationFrame(() => {
-      glassQualityCard.style.maxHeight = '0px';
-      glassQualityCard.style.opacity = '0';
-      glassQualityCard.style.transform = 'translateY(-8px) scaleY(0.97)';
-    });
-    glassQualityAnimationTimer = setTimeout(() => {
-      glassQualityCard.hidden = true;
-      glassQualityCard.classList.remove('is-leaving');
-      clearGlassQualityInlineStyles();
-    }, 260);
   };
 
   if (glassToggle) {
@@ -471,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const motionToggle = document.getElementById('animated-backgrounds-toggle');
+  const interfaceAnimationsToggle = document.getElementById('interface-animations-toggle');
   const gradientsToggle = document.getElementById('gradients-toggle');
 
   const setupThemeFeatureToggle = (toggle, attribute, storageKey, apiKey) => {
@@ -487,6 +509,12 @@ document.addEventListener('DOMContentLoaded', () => {
     'data-kasa-motion',
     'kasa-animated-backgrounds',
     'animated_backgrounds_enabled'
+  );
+  setupThemeFeatureToggle(
+    interfaceAnimationsToggle,
+    'data-kasa-animations',
+    'kasa-interface-animations',
+    'interface_animations_enabled'
   );
   setupThemeFeatureToggle(
     gradientsToggle,
@@ -571,6 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
           accent_color: next.accent,
           background_style: next.background,
           animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
+          interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
           gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
         });
       }, 250);
@@ -645,6 +674,10 @@ document.addEventListener('DOMContentLoaded', () => {
     lastToast?.hideToast();
     lastToast = Toastify(opts);
     lastToast.showToast();
+    if (lastToast.toastElement) {
+      lastToast.toastElement.setAttribute('role', opts.role || 'status');
+      lastToast.toastElement.setAttribute('aria-live', opts.role === 'alert' ? 'assertive' : 'polite');
+    }
   };
 
   const TOAST_BASE = {
@@ -658,15 +691,17 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const showSuccessToast = (text) => showToast({
-    ...TOAST_BASE, text,
+    ...TOAST_BASE, text, className: 'kasa-toast kasa-toast-success',
     style: {
       ...TOAST_BASE.style,
-      background: 'linear-gradient(to right, var(--success), #10b981)',
+      background: 'rgba(34, 197, 94, 0.15)',
+      border: '1px solid rgba(34, 197, 94, 0.30)',
+      color: '#bbf7d0',
     },
   });
 
   const showWarningToast = (text) => showToast({
-    ...TOAST_BASE, text,
+    ...TOAST_BASE, text, role: 'alert', className: 'kasa-toast kasa-toast-warning',
     style: {
       ...TOAST_BASE.style,
       background:  'rgba(239, 68, 68, 0.14)',
@@ -700,6 +735,59 @@ document.addEventListener('DOMContentLoaded', () => {
         exportButton.disabled = false;
       }
     });
+  });
+
+  const validationMessageFor = (field) => {
+    if (field.validity.valueMissing) return window._('Lütfen bu alanı doldurun.');
+    if (field.validity.typeMismatch || field.validity.badInput) {
+      return window._('Lütfen geçerli bir değer girin.');
+    }
+    if (field.validity.patternMismatch) {
+      return window._('Lütfen istenen biçime uygun bir değer girin.');
+    }
+    return window._('Bu alanı kontrol edin.');
+  };
+
+  const clearValidationState = (field) => {
+    field.classList.remove('kasa-field-invalid');
+    field.removeAttribute('aria-invalid');
+  };
+
+  // Native doğrulama balonları yerine temayla uyumlu toast ve alan vurgusu kullan.
+  document.querySelectorAll('form:not([data-native-validation])').forEach(form => {
+    form.noValidate = true;
+  });
+  document.addEventListener('invalid', event => event.preventDefault(), true);
+  document.addEventListener('submit', event => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.dataset.nativeValidation === 'true') return;
+    const fields = Array.from(form.elements).filter(field =>
+      typeof field.checkValidity === 'function' && !field.disabled
+    );
+    const invalidField = fields.find(field => !field.checkValidity());
+    if (!invalidField) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    invalidField.classList.add('kasa-field-invalid');
+    invalidField.setAttribute('aria-invalid', 'true');
+    invalidField.focus({ preventScroll: true });
+    const reduceMotion = document.documentElement.getAttribute('data-kasa-animations') === 'off'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    invalidField.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    showWarningToast(validationMessageFor(invalidField));
+  }, true);
+  document.addEventListener('input', event => {
+    const field = event.target;
+    if (field instanceof HTMLElement && field.classList.contains('kasa-field-invalid')) {
+      if (typeof field.checkValidity !== 'function' || field.checkValidity()) clearValidationState(field);
+    }
+  });
+  document.addEventListener('change', event => {
+    const field = event.target;
+    if (field instanceof HTMLElement && field.classList.contains('kasa-field-invalid')) {
+      if (typeof field.checkValidity !== 'function' || field.checkValidity()) clearValidationState(field);
+    }
   });
 
   const updateCheckButton = document.getElementById('update-check-btn');
@@ -778,6 +866,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const settingsForm = document.querySelector('[data-settings-form]');
   if (settingsForm) {
+    const settingsTabs = Array.from(settingsForm.querySelectorAll('[data-settings-tab]'));
+    const settingsPanels = Array.from(settingsForm.querySelectorAll('[data-settings-panel]'));
+
+    const activateSettingsTab = (tabName, focusTab = false) => {
+      const nextTab = settingsTabs.find(tab => tab.dataset.settingsTab === tabName);
+      const nextPanel = settingsPanels.find(panel => panel.dataset.settingsPanel === tabName);
+      if (!nextTab || !nextPanel) return;
+
+      settingsTabs.forEach(tab => {
+        const isActive = tab === nextTab;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', String(isActive));
+        tab.tabIndex = isActive ? 0 : -1;
+      });
+      settingsPanels.forEach(panel => {
+        const isActive = panel === nextPanel;
+        panel.hidden = !isActive;
+        panel.classList.toggle('active', isActive);
+      });
+      if (focusTab) nextTab.focus();
+    };
+
+    settingsTabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activateSettingsTab(tab.dataset.settingsTab));
+      tab.addEventListener('keydown', event => {
+        const keyOffsets = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+        let nextIndex = index;
+        if (event.key in keyOffsets) {
+          nextIndex = (index + keyOffsets[event.key] + settingsTabs.length) % settingsTabs.length;
+        } else if (event.key === 'Home') {
+          nextIndex = 0;
+        } else if (event.key === 'End') {
+          nextIndex = settingsTabs.length - 1;
+        } else {
+          return;
+        }
+        event.preventDefault();
+        activateSettingsTab(settingsTabs[nextIndex].dataset.settingsTab, true);
+      });
+    });
+
     const getSettingsSnapshot = () => {
       const entries = [];
       settingsForm.querySelectorAll('input[name], select[name], textarea[name]').forEach((field) => {
@@ -837,6 +966,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof data.animated_backgrounds_enabled === 'boolean' && motionToggle) {
           motionToggle.checked = data.animated_backgrounds_enabled;
           applyThemeFeature('data-kasa-motion', 'kasa-animated-backgrounds', data.animated_backgrounds_enabled);
+        }
+        if (typeof data.interface_animations_enabled === 'boolean' && interfaceAnimationsToggle) {
+          interfaceAnimationsToggle.checked = data.interface_animations_enabled;
+          applyThemeFeature('data-kasa-animations', 'kasa-interface-animations', data.interface_animations_enabled);
         }
         if (typeof data.gradients_enabled === 'boolean' && gradientsToggle) {
           gradientsToggle.checked = data.gradients_enabled;
@@ -1028,6 +1161,8 @@ document.addEventListener('DOMContentLoaded', () => {
   window.kasaModalKapat = (modalId) => {
     const modal = document.getElementById(modalId);
     if (!modal) return;
+    const transitionsDisabled = document.documentElement.getAttribute('data-kasa-animations') === 'off'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     modal.classList.remove('is-open');
     modal.classList.add('is-closing');
     setTimeout(() => {
@@ -1035,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
       modal.setAttribute('aria-hidden', 'true');
       if (!document.querySelector('.kasa-modal.is-visible'))
         document.body.style.overflow = '';
-    }, 180);
+    }, transitionsDisabled ? 0 : 280);
   };
 
   document.querySelectorAll('.kasa-modal').forEach(modal => {
@@ -1253,6 +1388,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── 8b. ÜRETİCİ GEÇMİŞİ ────────────────────────────────────────────────
 
   const GENERATOR_HISTORY_KEY = 'kasa-generator-history';
+  const GENERATED_RECORD_PASSWORD_KEY = 'kasa-generated-record-password';
   const MAX_HISTORY = 50;
 
   const getGeneratorHistory = () => {
@@ -1381,6 +1517,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalGeneratePassword = setupPasswordGenerator('passwordGeneratorModal', 'modal-');
   setupPasswordGenerator('pageGenerator', 'page-');
 
+  const pagePasswordInput = document.getElementById('page-password');
+  if (pagePasswordInput) {
+    let generatedPassword = '';
+    try {
+      generatedPassword = sessionStorage.getItem(GENERATED_RECORD_PASSWORD_KEY) || '';
+      sessionStorage.removeItem(GENERATED_RECORD_PASSWORD_KEY);
+    } catch {}
+    if (generatedPassword) {
+      pagePasswordInput.value = generatedPassword;
+      pagePasswordInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
   document.querySelector('[data-kasa-modal="passwordGeneratorModal"]')?.addEventListener('click', () => {
     setTimeout(() => {
       const output = document.getElementById('modal-generated-password-display');
@@ -1403,10 +1552,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (val) copyToClipboard(val, modalCopyGenBtn.querySelector('i'));
   });
 
+  document.getElementById('modal-create-record-from-password')?.addEventListener('click', () => {
+    const modal = document.getElementById('passwordGeneratorModal');
+    const output = document.getElementById('modal-generated-password-display');
+    if (!output?.value) modalGeneratePassword?.();
+    if (!output?.value || !modal?.dataset.createRecordUrl) return;
+    try {
+      sessionStorage.setItem(GENERATED_RECORD_PASSWORD_KEY, output.value);
+      window.location.assign(modal.dataset.createRecordUrl);
+    } catch {
+      showWarningToast(window._('İşlem tamamlanamadı.'));
+    }
+  });
+
   // ─── 9. INDEX SAYFASI ─────────────────────────────────────────────────────
 
   if (document.getElementById('card-container')) {
 
+    const cardContainer = document.getElementById('card-container');
     const searchInput   = document.getElementById('search-input');
     const categoryBtns  = document.querySelectorAll('#category-filter button');
     const filterEmptyState = document.getElementById('filter-empty-state');
@@ -1444,15 +1607,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const goToCardPage = (requestedPage) => {
       const normalizedPage = String(requestedPage ?? '').trim();
-      if (!normalizedPage) return;
       const numericPage = Number(normalizedPage);
-      if (!Number.isFinite(numericPage)) return;
+      const validPage = normalizedPage
+        && Number.isInteger(numericPage)
+        && numericPage >= 1
+        && numericPage <= currentCardPageCount;
+      if (!validPage) {
+        pageJumpInput?.classList.add('kasa-field-invalid');
+        pageJumpInput?.setAttribute('aria-invalid', 'true');
+        pageJumpInput?.focus();
+        pageJumpInput?.select();
+        showWarningToast(
+          `${window._('Geçersiz sayfa.')} ${window._('Geçerli sayfa aralığı:')} 1–${currentCardPageCount}.`
+        );
+        return;
+      }
 
-      currentCardPage = Math.min(
-        Math.max(Math.trunc(numericPage), 1),
-        currentCardPageCount,
-      );
-      if (pageJumpInput) pageJumpInput.value = '';
+      currentCardPage = numericPage;
+      if (pageJumpInput) {
+        pageJumpInput.value = '';
+        pageJumpInput.classList.remove('kasa-field-invalid');
+        pageJumpInput.removeAttribute('aria-invalid');
+      }
       filterCards({ preservePage: true, animate: true, scrollToGrid: true });
     };
 
@@ -1491,7 +1667,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderPagination = (matchedCount, pageCount, startIndex, endIndex) => {
       if (!paginationNav || !paginationSummary || !pageNumbers) return;
 
-      const shouldShow = cardCache.length > CARD_PAGE_SIZE && matchedCount > 0;
+      const shouldShow = matchedCount > CARD_PAGE_SIZE;
       paginationNav.hidden = !shouldShow;
       currentCardPageCount = pageCount;
       if (pageJumpInput) pageJumpInput.max = String(pageCount);
@@ -1555,8 +1731,35 @@ document.addEventListener('DOMContentLoaded', () => {
       renderPagination(matchedCards.length, pageCount, startIndex, endIndex);
       window.dispatchEvent(new CustomEvent('kasa:cards-page-changed'));
       if (scrollToGrid) {
-        document.getElementById('card-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const reduceMotion = document.documentElement.getAttribute('data-kasa-animations') === 'off'
+          || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        document.getElementById('card-container')?.scrollIntoView({
+          behavior: reduceMotion ? 'auto' : 'smooth',
+          block: 'start',
+        });
       }
+    };
+
+    const animateCategoryTransition = (activeButton) => {
+      activeButton.classList.remove('filter-activating');
+      void activeButton.offsetWidth;
+      activeButton.classList.add('filter-activating');
+      activeButton.addEventListener('animationend', () => {
+        activeButton.classList.remove('filter-activating');
+      }, { once: true });
+
+      const motionDisabled = document.documentElement.dataset.kasaMotion === 'off'
+        || document.documentElement.dataset.kasaAnimations === 'off'
+        || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!cardContainer || motionDisabled) return;
+      cardContainer.getAnimations().forEach(animation => animation.cancel());
+      cardContainer.animate(
+        [
+          { opacity: 0.68, transform: 'translateY(5px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: 240, easing: 'cubic-bezier(0.16,1,0.3,1)' },
+      );
     };
 
     rebuildCardCache();
@@ -1584,9 +1787,14 @@ document.addEventListener('DOMContentLoaded', () => {
       event.preventDefault();
       submitPageJump();
     });
+    pageJumpInput?.addEventListener('input', () => {
+      pageJumpInput.classList.remove('kasa-field-invalid');
+      pageJumpInput.removeAttribute('aria-invalid');
+    });
 
     categoryBtns.forEach(btn => {
       btn.addEventListener('click', () => {
+        if (btn.classList.contains('active')) return;
         categoryBtns.forEach(b => {
           b.classList.remove('active', 'btn-primary');
           b.classList.add('btn-outline-secondary');
@@ -1595,7 +1803,8 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.classList.remove('btn-outline-secondary');
         btn.classList.add('active', 'btn-primary');
         btn.setAttribute('aria-pressed', 'true');
-        filterCards({ preservePage: false, animate: true });
+        filterCards({ preservePage: false, animate: false });
+        animateCategoryTransition(btn);
       });
     });
 
@@ -1625,14 +1834,15 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           const fragment = document.createDocumentFragment();
-          data.forEach(item => {
+          data.forEach((item, index) => {
             const div = document.createElement('div');
-            div.className = 'list-group-item bg-transparent text-light border-secondary';
+            div.className = 'list-group-item history-entry';
+            div.style.setProperty('--history-delay', `${Math.min(index, 8) * 24}ms`);
 
             const header = document.createElement('div');
-            header.className = 'd-flex justify-content-between align-items-center mb-1';
+            header.className = 'history-entry-header';
             const time = document.createElement('small');
-            time.className = 'text-info';
+            time.className = 'history-entry-time';
             time.append(createIcon('fa-regular fa-clock me-1'), document.createTextNode(item.date || ''));
             header.appendChild(time);
 
@@ -1647,6 +1857,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const toggleBtn = createIconButton(window._('Göster/Gizle'), 'fa-solid fa-eye');
+            toggleBtn.classList.add('history-icon-btn');
             toggleBtn.addEventListener('click', () => {
               const hidden = input.type === 'password';
               input.type = hidden ? 'text' : 'password';
@@ -1656,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const copyBtn = createIconButton(window._('Kopyala'), 'fa-solid fa-copy');
             copyBtn.addEventListener('click', () => copyToClipboard(input.value, copyBtn.querySelector('i')));
-            copyBtn.classList.add('copy-btn-history');
+            copyBtn.classList.add('history-icon-btn', 'copy-btn-history');
 
             body.append(input, toggleBtn, copyBtn);
             div.append(header, body);
@@ -1758,30 +1969,49 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.pin-form').forEach(form => {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const icon = form.querySelector('i');
-        if (icon) {
-          icon.style.transform = 'scale(1.2)';
-          setTimeout(() => { icon.style.transform = 'scale(1)'; }, 200);
-        }
+        const icon = form.querySelector('.card-star-icon');
+        const button = form.querySelector('.card-star-btn');
+        const wrapper = form.closest('.card-wrapper');
+        if (!icon || !button || !wrapper || form.dataset.pending === 'true') return;
+
+        const originalPinned = wrapper.dataset.pinned === 'true';
+        const applyPinnedState = (isPinned, animate = true) => {
+          wrapper.dataset.pinned = String(isPinned);
+          icon.className = isPinned
+            ? 'fa-solid fa-star card-star-icon'
+            : 'fa-regular fa-star card-star-icon card-star-unpinned';
+          icon.style.color = isPinned ? '#f59e0b' : '';
+          button.setAttribute('aria-pressed', String(isPinned));
+          button.classList.remove('is-favoriting', 'is-unfavoriting');
+          if (animate) {
+            void button.offsetWidth;
+            button.classList.add(isPinned ? 'is-favoriting' : 'is-unfavoriting');
+            window.setTimeout(() => {
+              button.classList.remove('is-favoriting', 'is-unfavoriting');
+            }, 560);
+          }
+          updateCachedCard(wrapper);
+        };
+
+        const refreshFavoritesFilter = () => {
+          const activeButton = document.querySelector('#category-filter button.active');
+          if (activeButton?.dataset.filter === 'favorites') {
+            filterCards({ preservePage: true, animate: true });
+          }
+        };
+
+        form.dataset.pending = 'true';
+        applyPinnedState(!originalPinned);
+        refreshFavoritesFilter();
         try {
           const response = await apiFetch(form.action, { method: 'POST' });
           if (!response?.ok) throw new Error('pin-failed');
-          const wrapper  = form.closest('.card-wrapper');
-          if (!wrapper || !icon) return;
-          const isPinned = wrapper.dataset.pinned === 'true';
-          wrapper.dataset.pinned = isPinned ? 'false' : 'true';
-          if (isPinned) {
-            icon.className = 'fa-regular fa-star card-star-icon card-star-unpinned';
-            icon.style.color = '';
-          } else {
-            icon.className   = 'fa-solid fa-star card-star-icon';
-            icon.style.color = '#f59e0b';
-          }
-          updateCachedCard(wrapper);
-          const activeBtn = document.querySelector('#category-filter button.active');
-          if (activeBtn?.dataset.filter === 'favorites') filterCards({ preservePage: true, animate: true });
         } catch {
+          applyPinnedState(originalPinned, false);
+          refreshFavoritesFilter();
           showWarningToast(window._('İşlem tamamlanamadı.'));
+        } finally {
+          delete form.dataset.pending;
         }
       });
     });

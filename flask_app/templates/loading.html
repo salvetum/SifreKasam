@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr" class="dark" data-bs-theme="dark" data-glass-effects="on" data-glass-quality="normal" data-kasa-background="aurora" data-kasa-motion="on" data-kasa-gradient="on">
+<html lang="tr" class="dark" data-bs-theme="dark" data-glass-effects="on" data-glass-quality="normal" data-kasa-background="aurora" data-kasa-motion="on" data-kasa-animations="on" data-kasa-gradient="on">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -76,6 +76,7 @@
                 ? (params.get('glassQuality') || localStorage.getItem('kasa-glass-quality'))
                 : 'normal';
             const motion = (params.get('motion') || localStorage.getItem('kasa-animated-backgrounds')) === 'off' ? 'off' : 'on';
+            const animations = (params.get('animations') || localStorage.getItem('kasa-interface-animations')) === 'off' ? 'off' : 'on';
             const gradients = (params.get('gradients') || localStorage.getItem('kasa-gradients')) === 'off' ? 'off' : 'on';
             const accent = normalizeHex(params.get('accent') || localStorage.getItem('kasa-accent'));
             const accent2 = mixColor(accent);
@@ -89,6 +90,7 @@
             document.documentElement.setAttribute('data-glass-quality', glassQuality);
             document.documentElement.setAttribute('data-kasa-background', background);
             document.documentElement.setAttribute('data-kasa-motion', motion);
+            document.documentElement.setAttribute('data-kasa-animations', animations);
             document.documentElement.setAttribute('data-kasa-gradient', gradients);
             document.documentElement.style.setProperty('--accent', accent);
             document.documentElement.style.setProperty('--accent-2', accent2);
@@ -99,6 +101,7 @@
             localStorage.setItem('kasa-glass-effects', glass);
             localStorage.setItem('kasa-glass-quality', glassQuality);
             localStorage.setItem('kasa-animated-backgrounds', motion);
+            localStorage.setItem('kasa-interface-animations', animations);
             localStorage.setItem('kasa-gradients', gradients);
             localStorage.setItem('kasa-accent', accent);
             localStorage.setItem('kasa-background', background);
@@ -597,6 +600,15 @@
                 border-left: 0;
                 border-top: 1px solid var(--line);
             }
+        }
+
+        [data-kasa-animations="off"] *,
+        [data-kasa-animations="off"] *::before,
+        [data-kasa-animations="off"] *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.001ms !important;
         }
 
         @media (prefers-reduced-motion: reduce) {

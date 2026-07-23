@@ -42,6 +42,11 @@
         document.documentElement.setAttribute('data-kasa-motion', normalizedMotion);
         localStorage.setItem('kasa-animated-backgrounds', normalizedMotion);
 
+        const storedAnimations = localStorage.getItem('kasa-interface-animations') || "{{ 'on' if INTERFACE_ANIMATIONS_ENABLED else 'off' }}";
+        const normalizedAnimations = storedAnimations === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-kasa-animations', normalizedAnimations);
+        localStorage.setItem('kasa-interface-animations', normalizedAnimations);
+
         const storedGradients = localStorage.getItem('kasa-gradients') || "{{ 'on' if GRADIENTS_ENABLED else 'off' }}";
         const normalizedGradients = storedGradients === 'off' ? 'off' : 'on';
         document.documentElement.setAttribute('data-kasa-gradient', normalizedGradients);
@@ -107,7 +112,7 @@
     <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.5.4 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.5.5 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -129,7 +134,7 @@
     <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='style.css') }}?v=40" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}?v=48" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -147,7 +152,18 @@
         </div>
     </div>
 
-    <div class="{% block page_shell_class %}max-w-6xl mx-auto px-4 py-10{% endblock %}">
+    <div class="power-save-overlay" role="status" aria-live="polite" aria-hidden="true">
+        <div class="power-save-card">
+            <div class="power-save-mark" aria-hidden="true"><i class="fa-solid fa-leaf"></i></div>
+            <div class="power-save-copy">
+                <strong data-power-save-title>{{ _('Tasarruf modu') }}</strong>
+                <span data-power-save-subtitle>{{ _('ŞifreKasam arka planda kaynak kullanımını azaltıyor.') }}</span>
+            </div>
+            <div class="power-save-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        </div>
+    </div>
+
+    <div id="kasa-page-shell" class="{% block page_shell_class %}max-w-6xl mx-auto px-4 py-10{% endblock %}">
         {% block content %}{% endblock %}
     </div>
 
@@ -156,7 +172,7 @@
     <script src="{{ url_for('static', filename='toastify.min.js') }}" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=8.2" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=9.0" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script>
@@ -245,7 +261,7 @@
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script>
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v40';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v48';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>

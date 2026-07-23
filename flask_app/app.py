@@ -47,7 +47,7 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.5.4")
+APP_VERSION = os.environ.get("APP_VERSION", "2.5.5")
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 SECRET_PLACEHOLDER = '__SECRET__'
@@ -61,6 +61,7 @@ VALID_BACKGROUND_STYLES = {'aurora', 'midnight', 'mesh', 'plain'}
 DEFAULT_GLASS_QUALITY = 'normal'
 VALID_GLASS_QUALITIES = {'low', 'normal', 'high'}
 DEFAULT_ANIMATED_BACKGROUNDS_ENABLED = True
+DEFAULT_INTERFACE_ANIMATIONS_ENABLED = True
 DEFAULT_GRADIENTS_ENABLED = True
 
 def _normalize_version(value: str | None) -> str:
@@ -743,6 +744,18 @@ def get_animated_backgrounds_enabled() -> bool:
         DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
     )
 
+def get_interface_animations_enabled() -> bool:
+    try:
+        value = _get_setting('interface_animations_enabled')
+        if value is not None:
+            return normalize_theme_option(value, DEFAULT_INTERFACE_ANIMATIONS_ENABLED)
+    except Exception:
+        pass
+    return normalize_theme_option(
+        _load_appearance_file().get('interface_animations_enabled'),
+        DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
+    )
+
 def get_gradients_enabled() -> bool:
     try:
         v = _get_setting('gradients_enabled')
@@ -791,6 +804,12 @@ def save_animated_backgrounds(value) -> bool:
     _save_appearance_file(animated_backgrounds_enabled=enabled)
     return enabled
 
+def save_interface_animations(value) -> bool:
+    enabled = normalize_theme_option(value, DEFAULT_INTERFACE_ANIMATIONS_ENABLED)
+    _set_setting('interface_animations_enabled', str(enabled).lower())
+    _save_appearance_file(interface_animations_enabled=enabled)
+    return enabled
+
 def save_gradients(value) -> bool:
     enabled = normalize_theme_option(value, DEFAULT_GRADIENTS_ENABLED)
     _set_setting('gradients_enabled', str(enabled).lower())
@@ -809,6 +828,7 @@ def inject_globals():
     background_style   = DEFAULT_BACKGROUND_STYLE
     glass_quality      = DEFAULT_GLASS_QUALITY
     animated_backgrounds = DEFAULT_ANIMATED_BACKGROUNDS_ENABLED
+    interface_animations = DEFAULT_INTERFACE_ANIMATIONS_ENABLED
     gradients_enabled  = DEFAULT_GRADIENTS_ENABLED
     lan_enabled        = False
     try:
@@ -824,6 +844,7 @@ def inject_globals():
         background_style = get_saved_background_style()
         glass_quality = get_glass_quality()
         animated_backgrounds = get_animated_backgrounds_enabled()
+        interface_animations = get_interface_animations_enabled()
         gradients_enabled = get_gradients_enabled()
         le           = _get_setting('lan_enabled')
         if le is not None:
@@ -843,6 +864,7 @@ def inject_globals():
         'BACKGROUND_STYLE':      background_style,
         'GLASS_QUALITY':         glass_quality,
         'ANIMATED_BACKGROUNDS_ENABLED': animated_backgrounds,
+        'INTERFACE_ANIMATIONS_ENABLED': interface_animations,
         'GRADIENTS_ENABLED':     gradients_enabled,
         'LAN_ENABLED':           lan_enabled,
         'CURRENT_LANG':          current_lang,
@@ -1464,6 +1486,8 @@ def save_settings():
         save_glass_quality(request.form.get('glass_quality'))
     save_animated_backgrounds(
         'true' if request.form.get('animated_backgrounds_enabled') else 'false')
+    save_interface_animations(
+        'true' if request.form.get('interface_animations_enabled') else 'false')
     save_gradients(
         'true' if request.form.get('gradients_enabled') else 'false')
     _set_setting('lan_enabled',
@@ -1477,6 +1501,7 @@ def save_settings():
             "background_style": get_saved_background_style(),
             "glass_quality": get_glass_quality(),
             "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
+            "interface_animations_enabled": get_interface_animations_enabled(),
             "gradients_enabled": get_gradients_enabled(),
             "lan_enabled": _lan_access_enabled(),
         })
@@ -1789,6 +1814,11 @@ def settings_appearance():
             if 'animated_backgrounds_enabled' in data
             else get_animated_backgrounds_enabled()
         )
+        interface_animations = (
+            save_interface_animations(data.get('interface_animations_enabled'))
+            if 'interface_animations_enabled' in data
+            else get_interface_animations_enabled()
+        )
         gradients = (
             save_gradients(data.get('gradients_enabled'))
             if 'gradients_enabled' in data
@@ -1801,6 +1831,7 @@ def settings_appearance():
             "background_style": background,
             "glass_quality": glass_quality,
             "animated_backgrounds_enabled": animated_backgrounds,
+            "interface_animations_enabled": interface_animations,
             "gradients_enabled": gradients,
         })
     return jsonify({
@@ -1808,6 +1839,7 @@ def settings_appearance():
         "background_style": get_saved_background_style(),
         "glass_quality": get_glass_quality(),
         "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
+        "interface_animations_enabled": get_interface_animations_enabled(),
         "gradients_enabled": get_gradients_enabled(),
     })
 
