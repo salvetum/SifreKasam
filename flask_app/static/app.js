@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.10 Beta.1 - Main JavaScript
+ * ŞifreKasam v2.5.10 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -595,6 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openCustomSelect(true);
       } else if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopPropagation();
         closeCustomSelect(state);
       }
     });
@@ -617,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (event.key === 'End') nextIndex = enabledOptions.length - 1;
         else if (event.key === 'Escape') {
           event.preventDefault();
+          event.stopPropagation();
           closeCustomSelect(state, true);
           return;
         } else {
@@ -1026,7 +1028,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && accentColorTrigger?.getAttribute('aria-expanded') === 'true') {
+        event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         setColorPickerOpen(false);
         accentColorTrigger.focus({ preventScroll: true });
       }
@@ -1683,6 +1687,29 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       kasaModalAc(btn.dataset.kasaModal);
     });
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+
+    const openSelectState = [...customSelectStates]
+      .reverse()
+      .find(state => state.openRequested || state.wrapper.classList.contains('is-open'));
+    if (openSelectState) {
+      event.preventDefault();
+      closeCustomSelect(openSelectState, true);
+      return;
+    }
+
+    const visibleModals = Array.from(
+      document.querySelectorAll('.kasa-modal.is-visible:not(.is-closing)')
+    );
+    if (!visibleModals.length) return;
+
+    const topModal = visibleModals.find(modal => modal.classList.contains('is-top-modal'))
+      || visibleModals[visibleModals.length - 1];
+    event.preventDefault();
+    window.kasaModalKapat(topModal.id);
   });
 
   // ─── 7. ŞİFRE GÜCÜ ───────────────────────────────────────────────────────
