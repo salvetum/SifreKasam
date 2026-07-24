@@ -9,9 +9,6 @@
         window.LANG = {{ CURRENT_LANG|tojson }};
         window.TRANSLATIONS = {{ TRANSLATIONS|tojson }};
         window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson }};
-        window.KASA_STATIC_URLS = {
-            zxcvbn: "{{ url_for('static', filename='zxcvbn.js') }}?v=1",
-        };
         window._ = function (key) {
             return window.TRANSLATIONS[key] || key;
         };
@@ -106,7 +103,11 @@
         );
 
         const entryParams = new URLSearchParams(window.location.search);
-        const skipFirstFade = entryParams.get('entry') === 'loading' || entryParams.get('skipFade') === '1';
+        const entryFromLoading = entryParams.get('entry') === 'loading';
+        const skipFirstFade = entryFromLoading || entryParams.get('skipFade') === '1';
+        if (entryFromLoading) {
+            document.documentElement.classList.add('kasa-entry-handoff');
+        }
         if (!sessionStorage.getItem('kasa-loaded')) {
             sessionStorage.setItem('kasa-loaded', '1');
             if (!skipFirstFade) {
@@ -124,7 +125,7 @@
     <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.5.9-beta.2 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.5.9-beta.3 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

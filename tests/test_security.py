@@ -22,6 +22,7 @@ os.environ["XDG_CONFIG_HOME"] = str(RUNTIME_DIR)
 sys.path.insert(0, str(ROOT / "flask_app"))
 
 import app as app_module  # noqa: E402
+from kasa_core.reports import build_vault_report_payloads  # noqa: E402
 
 
 class ContentSecurityPolicyTests(unittest.TestCase):
@@ -241,6 +242,41 @@ class MetadataMigrationTests(unittest.TestCase):
         app_module.db.session.commit()
         self.assertEqual(app_module.PasswordHistory.query.filter_by(
             record_id=record.id).count(), 2)
+
+    def test_health_report_uses_context_and_accepts_score_three(self) -> None:
+        record = app_module.Record(
+            id="strength-record",
+            type="Website",
+            category="Genel",
+            title=app_module.encrypt_metadata(self.fernet, "Acme Portal"),
+            website_url=app_module.encrypt_metadata(
+                self.fernet,
+                "https://acme.example",
+            ),
+            login=app_module.encrypt_metadata(self.fernet, "admin@acme.example"),
+            encrypted_password=app_module.safe_encrypt(
+                self.fernet,
+                "AcmePortal-2026!",
+            ),
+        )
+        app_module.db.session.add(record)
+        app_module.db.session.commit()
+        received_inputs = []
+
+        def score_password(password: str, user_inputs: object) -> int:
+            received_inputs.extend(user_inputs)
+            return 3
+
+        stats, health = build_vault_report_payloads(
+            self.fernet,
+            score_password,
+        )
+
+        self.assertEqual(stats["zayif"], 0)
+        self.assertEqual(health["zayif"], [])
+        self.assertIn("Acme Portal", received_inputs)
+        self.assertIn("https://acme.example", received_inputs)
+        self.assertIn("admin@acme.example", received_inputs)
 
     def test_legacy_salt_migration_preserves_and_encrypts_metadata(self) -> None:
         master_password = "legacy-master-password"

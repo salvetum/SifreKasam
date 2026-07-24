@@ -1,48 +1,10 @@
 /**
- * ŞifreKasam v2.5.9-beta.2 - Main JavaScript
+ * ŞifreKasam v2.5.9-beta.3 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
 
   // ─── SABİTLER & YARDIMCILAR ───────────────────────────────────────────────
-
-  const scriptLoadCache = new Map();
-
-  const loadScriptOnce = (src) => {
-    if (!src) return Promise.reject(new Error('missing-script-src'));
-    if (scriptLoadCache.has(src)) return scriptLoadCache.get(src);
-
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing?.dataset.loaded === 'true') return Promise.resolve(existing);
-
-    const promise = new Promise((resolve, reject) => {
-      const script = existing || document.createElement('script');
-      script.src = src;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        script.dataset.loaded = 'true';
-        resolve(script);
-      };
-      script.onerror = () => reject(new Error(`script-load-failed:${src}`));
-      if (!existing) document.head.appendChild(script);
-    });
-
-    scriptLoadCache.set(src, promise);
-    promise.catch(() => scriptLoadCache.delete(src));
-    return promise;
-  };
-
-  const ensureZxcvbn = async () => {
-    if (typeof zxcvbn !== 'undefined') return true;
-    try {
-      await loadScriptOnce(window.KASA_STATIC_URLS?.zxcvbn || '/static/zxcvbn.js');
-      return typeof zxcvbn !== 'undefined';
-    } catch (err) {
-      console.error('zxcvbn load failed:', err);
-      return false;
-    }
-  };
 
   const notifyVaultWriteLocked = async (response) => {
     if (!response || ![409, 423].includes(response.status)) return;
@@ -489,13 +451,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!state || (!state.openRequested && !state.wrapper.classList.contains('is-open'))) return;
     state.openRequested = false;
     state.wrapper.classList.remove('is-open');
-    state.host?.classList.remove('has-open-select');
     state.trigger.setAttribute('aria-expanded', 'false');
     clearTimeout(state.closeTimer);
     state.closeTimer = setTimeout(() => {
       if (!state.wrapper.classList.contains('is-open')) {
         state.menu.hidden = true;
         state.wrapper.classList.remove('opens-upward');
+        state.host?.classList.remove('has-open-select');
         state.layerHosts.forEach((layerHost) => {
           if (!layerHost.querySelector('.kasa-custom-select.is-open')) {
             layerHost.classList.remove('has-open-select-layer');
@@ -1749,46 +1711,105 @@ document.addEventListener('DOMContentLoaded', () => {
       .trim();
 
   const STRENGTH_LEVELS = [
-    { className: 'strength-level-0', text: 'Çok Zayıf' },
-    { className: 'strength-level-1', text: 'Zayıf' },
-    { className: 'strength-level-2', text: 'Orta' },
-    { className: 'strength-level-3', text: 'Güçlü' },
-    { className: 'strength-level-4', text: 'Çok Güçlü' },
+    { className: 'strength-level-0', textKey: 'Çok Zayıf' },
+    { className: 'strength-level-1', textKey: 'Zayıf' },
+    { className: 'strength-level-2', textKey: 'Orta' },
+    { className: 'strength-level-3', textKey: 'Güçlü' },
+    { className: 'strength-level-4', textKey: 'Çok Güçlü' },
   ];
   const STRENGTH_CLASS_NAMES = STRENGTH_LEVELS.map(level => level.className);
+  const STRENGTH_REQUIREMENT_LABELS = {
+    min_length: 'en az 12 karakter',
+    lowercase: 'küçük harf',
+    uppercase: 'büyük harf',
+    number: 'sayı',
+    symbol: 'sembol',
+  };
+  const strengthMeterStates = new WeakMap();
 
-  window.updateStrengthMeter = async (password, barEl, labelEl) => {
+  window.updateStrengthMeter = (password, barEl, labelEl, userInputs = []) => {
     if (!barEl || !labelEl) return;
+    const previousState = strengthMeterStates.get(labelEl);
+    if (previousState?.timer) clearTimeout(previousState.timer);
+    const requestId = (previousState?.requestId || 0) + 1;
     barEl.classList.remove(...STRENGTH_CLASS_NAMES);
     if (!password) {
       labelEl.innerText = '';
+      strengthMeterStates.set(labelEl, { requestId, timer: 0 });
       return;
     }
-    if (typeof zxcvbn === 'undefined') {
-      labelEl.innerText = window._('Analiz hazırlanıyor…');
-      const loaded = await ensureZxcvbn();
-      if (!loaded) {
-        labelEl.innerText = window._('Analiz kullanılamıyor');
-        return;
-      }
-    }
-    const { score, crack_times_display } = zxcvbn(password);
-    const level     = STRENGTH_LEVELS[score];
-    const crackTime = translateTime(crack_times_display.offline_slow_hashing_1e4_per_second);
 
-    barEl.classList.add(level.className);
-    labelEl.innerText = crackTime
-      ? `${level.text} · ${window._('tahmini dayanım:')} ${crackTime}`
-      : level.text;
+    labelEl.innerText = window._('Analiz hazırlanıyor…');
+    const timer = setTimeout(async () => {
+      try {
+        const result = await apiJson('/api/password-strength', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password,
+            user_inputs: Array.isArray(userInputs) ? userInputs : [],
+          }),
+        });
+        if (strengthMeterStates.get(labelEl)?.requestId !== requestId) return;
+
+        const score = Math.max(0, Math.min(4, Number(result.score) || 0));
+        const level = STRENGTH_LEVELS[score];
+        const rawCrackTime = String(result.crack_time || '');
+        const crackTime = window.LANG === 'tr'
+          ? translateTime(rawCrackTime)
+          : rawCrackTime;
+        const missingRequirements = Array.isArray(result.missing_requirements)
+          ? result.missing_requirements
+            .map(requirement => STRENGTH_REQUIREMENT_LABELS[requirement])
+            .filter(Boolean)
+          : [];
+
+        barEl.classList.add(level.className);
+        if (missingRequirements.length && score < 3) {
+          const missingLabels = missingRequirements
+            .map(requirement => window._(requirement))
+            .join(', ');
+          labelEl.innerText = `${window._(level.textKey)} · ${window._('Eksik:')} ${missingLabels}`;
+        } else {
+          labelEl.innerText = crackTime
+            ? `${window._(level.textKey)} · ${window._('tahmini dayanım:')} ${crackTime}`
+            : window._(level.textKey);
+        }
+      } catch {
+        if (strengthMeterStates.get(labelEl)?.requestId !== requestId) return;
+        labelEl.innerText = window._('Analiz kullanılamıyor');
+      }
+    }, 120);
+
+    strengthMeterStates.set(labelEl, { requestId, timer });
   };
 
   const pagePassword  = document.getElementById('page-password');
   const strengthBar   = document.getElementById('password-strength-bar');
   const strengthText  = document.getElementById('password-strength-text');
   if (pagePassword && strengthBar && strengthText) {
-    pagePassword.addEventListener('input', () =>
-      void window.updateStrengthMeter(pagePassword.value, strengthBar, strengthText));
-    void window.updateStrengthMeter(pagePassword.value, strengthBar, strengthText);
+    const strengthContextFields = ['isim', 'login', 'website_url']
+      .map(fieldId => document.getElementById(fieldId))
+      .filter(Boolean);
+    const updatePagePasswordStrength = () => {
+      const userInputs = strengthContextFields
+        .map(field => field.value)
+        .filter(Boolean);
+      window.updateStrengthMeter(
+        pagePassword.value,
+        strengthBar,
+        strengthText,
+        userInputs,
+      );
+    };
+
+    pagePassword.addEventListener('input', updatePagePasswordStrength);
+    strengthContextFields.forEach(field => {
+      field.addEventListener('input', () => {
+        if (pagePassword.value) updatePagePasswordStrength();
+      });
+    });
+    updatePagePasswordStrength();
   }
 
   // ─── 8. ŞİFRE ÜRETECİ ────────────────────────────────────────────────────
@@ -1886,7 +1907,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const modalBar   = $('strength-bar');
       const modalLabel = $('strength-label');
       if (modalBar && modalLabel && typeof window.updateStrengthMeter === 'function')
-        void window.updateStrengthMeter(password, modalBar, modalLabel);
+        window.updateStrengthMeter(password, modalBar, modalLabel);
 
       if (typeof addToGeneratorHistory === 'function') addToGeneratorHistory(password);
       if (containerId !== 'pageGenerator') {
@@ -2452,6 +2473,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.delete-form').forEach(form => {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (form.dataset.pending === 'true') return;
         const { isConfirmed } = await Swal.fire({
           ...SWAL_BASE,
           title: window._('Emin misiniz?'),
@@ -2463,16 +2485,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (!isConfirmed) return;
         const wrapper = form.closest('.card-wrapper');
+        form.dataset.pending = 'true';
         wrapper?.classList.add('is-removing');
+        const removalReady = new Promise(resolve => {
+          setTimeout(resolve, wrapper ? 180 : 0);
+        });
         try {
-          const response = await apiFetch(form.action, { method: 'POST' });
+          const response = await apiFetch(form.action, {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+          });
           if (!response?.ok) throw new Error('delete-failed');
           if (wrapper) {
-            setTimeout(() => {
-              wrapper.remove();
-              rebuildCardCache();
-              filterCards({ preservePage: true, animate: true });
-            }, 300);
+            await removalReady;
+            wrapper.remove();
+            rebuildCardCache();
+            filterCards({ preservePage: true, animate: true });
           }
           showToast({
             ...TOAST_BASE,
@@ -2483,6 +2511,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {
           wrapper?.classList.remove('is-removing');
           showWarningToast(window._('Silme işlemi başarısız oldu.'));
+        } finally {
+          delete form.dataset.pending;
         }
       });
     });

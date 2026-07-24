@@ -17,6 +17,11 @@
   "Ana şifre boş olamaz.": "Master password cannot be empty.",
   "Analiz hazırlanıyor…": "Preparing analysis…",
   "Analiz kullanılamıyor": "Analysis unavailable",
+  "Çok Zayıf": "Very Weak",
+  "Zayıf": "Weak",
+  "Orta": "Fair",
+  "Güçlü": "Strong",
+  "Çok Güçlü": "Very Strong",
   "Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin.": "Too many failed attempts. Try again in {seconds} seconds.",
   "Yükleniyor": "Loading",
   "Yükleniyor...": "Loading...",
@@ -308,5 +313,11 @@
   "Dosya boyutu 5 MB sınırını aşıyor.": "The file exceeds the 5 MB size limit.",
   "Dosya seçilemedi. Lütfen seçim düğmesini kullanın.": "The file could not be selected. Please use the choose button.",
   "Bir dakika artır": "Increase by one minute",
-  "Bir dakika azalt": "Decrease by one minute"
+  "Bir dakika azalt": "Decrease by one minute",
+  "Eksik:": "Missing:",
+  "en az 12 karakter": "at least 12 characters",
+  "küçük harf": "lowercase letter",
+  "büyük harf": "uppercase letter",
+  "sayı": "number",
+  "sembol": "symbol"
 }

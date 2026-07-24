@@ -61,8 +61,8 @@ class ImportExportServiceTests(unittest.TestCase):
 
 class VersioningServiceTests(unittest.TestCase):
     def test_beta_version_compares_by_numeric_release(self) -> None:
-        self.assertTrue(is_newer_version("v2.6.0", "2.5.9-beta.2"))
-        self.assertFalse(is_newer_version("v2.5.9", "2.5.9-beta.2"))
+        self.assertTrue(is_newer_version("v2.6.0", "2.5.9-beta.3"))
+        self.assertFalse(is_newer_version("v2.5.9", "2.5.9-beta.3"))
 
 
 if __name__ == "__main__":
