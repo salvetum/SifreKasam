@@ -1,7 +1,7 @@
 {
-  "name": "sifrekasam-v2.5.10",
+  "name": "sifrekasam-v2.5.11",
   "productName": "ŞifreKasam",
-  "version": "2.5.10",
+  "version": "2.5.11",
   "description": "ŞifreKasam masaüstü şifre yöneticisi",
   "main": "main.js",
   "scripts": {
