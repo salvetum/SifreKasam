@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.5.8 — Main Stylesheet
+   ŞifreKasam v2.5.9-beta — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -737,8 +737,15 @@ html[data-kasa-animations="off"] *::after {
     border-radius: 20px;
 }
 
-.vault-form-panel.has-open-select-layer {
+.vault-form-panel.has-open-select-layer,
+.settings-panel.has-open-select-layer {
+    position: relative;
     z-index: 100;
+    overflow: visible;
+}
+
+.settings-body.has-open-select-layer {
+    overflow: visible;
 }
 
 .vault-section-head {
@@ -3168,6 +3175,7 @@ textarea.kasa-field {
 .has-open-select {
     position: relative;
     z-index: 90;
+    overflow: visible !important;
 }
 
 .kasa-custom-select-source {
@@ -3250,7 +3258,9 @@ textarea.kasa-field {
     display: grid;
     gap: 0.25rem;
     min-width: max(100%, 150px);
+    max-height: min(260px, 38vh);
     padding: 0.38rem;
+    overflow-y: auto;
     border: 1px solid rgba(var(--accent-rgb), 0.28);
     border-radius: 15px;
     background:
@@ -3261,6 +3271,13 @@ textarea.kasa-field {
     transform: translateY(-6px) scale(0.985);
     transform-origin: top;
     transition: opacity 140ms ease, transform 180ms var(--ease-out);
+}
+
+.kasa-custom-select.opens-upward .kasa-custom-select-menu {
+    top: auto;
+    bottom: calc(100% + 0.42rem);
+    transform: translateY(6px) scale(0.985);
+    transform-origin: bottom;
 }
 
 .kasa-custom-select.is-open .kasa-custom-select-menu {
@@ -4982,10 +4999,54 @@ html[data-kasa-motion="on"] .appearance-preview {
 }
 
 .generator-options-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-color: rgba(var(--accent-rgb), 0.24);
     background:
         radial-gradient(ellipse at left center, rgba(var(--accent-rgb), 0.16), transparent 44%),
         radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
         rgba(255,255,255,0.045);
+}
+
+.generator-options-card::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    inset: 0 auto 0 0;
+    width: 4px;
+    border-radius: inherit;
+    background: linear-gradient(180deg, var(--accent), var(--accent-2));
+    box-shadow: 9px 0 28px rgba(var(--accent-rgb), 0.38);
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.generator-options-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+.generator-title-animated {
+    background:
+        linear-gradient(
+            100deg,
+            var(--accent) 0%,
+            var(--accent-2) 34%,
+            color-mix(in srgb, var(--accent) 62%, #ffffff) 52%,
+            var(--accent-2) 68%,
+            var(--accent) 100%
+        );
+    background-size: 240% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: generatorTitleFlow 3.4s ease-in-out infinite alternate;
+}
+
+@keyframes generatorTitleFlow {
+    from { background-position: 0% 50%; }
+    to { background-position: 100% 50%; }
 }
 
 .generator-output-kicker i,
@@ -5076,6 +5137,42 @@ html[data-kasa-motion="on"] .appearance-preview {
     background: var(--accent);
     box-shadow: 0 3px 12px rgba(var(--accent-rgb), 0.38);
     cursor: grab;
+}
+
+/* === Native Control Polish === */
+input.kasa-field[type="date"] {
+    color-scheme: dark;
+}
+
+[data-bs-theme="light"] input.kasa-field[type="date"] {
+    color-scheme: light;
+}
+
+input.kasa-field[type="date"]::-webkit-calendar-picker-indicator {
+    padding: 0.38rem;
+    border-radius: 9px;
+    background-color: rgba(var(--accent-rgb), 0.10);
+    cursor: pointer;
+    opacity: 0.82;
+    transition:
+        opacity var(--motion-fast) ease,
+        background-color var(--motion-fast) ease,
+        transform var(--motion-fast) var(--ease-out);
+}
+
+input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
+    background-color: rgba(var(--accent-rgb), 0.18);
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.kasa-field:-webkit-autofill,
+.kasa-field:-webkit-autofill:hover,
+.kasa-field:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    box-shadow: 0 0 0 1000px var(--bg-2) inset !important;
+    transition: background-color 9999s ease-out;
 }
 
 .generator-option-grid label {

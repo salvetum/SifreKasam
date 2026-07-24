@@ -471,6 +471,46 @@
         color: var(--text);
     }
 
+    .entry-language-box {
+        overflow: visible;
+    }
+
+    .entry-language-box .kasa-custom-select {
+        width: 116px;
+    }
+
+    .entry-language-box .kasa-custom-select-trigger {
+        min-height: 30px;
+        grid-template-columns: minmax(0, 1fr) 26px;
+        padding: 0.25rem 0 0.25rem 0.55rem;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .entry-language-box .kasa-custom-select-trigger:hover,
+    .entry-language-box .kasa-custom-select-trigger[aria-expanded="true"],
+    .entry-language-box .kasa-custom-select-trigger:focus-visible {
+        background: rgba(var(--accent-rgb), 0.12);
+        box-shadow: none;
+    }
+
+    .entry-language-box .kasa-custom-select-trigger > i {
+        width: 26px;
+        height: 26px;
+    }
+
+    .entry-language-box .kasa-custom-select-value {
+        font-size: 0.76rem;
+    }
+
+    .entry-language-box .kasa-custom-select-menu {
+        right: 0;
+        left: auto;
+        min-width: 144px;
+    }
+
     .entry-login-mark {
         width: 88px;
         height: 88px;
@@ -543,16 +583,16 @@
                     <span>{{ _('Güvenli alan hazır') }}</span>
                 </div>
 
-                <label class="entry-language-box" for="login-language-select">
-                    <span>{{ _('Dil') }}</span>
-                    <select id="login-language-select" aria-label="{{ _('Dil') }}">
+                <div class="entry-language-box">
+                    <span id="login-language-label">{{ _('Dil') }}</span>
+                    <select id="login-language-select" aria-labelledby="login-language-label" data-custom-select>
                         {% for lang in AVAILABLE_LANGS %}
                         <option value="{{ lang.code }}" {% if lang.code == CURRENT_LANG %}selected{% endif %}>
                             {{ lang.name }}
                         </option>
                         {% endfor %}
                     </select>
-                </label>
+                </div>
             </div>
 
             <div>
