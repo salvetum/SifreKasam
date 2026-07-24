@@ -107,7 +107,7 @@
         </div>
         </div>
         <div class="record-search-wrap">
-            <label for="search-input" class="visually-hidden">{{ _('Kayıt ara') }}</label>
+            <label for="search-input" class="sr-only">{{ _('Kayıt ara') }}</label>
             <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
                 class="w-full px-3 py-2 kasa-field text-sm">
         </div>
@@ -288,7 +288,7 @@
             </button>
             <div id="card-page-numbers" class="card-page-numbers" aria-label="{{ _('Sayfa numaraları') }}"></div>
             <div class="card-page-jump" role="group" aria-label="{{ _('Sayfaya git') }}">
-                <label for="card-page-input" class="visually-hidden">{{ _('Sayfaya git') }}</label>
+                <label for="card-page-input" class="sr-only">{{ _('Sayfaya git') }}</label>
                 <input type="number" id="card-page-input" class="card-page-jump-input"
                     min="1" step="1" inputmode="numeric" placeholder="{{ _('Sayfa') }}"
                     aria-label="{{ _('Sayfaya git') }}">
@@ -307,10 +307,10 @@
 
 <!-- Şifre Üretici Modal -->
 <div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="password-generator-title" data-target-input="modal-generated-password-display" data-create-record-url="{{ url_for('ekle_sayfasi') }}">
-    <div class="modal-dialog modal-dialog-centered generator-modal-dialog">
+    <div class="modal-dialog generator-modal-dialog">
         <div class="modal-content generator-modal-content">
             <div class="modal-header">
-                <h2 id="password-generator-title" class="modal-title modal-title-display fw-bold">
+                <h2 id="password-generator-title" class="modal-title modal-title-display font-bold">
                     {{ _('Şifre Üretici') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -348,7 +348,7 @@
                             <small class="text-kasa-text-muted">{{ _('Uzunluk') }}</small>
                             <span id="modal-length-display" class="font-bold text-sm">16</span>
                         </div>
-                        <label class="visually-hidden" for="modal-length">{{ _('Şifre Uzunluğu') }}</label>
+                        <label class="sr-only" for="modal-length">{{ _('Şifre Uzunluğu') }}</label>
                         <input type="range" class="generator-length-range w-full mb-3" min="8" max="32" value="16" id="modal-length">
 
                         <div class="generator-option-grid generator-checkboxes">
@@ -404,10 +404,10 @@
 
 <!-- İçe Aktar Modal -->
 <div class="kasa-modal" id="importModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="import-modal-title">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="import-modal-title" class="modal-title modal-title-display fw-semibold">
+                <h2 id="import-modal-title" class="modal-title modal-title-display font-semibold">
                     <i class="fa-solid fa-upload mr-2 modal-icon-accent"></i>{{ _('İçe Aktar') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -455,10 +455,10 @@
 
 <!-- Dışa Aktar Modal -->
 <div class="kasa-modal" id="exportModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="export-modal-title">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="export-modal-title" class="modal-title modal-title-display fw-semibold">
+                <h2 id="export-modal-title" class="modal-title modal-title-display font-semibold">
                     <i class="fa-solid fa-download mr-2 modal-icon-accent-2"></i>{{ _('Dışa Aktar') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -507,10 +507,10 @@
 
 <!-- Şifre Geçmişi Modal -->
 <div class="kasa-modal" id="historyModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="history-modal-title">
-    <div class="modal-dialog modal-dialog-centered history-modal-dialog">
+    <div class="modal-dialog history-modal-dialog">
         <div class="modal-content history-modal-content">
             <div class="modal-header">
-                <h2 id="history-modal-title" class="modal-title modal-title-compact fw-semibold">
+                <h2 id="history-modal-title" class="modal-title modal-title-compact font-semibold">
                     <i class="fa-solid fa-clock-rotate-left mr-2 text-[#38bdf8]"></i>{{ _('Şifre Geçmişi') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -518,10 +518,10 @@
                 </button>
             </div>
             <div class="modal-body p-0">
-                <div class="list-group list-group-flush" id="history-list" aria-live="polite"></div>
+                <div id="history-list" class="history-list" aria-live="polite"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('Kapat') }}</button>
+                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('Kapat') }}</button>
             </div>
         </div>
     </div>
@@ -529,10 +529,10 @@
 
 <!-- Ayarlar Modal -->
 <div class="kasa-modal" id="settingsModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="settings-modal-title">
-    <div class="modal-dialog modal-dialog-centered settings-modal-dialog">
+    <div class="modal-dialog settings-modal-dialog">
         <div class="modal-content settings-modal-content">
             <div class="modal-header">
-                <h2 id="settings-modal-title" class="modal-title modal-title-display fw-semibold">
+                <h2 id="settings-modal-title" class="modal-title modal-title-display font-semibold">
                     <i class="fa-solid fa-gear mr-2 modal-icon-accent"></i>{{ _('Ayarlar') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -587,8 +587,8 @@
                             <h4 id="setting-theme-title" class="text-sm font-medium mb-0.5">{{ _('Koyu Tema') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüzü koyu renklere çevir.') }}</p>
                         </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input settings-switch-input" type="checkbox" id="theme-toggle" aria-labelledby="setting-theme-title">
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" id="theme-toggle" aria-labelledby="setting-theme-title">
                         </div>
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
@@ -596,8 +596,8 @@
                             <h4 id="setting-gradients-title" class="text-sm font-medium mb-0.5">{{ _('Gradient Katmanları') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kartlarda ve arkaplanda renk geçişlerini kullan.') }}</p>
                         </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input settings-switch-input" type="checkbox" name="gradients_enabled" id="gradients-toggle" {% if GRADIENTS_ENABLED %}checked{% endif %} aria-labelledby="setting-gradients-title">
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" name="gradients_enabled" id="gradients-toggle" {% if GRADIENTS_ENABLED %}checked{% endif %} aria-labelledby="setting-gradients-title">
                         </div>
                     </div>
                     <!-- Görünüm -->
@@ -728,8 +728,8 @@
                             <h4 id="setting-motion-title" class="text-sm font-medium mb-0.5">{{ _('Hareketli Arkaplan') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arkaplan bloblarını yumuşak şekilde hareket ettir.') }}</p>
                         </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input settings-switch-input" type="checkbox" name="animated_backgrounds_enabled" id="animated-backgrounds-toggle" {% if ANIMATED_BACKGROUNDS_ENABLED %}checked{% endif %} aria-labelledby="setting-motion-title">
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" name="animated_backgrounds_enabled" id="animated-backgrounds-toggle" {% if ANIMATED_BACKGROUNDS_ENABLED %}checked{% endif %} aria-labelledby="setting-motion-title">
                         </div>
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
@@ -737,8 +737,8 @@
                             <h4 id="setting-interface-animations-title" class="text-sm font-medium mb-0.5">{{ _('Arayüz Animasyonları') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Geçişleri ve etkileşim animasyonlarını kullan.') }}</p>
                         </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input settings-switch-input" type="checkbox" name="interface_animations_enabled" id="interface-animations-toggle" {% if INTERFACE_ANIMATIONS_ENABLED %}checked{% endif %} aria-labelledby="setting-interface-animations-title">
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" name="interface_animations_enabled" id="interface-animations-toggle" {% if INTERFACE_ANIMATIONS_ENABLED %}checked{% endif %} aria-labelledby="setting-interface-animations-title">
                         </div>
                     </div>
                     <div id="glass-effects-card" class="flex items-center justify-between p-3 rounded-xl glass-sm">
@@ -746,8 +746,8 @@
                             <h4 id="setting-glass-title" class="text-sm font-medium mb-0.5">{{ _('Cam Efektleri') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Bulanık cam yüzeylerini aç veya kapat.') }}</p>
                         </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input settings-switch-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title">
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title">
                         </div>
                     </div>
                     <div id="glass-quality-card" class="settings-select-card settings-glass-quality-card flex items-center justify-between p-3 rounded-xl glass-sm{% if not GLASS_EFFECTS_ENABLED %} is-collapsed{% endif %}" aria-hidden="{{ 'false' if GLASS_EFFECTS_ENABLED else 'true' }}">
@@ -780,8 +780,8 @@
                                 <h4 id="setting-auto-lock-title" class="text-sm font-medium mb-0.5">{{ _('Otomatik Kilitleme') }}</h4>
                                 <p class="text-xs text-kasa-text-muted mb-0">{{ _('Hareketsizlik durumunda kasayı kilitle.') }}</p>
                             </div>
-                            <div class="form-check form-switch m-0">
-                                <input class="form-check-input settings-switch-input" type="checkbox" name="auto_lock_enabled" id="auto_lock_enabled" {% if AUTO_LOCK_ENABLED %}checked{% endif %} aria-labelledby="setting-auto-lock-title">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="auto_lock_enabled" id="auto_lock_enabled" {% if AUTO_LOCK_ENABLED %}checked{% endif %} aria-labelledby="setting-auto-lock-title">
                             </div>
                         </div>
                         <div class="settings-timeout-row">
@@ -808,8 +808,8 @@
                                 <h4 id="setting-tray-title" class="text-sm font-medium mb-0.5">{{ _('Tepsiye Küçült') }}</h4>
                                 <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kapatınca uygulamayı sistem tepsisinde tut.') }}</p>
                             </div>
-                            <div class="form-check form-switch m-0">
-                                <input class="form-check-input settings-switch-input" type="checkbox" id="setting-minimize-to-tray" aria-labelledby="setting-tray-title">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" id="setting-minimize-to-tray" aria-labelledby="setting-tray-title">
                             </div>
                         </div>
                     </div>
@@ -878,11 +878,11 @@
                     <!-- LAN Erişimi -->
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h4 id="setting-lan-title" class="text-sm font-medium mb-0.5">{{ _('LAN Erişimi') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold align-middle settings-dev-badge">{{ _('GELİŞTİRME') }}</span></h4>
+                            <h4 id="setting-lan-title" class="text-sm font-medium mb-0.5">{{ _('LAN Erişimi') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold settings-dev-badge">{{ _('GELİŞTİRME') }}</span></h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Mobil cihazdan bağlanmak için ağ üzerinden erişime izin ver.') }}</p>
                         </div>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input settings-switch-input" type="checkbox" name="lan_enabled" id="lan-enabled-toggle" {% if LAN_ENABLED %}checked{% endif %} aria-labelledby="setting-lan-title">
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" name="lan_enabled" id="lan-enabled-toggle" {% if LAN_ENABLED %}checked{% endif %} aria-labelledby="setting-lan-title">
                         </div>
                     </div>
                     <div class="lan-warning-card">
@@ -971,8 +971,8 @@
                         <div class="opacity-75">By Salvetum</div>
                     </div>
                     <div class="flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('İptal') }}</button>
-                        <button type="submit" class="btn btn-primary btn-sm px-4">{{ _('Kaydet') }}</button>
+                        <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('İptal') }}</button>
+                        <button type="submit" class="kasa-btn kasa-btn-primary px-4">{{ _('Kaydet') }}</button>
                     </div>
                 </div>
             </form>
@@ -982,10 +982,10 @@
 
 <!-- Kasa Kilitleme Modal -->
 <div class="kasa-modal" id="lockVaultModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lock-vault-title">
-    <div class="modal-dialog modal-dialog-centered lock-vault-modal-dialog">
+    <div class="modal-dialog lock-vault-modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="lock-vault-title" class="modal-title fw-semibold">
+                <h2 id="lock-vault-title" class="modal-title font-semibold">
                     <i class="fa-solid fa-lock mr-2"></i>{{ _('Kasayı Kilitle') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -1356,10 +1356,10 @@ document.getElementById('lock-vault-btn')?.addEventListener('click', lockVault);
 
 <!-- Ana Şifre Değiştirme Modal -->
 <div class="kasa-modal" id="changePasswordModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="change-password-title">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="change-password-title" class="modal-title modal-title-display fw-semibold">
+                <h2 id="change-password-title" class="modal-title modal-title-display font-semibold">
                     <i class="fa-solid fa-shield-halved mr-2 text-[#f59e0b]"></i>{{ _('Şifreyi Değiştir') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -1405,10 +1405,10 @@ document.getElementById('lock-vault-btn')?.addEventListener('click', lockVault);
 
 <!-- Toplu Kategori Değiştir Modal -->
 <div class="kasa-modal" id="bulkCategoryModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="bulk-category-title">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="bulk-category-title" class="modal-title modal-title-display fw-semibold">
+                <h2 id="bulk-category-title" class="modal-title modal-title-display font-semibold">
                     <i class="fa-solid fa-tag mr-2 modal-icon-accent"></i>{{ _('Kategori Değiştir') }}
                 </h2>
                 <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
@@ -1417,13 +1417,13 @@ document.getElementById('lock-vault-btn')?.addEventListener('click', lockVault);
             </div>
             <div class="modal-body p-4">
                 <p class="text-sm text-kasa-text-muted mb-3"><span id="bulk-category-count">0</span> {{ _('kaydın kategorisi değiştirilecek.') }}</p>
-                <label class="visually-hidden" for="bulk-category-input">{{ _('Yeni kategori adı') }}</label>
+                <label class="sr-only" for="bulk-category-input">{{ _('Yeni kategori adı') }}</label>
                 <input type="text" id="bulk-category-input" placeholder="{{ _('Yeni kategori adı…') }}"
                     class="w-full px-3 py-2.5 kasa-field text-sm">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-kasa-close>{{ _('İptal') }}</button>
-                <button type="button" class="btn btn-primary btn-sm" id="bulk-category-apply">{{ _('Uygula') }}</button>
+                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('İptal') }}</button>
+                <button type="button" class="kasa-btn kasa-btn-primary" id="bulk-category-apply">{{ _('Uygula') }}</button>
             </div>
         </div>
     </div>

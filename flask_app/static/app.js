@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.9 - Main JavaScript
+ * ŞifreKasam v2.5.10 Beta.1 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return button;
   };
 
-  const createStatusNode = (message, className = 'p-3 text-center text-body-secondary', iconClass = '') => {
+  const createStatusNode = (message, className = 'p-3 text-center text-kasa-text-muted', iconClass = '') => {
     const wrapper = document.createElement('div');
     wrapper.className = className;
     if (iconClass) {
@@ -2356,12 +2356,10 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         if (btn.classList.contains('active')) return;
         categoryBtns.forEach(b => {
-          b.classList.remove('active', 'btn-primary');
-          b.classList.add('btn-outline-secondary');
+          b.classList.remove('active');
           b.setAttribute('aria-pressed', 'false');
         });
-        btn.classList.remove('btn-outline-secondary');
-        btn.classList.add('active', 'btn-primary');
+        btn.classList.add('active');
         btn.setAttribute('aria-pressed', 'true');
         filterCards({ preservePage: false, animate: false });
         animateCategoryTransition(btn);
@@ -2378,7 +2376,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (historyList) {
           historyList.replaceChildren(
-            createStatusNode(window._('Yükleniyor...'), 'p-3 text-center text-body-secondary', 'fa-solid fa-spinner fa-spin me-2')
+            createStatusNode(window._('Yükleniyor...'), 'p-3 text-center text-kasa-text-muted', 'fa-solid fa-spinner fa-spin mr-2')
           );
         }
         kasaModalAc('historyModal');
@@ -2396,7 +2394,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const fragment = document.createDocumentFragment();
           data.forEach((item, index) => {
             const div = document.createElement('div');
-            div.className = `list-group-item history-entry history-delay-${Math.min(index, 8)}`;
+            div.className = `history-entry history-delay-${Math.min(index, 8)}`;
 
             const header = document.createElement('div');
             header.className = 'history-entry-header';

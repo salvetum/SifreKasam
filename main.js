@@ -64,6 +64,8 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.10-beta.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.10-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.9-beta.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.9-beta.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.9-beta.2',
@@ -162,6 +164,7 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
     'sifrekasam',
     'SifreKasam',
+    'sifrekasam-v2.5.10-beta.1',
     'sifrekasam-v2.5.9-beta.3',
     'sifrekasam-v2.5.9-beta.2',
     'sifrekasam-v2.5.9-beta',
