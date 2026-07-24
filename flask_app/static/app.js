@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.8 - Main JavaScript
+ * ŞifreKasam v2.5.9-beta - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -470,6 +470,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const customSelectStates = [];
 
+  const syncCustomSelectDirection = (state) => {
+    if (!state?.openRequested) return;
+    const triggerRect = state.trigger.getBoundingClientRect();
+    const boundaryRect = state.wrapper.closest('.modal-content')?.getBoundingClientRect();
+    const boundaryTop = boundaryRect?.top ?? 0;
+    const boundaryBottom = boundaryRect?.bottom ?? window.innerHeight;
+    const menuHeight = Math.min(state.menu.scrollHeight, window.innerHeight * 0.38);
+    const spaceAbove = triggerRect.top - boundaryTop;
+    const spaceBelow = boundaryBottom - triggerRect.bottom;
+    state.wrapper.classList.toggle(
+      'opens-upward',
+      spaceBelow < menuHeight + 10 && spaceAbove > spaceBelow,
+    );
+  };
+
   const closeCustomSelect = (state, restoreFocus = false) => {
     if (!state || (!state.openRequested && !state.wrapper.classList.contains('is-open'))) return;
     state.openRequested = false;
@@ -480,7 +495,12 @@ document.addEventListener('DOMContentLoaded', () => {
     state.closeTimer = setTimeout(() => {
       if (!state.wrapper.classList.contains('is-open')) {
         state.menu.hidden = true;
-        state.layerHost?.classList.remove('has-open-select-layer');
+        state.wrapper.classList.remove('opens-upward');
+        state.layerHosts.forEach((layerHost) => {
+          if (!layerHost.querySelector('.kasa-custom-select.is-open')) {
+            layerHost.classList.remove('has-open-select-layer');
+          }
+        });
       }
     }, 140);
     if (restoreFocus) state.trigger.focus({ preventScroll: true });
@@ -559,7 +579,13 @@ document.addEventListener('DOMContentLoaded', () => {
       closeTimer: 0,
       openRequested: false,
       host: wrapper.closest('.glass-sm, .settings-appearance-card, .vault-field'),
-      layerHost: wrapper.closest('.vault-form-panel'),
+      layerHosts: [
+        wrapper.closest('.vault-form-panel'),
+        wrapper.closest('.settings-panel'),
+        wrapper.closest('.settings-body'),
+      ].filter((layerHost, layerIndex, layerHosts) => (
+        layerHost && layerHosts.indexOf(layerHost) === layerIndex
+      )),
     };
     customSelectStates.push(state);
 
@@ -588,9 +614,10 @@ document.addEventListener('DOMContentLoaded', () => {
       menu.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
       state.host?.classList.add('has-open-select');
-      state.layerHost?.classList.add('has-open-select-layer');
+      state.layerHosts.forEach(layerHost => layerHost.classList.add('has-open-select-layer'));
       requestAnimationFrame(() => {
         if (!state.openRequested) return;
+        syncCustomSelectDirection(state);
         wrapper.classList.add('is-open');
         if (focusSelected) {
           (optionButtons.find(button => button.classList.contains('is-selected'))
@@ -657,6 +684,12 @@ document.addEventListener('DOMContentLoaded', () => {
       closeCustomSelects();
     }
   });
+
+  const syncOpenCustomSelects = () => {
+    customSelectStates.forEach(syncCustomSelectDirection);
+  };
+  window.addEventListener('resize', syncOpenCustomSelects, { passive: true });
+  document.addEventListener('scroll', syncOpenCustomSelects, { passive: true, capture: true });
 
   document.querySelectorAll('.kasa-modal').forEach(modal => {
     modal.addEventListener('kasa:modal-closing', () => closeCustomSelects());

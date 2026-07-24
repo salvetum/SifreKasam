@@ -63,11 +63,12 @@
             document.querySelectorAll('[data-i18n]').forEach((node) => {
                 node.textContent = selected[node.dataset.i18n] || node.textContent;
             });
-            const select = document.getElementById('entry-language-select');
-            if (select) {
-                select.value = copy[lang] ? lang : 'tr';
-                select.setAttribute('aria-label', selected.language);
-            }
+            document.querySelectorAll('[data-entry-language]').forEach((button) => {
+                const isActive = button.dataset.entryLanguage === (copy[lang] ? lang : 'tr');
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-pressed', String(isActive));
+            });
+            document.querySelector('.language-box')?.setAttribute('aria-label', selected.language);
         }
 
         function applyAppearance(params) {
@@ -118,15 +119,19 @@
 
             document.addEventListener('DOMContentLoaded', () => {
                 applyLanguage(lang);
-                document.getElementById('entry-language-select')?.addEventListener('change', function () {
-                    const nextLang = copy[this.value] ? this.value : 'tr';
-                    localStorage.setItem('kasa-lang', nextLang);
-                    applyLanguage(nextLang);
-                    fetch('/settings/language', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ language: nextLang }),
-                    }).catch(() => {});
+                document.querySelectorAll('[data-entry-language]').forEach((button) => {
+                    button.addEventListener('click', function () {
+                        const nextLang = copy[this.dataset.entryLanguage]
+                            ? this.dataset.entryLanguage
+                            : 'tr';
+                        localStorage.setItem('kasa-lang', nextLang);
+                        applyLanguage(nextLang);
+                        fetch('/settings/language', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ language: nextLang }),
+                        }).catch(() => {});
+                    });
                 });
                 if (params.get('redirect')) {
                     setTimeout(() => { window.location.href = '/?entry=loading'; }, 560);
@@ -412,18 +417,48 @@
             transform: translateY(0) scale(0.985);
         }
 
-        .language-box select {
-            border: 0;
-            outline: 0;
-            color: var(--text);
-            background: transparent;
-            font: inherit;
-            cursor: pointer;
+        .language-switch {
+            display: inline-grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.2rem;
+            padding: 0.2rem;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: rgba(7, 9, 20, 0.34);
         }
 
-        .language-box option {
+        .language-switch button {
+            min-width: 34px;
+            min-height: 28px;
+            padding: 0.25rem 0.45rem;
+            border: 0;
+            border-radius: 7px;
+            color: var(--muted);
+            background: transparent;
+            font: 700 0.72rem/1 'Sora', system-ui, sans-serif;
+            cursor: pointer;
+            transition:
+                color 160ms ease,
+                background 160ms ease,
+                box-shadow 160ms ease,
+                transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .language-switch button:hover,
+        .language-switch button:focus-visible {
+            outline: none;
             color: var(--text);
-            background: var(--bg-2);
+            background: rgba(var(--accent-rgb), 0.12);
+        }
+
+        .language-switch button:active {
+            transform: scale(0.94);
+        }
+
+        .language-switch button.is-active {
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: 0 6px 16px rgba(var(--accent-rgb), 0.24);
         }
 
         .brand-lock {
@@ -632,13 +667,13 @@
                 <div class="entry-pill">
                     <span data-i18n="badge">Yerel ve güvenli</span>
                 </div>
-                <label class="language-box" for="entry-language-select">
+                <div class="language-box" role="group" aria-label="Dil">
                     <span data-i18n="language">Dil</span>
-                    <select id="entry-language-select" aria-label="Dil">
-                        <option value="tr">TR</option>
-                        <option value="en">EN</option>
-                    </select>
-                </label>
+                    <div class="language-switch">
+                        <button type="button" data-entry-language="tr" aria-pressed="true">TR</button>
+                        <button type="button" data-entry-language="en" aria-pressed="false">EN</button>
+                    </div>
+                </div>
             </div>
 
             <div>
