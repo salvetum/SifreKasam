@@ -1,11 +1,10 @@
 """SQLAlchemy models used by the local vault."""
 
-from datetime import datetime
-
 from flask_login import UserMixin
 
 from kasa_core.constants import DEFAULT_CATEGORY
 from kasa_core.extensions import db
+from kasa_core.time_utils import utc_now_naive
 
 
 class Setting(db.Model):
@@ -28,11 +27,11 @@ class Record(db.Model):
     encrypted_comment = db.Column(db.String, default="")
     is_pinned = db.Column(db.Integer, default=0)
     expiry_date = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now_naive)
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
     )
 
 
@@ -46,7 +45,7 @@ class PasswordHistory(db.Model):
         nullable=False,
     )
     encrypted_password = db.Column(db.String, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now_naive)
 
 
 class User(UserMixin):

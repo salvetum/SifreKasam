@@ -1,6 +1,6 @@
 """Password-health and vault-statistics calculations."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Callable
 
 from cryptography.fernet import Fernet
@@ -8,6 +8,7 @@ from cryptography.fernet import Fernet
 from kasa_core.crypto import decrypt_metadata, safe_decrypt
 from kasa_core.models import Record
 from kasa_core.password_strength import ACCEPTABLE_PASSWORD_SCORE
+from kasa_core.time_utils import utc_now_naive
 
 
 def build_vault_report_payloads(
@@ -25,7 +26,7 @@ def build_vault_report_payloads(
         Record.expiry_date,
     ).all()
 
-    now = datetime.utcnow()
+    now = utc_now_naive()
     six_months_ago = now - timedelta(days=180)
     pinned = weak = old = expired = 0
     weak_records: list[dict[str, str]] = []

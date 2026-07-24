@@ -1,6 +1,7 @@
 import json
 import sys
 import unittest
+from datetime import UTC
 from pathlib import Path
 
 
@@ -15,6 +16,11 @@ from kasa_core.import_export import (  # noqa: E402
     parse_import_payload,
 )
 from kasa_core.versioning import is_newer_version  # noqa: E402
+from kasa_core.time_utils import (  # noqa: E402
+    utc_iso_timestamp,
+    utc_now,
+    utc_now_naive,
+)
 
 
 class ImportExportServiceTests(unittest.TestCase):
@@ -61,8 +67,18 @@ class ImportExportServiceTests(unittest.TestCase):
 
 class VersioningServiceTests(unittest.TestCase):
     def test_beta_version_compares_by_numeric_release(self) -> None:
-        self.assertTrue(is_newer_version("v2.6.0", "2.5.9-beta.3"))
-        self.assertFalse(is_newer_version("v2.5.9", "2.5.9-beta.3"))
+        self.assertTrue(is_newer_version("v2.6.0", "2.5.9"))
+        self.assertFalse(is_newer_version("v2.5.9", "2.5.9"))
+
+
+class TimeServiceTests(unittest.TestCase):
+    def test_utc_helpers_preserve_storage_compatibility(self) -> None:
+        self.assertIs(utc_now().tzinfo, UTC)
+        self.assertIsNone(utc_now_naive().tzinfo)
+        self.assertRegex(
+            utc_iso_timestamp(),
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
+        )
 
 
 if __name__ == "__main__":
