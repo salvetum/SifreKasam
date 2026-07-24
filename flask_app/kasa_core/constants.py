@@ -1,6 +1,6 @@
 """Application constants shared by backend modules."""
 
-APP_VERSION_DEFAULT = "2.5.9"
+APP_VERSION_DEFAULT = "2.5.10-beta.1"
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 

@@ -66,6 +66,18 @@ class ContentSecurityPolicyTests(unittest.TestCase):
         self.assertNotIn('id="first-setup-guidance"', existing_vault_html)
 
 
+class StylesheetDependencyTests(unittest.TestCase):
+    def test_bootstrap_stylesheet_is_not_bundled_or_referenced(self) -> None:
+        self.assertFalse((ROOT / "flask_app" / "static" / "bootstrap.min.css").exists())
+
+        template_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (ROOT / "flask_app" / "templates").glob("*")
+            if path.is_file()
+        )
+        self.assertNotIn("bootstrap.min.css", template_text)
+
+
 class SecurityUnitTests(unittest.TestCase):
     def test_metadata_round_trip_does_not_store_plaintext(self) -> None:
         fernet = Fernet(Fernet.generate_key())

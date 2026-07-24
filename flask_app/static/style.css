@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.5.9 — Main Stylesheet
+   ŞifreKasam v2.5.10 Beta.1 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -139,6 +139,38 @@ html[data-bs-theme="light"][data-glass-quality="high"] {
 }
 
 html { scrollbar-gutter: stable; }
+
+html {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+}
+
+button,
+input,
+optgroup,
+select,
+textarea {
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+}
+
+button,
+select {
+    text-transform: none;
+}
+
+button:not(:disabled),
+[type="button"]:not(:disabled),
+[type="reset"]:not(:disabled),
+[type="submit"]:not(:disabled),
+[role="button"] {
+    cursor: pointer;
+}
+
+textarea { resize: vertical; }
+img, svg { vertical-align: middle; }
 
 *:focus:not(:focus-visible),
 button:focus:not(:focus-visible),
@@ -948,9 +980,7 @@ html[data-kasa-animations="off"] *::after {
 }
 
 /* Form elemanları — ortak temel */
-.kasa-field,
-.form-control,
-.form-select {
+.kasa-field {
     isolation: isolate;
     background: rgba(255,255,255,0.065) !important;
     border: var(--border-glass) !important;
@@ -959,24 +989,16 @@ html[data-kasa-animations="off"] *::after {
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
 }
 
-.kasa-field:focus,
-.form-control:focus,
-.form-select:focus {
+.kasa-field:focus {
     border-color: var(--glass-border-hi) !important;
     background-color: var(--surface-hover) !important;
     box-shadow: 0 0 0 3px rgba(124,111,247,0.12) !important;
 }
-.kasa-field::placeholder,
-.form-control::placeholder { color: var(--text-muted); opacity: 0.75; }
+.kasa-field::placeholder { color: var(--text-muted); opacity: 0.75; }
 
-.kasa-field option,
-.form-select option { background: #131527; color: var(--text); }
+.kasa-field option { background: #131527; color: var(--text); }
 
-.form-label { color: var(--text-muted); font-weight: 500; font-size: 0.9rem; }
-
-.kasa-field,
-.form-control,
-.form-select {
+.kasa-field {
     transition:
         transform 160ms cubic-bezier(0.16,1,0.3,1),
         border-color 160ms ease,
@@ -984,16 +1006,12 @@ html[data-kasa-animations="off"] *::after {
         box-shadow 160ms ease;
 }
 
-.kasa-field:focus,
-.form-control:focus,
-.form-select:focus {
+.kasa-field:focus {
     transform: translateY(-1px);
 }
 
 .kasa-field-invalid,
-.kasa-field.kasa-field-invalid,
-.form-control.kasa-field-invalid,
-.form-select.kasa-field-invalid {
+.kasa-field.kasa-field-invalid {
     border-color: rgba(239,68,68,0.72) !important;
     background-color: rgba(239,68,68,0.075) !important;
     box-shadow: 0 0 0 3px rgba(239,68,68,0.13) !important;
@@ -1053,11 +1071,21 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 }
 
 /* ── PROGRESS BAR ────────────────────────────────────────────── */
-.progress { background-color: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; }
 .progress-bar { transition: width 0.3s ease, background-color 0.3s ease; }
 
 /* === CSP-safe runtime states === */
 [hidden] { display: none !important; }
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
 .kasa-transition-fast { transition: all 0.2s ease; }
 .kasa-download-anchor { display: none; }
 .kasa-clipboard-fallback {
@@ -1120,17 +1148,53 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     font-family: var(--font-mono);
     letter-spacing: 0.08em;
 }
+.settings-switch-control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
 .settings-switch-input {
-    width: 2.5em !important;
-    height: 1.25em;
+    width: 2.5rem;
+    height: 1.35rem;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--glass-border-hi);
+    border-radius: 999px;
+    background-color: rgba(255,255,255,0.10);
+    background-image: radial-gradient(circle at 27% 50%, #f8fafc 0 4px, transparent 5px);
     cursor: pointer;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.24);
+    transition:
+        background-color var(--motion-fast) ease,
+        background-position var(--motion-fast) var(--ease-out),
+        border-color var(--motion-fast) ease,
+        box-shadow var(--motion-fast) ease;
+}
+.settings-switch-input:checked {
+    border-color: rgba(var(--accent-rgb),0.68);
+    background-color: var(--accent);
+    background-image: radial-gradient(circle at 73% 50%, #fff 0 4px, transparent 5px);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb),0.12), 0 5px 14px rgba(var(--accent-rgb),0.22);
+}
+.settings-switch-input:focus-visible {
+    outline: 2px solid transparent;
+    box-shadow: var(--focus-ring);
+}
+.settings-switch-input:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
 }
 .settings-language-select {
     width: auto;
     min-width: 120px;
     cursor: pointer;
 }
-.settings-dev-badge { letter-spacing: 0.02em; }
+.settings-dev-badge {
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+}
 
 .accent-preset-purple { --preset: #7c6ff7; }
 .accent-preset-blue { --preset: #38bdf8; }
@@ -1262,49 +1326,6 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 /* ════════════════════════════════════════════════════════════════
    BUTONLAR
    ════════════════════════════════════════════════════════════════ */
-
-/* Bootstrap .btn temel override */
-.btn {
-    font-family: var(--font-main);
-    font-weight: 600;
-    border-radius: 12px;
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    transition: all var(--speed) cubic-bezier(0.4,0,0.2,1);
-    outline: none;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 22px rgba(0,0,0,0.14);
-    -webkit-tap-highlight-color: transparent;
-}
-.btn:focus:not(:focus-visible),
-.btn:active {
-    outline: none;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 22px rgba(0,0,0,0.14);
-}
-.btn:focus-visible {
-    box-shadow: var(--focus-ring), inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 22px rgba(0,0,0,0.14);
-}
-.btn-primary {
-    background: linear-gradient(135deg, rgba(124,111,247,0.96), rgba(79,145,255,0.9)) !important;
-    border: 1px solid rgba(124,111,247,0.38) !important;
-    color: #fff !important;
-}
-.btn-primary:hover { color: #fff !important; transform: translateY(-1px); }
-.btn-outline-secondary {
-    isolation: isolate;
-    background: rgba(255,255,255,0.06) !important;
-    border-color: var(--glass-border) !important;
-    color: var(--text-muted) !important;
-    box-shadow: none !important;
-}
-.btn-outline-secondary:hover {
-    background: rgba(255,255,255,0.095) !important;
-    color: var(--text) !important;
-    border-color: var(--glass-border-hi) !important;
-    transform: translateY(-1px);
-}
 
 /* kasa-btn — özel buton sistemi */
 .kasa-btn {
@@ -1992,13 +2013,6 @@ html[data-glass-quality="normal"] .vault-card-shell.glass {
    GEÇMİŞ LİSTESİ
    ════════════════════════════════════════════════════════════════ */
 
-.list-group-item {
-    background-color: transparent;
-    border-color: var(--border);
-    color: var(--text);
-    padding: 1rem;
-}
-
 .history-modal-dialog {
     width: min(94vw, 640px) !important;
     max-width: 640px !important;
@@ -2083,28 +2097,6 @@ html[data-glass-quality="normal"] .vault-card-shell.glass {
     from { opacity: 0; transform: translateY(7px) scale(0.985); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
-/* ════════════════════════════════════════════════════════════════
-   AKORDİYON (SAĞLIK RAPORU)
-   ════════════════════════════════════════════════════════════════ */
-
-.accordion-item {
-    isolation: isolate;
-    background: var(--glass) !important;
-    border: var(--border-glass) !important;
-    border-radius: var(--radius-sm) !important;
-    overflow: hidden;
-    margin-bottom: 0.5rem;
-}
-.accordion-button {
-    background: var(--glass) !important;
-    color: var(--text);
-    outline: none !important;
-    box-shadow: none !important;
-}
-.accordion-button:not(.collapsed) { background: rgba(124,111,247,0.10) !important; color: var(--accent); }
-.accordion-button::after                             { filter: brightness(0) invert(1); }
-[data-bs-theme="light"] .accordion-button::after    { filter: none; }
 
 /* ════════════════════════════════════════════════════════════════
    ŞİFRE ÜRETECİ PANELİ
@@ -2405,8 +2397,6 @@ html[data-glass-effects="off"] .glass-sm,
 html[data-glass-effects="off"] .kasa-panel,
 html[data-glass-effects="off"] .kasa-panel-soft,
 html[data-glass-effects="off"] .kasa-field,
-html[data-glass-effects="off"] .form-control,
-html[data-glass-effects="off"] .form-select,
 html[data-glass-effects="off"] .kasa-btn,
 html[data-glass-effects="off"] .icon-btn,
 html[data-glass-effects="off"] .filter-btn,
@@ -2415,7 +2405,6 @@ html[data-glass-effects="off"] .generator-output-card,
 html[data-glass-effects="off"] .generator-options-card,
 html[data-glass-effects="off"] .generator-history-card,
 html[data-glass-effects="off"] .generator-panel,
-html[data-glass-effects="off"] .accordion-item,
 html[data-glass-effects="off"] .page-loading-overlay,
 html[data-glass-effects="off"] .page-loading-card,
 html[data-glass-effects="off"] .kasa-modal::before,
@@ -2526,22 +2515,16 @@ html[data-glass-effects="off"] .history-entry {
     border-color: rgba(31,41,55,0.1);
 }
 
-[data-bs-theme="light"] .kasa-field,
-[data-bs-theme="light"] .form-control,
-[data-bs-theme="light"] .form-select {
+[data-bs-theme="light"] .kasa-field {
     background: rgba(255,255,255,0.78) !important;
     color: var(--text) !important;
     border-color: var(--glass-border) !important;
 }
-[data-bs-theme="light"] .kasa-field:focus,
-[data-bs-theme="light"] .form-control:focus,
-[data-bs-theme="light"] .form-select:focus { background: #fff !important; }
+[data-bs-theme="light"] .kasa-field:focus { background: #fff !important; }
 
-[data-bs-theme="light"] .kasa-field option,
-[data-bs-theme="light"] .form-select option { background: #ffffff; color: var(--text); }
+[data-bs-theme="light"] .kasa-field option { background: #ffffff; color: var(--text); }
 
 [data-bs-theme="light"] .kasa-btn,
-[data-bs-theme="light"] .btn-outline-secondary,
 [data-bs-theme="light"] .filter-btn,
 [data-bs-theme="light"] .icon-btn,
 [data-bs-theme="light"] .card-icon-btn {
@@ -2550,7 +2533,6 @@ html[data-glass-effects="off"] .history-entry {
     color: var(--text) !important;
 }
 [data-bs-theme="light"] .kasa-btn:hover,
-[data-bs-theme="light"] .btn-outline-secondary:hover,
 [data-bs-theme="light"] .filter-btn:hover,
 [data-bs-theme="light"] .icon-btn:hover,
 [data-bs-theme="light"] .card-icon-btn:hover {
@@ -2558,21 +2540,18 @@ html[data-glass-effects="off"] .history-entry {
     color: var(--text) !important;
 }
 
-[data-bs-theme="light"] .kasa-btn-primary,
-[data-bs-theme="light"] .btn-primary {
+[data-bs-theme="light"] .kasa-btn-primary {
     color: #fff !important;
     background: linear-gradient(135deg, #5b4bdc, #1d4ed8) !important;
     border-color: rgba(29,78,216,0.28) !important;
     box-shadow: 0 12px 28px rgba(29,78,216,0.24) !important;
 }
-[data-bs-theme="light"] .kasa-btn-primary:hover,
-[data-bs-theme="light"] .btn-primary:hover {
+[data-bs-theme="light"] .kasa-btn-primary:hover {
     color: #fff !important;
     background: linear-gradient(135deg, #5141c8, #1e40af) !important;
     border-color: rgba(30,64,175,0.36) !important;
 }
-[data-bs-theme="light"] .kasa-btn-primary *,
-[data-bs-theme="light"] .btn-primary * { color: #fff !important; }
+[data-bs-theme="light"] .kasa-btn-primary * { color: #fff !important; }
 
 [data-bs-theme="light"] .kasa-btn-danger         { color: #b42318 !important; background: rgba(239,68,68,0.08) !important; border-color: rgba(180,35,24,0.18) !important; }
 [data-bs-theme="light"] .kasa-btn-danger:hover   { color: #912018 !important; background: rgba(239,68,68,0.12) !important; }
@@ -2586,7 +2565,6 @@ html[data-glass-effects="off"] .history-entry {
 [data-bs-theme="light"] .vault-detail-value,
 [data-bs-theme="light"] .text-white,
 [data-bs-theme="light"] .text-light,
-[data-bs-theme="light"] .list-group-item,
 [data-bs-theme="light"] .text-kasa-text { color: var(--text) !important; }
 
 [data-bs-theme="light"] .vault-card-shell .footer-action-btn,
@@ -2615,10 +2593,7 @@ html[data-glass-effects="off"] .history-entry {
 [data-bs-theme="light"] .text-emerald-400             { color: #047857 !important; }
 
 /* Genel metin overrideleri */
-[data-bs-theme="light"] .text-body-secondary,
 [data-bs-theme="light"] .text-kasa-text-muted         { color: var(--text-muted) !important; }
-[data-bs-theme="light"] .border-secondary             { border-color: var(--border) !important; }
-[data-bs-theme="light"] .bg-transparent               { background-color: transparent !important; }
 
 [data-bs-theme="light"] h1, [data-bs-theme="light"] h2,
 [data-bs-theme="light"] h3, [data-bs-theme="light"] h4,
@@ -3114,9 +3089,7 @@ html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] 
 }
 
 html[data-kasa-gradient="off"] .kasa-btn-primary,
-html[data-kasa-gradient="off"] .btn-primary,
-html[data-bs-theme="light"][data-kasa-gradient="off"] .kasa-btn-primary,
-html[data-bs-theme="light"][data-kasa-gradient="off"] .btn-primary {
+html[data-bs-theme="light"][data-kasa-gradient="off"] .kasa-btn-primary {
     background: var(--accent) !important;
 }
 
@@ -3136,8 +3109,6 @@ html[data-bs-theme="light"][data-kasa-gradient="off"] .btn-primary {
 }
 
 .kasa-field,
-.form-control,
-.form-select,
 input.kasa-field,
 select.kasa-field,
 textarea.kasa-field {
@@ -3148,8 +3119,7 @@ textarea.kasa-field {
     font-size: 0.9rem;
 }
 
-select.kasa-field,
-.form-select {
+select.kasa-field {
     display: block;
     padding-right: 2.2rem;
 }
@@ -3159,9 +3129,7 @@ textarea.kasa-field {
     resize: vertical;
 }
 
-.kasa-field:focus,
-.form-control:focus,
-.form-select:focus {
+.kasa-field:focus {
     border-color: rgba(var(--accent-rgb), 0.48) !important;
     box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15) !important;
 }
@@ -4378,7 +4346,7 @@ html[data-kasa-motion="on"] .appearance-preview {
         grid-template-columns: var(--grid-2);
     }
 
-    .settings-panel .form-check {
+    .settings-panel .settings-switch-control {
         align-self: flex-end;
     }
 
@@ -4975,8 +4943,7 @@ html[data-kasa-motion="on"] .appearance-preview {
 }
 
 /* === Accent Consistency Overrides === */
-.kasa-btn-primary,
-.btn-primary {
+.kasa-btn-primary {
     border-color: rgba(var(--accent-rgb), 0.38) !important;
     background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.96), rgba(var(--accent-2-rgb), 0.90)) !important;
     box-shadow: 0 12px 30px rgba(var(--accent-rgb), 0.22);
@@ -5491,8 +5458,7 @@ html[data-kasa-gradient="off"] .icon-btn:hover {
     background: rgba(var(--accent-rgb), 0.12) !important;
 }
 
-html[data-kasa-gradient="off"] .kasa-btn-primary,
-html[data-kasa-gradient="off"] .btn-primary {
+html[data-kasa-gradient="off"] .kasa-btn-primary {
     background: var(--accent) !important;
     box-shadow: 0 12px 30px rgba(var(--accent-rgb), 0.20);
 }
