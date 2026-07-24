@@ -84,6 +84,7 @@ from kasa_core.records import (
     append_password_history as _append_password_history,
     delete_records_and_history as _delete_records_and_history,
 )
+from kasa_core.time_utils import utc_iso_timestamp
 from kasa_core.reports import (
     build_vault_report_payloads as _calculate_vault_report_payloads,
 )
@@ -329,7 +330,7 @@ def _write_vault_initialized_marker() -> None:
     """DB commit tamamlandıktan sonra ilk kurulum işaretini atomik olarak yazar."""
     payload = {
         'initialized': True,
-        'created_at': datetime.utcnow().isoformat(timespec='seconds') + 'Z',
+        'created_at': utc_iso_timestamp(),
     }
     tmp_file = VAULT_INIT_FILE + '.tmp'
     try:
