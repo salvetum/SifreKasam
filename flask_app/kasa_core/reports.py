@@ -7,15 +7,18 @@ from cryptography.fernet import Fernet
 
 from kasa_core.crypto import decrypt_metadata, safe_decrypt
 from kasa_core.models import Record
+from kasa_core.password_strength import ACCEPTABLE_PASSWORD_SCORE
 
 
 def build_vault_report_payloads(
     fernet: Fernet,
-    score_password: Callable[[str], int],
+    score_password: Callable[[str, object], int],
 ) -> tuple[dict[str, int], dict[str, list]]:
     rows = Record.query.with_entities(
         Record.id,
         Record.title,
+        Record.website_url,
+        Record.login,
         Record.encrypted_password,
         Record.updated_at,
         Record.is_pinned,
@@ -37,11 +40,14 @@ def build_vault_report_payloads(
         if not password:
             continue
 
-        record_data = {
-            "id": record.id,
-            "title": decrypt_metadata(fernet, record.title),
-        }
-        if score_password(password) < 4:
+        title = decrypt_metadata(fernet, record.title)
+        record_data = {"id": record.id, "title": title}
+        user_inputs = [
+            title,
+            decrypt_metadata(fernet, record.website_url),
+            decrypt_metadata(fernet, record.login),
+        ]
+        if score_password(password, user_inputs) < ACCEPTABLE_PASSWORD_SCORE:
             weak += 1
             weak_records.append(record_data)
         password_map.setdefault(password, []).append(record_data)

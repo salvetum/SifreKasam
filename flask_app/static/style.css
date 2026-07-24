@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.5.9-beta.2 — Main Stylesheet
+   ŞifreKasam v2.5.9-beta.3 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -1189,7 +1189,8 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 .card-wrapper.is-removing {
     opacity: 0;
     transform: scale(0.95);
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .card-star-icon.is-pinned { color: #f59e0b; }
 
@@ -4109,12 +4110,18 @@ html[data-glass-effects="off"] .settings-appearance-card {
         visibility 0s linear 240ms;
 }
 
+.settings-glass-quality-card.has-open-select {
+    z-index: 120;
+    overflow: visible;
+    clip-path: none;
+}
+
 .kasa-modal.is-open .settings-panel.active > *:not(.settings-glass-quality-card) {
     animation: settingsItemIn 280ms var(--ease-out) both;
 }
 
 .kasa-modal.is-open .settings-panel.active > .settings-glass-quality-card:not(.is-collapsed) {
-    animation: settingsGlassQualityIn 300ms var(--ease-out) 66ms backwards;
+    animation: settingsItemIn 280ms var(--ease-out) 66ms backwards;
 }
 
 .kasa-modal.is-open .settings-panel.active > *:nth-child(2) { animation-delay: 22ms; }
@@ -4124,19 +4131,6 @@ html[data-glass-effects="off"] .settings-appearance-card {
 @keyframes settingsItemIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes settingsGlassQualityIn {
-    from {
-        opacity: 0;
-        clip-path: inset(0 72% 0 0 round 16px);
-        transform: translateX(-18px) scaleX(0.9);
-    }
-    to {
-        opacity: 1;
-        clip-path: inset(0 0 0 0 round 16px);
-        transform: translateX(0) scaleX(1);
-    }
 }
 
 .settings-appearance-card {
@@ -5027,7 +5021,7 @@ html[data-kasa-motion="on"] .appearance-preview {
     z-index: 1;
 }
 
-.generator-title-animated {
+.brand-title-animated {
     background:
         linear-gradient(
             100deg,
@@ -5039,12 +5033,13 @@ html[data-kasa-motion="on"] .appearance-preview {
         );
     background-size: 240% 100%;
     -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     background-clip: text;
     color: transparent;
-    animation: generatorTitleFlow 3.4s ease-in-out infinite alternate;
+    animation: brandTitleFlow 3.4s ease-in-out infinite alternate;
 }
 
-@keyframes generatorTitleFlow {
+@keyframes brandTitleFlow {
     from { background-position: 0% 50%; }
     to { background-position: 100% 50%; }
 }

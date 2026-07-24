@@ -76,6 +76,10 @@ from kasa_core.paths import (
     ensure_private_data_dir as _ensure_private_data_dir,
     get_data_dir,
 )
+from kasa_core.password_strength import (
+    analyze_password,
+    score_password as _score_password,
+)
 from kasa_core.records import (
     append_password_history as _append_password_history,
     delete_records_and_history as _delete_records_and_history,
@@ -101,11 +105,6 @@ from kasa_core.versioning import (
     normalize_version as _normalize_version,
     version_parts as _version_parts,
 )
-
-try:
-    from zxcvbn import zxcvbn as zxcvbn_score
-except ImportError:  # Paket eksikse uygulama açılır; kurulumda zxcvbn kullanılır.
-    zxcvbn_score = None
 
 # ─── UYGULAMA KURULUMU ────────────────────────────────────────────────────────
 
@@ -465,21 +464,6 @@ def get_bulk_ids() -> list[str]:
         if len(normalized) >= MAX_BULK_IDS:
             break
     return normalized
-
-def _score_password(pw: str) -> int:
-    """Return the backend password strength score in the same 0-4 range as zxcvbn.js."""
-    if zxcvbn_score:
-        try:
-            return int(zxcvbn_score(pw or '').get('score', 0))
-        except Exception:
-            log.exception("zxcvbn score calculation failed")
-    # Fallback keeps the app usable if the optional package is missing.
-    return sum([
-        len(pw) >= 12,
-        any(c.isupper() for c in pw),
-        any(c.isdigit() for c in pw),
-        any(c in "!@#$%^&*()_+-=" for c in pw),
-    ])
 
 # ─── AYAR / TEMA YARDIMCILARI ─────────────────────────────────────────────────
 
@@ -1035,9 +1019,11 @@ def duzenle_sayfasi(kayit_id):
 @login_required
 def sil_kayit(kayit_id):
     backup_database()
-    _delete_records_and_history([kayit_id])
+    deleted = _delete_records_and_history([kayit_id])
     db.session.commit()
     invalidate_vault_report_cache()
+    if request.accept_mimetypes.best == 'application/json':
+        return jsonify({'status': 'ok', 'deleted': deleted})
     return redirect(url_for('index'))
 
 @app.route('/pin/<kayit_id>', methods=['POST'])
@@ -1077,6 +1063,15 @@ def get_record_password(kayit_id):
     fernet = get_fernet()
     r = db.get_or_404(Record, kayit_id)
     return jsonify({'password': safe_decrypt(fernet, r.encrypted_password)})
+
+@app.route('/api/password-strength', methods=['POST'])
+@login_required
+def password_strength():
+    data = request_json()
+    password = data.get('password')
+    if not isinstance(password, str):
+        return jsonify({'error': 'password-required'}), 400
+    return jsonify(analyze_password(password, data.get('user_inputs')))
 
 def _build_vault_report_payloads() -> tuple[dict[str, int], dict[str, list]]:
     """Stats ve sağlık verisini tek decrypt/score geçişinde üretir."""

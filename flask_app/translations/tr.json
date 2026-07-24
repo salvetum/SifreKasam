@@ -17,6 +17,11 @@
   "Ana şifre boş olamaz.": "Ana şifre boş olamaz.",
   "Analiz hazırlanıyor…": "Analiz hazırlanıyor…",
   "Analiz kullanılamıyor": "Analiz kullanılamıyor",
+  "Çok Zayıf": "Çok Zayıf",
+  "Zayıf": "Zayıf",
+  "Orta": "Orta",
+  "Güçlü": "Güçlü",
+  "Çok Güçlü": "Çok Güçlü",
   "Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin.": "Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin.",
   "Yükleniyor": "Yükleniyor",
   "Yükleniyor...": "Yükleniyor...",
@@ -295,5 +300,11 @@
   "Dosya boyutu 5 MB sınırını aşıyor.": "Dosya boyutu 5 MB sınırını aşıyor.",
   "Dosya seçilemedi. Lütfen seçim düğmesini kullanın.": "Dosya seçilemedi. Lütfen seçim düğmesini kullanın.",
   "Bir dakika artır": "Bir dakika artır",
-  "Bir dakika azalt": "Bir dakika azalt"
+  "Bir dakika azalt": "Bir dakika azalt",
+  "Eksik:": "Eksik:",
+  "en az 12 karakter": "en az 12 karakter",
+  "küçük harf": "küçük harf",
+  "büyük harf": "büyük harf",
+  "sayı": "sayı",
+  "sembol": "sembol"
 }

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,7 @@ EXPECTED_ROUTES = {
     "pin_kayit": ("/pin/<kayit_id>", {"POST"}),
     "get_gecmis": ("/gecmis/<kayit_id>", {"GET"}),
     "get_record_password": ("/api/record/<kayit_id>/password", {"GET"}),
+    "password_strength": ("/api/password-strength", {"POST"}),
     "api_stats": ("/api/stats", {"GET"}),
     "saglik_raporu": ("/saglik", {"GET"}),
     "save_settings": ("/save_settings", {"POST"}),
@@ -67,6 +69,54 @@ class RouteContractTests(unittest.TestCase):
                 )
                 self.assertEqual(response.status_code, 302)
                 self.assertIn("/login", response.headers["Location"])
+
+    def test_delete_json_request_does_not_render_index_redirect(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+        with patch.object(app_module, "backup_database"), \
+                patch.object(
+                    app_module,
+                    "_delete_records_and_history",
+                    return_value=1,
+                ), \
+                patch.object(app_module.db.session, "commit"), \
+                patch.object(app_module, "invalidate_vault_report_cache"):
+            response = self.client.post(
+                "/sil/test-record",
+                base_url="https://localhost",
+                headers={
+                    "X-App-Token": app_module.APP_TOKEN,
+                    "Accept": "application/json",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"status": "ok", "deleted": 1})
+        self.assertIsNone(response.location)
+
+    def test_password_strength_endpoint_uses_authenticated_backend_engine(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+        response = self.client.post(
+            "/api/password-strength",
+            base_url="https://localhost",
+            headers={"X-App-Token": app_module.APP_TOKEN},
+            json={
+                "password": "AcmePortal1!",
+                "user_inputs": ["AcmePortal"],
+            },
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(payload["score"], 3)
+        self.assertIn("requirements", payload)
+        self.assertIn("missing_requirements", payload)
+        self.assertNotIn("password", payload)
 
 
 if __name__ == "__main__":
