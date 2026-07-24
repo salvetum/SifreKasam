@@ -67,8 +67,8 @@ class ImportExportServiceTests(unittest.TestCase):
 
 class VersioningServiceTests(unittest.TestCase):
     def test_beta_version_compares_by_numeric_release(self) -> None:
-        self.assertTrue(is_newer_version("v2.6.0", "2.5.10"))
-        self.assertFalse(is_newer_version("v2.5.10", "2.5.10"))
+        self.assertTrue(is_newer_version("v2.6.0", "2.5.11"))
+        self.assertFalse(is_newer_version("v2.5.11", "2.5.11"))
 
 
 class TimeServiceTests(unittest.TestCase):

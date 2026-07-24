@@ -1211,28 +1211,27 @@ document.addEventListener('DOMContentLoaded', function () {
 // ── Dil Değiştirme (Ayarlar) ──
 document.getElementById('settings-language-select')?.addEventListener('change', function () {
     var lang = this.value;
+    var select = this;
+    window.KASA_SET_PAGE_LOADING?.(true, {
+        title: _('Dil değiştiriliyor…'),
+        subtitle: _('Arayüz seçilen dilde yeniden yükleniyor.')
+    });
     fetch('/settings/language', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language: lang })
-    }).then(function () {
-        var theme = localStorage.getItem('kasa-theme') || 'dark';
-        var glass = localStorage.getItem('kasa-glass-effects') || 'on';
-        var motion = localStorage.getItem('kasa-animated-backgrounds') || 'on';
-        var animations = localStorage.getItem('kasa-interface-animations') || 'on';
-        var gradients = localStorage.getItem('kasa-gradients') || 'on';
-        var accent = localStorage.getItem('kasa-accent') || '{{ ACCENT_COLOR }}';
-        var background = localStorage.getItem('kasa-background') || '{{ BACKGROUND_STYLE }}';
-        window.location.href = '/loading?lang=' + encodeURIComponent(lang)
-            + '&theme=' + encodeURIComponent(theme)
-            + '&glassEffects=' + encodeURIComponent(glass)
-            + '&motion=' + encodeURIComponent(motion)
-            + '&animations=' + encodeURIComponent(animations)
-            + '&gradients=' + encodeURIComponent(gradients)
-            + '&accent=' + encodeURIComponent(accent)
-            + '&background=' + encodeURIComponent(background)
-            + '&redirect=1';
-    }).catch(function () { location.reload(); });
+    }).then(function (response) {
+        if (!response.ok) throw new Error('language-save-failed');
+        return response.json();
+    }).then(function (data) {
+        localStorage.setItem('kasa-lang', data.language || lang);
+        window.location.reload();
+    }).catch(function () {
+        select.value = window.LANG || 'tr';
+        select.kasaSyncCustomSelect?.();
+        window.KASA_SET_PAGE_LOADING?.(false);
+        window.KASA_SHOW_WARNING_TOAST?.(_('Dil değiştirilemedi.'));
+    });
 });
 
 // ── Ana Şifre Değiştirme ──
