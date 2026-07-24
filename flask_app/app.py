@@ -1,12 +1,9 @@
 # ─── IMPORTS ──────────────────────────────────────────────────────────────────
 import base64
-import hashlib
-import hmac
 import io
 import json
 import logging
 import os
-import re
 import secrets
 import shutil
 import socket
@@ -16,23 +13,94 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import serialization
-from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.fernet import Fernet
 import ipaddress
 from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 from flask import (Flask, Response, abort, g, jsonify, has_request_context,
                    redirect, render_template, request, send_file, session, url_for)
-from flask_login import (LoginManager, UserMixin, current_user, login_required,
-                         login_user, logout_user)
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import check_password_hash, generate_password_hash
+from flask_login import current_user, login_required, login_user, logout_user
+
+from kasa_core.appearance import AppearanceSettings
+from kasa_core.certificates import ensure_self_signed_cert
+from kasa_core.constants import (
+    APP_VERSION_DEFAULT,
+    DEFAULT_ACCENT_COLOR,
+    DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
+    DEFAULT_BACKGROUND_STYLE,
+    DEFAULT_CATEGORY,
+    DEFAULT_GLASS_QUALITY,
+    DEFAULT_GRADIENTS_ENABLED,
+    DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
+    LEGACY_PBKDF2_ITERATIONS,
+    LEGACY_PBKDF2_SALT,
+    MAX_BULK_IDS,
+    PBKDF2_ITERATIONS,
+    PBKDF2_SALT_SETTING,
+    RECORD_METADATA_FIELDS,
+    RECORD_METADATA_PREFIX,
+    RECORD_METADATA_SETTING,
+    SECRET_PLACEHOLDER,
+    UPDATE_RELEASE_API,
+    UPDATE_REPOSITORY,
+)
+from kasa_core.crypto import (
+    decode_salt as _decode_salt,
+    decrypt_metadata,
+    derive_key_with_salt as _derive_key_with_salt,
+    encrypt_metadata,
+    hash_master_password,
+    is_legacy_master_hash as _is_legacy_master_hash,
+    metadata_value_for_migration as _metadata_value_for_migration,
+    new_salt_b64 as _new_salt_b64,
+    safe_decrypt,
+    safe_encrypt,
+    strict_decrypt,
+    strict_decrypt_metadata,
+    verify_master_password,
+)
+from kasa_core.extensions import db, login_manager
+from kasa_core.i18n import TranslationService
+from kasa_core.import_export import (
+    build_export_payload,
+    new_record_id,
+    parse_expiry as _parse_expiry,
+    parse_import_payload as _parse_import_payload,
+    parse_import_record as _parse_import_record_data,
+    parse_old_txt,
+    serialize_records as _serialize_records,
+    serialize_records_txt as _serialize_records_txt,
+)
+from kasa_core.models import PasswordHistory, Record, Setting, User
+from kasa_core.paths import (
+    ensure_private_data_dir as _ensure_private_data_dir,
+    get_data_dir,
+)
+from kasa_core.records import (
+    append_password_history as _append_password_history,
+    delete_records_and_history as _delete_records_and_history,
+)
+from kasa_core.reports import (
+    build_vault_report_payloads as _calculate_vault_report_payloads,
+)
+from kasa_core.validation import (
+    normalize_background_style,
+    normalize_glass_effects,
+    normalize_glass_quality,
+    normalize_hex_color,
+    normalize_record_type,
+    normalize_text,
+    normalize_theme,
+    normalize_theme_option,
+    normalize_url,
+    safe_int,
+)
+from kasa_core.versioning import (
+    fetch_latest_release,
+    is_newer_version as _is_newer_version,
+    normalize_version as _normalize_version,
+    version_parts as _version_parts,
+)
 
 try:
     from zxcvbn import zxcvbn as zxcvbn_score
@@ -48,54 +116,14 @@ app = Flask(__name__)
 
 APP_TOKEN = os.environ.setdefault('APP_TOKEN', uuid.uuid4().hex)
 FLASK_SECRET_KEY = os.environ.setdefault('FLASK_SECRET_KEY', uuid.uuid4().hex)
-APP_VERSION = os.environ.get("APP_VERSION", "2.5.9-beta")
-UPDATE_REPOSITORY = "salvetum/SifreKasam"
-UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
-SECRET_PLACEHOLDER = '__SECRET__'
-MAX_BULK_IDS = 500
-MAX_IMPORT_RECORDS = 5000
-VALID_RECORD_TYPES = {'Website', 'Application', 'CreditCard', 'SecureNote', 'Other'}
-DEFAULT_CATEGORY = 'Genel'
-DEFAULT_ACCENT_COLOR = '#7c6ff7'
-DEFAULT_BACKGROUND_STYLE = 'aurora'
-VALID_BACKGROUND_STYLES = {'aurora', 'midnight', 'mesh', 'plain'}
-DEFAULT_GLASS_QUALITY = 'normal'
-VALID_GLASS_QUALITIES = {'low', 'normal', 'high'}
-DEFAULT_ANIMATED_BACKGROUNDS_ENABLED = True
-DEFAULT_INTERFACE_ANIMATIONS_ENABLED = True
-DEFAULT_GRADIENTS_ENABLED = True
-
-def _normalize_version(value: str | None) -> str:
-    return str(value or '').strip().lstrip('vV')
-
-def _version_parts(value: str | None) -> tuple[int, ...]:
-    normalized = _normalize_version(value).split('-', 1)[0]
-    numbers = [int(part) for part in re.findall(r'\d+', normalized)]
-    return tuple((numbers + [0, 0, 0])[:3])
-
-def _is_newer_version(latest: str | None, current: str | None) -> bool:
-    latest_parts = _version_parts(latest)
-    current_parts = _version_parts(current)
-    return bool(latest_parts) and latest_parts > current_parts
+APP_VERSION = os.environ.get("APP_VERSION", APP_VERSION_DEFAULT)
 
 def _fetch_latest_release() -> dict[str, Any]:
-    req = Request(
+    return fetch_latest_release(
         UPDATE_RELEASE_API,
-        headers={
-            'Accept': 'application/vnd.github+json',
-            'User-Agent': f'SifreKasam/{APP_VERSION}',
-        },
+        UPDATE_REPOSITORY,
+        APP_VERSION,
     )
-    with urlopen(req, timeout=5) as response:
-        payload = response.read().decode('utf-8')
-    data = json.loads(payload)
-    latest_version = _normalize_version(data.get('tag_name') or data.get('name'))
-    return {
-        'latest_version': latest_version,
-        'release_name': data.get('name') or f"v{latest_version}",
-        'release_url': data.get('html_url') or f"https://github.com/{UPDATE_REPOSITORY}/releases",
-        'published_at': data.get('published_at'),
-    }
 
 app.secret_key = FLASK_SECRET_KEY
 app.permanent_session_lifetime = timedelta(minutes=60)
@@ -108,22 +136,6 @@ app.config.update(
 
 # ─── VERİ YOLU AYARLARI ───────────────────────────────────────────────────────
 
-def _ensure_private_data_dir(path: str) -> str:
-    os.makedirs(path, exist_ok=True)
-    try:
-        os.chmod(path, 0o700)
-    except OSError as exc:
-        log.warning("Veri dizini izinleri sıkılaştırılamadı: %s", exc)
-    return path
-
-def get_data_dir() -> str:
-    if os.name == 'nt':
-        appdata = os.environ.get('APPDATA')
-        if appdata:
-            return _ensure_private_data_dir(os.path.join(appdata, '.SifrekasamV2'))
-    xdg = os.environ.get('XDG_CONFIG_HOME') or os.path.join(os.path.expanduser('~'), '.config')
-    return _ensure_private_data_dir(os.path.join(xdg, 'sifrekasam'))
-
 DATA_DIR  = get_data_dir()
 DB_FILE   = os.path.join(DATA_DIR, 'sifreler.db')
 TXT_FILE  = os.path.join(DATA_DIR, 'sifreler.txt')
@@ -135,48 +147,45 @@ KEY_FILE   = os.path.join(DATA_DIR, 'key.pem')
 app.config['SQLALCHEMY_DATABASE_URI']        = f"sqlite:///{DB_FILE}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db            = SQLAlchemy(app)
-login_manager = LoginManager(app)
+db.init_app(app)
+login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# ─── MODELLER ─────────────────────────────────────────────────────────────────
+_appearance_settings = AppearanceSettings(THEME_FILE)
+_load_appearance_file = _appearance_settings.load_file
+_save_appearance_file = _appearance_settings.save_file
+_get_setting = _appearance_settings.get_setting
+_set_setting = _appearance_settings.set_setting
+get_saved_theme = _appearance_settings.get_saved_theme
+get_glass_effects_enabled = _appearance_settings.get_glass_effects_enabled
+get_saved_accent_color = _appearance_settings.get_saved_accent_color
+get_saved_background_style = _appearance_settings.get_saved_background_style
+get_glass_quality = _appearance_settings.get_glass_quality
+get_animated_backgrounds_enabled = _appearance_settings.get_animated_backgrounds_enabled
+get_interface_animations_enabled = _appearance_settings.get_interface_animations_enabled
+get_gradients_enabled = _appearance_settings.get_gradients_enabled
+save_glass_effects = _appearance_settings.save_glass_effects
+save_theme = _appearance_settings.save_theme
+save_accent_color = _appearance_settings.save_accent_color
+save_background_style = _appearance_settings.save_background_style
+save_glass_quality = _appearance_settings.save_glass_quality
+save_animated_backgrounds = _appearance_settings.save_animated_backgrounds
+save_interface_animations = _appearance_settings.save_interface_animations
+save_gradients = _appearance_settings.save_gradients
 
-class Setting(db.Model):
-    __tablename__ = 'settings'
-    key   = db.Column(db.String, primary_key=True)
-    value = db.Column(db.String)
+_translation_service = TranslationService(
+    os.path.join(os.path.dirname(__file__), 'translations'),
+    _get_setting,
+    _set_setting,
+    _save_appearance_file,
+)
+get_available_languages = _translation_service.get_available_languages
+load_translations = _translation_service.load_translations
+get_saved_language = _translation_service.get_saved_language
+save_language = _translation_service.save_language
+_ = _translation_service.translate
 
-
-class Record(db.Model):
-    __tablename__ = 'records'
-    id                 = db.Column(db.String,   primary_key=True)
-    type               = db.Column(db.String,   nullable=False)
-    category           = db.Column(db.String,   default='Genel')
-    title              = db.Column(db.String,   nullable=False)
-    website_url        = db.Column(db.String,   default='')
-    login              = db.Column(db.String,   default='')
-    encrypted_password = db.Column(db.String,   default='')
-    encrypted_comment  = db.Column(db.String,   default='')
-    is_pinned          = db.Column(db.Integer,  default=0)
-    expiry_date        = db.Column(db.DateTime, nullable=True)
-    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at         = db.Column(db.DateTime, default=datetime.utcnow,
-                                   onupdate=datetime.utcnow)
-
-
-class PasswordHistory(db.Model):
-    __tablename__ = 'password_history'
-    id                 = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    record_id          = db.Column(db.String,  db.ForeignKey('records.id', ondelete='CASCADE'),
-                                   nullable=False)
-    encrypted_password = db.Column(db.String,  nullable=False)
-    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class User(UserMixin):
-    def __init__(self, id: str):
-        self.id = id
-
+# ─── FLASK-LOGIN ──────────────────────────────────────────────────────────────
 
 @login_manager.user_loader
 def load_user(user_id: str):
@@ -203,65 +212,6 @@ with app.app_context():
             db.session.rollback()
 
 # ─── ÇEVİRİ / DİL SİSTEMİ ──────────────────────────────────────
-
-_TRANSLATIONS_DIR = os.path.join(os.path.dirname(__file__), 'translations')
-_translations_cache: dict[str, dict] = {}
-
-def get_available_languages() -> list[dict]:
-    langs = []
-    if not os.path.isdir(_TRANSLATIONS_DIR):
-        return [{'code': 'tr', 'name': 'Türkçe'}]
-    for fname in sorted(os.listdir(_TRANSLATIONS_DIR)):
-        if fname.endswith('.json'):
-            code = fname[:-5]
-            try:
-                with open(os.path.join(_TRANSLATIONS_DIR, fname), 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                langs.append({'code': code, 'name': data.get('language_name', code)})
-            except Exception:
-                langs.append({'code': code, 'name': code})
-    return langs if langs else [{'code': 'tr', 'name': 'Türkçe'}]
-
-def load_translations(lang: str) -> dict:
-    if not lang or not lang.replace('-', '').replace('_', '').isalnum():
-        lang = 'tr'
-    if lang in _translations_cache:
-        return _translations_cache[lang]
-    filepath = os.path.join(_TRANSLATIONS_DIR, f'{lang}.json')
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            _translations_cache[lang] = data
-            return data
-        except Exception:
-            pass
-    _translations_cache[lang] = {}
-    return {}
-
-def get_saved_language() -> str:
-    try:
-        v = _get_setting('language')
-        if v:
-            return v
-    except Exception:
-        pass
-    return 'tr'
-
-def save_language(value: str) -> str:
-    requested = value.strip() if value else 'tr'
-    allowed = {item['code'] for item in get_available_languages()}
-    code = requested if requested in allowed else 'tr'
-    _set_setting('language', code)
-    _save_appearance_file(language=code)
-    return code
-
-def _(key: str) -> str:
-    lang = get_saved_language()
-    if lang == 'tr':
-        return key
-    t = load_translations(lang)
-    return t.get(key, key)
 
 # ─── HEARTBEAT ────────────────────────────────────────────────────────────────
 
@@ -321,32 +271,8 @@ def _get_vault_password() -> str | None:
 
 # ─── KRİPTOGRAFİ ──────────────────────────────────────────────────────────────
 
-LEGACY_PBKDF2_SALT = b'kasa_masaustu_salt_12345'
-PBKDF2_SALT_SETTING = 'pbkdf2_salt_b64'
-PBKDF2_ITERATIONS = 600_000
-LEGACY_PBKDF2_ITERATIONS = 100_000
-RECORD_METADATA_PREFIX = 'sifrekasam:v1:'
-RECORD_METADATA_SETTING = 'record_metadata_encryption_v1'
-RECORD_METADATA_FIELDS = ('title', 'website_url', 'login')
-
-def _derive_key_with_salt(master_password: str, salt: bytes,
-                          iterations: int = PBKDF2_ITERATIONS) -> bytes:
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32,
-                     salt=salt, iterations=iterations)
-    return base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
-
-def _decode_salt(value: str | None) -> bytes | None:
-    try:
-        salt = base64.b64decode(value or '', validate=True)
-        return salt if len(salt) >= 16 else None
-    except Exception:
-        return None
-
 def _get_saved_pbkdf2_salt() -> bytes | None:
     return _decode_salt(_get_setting(PBKDF2_SALT_SETTING))
-
-def _new_salt_b64() -> str:
-    return base64.b64encode(os.urandom(16)).decode()
 
 def _create_pbkdf2_salt() -> bytes:
     # Her kurulum için benzersiz salt üreterek offline brute-force maliyetini artırır.
@@ -371,41 +297,6 @@ def get_fernet() -> Fernet:
         abort(401)
     return Fernet(derive_key(mp))
 
-def safe_decrypt(fernet: Fernet, value: str) -> str:
-    if not value:
-        return ""
-    try:
-        return fernet.decrypt(value.encode()).decode()
-    except Exception:
-        return "[Şifre Çözülemedi]"
-
-def safe_encrypt(fernet: Fernet, value: str) -> str:
-    return fernet.encrypt(value.encode()).decode() if value else ""
-
-def strict_decrypt(fernet: Fernet, value: str) -> str:
-    return fernet.decrypt(value.encode()).decode() if value else ""
-
-def encrypt_metadata(fernet: Fernet, value: str) -> str:
-    return RECORD_METADATA_PREFIX + safe_encrypt(fernet, value) if value else ""
-
-def decrypt_metadata(fernet: Fernet, value: str) -> str:
-    if not value or not value.startswith(RECORD_METADATA_PREFIX):
-        return value or ""
-    return safe_decrypt(fernet, value[len(RECORD_METADATA_PREFIX):])
-
-def strict_decrypt_metadata(fernet: Fernet, value: str) -> str:
-    if not value or not value.startswith(RECORD_METADATA_PREFIX):
-        return value or ""
-    return strict_decrypt(fernet, value[len(RECORD_METADATA_PREFIX):])
-
-def _metadata_value_for_migration(fernet: Fernet, value: str) -> tuple[str, bool]:
-    if not value or not value.startswith(RECORD_METADATA_PREFIX):
-        return value or "", False
-    try:
-        return strict_decrypt_metadata(fernet, value), True
-    except InvalidToken:
-        return value, False
-
 def _reencrypt_record(record: Record, old_fernet: Fernet, new_fernet: Fernet,
                       allow_legacy_prefix: bool = False) -> None:
     record.encrypted_password = safe_encrypt(
@@ -423,23 +314,6 @@ def _reencrypt_record(record: Record, old_fernet: Fernet, new_fernet: Fernet,
         else:
             plaintext = strict_decrypt_metadata(old_fernet, encrypted_value)
         setattr(record, field, encrypt_metadata(new_fernet, plaintext))
-
-def _is_legacy_master_hash(value: str) -> bool:
-    return len(value or '') == 64 and all(c in '0123456789abcdef' for c in value.lower())
-
-def hash_master_password(master_password: str) -> str:
-    return generate_password_hash(master_password)
-
-def verify_master_password(stored_hash: str, master_password: str) -> bool:
-    if not stored_hash:
-        return False
-    if _is_legacy_master_hash(stored_hash):
-        candidate = hashlib.sha256(master_password.encode()).hexdigest()
-        return hmac.compare_digest(stored_hash, candidate)
-    try:
-        return check_password_hash(stored_hash, master_password)
-    except Exception:
-        return False
 
 def _vault_initialized() -> bool:
     if os.path.exists(VAULT_INIT_FILE):
@@ -571,31 +445,10 @@ def migrate_plaintext_record_metadata(fernet: Fernet) -> bool:
         log.exception("Kayıt metadata şifreleme migrasyonu geri alındı.")
         raise
 
-def new_record_id() -> str:
-    return uuid.uuid4().hex
-
 def request_json() -> dict[str, Any]:
     """JSON body sözlük değilse güvenli biçimde boş dict döndürür."""
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else {}
-
-def normalize_record_type(value: str | None) -> str:
-    return value if value in VALID_RECORD_TYPES else 'Other'
-
-def normalize_text(value: object | None, fallback: str = '', max_length: int | None = None) -> str:
-    """Form/import verisini string'e çevirir, kırpar ve opsiyonel uzunluk sınırı uygular."""
-    text = str(value if value not in (None, '') else fallback).strip()
-    return text[:max_length] if max_length and len(text) > max_length else text
-
-def normalize_url(value: object | None) -> str:
-    """Sadece http/https URL kabul eder; şema yoksa https ekler."""
-    url = normalize_text(value)
-    if not url:
-        return ''
-    parsed = urlparse(url if '://' in url else f'https://{url}')
-    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
-        return ''
-    return parsed.geturl()
 
 def get_bulk_ids() -> list[str]:
     """Toplu işlem ID listesini normalize eder, tekrarları ve aşırı uzun listeleri engeller."""
@@ -629,217 +482,6 @@ def _score_password(pw: str) -> int:
     ])
 
 # ─── AYAR / TEMA YARDIMCILARI ─────────────────────────────────────────────────
-
-def normalize_theme(value) -> str:
-    return 'light' if value == 'light' else 'dark'
-
-def normalize_glass_effects(value) -> bool:
-    return str(value).lower() not in {'false', '0', 'off', 'disabled', 'kapali'}
-
-def normalize_theme_option(value, default: bool = True) -> bool:
-    if value is None:
-        return default
-    return str(value).lower() not in {'false', '0', 'off', 'disabled', 'kapali'}
-
-def normalize_hex_color(value, fallback: str = DEFAULT_ACCENT_COLOR) -> str:
-    text = str(value or '').strip()
-    if not text.startswith('#'):
-        text = f'#{text}'
-    if len(text) == 7 and all(c in '0123456789abcdefABCDEF' for c in text[1:]):
-        return text.lower()
-    return fallback
-
-def normalize_background_style(value) -> str:
-    text = str(value or DEFAULT_BACKGROUND_STYLE).strip().lower()
-    return text if text in VALID_BACKGROUND_STYLES else DEFAULT_BACKGROUND_STYLE
-
-def normalize_glass_quality(value) -> str:
-    text = str(value or DEFAULT_GLASS_QUALITY).strip().lower()
-    return text if text in VALID_GLASS_QUALITIES else DEFAULT_GLASS_QUALITY
-
-def safe_int(value: object | None, default: int, minimum: int | None = None,
-             maximum: int | None = None) -> int:
-    """Kullanıcı/env kaynaklı sayıları güvenli aralığa çevirir."""
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        number = default
-    if minimum is not None:
-        number = max(minimum, number)
-    if maximum is not None:
-        number = min(maximum, number)
-    return number
-
-def _load_appearance_file() -> dict:
-    try:
-        if os.path.exists(THEME_FILE):
-            with open(THEME_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data if isinstance(data, dict) else {}
-    except Exception:
-        pass
-    return {}
-
-def _save_appearance_file(**updates: Any) -> None:
-    """Tema ayarlarını atomik JSON yazma ile kaydeder."""
-    data = _load_appearance_file()
-    data.update(updates)
-    tmp_file = f"{THEME_FILE}.{uuid.uuid4().hex}.tmp"
-    try:
-        with open(tmp_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False)
-        os.replace(tmp_file, THEME_FILE)
-    finally:
-        if os.path.exists(tmp_file):
-            try:
-                os.unlink(tmp_file)
-            except OSError:
-                pass
-
-def _get_setting(key: str):
-    """DB'den ayar okur; bulamazsa None döner."""
-    s = Setting.query.filter_by(key=key).first()
-    return s.value if s else None
-
-def _set_setting(key: str, value: str):
-    s = Setting.query.filter_by(key=key).first()
-    if s:
-        s.value = value
-    else:
-        db.session.add(Setting(key=key, value=value))
-
-def get_saved_theme() -> str:
-    try:
-        v = _get_setting('theme')
-        if v:
-            return normalize_theme(v)
-    except Exception:
-        pass
-    return normalize_theme(_load_appearance_file().get('theme', 'dark'))
-
-def get_glass_effects_enabled() -> bool:
-    try:
-        v = _get_setting('glass_effects_enabled')
-        if v is not None:
-            return normalize_glass_effects(v)
-    except Exception:
-        pass
-    data = _load_appearance_file()
-    if 'glass_effects_enabled' in data:
-        return normalize_glass_effects(data['glass_effects_enabled'])
-    return True
-
-def get_saved_accent_color() -> str:
-    try:
-        v = _get_setting('accent_color')
-        if v:
-            return normalize_hex_color(v)
-    except Exception:
-        pass
-    return normalize_hex_color(_load_appearance_file().get('accent_color'))
-
-def get_saved_background_style() -> str:
-    try:
-        v = _get_setting('background_style')
-        if v:
-            return normalize_background_style(v)
-    except Exception:
-        pass
-    return normalize_background_style(_load_appearance_file().get('background_style'))
-
-def get_glass_quality() -> str:
-    try:
-        v = _get_setting('glass_quality')
-        if v:
-            return normalize_glass_quality(v)
-    except Exception:
-        pass
-    return normalize_glass_quality(_load_appearance_file().get('glass_quality'))
-
-def get_animated_backgrounds_enabled() -> bool:
-    try:
-        v = _get_setting('animated_backgrounds_enabled')
-        if v is not None:
-            return normalize_theme_option(v, DEFAULT_ANIMATED_BACKGROUNDS_ENABLED)
-    except Exception:
-        pass
-    data = _load_appearance_file()
-    return normalize_theme_option(
-        data.get('animated_backgrounds_enabled'),
-        DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
-    )
-
-def get_interface_animations_enabled() -> bool:
-    try:
-        value = _get_setting('interface_animations_enabled')
-        if value is not None:
-            return normalize_theme_option(value, DEFAULT_INTERFACE_ANIMATIONS_ENABLED)
-    except Exception:
-        pass
-    return normalize_theme_option(
-        _load_appearance_file().get('interface_animations_enabled'),
-        DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
-    )
-
-def get_gradients_enabled() -> bool:
-    try:
-        v = _get_setting('gradients_enabled')
-        if v is not None:
-            return normalize_theme_option(v, DEFAULT_GRADIENTS_ENABLED)
-    except Exception:
-        pass
-    return normalize_theme_option(
-        _load_appearance_file().get('gradients_enabled'),
-        DEFAULT_GRADIENTS_ENABLED,
-    )
-
-def save_glass_effects(value) -> bool:
-    enabled = normalize_glass_effects(value)
-    _set_setting('glass_effects_enabled', str(enabled).lower())
-    _save_appearance_file(glass_effects_enabled=enabled)
-    return enabled
-
-def save_theme(value) -> str:
-    theme = normalize_theme(value)
-    _set_setting('theme', theme)
-    _save_appearance_file(theme=theme)
-    return theme
-
-def save_accent_color(value) -> str:
-    color = normalize_hex_color(value)
-    _set_setting('accent_color', color)
-    _save_appearance_file(accent_color=color)
-    return color
-
-def save_background_style(value) -> str:
-    background = normalize_background_style(value)
-    _set_setting('background_style', background)
-    _save_appearance_file(background_style=background)
-    return background
-
-def save_glass_quality(value) -> str:
-    quality = normalize_glass_quality(value)
-    _set_setting('glass_quality', quality)
-    _save_appearance_file(glass_quality=quality)
-    return quality
-
-def save_animated_backgrounds(value) -> bool:
-    enabled = normalize_theme_option(value, DEFAULT_ANIMATED_BACKGROUNDS_ENABLED)
-    _set_setting('animated_backgrounds_enabled', str(enabled).lower())
-    _save_appearance_file(animated_backgrounds_enabled=enabled)
-    return enabled
-
-def save_interface_animations(value) -> bool:
-    enabled = normalize_theme_option(value, DEFAULT_INTERFACE_ANIMATIONS_ENABLED)
-    _set_setting('interface_animations_enabled', str(enabled).lower())
-    _save_appearance_file(interface_animations_enabled=enabled)
-    return enabled
-
-def save_gradients(value) -> bool:
-    enabled = normalize_theme_option(value, DEFAULT_GRADIENTS_ENABLED)
-    _set_setting('gradients_enabled', str(enabled).lower())
-    _save_appearance_file(gradients_enabled=enabled)
-    return enabled
 
 # ─── CONTEXT PROCESSORS ───────────────────────────────────────────────────────
 
@@ -901,7 +543,7 @@ def inject_globals():
 
 # ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
 
-_PUBLIC_ENDPOINTS = {'login', 'static', 'loading', 'manifest_json', 'sw',
+_PUBLIC_ENDPOINTS = {'login', 'static', 'loading_page', 'manifest_json', 'sw',
                      'settings_language'}
 _TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'settings_tray', 'lan_info',
                     'settings_runtime'}
@@ -1319,14 +961,6 @@ def index():
 
     return render_template('index.html', kayit_listesi=kasa_verileri)
 
-def _parse_expiry(expiry_str: str | None) -> datetime | None:
-    if not expiry_str:
-        return None
-    try:
-        return datetime.strptime(expiry_str, '%Y-%m-%d')
-    except ValueError:
-        return None
-
 def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str, Any]:
     """Form verilerini okuyup (id, Record alanları) döner."""
     record_type = normalize_record_type(request.form.get('kayit_tipi'))
@@ -1344,46 +978,6 @@ def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str,
         encrypted_comment  = safe_encrypt(fernet, request.form.get('comment', '')),
         expiry_date        = _parse_expiry(request.form.get('expiry_date', '')),
     )
-
-def _delete_records_and_history(record_ids: list[str]) -> int:
-    """Kayıtlarla birlikte artık erişilemeyecek şifre geçmişini de siler."""
-    if not record_ids:
-        return 0
-    PasswordHistory.query.filter(
-        PasswordHistory.record_id.in_(record_ids)
-    ).delete(synchronize_session=False)
-    return Record.query.filter(
-        Record.id.in_(record_ids)
-    ).delete(synchronize_session=False)
-
-def _append_password_history(record_id: str, encrypted_password: str,
-                             fernet: Fernet) -> bool:
-    """Yalnızca önceki kayıttan farklı ve çözülebilir parolaları geçmişe ekler."""
-    if not encrypted_password:
-        return False
-    try:
-        password = strict_decrypt(fernet, encrypted_password)
-    except Exception:
-        log.warning("Çözülemeyen parola geçmişe eklenmedi: %s", record_id)
-        return False
-
-    latest = PasswordHistory.query.filter_by(record_id=record_id).order_by(
-        PasswordHistory.created_at.desc(),
-        PasswordHistory.id.desc(),
-    ).first()
-    if latest:
-        try:
-            latest_password = strict_decrypt(fernet, latest.encrypted_password)
-        except Exception:
-            latest_password = None
-        if latest_password is not None and latest_password == password:
-            return False
-
-    db.session.add(PasswordHistory(
-        record_id=record_id,
-        encrypted_password=encrypted_password,
-    ))
-    return True
 
 @app.route('/ekle', methods=['GET', 'POST'])
 @login_required
@@ -1486,48 +1080,7 @@ def get_record_password(kayit_id):
 
 def _build_vault_report_payloads() -> tuple[dict[str, int], dict[str, list]]:
     """Stats ve sağlık verisini tek decrypt/score geçişinde üretir."""
-    fernet      = get_fernet()
-    rows        = Record.query.with_entities(
-        Record.id, Record.title, Record.encrypted_password,
-        Record.updated_at, Record.is_pinned, Record.expiry_date
-    ).all()
-
-    simdi       = datetime.utcnow()
-    alti_ay_once = simdi - timedelta(days=180)
-    pinned = zayif = eski = expired = 0
-    zayif_records: list[dict[str, str]] = []
-    eski_records: list[dict[str, Any]] = []
-    expired_records: list[dict[str, str]] = []
-    pw_map: dict[str, list[dict[str, str]]] = {}
-
-    for r in rows:
-        if r.is_pinned:
-            pinned += 1
-        pw = safe_decrypt(fernet, r.encrypted_password)
-        if not pw:
-            continue
-
-        rec = {'id': r.id, 'title': decrypt_metadata(fernet, r.title)}
-        if _score_password(pw) < 4:
-            zayif += 1
-            zayif_records.append(rec)
-        pw_map.setdefault(pw, []).append(rec)
-        if r.updated_at and r.updated_at < alti_ay_once:
-            eski += 1
-            eski_records.append({**rec, 'days': (simdi - r.updated_at).days})
-        if r.expiry_date and r.expiry_date < simdi:
-            expired += 1
-            expired_records.append(rec)
-
-    stats = {'toplam': len(rows), 'pinned': pinned,
-             'zayif': zayif, 'eski': eski, 'expired': expired}
-    health = {
-        'zayif': zayif_records,
-        'tekrar': [group for group in pw_map.values() if len(group) > 1],
-        'eski': eski_records,
-        'expired': expired_records,
-    }
-    return stats, health
+    return _calculate_vault_report_payloads(get_fernet(), _score_password)
 
 @app.route('/api/stats')
 @login_required
@@ -1604,90 +1157,19 @@ def export_data():
         export_format,
     )
 
-def _serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
-    """Kayıtları dışa aktarılabilir plain JSON sözlüklerine dönüştürür."""
-    return [{
-        'type': r.type, 'category': r.category,
-        'title': decrypt_metadata(fernet, r.title),
-        'website_url': decrypt_metadata(fernet, r.website_url),
-        'login': decrypt_metadata(fernet, r.login),
-        'password': safe_decrypt(fernet, r.encrypted_password),
-        'comment':  safe_decrypt(fernet, r.encrypted_comment),
-        'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
-    } for r in rows]
-
 def _requested_export_format() -> str:
     export_format = normalize_text(request.args.get('format', 'json')).lower()
     return export_format if export_format in {'json', 'kasa', 'txt'} else 'json'
 
-def _serialize_records_txt(data: list[dict[str, Any]]) -> bytes:
-    fields = ('type', 'category', 'title', 'website_url', 'login',
-              'password', 'comment', 'expiry_date')
-    blocks = []
-    for item in data:
-        lines = [
-            f"{field}: {json.dumps(str(item.get(field) or ''), ensure_ascii=False)}"
-            for field in fields
-        ]
-        blocks.append('\n'.join(lines))
-    return '\n---\n'.join(blocks).encode('utf-8')
-
 def _send_records_export(data: list[dict[str, Any]], base_name: str,
                          export_format: str = 'json'):
-    if export_format == 'txt':
-        payload = _serialize_records_txt(data)
-        mimetype = 'text/plain; charset=utf-8'
-    else:
-        payload = json.dumps(data, ensure_ascii=False, indent=4).encode('utf-8')
-        mimetype = ('application/vnd.sifrekasam.backup+json'
-                    if export_format == 'kasa' else 'application/json')
-
+    payload, mimetype = build_export_payload(data, export_format)
     return send_file(io.BytesIO(payload), mimetype=mimetype, as_attachment=True,
                      download_name=f'{base_name}.{export_format}')
 
 def _parse_import_record(item: dict, fernet: Fernet) -> Record:
     """Desteklenen yedek sözlüğünü yeni Record modeline çevirir."""
-    title = (item.get('title') or item.get('Website name') or item.get('Application')
-             or item.get('Account name') or item.get('SecureNote') or 'Bilinmeyen')
-    login_val = normalize_text(item.get('login') or item.get('Login') or
-                               item.get('Login name') or item.get('CreditCard') or '', max_length=300)
-    password  = normalize_text(item.get('password') or item.get('Password') or '')
-    comment   = normalize_text(item.get('comment') or item.get('Comment') or item.get('SecureNote') or '',
-                               max_length=5000)
-    url       = normalize_url(item.get('website_url') or item.get('Website URL') or '')
-    category  = item.get('category') or item.get('Category') or 'Genel'
-    rec_type  = (item.get('type') or
-                 ('Website'    if 'Website name' in item else
-                  'Application' if 'Application' in item else
-                  'CreditCard'  if 'CreditCard'  in item else
-                  'SecureNote'  if 'SecureNote'  in item else 'Other'))
-    return Record(
-        id                 = new_record_id(),
-        type               = normalize_record_type(rec_type),
-        category           = normalize_text(category, DEFAULT_CATEGORY, 120),
-        title              = encrypt_metadata(
-            fernet, normalize_text(title, _('Bilinmeyen'), 200)),
-        website_url        = encrypt_metadata(fernet, url),
-        login              = encrypt_metadata(fernet, login_val),
-        encrypted_password = safe_encrypt(fernet, password),
-        encrypted_comment  = safe_encrypt(fernet, comment),
-        expiry_date        = _parse_expiry(normalize_text(item.get('expiry_date') or item.get('Expiry Date'))),
-    )
-
-def _parse_import_payload(filename: str, content: str) -> list[dict[str, Any]]:
-    """Yedek dosyasını uzantısına göre çözer ve geçerli kayıt sözlüklerini döndürür."""
-    suffix = os.path.splitext(filename.lower())[1]
-    if suffix in {'.json', '.kasa'}:
-        data = json.loads(content)
-    elif suffix == '.txt':
-        data = parse_old_txt(content)
-    else:
-        raise ValueError('unsupported-import-format')
-
-    if not isinstance(data, list):
-        raise ValueError('invalid-import-payload')
-
-    return [item for item in data[:MAX_IMPORT_RECORDS] if isinstance(item, dict)]
+    return _parse_import_record_data(item, fernet, _('Bilinmeyen'))
 
 @app.route('/import', methods=['POST'])
 @login_required
@@ -1721,30 +1203,6 @@ def import_data():
         db.session.rollback()
         log.error(f"Import Error: {e}")
         return "İçe aktarma sırasında hata oluştu.", 400
-
-def parse_old_txt(content: str) -> list[dict[str, str]]:
-    """Eski TXT yedek formatını kayıt sözlüklerine dönüştürür."""
-    records: list[dict[str, str]] = []
-    for block in content.split("---"):
-        block = block.strip()
-        if not block:
-            continue
-        data = {}
-        for line in block.splitlines():
-            if ':' in line:
-                key, _, val = line.partition(':')
-                value = val.strip()
-                if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
-                    try:
-                        value = json.loads(value)
-                    except json.JSONDecodeError:
-                        pass
-                data[key.strip()] = str(value)
-        if data and any(k in data for k in (
-                'title', 'Website name', 'Application', 'Account name',
-                'CreditCard', 'SecureNote', 'Login')):
-            records.append(data)
-    return records
 
 @app.route('/api/bulk/delete', methods=['POST'])
 @login_required
@@ -2088,37 +1546,7 @@ def migrate_txt_to_db(mp: str):
 # ─── SSL SERTİFİKASI (self-signed) ─────────────────────────────────────────────
 
 def _ensure_self_signed_cert():
-    if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
-        return
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "ŞifreKasam")])
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=365 * 10))
-        .add_extension(
-            x509.SubjectAlternativeName([
-                x509.DNSName("localhost"),
-                x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
-                x509.IPAddress(ipaddress.IPv6Address("::1")),
-            ]),
-            critical=False,
-        )
-        .sign(key, hashes.SHA256())
-    )
-    with open(CERT_FILE, "wb") as f:
-        f.write(cert.public_bytes(serialization.Encoding.PEM))
-    with open(KEY_FILE, "wb") as f:
-        f.write(key.private_bytes(
-            serialization.Encoding.PEM,
-            serialization.PrivateFormat.TraditionalOpenSSL,
-            serialization.NoEncryption(),
-        ))
-    log.info("Self-signed SSL sertifikasi olusturuldu")
+    ensure_self_signed_cert(CERT_FILE, KEY_FILE, log)
 
 _ensure_self_signed_cert()
 
