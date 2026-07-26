@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.6.0 — Main Stylesheet
+   ŞifreKasam v2.6.1 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -3696,7 +3696,7 @@ textarea.kasa-field {
 
 @media (min-width: 560px) {
     .settings-appearance-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
     }
 }
 

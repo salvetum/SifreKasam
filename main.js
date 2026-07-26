@@ -71,8 +71,15 @@ process.on('unhandledRejection', (reason) => showFriendlyFatalError('UPR', reaso
 
 const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam';
 const LEGACY_UNINSTALL_KEYS = [
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.0',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.0',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.12',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.12',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.11',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.11',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.10-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.10-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.9-beta.3',
@@ -173,7 +180,9 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
   'sifrekasam',
   'SifreKasam',
+  'sifrekasam-v2.6.1',
   'sifrekasam-v2.6.0',
+  'sifrekasam-v2.5.12',
   'sifrekasam-v2.5.11',
     'sifrekasam-v2.5.10',
     'sifrekasam-v2.5.10-beta.1',

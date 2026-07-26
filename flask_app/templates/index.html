@@ -672,16 +672,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="appearance-field">
-                                <span id="background-style-label">{{ _('Arkaplan') }}</span>
-                                <select name="background_style" id="background-style-select" class="kasa-field"
-                                    aria-labelledby="background-style-label" data-custom-select>
-                                    <option value="aurora" {% if BACKGROUND_STYLE == 'aurora' %}selected{% endif %}>{{ _('Aurora') }}</option>
-                                    <option value="midnight" {% if BACKGROUND_STYLE == 'midnight' %}selected{% endif %}>{{ _('Gece') }}</option>
-                                    <option value="mesh" {% if BACKGROUND_STYLE == 'mesh' %}selected{% endif %}>{{ _('Mesh') }}</option>
-                                    <option value="plain" {% if BACKGROUND_STYLE == 'plain' %}selected{% endif %}>{{ _('Sade') }}</option>
-                                </select>
-                            </div>
+                            <input type="hidden" name="background_style" id="background-style-hidden" value="{{ BACKGROUND_STYLE }}">
                         </div>
                         <div class="accent-preset-row" role="group" aria-label="{{ _('Hazır renkler') }}">
                             <button type="button" class="accent-preset-purple" data-accent-preset="#7c6ff7" aria-pressed="false"><span></span>{{ _('Mor') }}</button>
