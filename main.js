@@ -678,14 +678,22 @@ async function createWindow() {
 // ─── SİSTEM TEPSİSİ ───────────────────────────────────────────────────────────
 
 function createTray() {
-  tray = new Tray(resolvePath('favicon.ico'));
-  tray.setToolTip('ŞifreKasam');
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Göster', click: showMainWindow },
-    { type: 'separator' },
-    { label: 'Çıkış',  click: () => { isQuiting = true; app.quit(); } },
-  ]));
-  tray.on('click', showMainWindow);
+  try {
+    const iconPath = process.platform === 'win32'
+      ? resolvePath('favicon.ico')
+      : resolvePath('assets', 'tray-icon.png');
+    tray = new Tray(iconPath);
+    tray.setToolTip('ŞifreKasam');
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: 'Göster', click: showMainWindow },
+      { type: 'separator' },
+      { label: 'Çıkış',  click: () => { isQuiting = true; app.quit(); } },
+    ]));
+    tray.on('click', showMainWindow);
+  } catch (err) {
+    console.error('Tray icon yuklenemedi, tray ozelligi atlaniyor:', err);
+    tray = null;
+  }
 }
 
 function showMainWindow() {

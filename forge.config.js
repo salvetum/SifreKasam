@@ -20,7 +20,8 @@ module.exports = {
     executableName: "SifreKasam",
     extraResource: [
       "./backend",
-      "./favicon.ico"
+      "./favicon.ico",
+      "./assets"
     ],
     icon: iconPath,
     win32metadata: {
