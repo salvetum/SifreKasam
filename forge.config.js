@@ -43,7 +43,7 @@ module.exports = {
       platforms: ['darwin', 'win32', 'linux'],
     },
     {
-      name: '@electron-forge/maker-appimage',
+      name: '@reforged/maker-appimage',
       platforms: ['linux'],
       // WSL uzerinde test icin: sudo apt install libfuse2
       // WSLg ile GUI testi icin /etc/wsl.conf icinde [boot] systemd=true olmali
