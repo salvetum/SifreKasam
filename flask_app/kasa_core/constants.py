@@ -1,6 +1,6 @@
 """Application constants shared by backend modules."""
 
-APP_VERSION_DEFAULT = "2.5.11"
+APP_VERSION_DEFAULT = "2.5.12"
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 
@@ -13,6 +13,9 @@ DEFAULT_CATEGORY = "Genel"
 DEFAULT_ACCENT_COLOR = "#7c6ff7"
 DEFAULT_BACKGROUND_STYLE = "aurora"
 VALID_BACKGROUND_STYLES = {"aurora", "midnight", "mesh", "plain"}
+DEFAULT_CHROMA_ACCENT_ENABLED = False
+DEFAULT_CHROMA_ACCENT_SPEED = 15
+VALID_CHROMA_ACCENT_SPEEDS = {8, 15, 30, 60}
 DEFAULT_GLASS_QUALITY = "normal"
 VALID_GLASS_QUALITIES = {"low", "normal", "high"}
 DEFAULT_ANIMATED_BACKGROUNDS_ENABLED = True

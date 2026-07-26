@@ -28,6 +28,8 @@ from kasa_core.constants import (
     DEFAULT_ACCENT_COLOR,
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
     DEFAULT_BACKGROUND_STYLE,
+    DEFAULT_CHROMA_ACCENT_ENABLED,
+    DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_CATEGORY,
     DEFAULT_GLASS_QUALITY,
     DEFAULT_GRADIENTS_ENABLED,
@@ -160,6 +162,8 @@ get_saved_theme = _appearance_settings.get_saved_theme
 get_glass_effects_enabled = _appearance_settings.get_glass_effects_enabled
 get_saved_accent_color = _appearance_settings.get_saved_accent_color
 get_saved_background_style = _appearance_settings.get_saved_background_style
+get_chroma_accent_enabled = _appearance_settings.get_chroma_accent_enabled
+get_chroma_accent_speed = _appearance_settings.get_chroma_accent_speed
 get_glass_quality = _appearance_settings.get_glass_quality
 get_animated_backgrounds_enabled = _appearance_settings.get_animated_backgrounds_enabled
 get_interface_animations_enabled = _appearance_settings.get_interface_animations_enabled
@@ -168,6 +172,8 @@ save_glass_effects = _appearance_settings.save_glass_effects
 save_theme = _appearance_settings.save_theme
 save_accent_color = _appearance_settings.save_accent_color
 save_background_style = _appearance_settings.save_background_style
+save_chroma_accent_enabled = _appearance_settings.save_chroma_accent_enabled
+save_chroma_accent_speed = _appearance_settings.save_chroma_accent_speed
 save_glass_quality = _appearance_settings.save_glass_quality
 save_animated_backgrounds = _appearance_settings.save_animated_backgrounds
 save_interface_animations = _appearance_settings.save_interface_animations
@@ -478,6 +484,8 @@ def inject_globals():
     glass_effects      = True
     accent_color       = DEFAULT_ACCENT_COLOR
     background_style   = DEFAULT_BACKGROUND_STYLE
+    chroma_accent_enabled = DEFAULT_CHROMA_ACCENT_ENABLED
+    chroma_accent_speed = DEFAULT_CHROMA_ACCENT_SPEED
     glass_quality      = DEFAULT_GLASS_QUALITY
     animated_backgrounds = DEFAULT_ANIMATED_BACKGROUNDS_ENABLED
     interface_animations = DEFAULT_INTERFACE_ANIMATIONS_ENABLED
@@ -494,6 +502,8 @@ def inject_globals():
         glass_effects = get_glass_effects_enabled()
         accent_color  = get_saved_accent_color()
         background_style = get_saved_background_style()
+        chroma_accent_enabled = get_chroma_accent_enabled()
+        chroma_accent_speed = get_chroma_accent_speed()
         glass_quality = get_glass_quality()
         animated_backgrounds = get_animated_backgrounds_enabled()
         interface_animations = get_interface_animations_enabled()
@@ -514,6 +524,8 @@ def inject_globals():
         'GLASS_EFFECTS_ENABLED': glass_effects,
         'ACCENT_COLOR':          accent_color,
         'BACKGROUND_STYLE':      background_style,
+        'CHROMA_ACCENT_ENABLED': chroma_accent_enabled,
+        'CHROMA_ACCENT_SPEED':   chroma_accent_speed,
         'GLASS_QUALITY':         glass_quality,
         'ANIMATED_BACKGROUNDS_ENABLED': animated_backgrounds,
         'INTERFACE_ANIMATIONS_ENABLED': interface_animations,
@@ -1115,6 +1127,10 @@ def save_settings():
         save_accent_color(request.form.get('accent_color'))
     if 'background_style' in request.form:
         save_background_style(request.form.get('background_style'))
+    save_chroma_accent_enabled(
+        'true' if request.form.get('chroma_accent_enabled') else 'false')
+    if 'chroma_accent_speed' in request.form:
+        save_chroma_accent_speed(request.form.get('chroma_accent_speed'))
     if 'glass_quality' in request.form:
         save_glass_quality(request.form.get('glass_quality'))
     save_animated_backgrounds(
@@ -1132,6 +1148,8 @@ def save_settings():
             "glass_effects_enabled": get_glass_effects_enabled(),
             "accent_color": get_saved_accent_color(),
             "background_style": get_saved_background_style(),
+            "chroma_accent_enabled": get_chroma_accent_enabled(),
+            "chroma_accent_speed": get_chroma_accent_speed(),
             "glass_quality": get_glass_quality(),
             "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
             "interface_animations_enabled": get_interface_animations_enabled(),
@@ -1346,6 +1364,16 @@ def settings_appearance():
         data = request_json()
         accent = save_accent_color(data.get('accent_color')) if 'accent_color' in data else get_saved_accent_color()
         background = save_background_style(data.get('background_style')) if 'background_style' in data else get_saved_background_style()
+        chroma_accent_enabled = (
+            save_chroma_accent_enabled(data.get('chroma_accent_enabled'))
+            if 'chroma_accent_enabled' in data
+            else get_chroma_accent_enabled()
+        )
+        chroma_accent_speed = (
+            save_chroma_accent_speed(data.get('chroma_accent_speed'))
+            if 'chroma_accent_speed' in data
+            else get_chroma_accent_speed()
+        )
         glass_quality = save_glass_quality(data.get('glass_quality')) if 'glass_quality' in data else get_glass_quality()
         animated_backgrounds = (
             save_animated_backgrounds(data.get('animated_backgrounds_enabled'))
@@ -1367,6 +1395,8 @@ def settings_appearance():
             "status": "ok",
             "accent_color": accent,
             "background_style": background,
+            "chroma_accent_enabled": chroma_accent_enabled,
+            "chroma_accent_speed": chroma_accent_speed,
             "glass_quality": glass_quality,
             "animated_backgrounds_enabled": animated_backgrounds,
             "interface_animations_enabled": interface_animations,
@@ -1375,6 +1405,8 @@ def settings_appearance():
     return jsonify({
         "accent_color": get_saved_accent_color(),
         "background_style": get_saved_background_style(),
+        "chroma_accent_enabled": get_chroma_accent_enabled(),
+        "chroma_accent_speed": get_chroma_accent_speed(),
         "glass_quality": get_glass_quality(),
         "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
         "interface_animations_enabled": get_interface_animations_enabled(),

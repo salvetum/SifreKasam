@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   ŞifreKasam v2.5.11 — Main Stylesheet
+   ŞifreKasam v2.5.12 — Main Stylesheet
    ════════════════════════════════════════════════════════════════ */
 
 /* ── FONT ────────────────────────────────────────────────────── */
@@ -4103,7 +4103,8 @@ html[data-glass-effects="off"] .settings-appearance-card {
     text-align: left;
 }
 
-.settings-glass-quality-card {
+.settings-glass-quality-card,
+.settings-chroma-speed-card {
     min-height: 72px;
     overflow: hidden;
     transform-origin: left center;
@@ -4119,11 +4120,13 @@ html[data-glass-effects="off"] .settings-appearance-card {
         visibility 0s linear;
 }
 
-.settings-glass-quality-card.is-no-transition {
+.settings-glass-quality-card.is-no-transition,
+.settings-chroma-speed-card.is-no-transition {
     transition: none !important;
 }
 
-.settings-glass-quality-card.is-collapsed {
+.settings-glass-quality-card.is-collapsed,
+.settings-chroma-speed-card.is-collapsed {
     visibility: hidden;
     opacity: 0;
     clip-path: inset(0 100% 0 0 round 16px);
@@ -4138,17 +4141,19 @@ html[data-glass-effects="off"] .settings-appearance-card {
         visibility 0s linear 240ms;
 }
 
-.settings-glass-quality-card.has-open-select {
+.settings-glass-quality-card.has-open-select,
+.settings-chroma-speed-card.has-open-select {
     z-index: 120;
     overflow: visible;
     clip-path: none;
 }
 
-.kasa-modal.is-open .settings-panel.active > *:not(.settings-glass-quality-card) {
+.kasa-modal.is-open .settings-panel.active > *:not(.settings-glass-quality-card):not(.settings-chroma-speed-card) {
     animation: settingsItemIn 280ms var(--ease-out) both;
 }
 
-.kasa-modal.is-open .settings-panel.active > .settings-glass-quality-card:not(.is-collapsed) {
+.kasa-modal.is-open .settings-panel.active > .settings-glass-quality-card:not(.is-collapsed),
+.kasa-modal.is-open .settings-panel.active > .settings-chroma-speed-card:not(.is-collapsed) {
     animation: settingsItemIn 280ms var(--ease-out) 66ms backwards;
 }
 

@@ -114,10 +114,11 @@
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        border: 1px solid rgba(255,255,255,0.14);
+        min-height: 38px;
+        border: 1px solid var(--glass-border);
         border-radius: 999px;
-        background: #131527;
-        color: #cbd5e1;
+        background: var(--surface);
+        color: var(--text);
         font-size: 0.78rem;
     }
 
@@ -128,15 +129,15 @@
         min-width: 74px;
         border: 0;
         outline: 0;
-        background: #131527;
-        color: #eef2ff;
+        background: transparent;
+        color: var(--text);
         font: inherit;
         cursor: pointer;
     }
 
     .entry-language-box select option {
-        background: #131527;
-        color: #eef2ff;
+        background: var(--bg-2);
+        color: var(--text);
     }
 
     .entry-login-mark {
@@ -295,13 +296,6 @@
     .entry-first-setup-warning i {
         margin-top: 0.15rem;
         flex: 0 0 auto;
-    }
-
-    [data-bs-theme="dark"] .entry-login-pill,
-    [data-bs-theme="dark"] .entry-language-box {
-        border-color: rgba(255,255,255,0.18);
-        background: rgba(10,13,29,0.86);
-        color: rgba(241,245,249,0.92);
     }
 
     [data-bs-theme="dark"] .entry-login-title,
@@ -464,24 +458,6 @@
         background:
             linear-gradient(135deg, rgba(255,255,255,0.17), transparent 30%),
             radial-gradient(circle at 86% 16%, rgba(var(--accent-2-rgb), 0.16), transparent 34%);
-    }
-
-    .entry-login-pill,
-    .entry-language-box {
-        min-height: 38px;
-        border-color: rgba(255,255,255,0.14);
-        background: rgba(255,255,255,0.06);
-        color: rgba(238,242,255,0.82);
-    }
-
-    .entry-language-box select {
-        background: transparent;
-        color: var(--text);
-    }
-
-    .entry-language-box select option {
-        background: var(--bg-2);
-        color: var(--text);
     }
 
     .entry-language-box {

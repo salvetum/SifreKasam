@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.5.11 - Main JavaScript
+ * ŞifreKasam v2.5.12 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -200,9 +200,128 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
     localStorage.setItem('kasa-accent', normalizedAccent);
     localStorage.setItem('kasa-background', normalizedBackground);
-    window.KASA_APPEARANCE = { accent: normalizedAccent, background: normalizedBackground };
+    window.KASA_APPEARANCE = Object.assign(window.KASA_APPEARANCE || {}, {
+      accent: normalizedAccent,
+      background: normalizedBackground,
+    });
     return window.KASA_APPEARANCE;
   };
+
+  const CHROMA_SPEED_OPTIONS = new Set([8, 15, 30, 60]);
+  const CHROMA_UPDATE_INTERVAL_MS = 100;
+  const normalizeChromaSpeed = (value) => {
+    const speed = Number(value);
+    return CHROMA_SPEED_OPTIONS.has(speed) ? speed : 15;
+  };
+
+  const chromaRoot = document.documentElement;
+  let chromaAccentEnabled = chromaRoot.getAttribute('data-kasa-chroma-accent') === 'on';
+  let chromaAccentSpeed = normalizeChromaSpeed(
+    chromaRoot.getAttribute('data-kasa-chroma-speed')
+  );
+  let chromaElapsedMs = 0;
+  let chromaStartedAt = 0;
+  let chromaTimer = 0;
+
+  const chromaCanAnimate = () => (
+    chromaAccentEnabled
+    && !document.hidden
+    && chromaRoot.getAttribute('data-kasa-animations') !== 'off'
+    && chromaRoot.getAttribute('data-kasa-low-power') !== 'on'
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+
+  const applyChromaAccent = (accent) => {
+    const normalizedAccent = normalizeHexColor(accent);
+    const accent2 = mixColor(normalizedAccent);
+    window.KASA_SET_RUNTIME_STYLE?.(
+      'chroma-accent',
+      `html:root {
+        --accent: ${normalizedAccent};
+        --accent-2: ${accent2};
+        --accent-rgb: ${hexToRgb(normalizedAccent)};
+        --accent-2-rgb: ${hexToRgb(accent2)};
+      }
+      #appearance-preview { --preview-accent: ${normalizedAccent}; }`
+    );
+  };
+
+  const clearChromaAccent = () => {
+    window.KASA_SET_RUNTIME_STYLE?.('chroma-accent', '');
+  };
+
+  const stopChromaCycle = () => {
+    if (chromaTimer) clearTimeout(chromaTimer);
+    chromaTimer = 0;
+    if (chromaStartedAt) {
+      chromaElapsedMs = Math.max(0, performance.now() - chromaStartedAt);
+      chromaStartedAt = 0;
+    }
+  };
+
+  const renderChromaAccent = () => {
+    const cycleMs = chromaAccentSpeed * 1000;
+    const hue = ((chromaElapsedMs % cycleMs) / cycleMs) * 360;
+    applyChromaAccent(hsvToHex(hue, 84, 96));
+  };
+
+  const refreshChromaCycle = () => {
+    stopChromaCycle();
+    if (!chromaCanAnimate()) {
+      clearChromaAccent();
+      return;
+    }
+
+    chromaStartedAt = performance.now() - chromaElapsedMs;
+    const tick = () => {
+      if (!chromaCanAnimate()) {
+        stopChromaCycle();
+        return;
+      }
+      chromaElapsedMs = performance.now() - chromaStartedAt;
+      renderChromaAccent();
+      chromaTimer = window.setTimeout(tick, CHROMA_UPDATE_INTERVAL_MS);
+    };
+    tick();
+  };
+
+  const setChromaAccent = (enabled, speed = chromaAccentSpeed) => {
+    const wasEnabled = chromaAccentEnabled;
+    const previousCycleMs = chromaAccentSpeed * 1000;
+    stopChromaCycle();
+
+    chromaAccentEnabled = Boolean(enabled);
+    chromaAccentSpeed = normalizeChromaSpeed(speed);
+    if (!wasEnabled && chromaAccentEnabled) {
+      const staticAccent = window.KASA_APPEARANCE?.accent || '#7c6ff7';
+      chromaElapsedMs = (hexToHsv(staticAccent).hue / 360) * chromaAccentSpeed * 1000;
+    } else if (wasEnabled && chromaAccentEnabled && previousCycleMs) {
+      const progress = (chromaElapsedMs % previousCycleMs) / previousCycleMs;
+      chromaElapsedMs = progress * chromaAccentSpeed * 1000;
+    }
+
+    chromaRoot.setAttribute('data-kasa-chroma-accent', chromaAccentEnabled ? 'on' : 'off');
+    chromaRoot.setAttribute('data-kasa-chroma-speed', String(chromaAccentSpeed));
+    localStorage.setItem('kasa-chroma-accent', chromaAccentEnabled ? 'on' : 'off');
+    localStorage.setItem('kasa-chroma-speed', String(chromaAccentSpeed));
+
+    if (!chromaAccentEnabled) {
+      clearChromaAccent();
+      return { enabled: false, speed: chromaAccentSpeed };
+    }
+
+    refreshChromaCycle();
+    return { enabled: true, speed: chromaAccentSpeed };
+  };
+
+  window.KASA_SET_CHROMA_ACCENT = setChromaAccent;
+  window.KASA_REFRESH_CHROMA_ACCENT = refreshChromaCycle;
+  document.addEventListener('visibilitychange', refreshChromaCycle);
+  new MutationObserver(refreshChromaCycle).observe(chromaRoot, {
+    attributes: true,
+    attributeFilter: ['data-kasa-animations', 'data-kasa-low-power'],
+  });
+  setChromaAccent(chromaAccentEnabled, chromaAccentSpeed);
 
   const applyThemeFeature = (attribute, storageKey, enabled) => {
     const value = enabled ? 'on' : 'off';
@@ -803,6 +922,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const backgroundSelect = document.getElementById('background-style-select');
   const backgroundHidden = document.getElementById('background-style-hidden');
   const accentHidden = document.getElementById('accent-color-hidden');
+  const chromaToggle = document.getElementById('chroma-accent-toggle');
+  const chromaSpeedCard = document.getElementById('chroma-speed-card');
+  const chromaSpeedSelect = document.getElementById('chroma-speed-select');
   const appearancePreview = document.getElementById('appearance-preview');
   const backgroundButtons = document.querySelectorAll('[data-background-option]');
   const accentPresetButtons = document.querySelectorAll('[data-accent-preset]');
@@ -814,6 +936,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let accentContrastWarningTimer = 0;
   let lightAccentWarningShown = false;
   let colorPickerCloseTimer = 0;
+  let chromaSpeedSyncFrame = 0;
   let colorPickerState = hexToHsv(currentAppearance.accent);
 
   if (settingsModal && accentColorScrim && accentColorPopover) {
@@ -933,26 +1056,87 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  const queueAppearanceSave = (accent, background) => {
+    clearTimeout(appearanceSaveTimer);
+    appearanceSaveTimer = setTimeout(() => {
+      apiPost('/settings/appearance', {
+        accent_color: accent,
+        background_style: background,
+        chroma_accent_enabled: chromaAccentEnabled,
+        chroma_accent_speed: chromaAccentSpeed,
+        animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
+        interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
+        gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
+      });
+    }, 250);
+  };
+
+  const syncChromaSpeedVisibility = (enabled, animate = true) => {
+    if (!chromaSpeedCard) return;
+    const shouldAnimate = animate
+      && document.documentElement.getAttribute('data-kasa-animations') !== 'off'
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldShow = Boolean(enabled);
+    cancelAnimationFrame(chromaSpeedSyncFrame);
+    chromaSpeedCard.setAttribute('aria-hidden', String(!shouldShow));
+
+    if (chromaSpeedSelect) {
+      chromaSpeedSelect.disabled = !shouldShow;
+      chromaSpeedSelect.tabIndex = chromaSpeedSelect.dataset.customSelectReady === 'true'
+        ? -1
+        : (shouldShow ? 0 : -1);
+      chromaSpeedSelect.kasaSyncCustomSelect?.();
+    }
+
+    chromaSpeedCard.classList.toggle('is-no-transition', !shouldAnimate);
+    chromaSpeedCard.classList.toggle('is-collapsed', !shouldShow);
+    if (!shouldAnimate) {
+      chromaSpeedSyncFrame = requestAnimationFrame(() => {
+        chromaSpeedCard.classList.remove('is-no-transition');
+      });
+    }
+  };
+
+  const setChromaAccentPreference = (enabled, speed = chromaAccentSpeed, persist = true, animate = true) => {
+    const next = window.KASA_SET_CHROMA_ACCENT?.(enabled, speed) || {
+      enabled: Boolean(enabled),
+      speed: normalizeChromaSpeed(speed),
+    };
+    chromaAccentEnabled = next.enabled;
+    chromaAccentSpeed = next.speed;
+
+    if (chromaToggle) chromaToggle.checked = next.enabled;
+    if (chromaSpeedSelect) {
+      chromaSpeedSelect.value = String(next.speed);
+      chromaSpeedSelect.kasaSyncCustomSelect?.();
+    }
+    syncChromaSpeedVisibility(next.enabled, animate);
+
+    if (persist) {
+      queueAppearanceSave(
+        accentInput?.value || currentAppearance.accent,
+        backgroundSelect?.value || currentAppearance.background
+      );
+    }
+  };
+
   const updateAppearance = (accent, background, persist = true, preservePickerState = false) => {
     const next = applyAppearance(accent, background);
     syncAppearanceControls(next.accent, next.background, preservePickerState);
     queueAccentContrastWarning(next.accent);
-    if (persist) {
-      clearTimeout(appearanceSaveTimer);
-      appearanceSaveTimer = setTimeout(() => {
-        apiPost('/settings/appearance', {
-          accent_color: next.accent,
-          background_style: next.background,
-          animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
-          interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
-          gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
-        });
-      }, 250);
-    }
+    if (persist) queueAppearanceSave(next.accent, next.background);
   };
 
   if (accentInput || accentTextInput || backgroundSelect) {
     syncAppearanceControls(currentAppearance.accent, currentAppearance.background);
+    setChromaAccentPreference(chromaAccentEnabled, chromaAccentSpeed, false, false);
+
+    chromaToggle?.addEventListener('change', () => {
+      setChromaAccentPreference(chromaToggle.checked, chromaSpeedSelect?.value);
+    });
+    chromaSpeedSelect?.addEventListener('change', () => {
+      setChromaAccentPreference(chromaToggle?.checked ?? chromaAccentEnabled, chromaSpeedSelect.value);
+    });
 
     accentColorTrigger?.addEventListener('click', () => {
       setColorPickerOpen(accentColorTrigger.getAttribute('aria-expanded') !== 'true');
@@ -1355,6 +1539,14 @@ document.addEventListener('DOMContentLoaded', () => {
           updateAppearance(
             data.accent_color || accentInput?.value,
             data.background_style || backgroundSelect?.value,
+            false
+          );
+        }
+        if (typeof data.chroma_accent_enabled === 'boolean') {
+          setChromaAccentPreference(
+            data.chroma_accent_enabled,
+            data.chroma_accent_speed,
+            false,
             false
           );
         }

@@ -16,6 +16,7 @@ from kasa_core.import_export import (  # noqa: E402
     parse_import_payload,
 )
 from kasa_core.versioning import is_newer_version  # noqa: E402
+from kasa_core.validation import normalize_chroma_accent_speed  # noqa: E402
 from kasa_core.time_utils import (  # noqa: E402
     utc_iso_timestamp,
     utc_now,
@@ -67,8 +68,8 @@ class ImportExportServiceTests(unittest.TestCase):
 
 class VersioningServiceTests(unittest.TestCase):
     def test_beta_version_compares_by_numeric_release(self) -> None:
-        self.assertTrue(is_newer_version("v2.6.0", "2.5.11"))
-        self.assertFalse(is_newer_version("v2.5.11", "2.5.11"))
+        self.assertTrue(is_newer_version("v2.6.0", "2.5.12"))
+        self.assertFalse(is_newer_version("v2.5.12", "2.5.12"))
 
 
 class TimeServiceTests(unittest.TestCase):
@@ -79,6 +80,14 @@ class TimeServiceTests(unittest.TestCase):
             utc_iso_timestamp(),
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
         )
+
+
+class AppearanceValidationTests(unittest.TestCase):
+    def test_chroma_speed_only_accepts_supported_values(self) -> None:
+        self.assertEqual(normalize_chroma_accent_speed(30), 30)
+        self.assertEqual(normalize_chroma_accent_speed("8"), 8)
+        self.assertEqual(normalize_chroma_accent_speed(12), 15)
+        self.assertEqual(normalize_chroma_accent_speed("invalid"), 15)
 
 
 if __name__ == "__main__":

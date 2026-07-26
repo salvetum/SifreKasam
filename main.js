@@ -57,6 +57,15 @@ function showFriendlyFatalError(area, error, message = 'Kurulum veya başlatma i
   else app.whenReady().then(showDialog).catch(() => app.exit(1));
 }
 
+function relaunchInSafeMode(error) {
+  const code = createUserErrorCode('GPU', error);
+  writeFatalDiagnostic(code, error);
+  console.error(`[${code}] Renderer crashed; restarting with hardware acceleration disabled.`);
+  const args = process.argv.slice(1).filter((arg) => arg !== SAFE_MODE_FLAG);
+  app.relaunch({ args: [...args, SAFE_MODE_FLAG] });
+  app.exit(0);
+}
+
 process.on('uncaughtException', (error) => showFriendlyFatalError('UCP', error));
 process.on('unhandledRejection', (reason) => showFriendlyFatalError('UPR', reason));
 
@@ -162,9 +171,10 @@ function cleanupApplicationData(currentInstallRoot) {
 
   const appDataNames = [
     '.SifrekasamV2',
-    'sifrekasam',
-    'SifreKasam',
-    'sifrekasam-v2.5.11',
+  'sifrekasam',
+  'SifreKasam',
+  'sifrekasam-v2.5.12',
+  'sifrekasam-v2.5.11',
     'sifrekasam-v2.5.10',
     'sifrekasam-v2.5.10-beta.1',
     'sifrekasam-v2.5.9-beta.3',
@@ -310,8 +320,11 @@ function updateWindowsUninstallMetadata(installRoot) {
 
 const APP_TOKEN        = crypto.randomBytes(32).toString('hex');
 const HOST             = '127.0.0.1';
-const FLASK_TIMEOUT_MS = 20_000;
+const FLASK_TIMEOUT_MS = 60_000;
 const RETRY_INTERVAL_MS = 500;
+const BACKEND_PROBE_TIMEOUT_MS = 1_500;
+const SAFE_MODE_FLAG = '--sifrekasam-safe-mode';
+const safeModeRequested = process.argv.includes(SAFE_MODE_FLAG);
 
 const PROTOCOL            = 'https';
 const GLASS_EFFECTS_FALSY = new Set(['false', '0', 'off', 'disabled']);
@@ -337,8 +350,10 @@ let resetSavedLanOnNextStart = true;
 let isRestartingFlask = false;
 let hasReportedLocalCertificateNoise = false;
 let rendererLowPowerRequested = false;
+let backendPageRecoveryAttempts = 0;
 
 app.commandLine.appendSwitch('disable-spell-checking');
+if (safeModeRequested) app.disableHardwareAcceleration();
 
 // ─── TEK ÖRNEK KİLİDİ ────────────────────────────────────────────────────────
 
@@ -379,10 +394,62 @@ if (!gotTheLock) {
 
 async function onAppReady() {
   try {
+    verifyPackagedStartupResources();
     PORT = await findFreePort();
-    createWindow();
+    await createWindow();
     createTray();
-    await startFlaskServer();
+
+    let progressTimer = null;
+    const showProgressMessage = () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.webContents.executeJavaScript(`
+        (function () {
+          var lang = document.documentElement.lang || 'tr';
+          var msgs = {
+            tr: 'Arka plan hizmeti başlatılıyor, bu biraz sürebilir…',
+            en: 'Starting background service, this may take a while…'
+          };
+          var el = document.querySelector('.loading-status');
+          if (el) el.textContent = msgs[lang] || msgs.tr;
+        })();
+      `).catch(() => {});
+    };
+    const clearProgressTimer = () => {
+      if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
+    };
+
+    try {
+      progressTimer = setTimeout(showProgressMessage, 12_000);
+      await startFlaskServer();
+    } catch (err) {
+      clearProgressTimer();
+      await stopFlaskServer();
+
+      const result = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'ŞifreKasam',
+        message: 'Arka plan hizmeti başlatılamadı',
+        detail: `${err.message}\n\nTekrar denemek ister misiniz?`,
+        buttons: ['Tekrar Dene', 'Çıkış'],
+        defaultId: 0,
+        noLink: true,
+      });
+
+      if (result.response === 0) {
+        try {
+          progressTimer = setTimeout(showProgressMessage, 12_000);
+          await startFlaskServer();
+        } catch (retryErr) {
+          clearProgressTimer();
+          throw retryErr;
+        }
+      } else {
+        app.exit(1);
+        return;
+      }
+    }
+
+    clearProgressTimer();
 
     if (mainWindow) {
       try {
@@ -401,7 +468,7 @@ async function onAppReady() {
         await mainWindow.webContents.executeJavaScript('transitionToApp()');
       } catch (_) { /* loading.html henüz yüklenmemiş olabilir */ }
       mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
-      mainWindow.loadURL(`${PROTOCOL}://${HOST}:${PORT}/login?entry=loading`);
+      await loadBackendPage('/login?entry=loading');
     }
   } catch (err) {
     const isSquirrel = process.argv.some(arg => arg.startsWith('--squirrel-'));
@@ -412,13 +479,13 @@ async function onAppReady() {
 
 // ─── PENCERE ──────────────────────────────────────────────────────────────────
 
-function createWindow() {
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: resolvePath('favicon.ico'),
     backgroundColor: getSavedWindowBackgroundColor(),
-    show: true,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -430,7 +497,15 @@ function createWindow() {
   });
 
   mainWindow.setMenu(null);
-  mainWindow.loadFile(resolveLoadingPagePath(), {
+  let windowShown = false;
+  const showWindow = () => {
+    if (windowShown || !mainWindow || mainWindow.isDestroyed()) return;
+    windowShown = true;
+    mainWindow.show();
+  };
+  mainWindow.once('ready-to-show', showWindow);
+  setTimeout(showWindow, 1_200);
+  await mainWindow.loadFile(resolveLoadingPagePath(), {
     query: {
       theme:        getSavedTheme(),
       glassEffects: getSavedGlassEffects() ? 'on' : 'off',
@@ -440,14 +515,18 @@ function createWindow() {
       accent:       getSavedAccentColor(),
       background:   getSavedBackgroundStyle(),
     },
-  }).catch(() => {});
+  });
 
   // Harici linkleri sistem tarayıcısında aç
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsedUrl = new URL(url);
       if (['https:', 'http:', 'mailto:'].includes(parsedUrl.protocol)) {
-        shell.openExternal(url);
+        // .catch() zorunlu: Sistemde varsayilan tarayici yoksa (orn. WSL/xdg-open basarisiz)
+        // Promise reject olur. Bu durum app'i kapatmamali, sadece link acilmamis olur.
+        shell.openExternal(url).catch((err) => {
+          console.warn(`Harici baglanti acilamadi (${url}): ${err.message}`);
+        });
       }
     } catch (_) {}
     return { action: 'deny' };
@@ -469,7 +548,10 @@ function createWindow() {
 
     event.preventDefault();
     if (['https:', 'http:', 'mailto:'].includes(parsedUrl.protocol)) {
-      shell.openExternal(url).catch(() => {});
+      // .catch() zorunlu: Ayni nedenle setWindowOpenHandler'daki ile ayni.
+      shell.openExternal(url).catch((err) => {
+        console.warn(`Harici baglanti acilamadi (${url}): ${err.message}`);
+      });
     }
   });
 
@@ -479,13 +561,46 @@ function createWindow() {
     const isCertificateNoise = errorCode === -202
       || errorCode === -201
       || SSL_NOISE_PATTERNS.some((pattern) => description.includes(pattern));
-    if (!isCertificateNoise) return;
-
-    event.preventDefault();
-    if (!hasReportedLocalCertificateNoise) {
-      hasReportedLocalCertificateNoise = true;
-      console.warn(`Yerel self-signed SSL uyarısı bir kez susturuldu (${errorCode}: ${description}).`);
+    if (isCertificateNoise && backendPageRecoveryAttempts < 2) {
+      event.preventDefault();
+      backendPageRecoveryAttempts += 1;
+      if (!hasReportedLocalCertificateNoise) {
+        hasReportedLocalCertificateNoise = true;
+        console.warn(`Yerel self-signed SSL uyarısı için yeniden deneme yapılıyor (${errorCode}: ${description}).`);
+      }
+      setTimeout(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        loadBackendPage('/login?entry=loading').catch((error) => {
+          showFriendlyFatalError('WEB', error, 'ŞifreKasam arayüzü başlatılamadı.');
+        });
+      }, 450);
+      return;
     }
+
+    showFriendlyFatalError(
+      'WEB',
+      new Error(`Yerel arayüz yüklenemedi (${errorCode}: ${description}). URL: ${validatedURL}`),
+      'ŞifreKasam arayüzü başlatılamadı.'
+    );
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    backendPageRecoveryAttempts = 0;
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    const rendererError = new Error(
+      `Renderer kapandı: ${details.reason} (çıkış kodu: ${details.exitCode ?? 'yok'})`
+    );
+    if (details.reason === 'crashed' && !safeModeRequested) {
+      relaunchInSafeMode(rendererError);
+      return;
+    }
+    showFriendlyFatalError(
+      'RND',
+      rendererError,
+      'ŞifreKasam görsel bileşeni beklenmedik şekilde kapandı.'
+    );
   });
 
   mainWindow.webContents.on('console-message', (event, _level, message, _line, sourceId) => {
@@ -649,6 +764,19 @@ function startFlaskServer() {
     flaskProcess = spawnedProcess;
     resetSavedLanOnNextStart = false;
     let startupComplete = false;
+    let startupSettled = false;
+
+    const failStartup = (error) => {
+      if (startupSettled) return;
+      startupSettled = true;
+      reject(error);
+    };
+    const completeStartup = () => {
+      if (startupSettled) return;
+      startupSettled = true;
+      startupComplete = true;
+      resolve();
+    };
 
     let stderrBuffer = '';
     spawnedProcess.stdout.on('data', () => {});
@@ -658,23 +786,20 @@ function startFlaskServer() {
     });
 
     spawnedProcess.on('error', (err) =>
-      reject(new Error(`Flask baslatilamadi (spawn hatası): ${err.message}\nKomut: ${command}`))
+      failStartup(new Error(`Flask baslatilamadi (spawn hatası): ${err.message}\nKomut: ${command}`))
     );
     spawnedProcess.on('exit', (code, signal) => {
       if (flaskProcess === spawnedProcess) flaskProcess = null;
       const exitDetail = `kod ${code ?? 'yok'}, sinyal ${signal || 'yok'}`;
       const error = new Error(`Flask beklenmedik cikis (${exitDetail}):\n${stderrBuffer}`);
       if (!startupComplete) {
-        reject(error);
+        failStartup(error);
       } else if (!isQuiting && !isRestartingFlask) {
         showFriendlyFatalError('BCK', error, 'ŞifreKasam arka plan hizmeti beklenmedik şekilde durdu.');
       }
     });
 
-    waitForPort(() => {
-      startupComplete = true;
-      resolve();
-    }, reject);
+    waitForBackendReady(completeStartup, failStartup);
   });
 }
 
@@ -780,24 +905,57 @@ function stopFlaskServer() {
   });
 }
 
-function waitForPort(resolve, reject) {
+function waitForBackendReady(resolve, reject) {
   const deadline = Date.now() + FLASK_TIMEOUT_MS;
+  let lastError = 'HTTPS bağlantısı kurulamadı.';
 
-  const tryConnect = () => {
-    const client = net.createConnection({ host: HOST, port: PORT }, () => {
-      client.destroy();
-      resolve();
-    });
-    client.on('error', () => {
-      client.destroy();
-      if (Date.now() >= deadline)
-        reject(new Error(`Flask ${FLASK_TIMEOUT_MS / 1000}s içinde baslamadi.`));
-      else
-        setTimeout(tryConnect, RETRY_INTERVAL_MS);
-    });
+  const retry = () => {
+    if (Date.now() >= deadline) {
+      reject(new Error(
+        `Flask ${FLASK_TIMEOUT_MS / 1000}s içinde HTTPS üzerinden hazır olmadı: ${lastError}`
+      ));
+      return;
+    }
+    setTimeout(probe, RETRY_INTERVAL_MS);
   };
 
-  tryConnect();
+  const probe = () => {
+    let probeHandled = false;
+    const retryProbe = (error) => {
+      if (probeHandled) return;
+      probeHandled = true;
+      lastError = error instanceof Error ? error.message : String(error || lastError);
+      retry();
+    };
+
+    const request = https.request({
+      hostname: HOST,
+      port: PORT,
+      path: '/heartbeat',
+      method: 'POST',
+      timeout: BACKEND_PROBE_TIMEOUT_MS,
+      rejectUnauthorized: false,
+      headers: { 'X-App-Token': APP_TOKEN },
+    }, (response) => {
+      response.resume();
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (!probeHandled) {
+          probeHandled = true;
+          resolve();
+        }
+        return;
+      }
+      retryProbe(new Error(`Backend HTTP ${response.statusCode}`));
+    });
+
+    request.once('error', retryProbe);
+    request.once('timeout', () => {
+      request.destroy(new Error('Backend HTTPS kontrolü zaman aşımına uğradı.'));
+    });
+    request.end();
+  };
+
+  probe();
 }
 
 function findFreePort() {
@@ -857,6 +1015,28 @@ function resolveLoadingPagePath() {
     return path.join(process.resourcesPath, 'backend', '_internal', 'templates', 'loading.html');
   }
   return path.join(__dirname, 'flask_app', 'templates', 'loading.html');
+}
+
+function verifyPackagedStartupResources() {
+  if (!app.isPackaged) return;
+
+  const backendBinary = process.platform === 'win32' ? 'SifreKasam.exe' : 'SifreKasam';
+  const requiredFiles = [
+    resolveLoadingPagePath(),
+    resolvePath('backend', backendBinary),
+  ];
+  const missingFiles = requiredFiles.filter((filePath) => !fs.existsSync(filePath));
+  if (missingFiles.length) {
+    throw new Error(`Eksik paket dosyaları: ${missingFiles.join(', ')}`);
+  }
+}
+
+async function loadBackendPage(pathname) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('Ana pencere kullanılamıyor.');
+  }
+  const targetUrl = `${PROTOCOL}://${HOST}:${PORT}${pathname}`;
+  await mainWindow.loadURL(targetUrl);
 }
 
 function getConfigDir() {

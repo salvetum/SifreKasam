@@ -7,6 +7,8 @@ from typing import Any
 
 from kasa_core.constants import (
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
+    DEFAULT_CHROMA_ACCENT_ENABLED,
+    DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GRADIENTS_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
 )
@@ -14,6 +16,7 @@ from kasa_core.extensions import db
 from kasa_core.models import Setting
 from kasa_core.validation import (
     normalize_background_style,
+    normalize_chroma_accent_speed,
     normalize_glass_effects,
     normalize_glass_quality,
     normalize_hex_color,
@@ -105,6 +108,29 @@ class AppearanceSettings:
             pass
         return normalize_background_style(self.load_file().get("background_style"))
 
+    def get_chroma_accent_enabled(self) -> bool:
+        try:
+            value = self.get_setting("chroma_accent_enabled")
+            if value is not None:
+                return normalize_theme_option(value, DEFAULT_CHROMA_ACCENT_ENABLED)
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("chroma_accent_enabled"),
+            DEFAULT_CHROMA_ACCENT_ENABLED,
+        )
+
+    def get_chroma_accent_speed(self) -> int:
+        try:
+            value = self.get_setting("chroma_accent_speed")
+            if value is not None:
+                return normalize_chroma_accent_speed(value)
+        except Exception:
+            pass
+        return normalize_chroma_accent_speed(
+            self.load_file().get("chroma_accent_speed")
+        )
+
     def get_glass_quality(self) -> str:
         try:
             value = self.get_setting("glass_quality")
@@ -179,6 +205,18 @@ class AppearanceSettings:
         self.set_setting("background_style", background)
         self.save_file(background_style=background)
         return background
+
+    def save_chroma_accent_enabled(self, value: object) -> bool:
+        enabled = normalize_theme_option(value, DEFAULT_CHROMA_ACCENT_ENABLED)
+        self.set_setting("chroma_accent_enabled", str(enabled).lower())
+        self.save_file(chroma_accent_enabled=enabled)
+        return enabled
+
+    def save_chroma_accent_speed(self, value: object) -> int:
+        speed = normalize_chroma_accent_speed(value)
+        self.set_setting("chroma_accent_speed", str(speed))
+        self.save_file(chroma_accent_speed=speed)
+        return speed
 
     def save_glass_quality(self, value: object) -> str:
         quality = normalize_glass_quality(value)

@@ -59,6 +59,21 @@
         document.documentElement.setAttribute('data-kasa-gradient', normalizedGradients);
         localStorage.setItem('kasa-gradients', normalizedGradients);
 
+        const normalizeChromaSpeed = function (value) {
+            const speed = Number(value);
+            return [8, 15, 30, 60].includes(speed) ? speed : 15;
+        };
+        const storedChromaAccent = localStorage.getItem('kasa-chroma-accent')
+            || "{{ 'on' if CHROMA_ACCENT_ENABLED else 'off' }}";
+        const normalizedChromaAccent = storedChromaAccent === 'on' ? 'on' : 'off';
+        const storedChromaSpeed = normalizeChromaSpeed(
+            localStorage.getItem('kasa-chroma-speed') || "{{ CHROMA_ACCENT_SPEED }}"
+        );
+        document.documentElement.setAttribute('data-kasa-chroma-accent', normalizedChromaAccent);
+        document.documentElement.setAttribute('data-kasa-chroma-speed', String(storedChromaSpeed));
+        localStorage.setItem('kasa-chroma-accent', normalizedChromaAccent);
+        localStorage.setItem('kasa-chroma-speed', String(storedChromaSpeed));
+
         const normalizeHexColor = function (value, fallback) {
             const raw = String(value || '').trim();
             const hex = raw.startsWith('#') ? raw : '#' + raw;
@@ -125,7 +140,7 @@
     <title>{{ title or 'ŞifreKasam | Güvenli Şifre Yöneticisi' }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.5.11 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.5.12 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

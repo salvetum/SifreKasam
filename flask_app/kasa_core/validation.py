@@ -5,8 +5,10 @@ from urllib.parse import urlparse
 from kasa_core.constants import (
     DEFAULT_ACCENT_COLOR,
     DEFAULT_BACKGROUND_STYLE,
+    DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GLASS_QUALITY,
     VALID_BACKGROUND_STYLES,
+    VALID_CHROMA_ACCENT_SPEEDS,
     VALID_GLASS_QUALITIES,
     VALID_RECORD_TYPES,
 )
@@ -66,6 +68,14 @@ def normalize_hex_color(
 def normalize_background_style(value: object) -> str:
     text = str(value or DEFAULT_BACKGROUND_STYLE).strip().lower()
     return text if text in VALID_BACKGROUND_STYLES else DEFAULT_BACKGROUND_STYLE
+
+
+def normalize_chroma_accent_speed(value: object) -> int:
+    try:
+        speed = int(value)
+    except (TypeError, ValueError):
+        speed = DEFAULT_CHROMA_ACCENT_SPEED
+    return speed if speed in VALID_CHROMA_ACCENT_SPEEDS else DEFAULT_CHROMA_ACCENT_SPEED
 
 
 def normalize_glass_quality(value: object) -> str:

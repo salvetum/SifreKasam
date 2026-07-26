@@ -369,5 +369,13 @@
   "Yeşil": "Green",
   "Yumuşak renk patlamaları": "Soft color bursts",
   "İndigo": "Indigo",
-  "İşlem tamamlanamadı.": "The operation could not be completed."
+  "İşlem tamamlanamadı.": "The operation could not be completed.",
+  "Chroma RGB": "Chroma RGB",
+  "Vurgu rengini yumuşak bir renk döngüsünde değiştir.": "Cycle the accent color smoothly through the spectrum.",
+  "Renk Döngüsü Hızı": "Color Cycle Speed",
+  "Tam bir renk döngüsünün süresini seçin.": "Choose the duration of a full color cycle.",
+  "8 saniye · Hızlı": "8 seconds · Fast",
+  "15 saniye · Normal": "15 seconds · Normal",
+  "30 saniye · Sakin": "30 seconds · Calm",
+  "60 saniye · Çok sakin": "60 seconds · Very calm"
 }
