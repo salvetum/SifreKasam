@@ -167,6 +167,9 @@ Detaylar için [`LICENSE`](LICENSE) dosyasına bakabilirsiniz.
 
 Kullanılan üçüncü taraf bileşenleri ve lisans bildirimleri için, [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) dosyasını inceleyebilirsiniz.
 
+> [!WARNING]
+> v2.5.3 ve altı sürümlerin yürütelebilir dosyaları lisanlarla alakalı bir sorun yaşamamak için silinmiştir.
+
 ---
 
 <div align="center">
