@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.1 - Main JavaScript
+ * ŞifreKasam v2.6.2 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -81,6 +81,23 @@ document.addEventListener('DOMContentLoaded', () => {
       fallbackFilename
     );
     triggerBlobDownload(blob, filename);
+  };
+
+  const refreshStatsBar = () => {
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(data => {
+        const el = (id, val) => {
+          const node = document.getElementById(id);
+          if (node) node.textContent = val;
+        };
+        el('stat-toplam', data.toplam);
+        el('stat-pinned', data.pinned);
+        el('stat-zayif', data.zayif);
+        el('stat-eski', data.eski);
+        el('stat-expired', data.expired);
+      })
+      .catch(() => {});
   };
 
   const createIcon = (className) => {
@@ -2719,6 +2736,7 @@ document.addEventListener('DOMContentLoaded', () => {
             rebuildCardCache();
             filterCards({ preservePage: true, animate: true });
           }
+          refreshStatsBar();
           showToast({
             ...TOAST_BASE,
             text: window._('Kayıt başarıyla silindi.'),
@@ -2775,6 +2793,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const response = await apiFetch(form.action, { method: 'POST' });
           if (!response?.ok) throw new Error('pin-failed');
+          refreshStatsBar();
         } catch {
           applyPinnedState(originalPinned, false);
           refreshFavoritesFilter();
@@ -2887,4 +2906,5 @@ document.addEventListener('DOMContentLoaded', () => {
     kayitTipiSelect.addEventListener('change', toggleFormFields);
   }
 
+  refreshStatsBar();
 });

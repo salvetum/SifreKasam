@@ -80,14 +80,6 @@
     <!-- Alt satır: Seçim + Filtre + Arama -->
     <div class="flex flex-wrap justify-between items-center gap-3">
         <div class="flex items-center gap-2 flex-wrap">
-            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
-                class="kasa-btn kasa-btn-muted kasa-transition-fast">
-                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
-            </button>
-            <label class="bulk-select-all-control flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" for="select-all" hidden>
-                <input type="checkbox" id="select-all" class="bulk-select-checkbox">
-                {{ _('Tümünü seç') }}
-            </label>
             <div class="flex flex-wrap gap-1.5" id="category-filter" role="group" aria-label="{{ _('Kayıt filtreleri') }}">
             <button type="button" data-filter="all"
                 class="filter-btn filter-btn-active active" aria-pressed="true">{{ _('Tümü') }}</button>
@@ -104,6 +96,14 @@
             <button type="button" data-filter="Other"
                 class="filter-btn" aria-pressed="false"><i class="fa-solid fa-folder"></i> {{ _('Diğer') }}</button>
         </div>
+            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
+                class="kasa-btn kasa-btn-muted kasa-transition-fast">
+                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
+            </button>
+            <label class="bulk-select-all-control flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" for="select-all" hidden>
+                <input type="checkbox" id="select-all" class="bulk-select-checkbox">
+                {{ _('Tümünü seç') }}
+            </label>
         </div>
         <div class="record-search-wrap">
             <label for="search-input" class="sr-only">{{ _('Kayıt ara') }}</label>
@@ -1019,17 +1019,6 @@
 
 <script nonce="{{ csp_nonce }}">
 document.addEventListener('DOMContentLoaded', function () {
-    fetch('/api/stats')
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            document.getElementById('stat-toplam').textContent = data.toplam;
-            document.getElementById('stat-pinned').textContent = data.pinned;
-            document.getElementById('stat-zayif').textContent = data.zayif;
-            document.getElementById('stat-eski').textContent = data.eski;
-            document.getElementById('stat-expired').textContent = data.expired;
-        })
-        .catch(function () {});
-
     document.querySelectorAll('.expiry-badge').forEach(function (el) {
         var expiryStr = el.getAttribute('data-expiry');
         if (!expiryStr) return;

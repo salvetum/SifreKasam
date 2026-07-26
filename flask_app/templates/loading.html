@@ -6,7 +6,7 @@
     <meta name="description" content="ŞifreKasam güvenli giriş ekranı hazırlanıyor.">
     <meta name="theme-color" content="#080912">
     <meta name="color-scheme" content="dark light">
-    <title>ŞifreKasam - Yükleniyor</title>
+    <title>SifreKasam</title>
     <style nonce="{{ csp_nonce }}" id="loading-runtime-styles"></style>
     <script nonce="{{ csp_nonce }}">
         const copy = {
@@ -23,6 +23,7 @@
                 cardSubtitle: 'Ana şifrenizle devam edin.',
                 preparing: 'Giriş hazırlanıyor…',
                 status: 'Güvenli oturum başlatılıyor',
+                pageTitle: 'ŞifreKasam - Yükleniyor',
             },
             en: {
                 badge: 'Secure area ready',
@@ -37,6 +38,7 @@
                 cardSubtitle: 'Continue with your master password.',
                 preparing: 'Preparing sign-in…',
                 status: 'Starting secure session',
+                pageTitle: 'SifreKasam - Loading',
             },
         };
 
@@ -71,6 +73,7 @@
             const language = normalizeLanguage(value);
             const selected = copy[language];
             document.documentElement.lang = language;
+            document.title = selected.pageTitle || 'ŞifreKasam - Yükleniyor';
             document.querySelectorAll('[data-i18n]').forEach((node) => {
                 node.textContent = selected[node.dataset.i18n] || node.textContent;
             });
