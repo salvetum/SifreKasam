@@ -307,5 +307,11 @@
   "büyük harf": "büyük harf",
   "sayı": "sayı",
   "sembol": "sembol",
-  "ŞifreKasam | Güvenli Şifre Yöneticisi": "ŞifreKasam | Güvenli Şifre Yöneticisi"
+  "ŞifreKasam | Güvenli Şifre Yöneticisi": "ŞifreKasam | Güvenli Şifre Yöneticisi",
+  "Kendi resminizi veya GIF'inizi yükleyin": "Kendi resminizi veya GIF'inizi yükleyin",
+  "Özel": "Özel",
+  "Arka plan güncellendi.": "Arka plan güncellendi.",
+  "Yükleme başarısız oldu.": "Yükleme başarısız oldu.",
+  "Desteklenmeyen dosya formatı. PNG, JPEG, WebP veya GIF yükleyin.": "Desteklenmeyen dosya formatı. PNG, JPEG, WebP veya GIF yükleyin.",
+  "Dosya boyutu sınırını aşıyor.": "Dosya boyutu sınırını aşıyor."
 }

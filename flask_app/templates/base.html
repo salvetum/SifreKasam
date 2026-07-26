@@ -99,7 +99,7 @@
         };
         const applyKasaAppearance = function (accent, background) {
             const normalizedAccent = normalizeHexColor(accent, "{{ ACCENT_COLOR|default('#7c6ff7') }}");
-            const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain'].includes(background) ? background : "{{ BACKGROUND_STYLE|default('aurora') }}";
+            const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain', 'custom'].includes(background) ? background : "{{ BACKGROUND_STYLE|default('aurora') }}";
             const accent2 = mixColor(normalizedAccent, '#38bdf8', 0.45);
             window.KASA_SET_RUNTIME_STYLE('appearance', `html:root {
                 --accent: ${normalizedAccent};
@@ -108,6 +108,17 @@
                 --accent-2-rgb: ${hexToRgb(accent2)};
             }`);
             document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
+            var customLayer = document.getElementById('custom-bg-layer');
+            if (customLayer) {
+                var bgUrl = customLayer.getAttribute('data-bg-url');
+                var isActive = normalizedBackground === 'custom' && bgUrl;
+                customLayer.classList.toggle('is-active', isActive);
+                if (isActive) {
+                    window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + bgUrl + '); }');
+                } else {
+                    window.KASA_SET_RUNTIME_STYLE('custom-background', '');
+                }
+            }
             localStorage.setItem('kasa-accent', normalizedAccent);
             localStorage.setItem('kasa-background', normalizedBackground);
             window.KASA_APPEARANCE = { accent: normalizedAccent, background: normalizedBackground };
@@ -165,6 +176,7 @@
 
     <!-- 3. Animasyonlu Blob (opsiyonel) -->
     <div class="blob-accent" aria-hidden="true"></div>
+    <div id="custom-bg-layer" aria-hidden="true"{% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL %} data-bg-url="{{ CUSTOM_BACKGROUND_URL }}"{% endif %}></div>
 
     <div class="page-loading-overlay" role="status" aria-live="polite" aria-hidden="true" aria-label="{{ _('Sayfa yükleniyor') }}">
         <div class="page-loading-card">

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import os
 import re
 import stat
@@ -320,6 +321,124 @@ class MetadataMigrationTests(unittest.TestCase):
         self.assertEqual(app_module.decrypt_metadata(current_fernet, migrated.website_url), "https://legacy.example")
         self.assertEqual(app_module.decrypt_metadata(current_fernet, migrated.login), "legacy-user")
         self.assertEqual(app_module.safe_decrypt(current_fernet, migrated.encrypted_password), "legacy-secret")
+
+
+class CustomBackgroundUploadTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+        self._token = {'X-App-Token': app_module.APP_TOKEN}
+
+    def tearDown(self) -> None:
+        bg_dir = app_module.BACKGROUND_DIR
+        if os.path.isdir(bg_dir):
+            for name in os.listdir(bg_dir):
+                try:
+                    os.unlink(os.path.join(bg_dir, name))
+                except OSError:
+                    pass
+
+    def _make_png(self, size_bytes: int = 100) -> bytes:
+        from PIL import Image
+        import io as _io
+        img = Image.new('RGB', (4, 4), color=(128, 64, 32))
+        buf = _io.BytesIO()
+        img.save(buf, format='PNG')
+        data = buf.getvalue()
+        if size_bytes > len(data):
+            data = data + b'\x00' * (size_bytes - len(data))
+        return data
+
+    def _make_gif(self) -> bytes:
+        from PIL import Image
+        import io as _io
+        img = Image.new('RGB', (4, 4), color=(128, 64, 32))
+        buf = _io.BytesIO()
+        img.save(buf, format='GIF')
+        return buf.getvalue()
+
+    def test_rejects_non_image_file(self) -> None:
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(b'<script>alert(1)</script>'), 'evil.html'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertIn(response.status_code, (400, 415))
+        data = response.get_json()
+        self.assertIn('error', data)
+
+    def test_rejects_oversized_image(self) -> None:
+        oversized = self._make_png(size_bytes=11 * 1024 * 1024)
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(oversized), 'big.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertIn('error', data)
+
+    def test_accepts_valid_png(self) -> None:
+        png_data = self._make_png()
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(png_data), 'photo.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('url', data)
+
+    def test_accepts_valid_gif(self) -> None:
+        gif_data = self._make_gif()
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(gif_data), 'anim.gif'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get('is_gif'))
+
+    def test_serves_uploaded_background(self) -> None:
+        png_data = self._make_png()
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(png_data), 'test.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        response = self.client.get('/api/background/current', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+
+    def test_delete_removes_background(self) -> None:
+        png_data = self._make_png()
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(png_data), 'del.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        response = self.client.delete('/api/background', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get('/api/background/current', headers=self._token)
+        self.assertEqual(response.status_code, 404)
+
+    def test_upload_rejects_empty_file(self) -> None:
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(b''), ''),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 400)
+
+    def test_filename_is_uuid_not_user_input(self) -> None:
+        png_data = self._make_png()
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(png_data), '../../etc/passwd.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        bg_dir = app_module.BACKGROUND_DIR
+        if os.path.isdir(bg_dir):
+            for name in os.listdir(bg_dir):
+                self.assertRegex(name, r'^[0-9a-f]{32}\.png$')
+                self.assertNotIn('..', name)
+                self.assertNotIn('etc', name)
+
+    def test_old_background_removed_on_new_upload(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'first.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'second.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        bg_dir = app_module.BACKGROUND_DIR
+        if os.path.isdir(bg_dir):
+            files = [f for f in os.listdir(bg_dir) if os.path.isfile(os.path.join(bg_dir, f))]
+            self.assertEqual(len(files), 1)
 
 
 if __name__ == "__main__":

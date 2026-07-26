@@ -378,5 +378,11 @@
   "15 saniye · Normal": "15 seconds · Normal",
   "30 saniye · Sakin": "30 seconds · Calm",
   "60 saniye · Çok sakin": "60 seconds · Very calm",
-  "ŞifreKasam | Güvenli Şifre Yöneticisi": "SifreKasam | Secure Password Manager"
+  "ŞifreKasam | Güvenli Şifre Yöneticisi": "SifreKasam | Secure Password Manager",
+  "Kendi resminizi veya GIF'inizi yükleyin": "Upload your own image or GIF",
+  "Özel": "Custom",
+  "Arka plan güncellendi.": "Background updated.",
+  "Yükleme başarısız oldu.": "Upload failed.",
+  "Desteklenmeyen dosya formatı. PNG, JPEG, WebP veya GIF yükleyin.": "Unsupported file format. Please upload PNG, JPEG, WebP, or GIF.",
+  "Dosya boyutu sınırını aşıyor.": "File size exceeds the limit."
 }

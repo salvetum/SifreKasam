@@ -3067,6 +3067,49 @@ html[data-kasa-background="plain"] .blob-accent {
     display: none !important;
 }
 
+/* ── ÖZEL ARKA PLAN ─────────────────────────────────────────── */
+#custom-bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    display: none;
+    pointer-events: none;
+}
+
+#custom-bg-layer.is-active {
+    display: block;
+}
+
+#custom-bg-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+}
+
+html[data-bs-theme="light"] #custom-bg-layer::after {
+    background: rgba(255, 255, 255, 0.30);
+}
+
+html[data-kasa-background="custom"] body::before,
+html[data-kasa-background="custom"] body::after,
+html[data-kasa-background="custom"] .blob-accent {
+    display: none !important;
+}
+
+html[data-kasa-low-power="on"] #custom-bg-layer[data-animated="true"] {
+    display: none !important;
+}
+
+html[data-kasa-motion="off"] #custom-bg-layer[data-animated="true"] {
+    display: none !important;
+}
+
 html[data-kasa-gradient="off"] body {
     background: var(--bg) !important;
 }

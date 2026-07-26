@@ -25,6 +25,8 @@ from kasa_core.appearance import AppearanceSettings
 from kasa_core.certificates import ensure_self_signed_cert
 from kasa_core.constants import (
     APP_VERSION_DEFAULT,
+    CUSTOM_BACKGROUND_MAX_GIF_BYTES,
+    CUSTOM_BACKGROUND_MAX_IMAGE_BYTES,
     DEFAULT_ACCENT_COLOR,
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
     DEFAULT_BACKGROUND_STYLE,
@@ -76,6 +78,7 @@ from kasa_core.import_export import (
 from kasa_core.models import PasswordHistory, Record, Setting, User
 from kasa_core.paths import (
     ensure_private_data_dir as _ensure_private_data_dir,
+    get_backgrounds_dir,
     get_data_dir,
 )
 from kasa_core.password_strength import (
@@ -130,7 +133,7 @@ def _fetch_latest_release() -> dict[str, Any]:
 app.secret_key = FLASK_SECRET_KEY
 app.permanent_session_lifetime = timedelta(minutes=60)
 app.config.update(
-    MAX_CONTENT_LENGTH=5 * 1024 * 1024,
+    MAX_CONTENT_LENGTH=20 * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Strict',
     SESSION_COOKIE_SECURE=True,
@@ -145,6 +148,7 @@ THEME_FILE = os.path.join(DATA_DIR, 'theme.json')
 VAULT_INIT_FILE = os.path.join(DATA_DIR, 'vault.initialized')
 CERT_FILE  = os.path.join(DATA_DIR, 'cert.pem')
 KEY_FILE   = os.path.join(DATA_DIR, 'key.pem')
+BACKGROUND_DIR = get_backgrounds_dir()
 
 app.config['SQLALCHEMY_DATABASE_URI']        = f"sqlite:///{DB_FILE}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -524,6 +528,7 @@ def inject_globals():
         'GLASS_EFFECTS_ENABLED': glass_effects,
         'ACCENT_COLOR':          accent_color,
         'BACKGROUND_STYLE':      background_style,
+        'CUSTOM_BACKGROUND_URL': url_for('serve_custom_background') if background_style == 'custom' and _find_custom_background() else None,
         'CHROMA_ACCENT_ENABLED': chroma_accent_enabled,
         'CHROMA_ACCENT_SPEED':   chroma_accent_speed,
         'GLASS_QUALITY':         glass_quality,
@@ -543,7 +548,9 @@ def inject_globals():
 _PUBLIC_ENDPOINTS = {'login', 'static', 'loading_page', 'manifest_json', 'sw',
                      'settings_language'}
 _TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'settings_tray', 'lan_info',
-                    'settings_runtime'}
+                    'settings_runtime',
+                    'serve_custom_background', 'upload_custom_background',
+                    'delete_custom_background'}
 
 def _is_local_request() -> bool:
     remote = request.remote_addr or '127.0.0.1'
@@ -1405,6 +1412,7 @@ def settings_appearance():
     return jsonify({
         "accent_color": get_saved_accent_color(),
         "background_style": get_saved_background_style(),
+        "custom_background_url": url_for('serve_custom_background') if get_saved_background_style() == 'custom' and _find_custom_background() else None,
         "chroma_accent_enabled": get_chroma_accent_enabled(),
         "chroma_accent_speed": get_chroma_accent_speed(),
         "glass_quality": get_glass_quality(),
@@ -1412,6 +1420,117 @@ def settings_appearance():
         "interface_animations_enabled": get_interface_animations_enabled(),
         "gradients_enabled": get_gradients_enabled(),
     })
+
+# ─── ÖZEL ARKA PLAN YÜKLEME ─────────────────────────────────────────────────
+
+_ALLOWED_IMAGE_MIMES = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+}
+
+def _validate_custom_background(file_storage):
+    """Validate uploaded file via magic bytes and size limits."""
+    file_storage.seek(0)
+
+    from PIL import Image
+    import io as _io
+    try:
+        file_storage.seek(0)
+        raw = file_storage.read()
+        file_storage.seek(0)
+        img = Image.open(_io.BytesIO(raw))
+        fmt = (img.format or '').upper()
+    except Exception:
+        file_storage.seek(0)
+        return None, 'Geçersiz dosya formatı.'
+    finally:
+        file_storage.seek(0)
+
+    mime_map = {'PNG': 'image/png', 'JPEG': 'image/jpeg', 'WEBP': 'image/webp', 'GIF': 'image/gif'}
+    mime = mime_map.get(fmt)
+    if not mime:
+        return None, 'Desteklenmeyen dosya formatı. PNG, JPEG, WebP veya GIF yükleyin.'
+
+    file_storage.seek(0, 2)
+    size = file_storage.tell()
+    file_storage.seek(0)
+
+    is_gif = mime == 'image/gif'
+    max_bytes = CUSTOM_BACKGROUND_MAX_GIF_BYTES if is_gif else CUSTOM_BACKGROUND_MAX_IMAGE_BYTES
+    if size > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        return None, f'Dosya boyutu {limit_mb}MB sınırını aşıyor.'
+
+    return _ALLOWED_IMAGE_MIMES[mime], None
+
+
+def _remove_old_custom_backgrounds():
+    """Delete all files in the backgrounds directory (keep only the latest)."""
+    if not os.path.isdir(BACKGROUND_DIR):
+        return
+    for name in os.listdir(BACKGROUND_DIR):
+        filepath = os.path.join(BACKGROUND_DIR, name)
+        if os.path.isfile(filepath):
+            try:
+                os.unlink(filepath)
+            except OSError:
+                pass
+
+
+def _find_custom_background():
+    """Return the path of the current custom background file, or None."""
+    if not os.path.isdir(BACKGROUND_DIR):
+        return None
+    for name in os.listdir(BACKGROUND_DIR):
+        filepath = os.path.join(BACKGROUND_DIR, name)
+        if os.path.isfile(filepath):
+            return filepath
+    return None
+
+
+@app.route('/api/background/upload', methods=['POST'])
+def upload_custom_background():
+    if 'file' not in request.files:
+        return jsonify({'error': 'Dosya seçilmedi.'}), 400
+
+    uploaded = request.files['file']
+    if not uploaded.filename:
+        return jsonify({'error': 'Dosya seçilmedi.'}), 400
+
+    ext, error = _validate_custom_background(uploaded)
+    if error:
+        return jsonify({'error': error}), 400
+
+    _remove_old_custom_backgrounds()
+    filename = f"{uuid.uuid4().hex}{ext}"
+    filepath = os.path.join(BACKGROUND_DIR, filename)
+    uploaded.save(filepath)
+
+    is_gif = ext == '.gif'
+    return jsonify({
+        'status': 'ok',
+        'url': url_for('serve_custom_background'),
+        'is_gif': is_gif,
+    })
+
+
+@app.route('/api/background/current')
+def serve_custom_background():
+    bg_path = _find_custom_background()
+    if not bg_path:
+        abort(404)
+    return send_file(bg_path)
+
+
+@app.route('/api/background', methods=['DELETE'])
+def delete_custom_background():
+    _remove_old_custom_backgrounds()
+    if get_saved_background_style() == 'custom':
+        save_background_style('aurora')
+    db.session.commit()
+    return jsonify({'status': 'ok', 'background_style': get_saved_background_style()})
 
 # ─── ŞİFRE DEĞİŞTİRME ────────────────────────────────────────────────────────
 

@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const applyAppearance = (accent, background) => {
     const normalizedAccent = normalizeHexColor(accent);
-    const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain'].includes(background)
+    const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain', 'custom'].includes(background)
       ? background
       : 'aurora';
     const accent2 = mixColor(normalizedAccent);
@@ -215,6 +215,15 @@ document.addEventListener('DOMContentLoaded', () => {
       --accent-2-rgb: ${hexToRgb(accent2)};
     }`);
     document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
+    const customLayer = document.getElementById('custom-bg-layer');
+    if (customLayer) {
+      const bgUrl = customLayer.getAttribute('data-bg-url');
+      const isActive = normalizedBackground === 'custom' && bgUrl;
+      customLayer.classList.toggle('is-active', isActive);
+      window.KASA_SET_RUNTIME_STYLE?.('custom-background',
+        isActive ? `#custom-bg-layer.is-active { background-image: url(${bgUrl}); }` : ''
+      );
+    }
     localStorage.setItem('kasa-accent', normalizedAccent);
     localStorage.setItem('kasa-background', normalizedBackground);
     window.KASA_APPEARANCE = Object.assign(window.KASA_APPEARANCE || {}, {
@@ -1215,6 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     });
     backgroundButtons.forEach(btn => {
+      if (btn.id === 'custom-bg-btn') return;
       btn.addEventListener('click', () =>
         updateAppearance(
           accentInput?.value || currentAppearance.accent,
@@ -1224,6 +1234,43 @@ document.addEventListener('DOMContentLoaded', () => {
         )
       );
     });
+
+    // ── Özel Arka Plan Yükleme ──
+    const customBgBtn = document.getElementById('custom-bg-btn');
+    const customBgInput = document.getElementById('custom-bg-input');
+    if (customBgBtn && customBgInput) {
+      customBgBtn.addEventListener('click', () => customBgInput.click());
+      customBgInput.addEventListener('change', async () => {
+        const file = customBgInput.files?.[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        customBgBtn.disabled = true;
+        try {
+          const resp = await apiFetch('/api/background/upload', { method: 'POST', body: formData });
+          if (!resp || !resp.ok) {
+            const data = await resp?.json?.().catch(() => ({}));
+            showWarningToast(window._(data?.error || 'Yükleme başarısız oldu.'));
+            return;
+          }
+          const data = await resp.json();
+          const customLayer = document.getElementById('custom-bg-layer');
+          if (customLayer && data.url) {
+            customLayer.setAttribute('data-bg-url', data.url);
+            if (data.is_gif) customLayer.setAttribute('data-animated', 'true');
+            else customLayer.removeAttribute('data-animated');
+          }
+          updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+          showSuccessToast(window._('Arka plan güncellendi.'));
+        } catch {
+          showWarningToast(window._('Yükleme başarısız oldu.'));
+        } finally {
+          customBgBtn.disabled = false;
+          customBgInput.value = '';
+        }
+      });
+    }
+
     settingsModal?.addEventListener('kasa:modal-closing', () => {
       setColorPickerOpen(false);
     });

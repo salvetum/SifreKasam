@@ -26,3 +26,7 @@ def get_data_dir() -> str:
         ".config",
     )
     return ensure_private_data_dir(os.path.join(xdg, "sifrekasam"))
+
+
+def get_backgrounds_dir() -> str:
+    return ensure_private_data_dir(os.path.join(get_data_dir(), "backgrounds"))
