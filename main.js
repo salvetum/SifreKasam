@@ -424,7 +424,6 @@ async function onAppReady() {
       await startFlaskServer();
     } catch (err) {
       clearProgressTimer();
-      await stopFlaskServer();
 
       const result = await dialog.showMessageBox(mainWindow, {
         type: 'warning',
@@ -439,12 +438,20 @@ async function onAppReady() {
       if (result.response === 0) {
         try {
           progressTimer = setTimeout(showProgressMessage, 12_000);
-          await startFlaskServer();
+          if (flaskProcess) {
+            await new Promise((resolve, reject) => {
+              waitForBackendReady(resolve, reject);
+            });
+          } else {
+            await startFlaskServer();
+          }
         } catch (retryErr) {
           clearProgressTimer();
+          await stopFlaskServer();
           throw retryErr;
         }
       } else {
+        await stopFlaskServer();
         app.exit(1);
         return;
       }
