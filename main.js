@@ -323,6 +323,7 @@ const HOST             = '127.0.0.1';
 const FLASK_TIMEOUT_MS = 60_000;
 const RETRY_INTERVAL_MS = 500;
 const BACKEND_PROBE_TIMEOUT_MS = 1_500;
+const PYTHON_COMMAND = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const SAFE_MODE_FLAG = '--sifrekasam-safe-mode';
 const safeModeRequested = process.argv.includes(SAFE_MODE_FLAG);
 
@@ -756,7 +757,7 @@ function startFlaskServer() {
     const flaskHost = lanRuntimeEnabled ? '0.0.0.0' : HOST;
     const [command, args] = app.isPackaged
       ? [resolvePath(path.join('backend', backendBinary)), []]
-      : ['python', [path.join(__dirname, 'flask_app', 'app.py')]];
+      : [PYTHON_COMMAND, [path.join(__dirname, 'flask_app', 'app.py')]];
 
     console.log(`Flask baslatiliyor: ${command} ${args.join(' ')} (${flaskHost}:${PORT})`);
 
