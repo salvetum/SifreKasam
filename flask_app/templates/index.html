@@ -93,17 +93,17 @@
             <button type="button" data-filter="all"
                 class="filter-btn filter-btn-active active" aria-pressed="true">{{ _('Tümü') }}</button>
             <button type="button" data-filter="favorites"
-                class="filter-btn" aria-pressed="false">⭐ {{ _('Favori') }}</button>
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-star"></i> {{ _('Favori') }}</button>
             <button type="button" data-filter="Website"
-                class="filter-btn" aria-pressed="false">🌐 {{ _('Web') }}</button>
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-globe"></i> {{ _('Web') }}</button>
             <button type="button" data-filter="Application"
-                class="filter-btn" aria-pressed="false">💻 {{ _('Uygulama') }}</button>
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-desktop"></i> {{ _('Uygulama') }}</button>
             <button type="button" data-filter="CreditCard"
-                class="filter-btn" aria-pressed="false">💳 {{ _('Kart') }}</button>
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-credit-card"></i> {{ _('Kart') }}</button>
             <button type="button" data-filter="SecureNote"
-                class="filter-btn" aria-pressed="false">📝 {{ _('Not') }}</button>
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-note-sticky"></i> {{ _('Not') }}</button>
             <button type="button" data-filter="Other"
-                class="filter-btn" aria-pressed="false">📁 {{ _('Diğer') }}</button>
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-folder"></i> {{ _('Diğer') }}</button>
         </div>
         </div>
         <div class="record-search-wrap">
@@ -155,11 +155,11 @@
                                 <input type="checkbox" id="select-{{ kayit.id }}" class="select-item bulk-select-checkbox" value="{{ kayit.id }}">
                             </label>
                             <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm">
-                                {% if kayit.full_data.type == 'Website' %}🌐
-                                {% elif kayit.full_data.type == 'Application' %}💻
-                                {% elif kayit.full_data.type == 'CreditCard' %}💳
-                                {% elif kayit.full_data.type == 'SecureNote' %}📝
-                                {% else %}📁{% endif %}
+                                {% if kayit.full_data.type == 'Website' %}<i class="fa-solid fa-globe"></i>
+                                {% elif kayit.full_data.type == 'Application' %}<i class="fa-solid fa-desktop"></i>
+                                {% elif kayit.full_data.type == 'CreditCard' %}<i class="fa-solid fa-credit-card"></i>
+                                {% elif kayit.full_data.type == 'SecureNote' %}<i class="fa-solid fa-note-sticky"></i>
+                                {% else %}<i class="fa-solid fa-folder"></i>{% endif %}
                             </span>
                              <h2 id="record-title-{{ kayit.id }}" class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">
                                  {{ kayit.normalized.baslik }}
