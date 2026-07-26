@@ -14,11 +14,6 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-            <!-- Toplu Seç -->
-            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
-                class="kasa-btn kasa-btn-muted kasa-transition-fast">
-                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
-            </button>
             <!-- Sağlık raporu -->
             <a href="{{ url_for('saglik_raporu') }}" title="{{ _('Şifre Sağlık Raporu') }}"
                class="kasa-btn kasa-btn-danger">
@@ -85,6 +80,10 @@
     <!-- Alt satır: Seçim + Filtre + Arama -->
     <div class="flex flex-wrap justify-between items-center gap-3">
         <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
+                class="kasa-btn kasa-btn-muted kasa-transition-fast">
+                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
+            </button>
             <label class="bulk-select-all-control flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" for="select-all" hidden>
                 <input type="checkbox" id="select-all" class="bulk-select-checkbox">
                 {{ _('Tümünü seç') }}
