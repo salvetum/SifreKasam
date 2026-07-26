@@ -168,6 +168,9 @@ See the [`LICENSE`](LICENSE) file for details.
 
 For third-party components used and license notices, you can review the [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) file.
 
+> [!WARNING]
+> Executables for versions v2.5.3 and below have been deleted to avoid any issues regarding licenses. You can now only access the source code for these versions.
+
 ---
 
 <div align="center">
