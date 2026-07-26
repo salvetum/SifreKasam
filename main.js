@@ -330,6 +330,7 @@ function updateWindowsUninstallMetadata(installRoot) {
 const APP_TOKEN        = crypto.randomBytes(32).toString('hex');
 const HOST             = '127.0.0.1';
 const FLASK_TIMEOUT_MS = 60_000;
+const FLASK_TIMEOUT_FIRST_RUN_MS = 90_000;
 const RETRY_INTERVAL_MS = 500;
 const BACKEND_PROBE_TIMEOUT_MS = 1_500;
 const PYTHON_COMMAND = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
@@ -428,41 +429,66 @@ async function onAppReady() {
       if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
     };
 
+    const flaskTimeoutMs = isFirstRun() ? FLASK_TIMEOUT_FIRST_RUN_MS : FLASK_TIMEOUT_MS;
+
     try {
       progressTimer = setTimeout(showProgressMessage, 12_000);
-      await startFlaskServer();
-    } catch (err) {
+      await startFlaskServer(flaskTimeoutMs);
+    } catch (firstErr) {
       clearProgressTimer();
 
-      const result = await dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        title: 'ŞifreKasam',
-        message: 'Arka plan hizmeti başlatılamadı',
-        detail: `${err.message}\n\nTekrar denemek ister misiniz?`,
-        buttons: ['Tekrar Dene', 'Çıkış'],
-        defaultId: 0,
-        noLink: true,
-      });
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript(`
+          (function () {
+            var lang = document.documentElement.lang || 'tr';
+            var msgs = {
+              tr: 'İlk kurulum güvenlik taraması sürebilir, tekrar deneniyor…',
+              en: 'Initial security scan may take time, retrying…'
+            };
+            var el = document.querySelector('.loading-status');
+            if (el) el.textContent = msgs[lang] || msgs.tr;
+          })();
+        `).catch(() => {});
+      }
 
-      if (result.response === 0) {
-        try {
-          progressTimer = setTimeout(showProgressMessage, 12_000);
-          if (flaskProcess) {
-            await new Promise((resolve, reject) => {
-              waitForBackendReady(resolve, reject);
-            });
-          } else {
-            await startFlaskServer();
+      await stopFlaskServer();
+
+      try {
+        progressTimer = setTimeout(showProgressMessage, 12_000);
+        await startFlaskServer(flaskTimeoutMs);
+      } catch (retryErr) {
+        clearProgressTimer();
+
+        const result = await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'ŞifreKasam',
+          message: 'Arka plan hizmeti başlatılamadı',
+          detail: `${retryErr.message}\n\nTekrar denemek ister misiniz?`,
+          buttons: ['Tekrar Dene', 'Çıkış'],
+          defaultId: 0,
+          noLink: true,
+        });
+
+        if (result.response === 0) {
+          try {
+            progressTimer = setTimeout(showProgressMessage, 12_000);
+            if (flaskProcess) {
+              await new Promise((resolve, reject) => {
+                waitForBackendReady(resolve, reject);
+              });
+            } else {
+              await startFlaskServer(flaskTimeoutMs);
+            }
+          } catch (retryErr2) {
+            clearProgressTimer();
+            await stopFlaskServer();
+            throw retryErr2;
           }
-        } catch (retryErr) {
-          clearProgressTimer();
+        } else {
           await stopFlaskServer();
-          throw retryErr;
+          app.exit(1);
+          return;
         }
-      } else {
-        await stopFlaskServer();
-        app.exit(1);
-        return;
       }
     }
 
@@ -766,7 +792,7 @@ function checkMinimizeToTray() {
 
 // ─── FLASK SUNUCUSU ───────────────────────────────────────────────────────────
 
-function startFlaskServer() {
+function startFlaskServer(timeoutMs) {
   return new Promise((resolve, reject) => {
     const isWin = process.platform === 'win32';
     const backendBinary = isWin ? 'SifreKasam.exe' : 'SifreKasam';
@@ -824,7 +850,7 @@ function startFlaskServer() {
       }
     });
 
-    waitForBackendReady(completeStartup, failStartup);
+    waitForBackendReady(completeStartup, failStartup, timeoutMs);
   });
 }
 
@@ -930,14 +956,15 @@ function stopFlaskServer() {
   });
 }
 
-function waitForBackendReady(resolve, reject) {
-  const deadline = Date.now() + FLASK_TIMEOUT_MS;
+function waitForBackendReady(resolve, reject, timeoutMs) {
+  const effectiveTimeout = timeoutMs || FLASK_TIMEOUT_MS;
+  const deadline = Date.now() + effectiveTimeout;
   let lastError = 'HTTPS bağlantısı kurulamadı.';
 
   const retry = () => {
     if (Date.now() >= deadline) {
       reject(new Error(
-        `Flask ${FLASK_TIMEOUT_MS / 1000}s içinde HTTPS üzerinden hazır olmadı: ${lastError}`
+        `Flask ${effectiveTimeout / 1000}s içinde HTTPS üzerinden hazır olmadı: ${lastError}`
       ));
       return;
     }
@@ -1067,6 +1094,19 @@ async function loadBackendPage(pathname) {
 function getConfigDir() {
   if (process.platform === 'win32') return process.env.APPDATA;
   return process.env.XDG_CONFIG_HOME || path.join(process.env.HOME, '.config');
+}
+
+function isFirstRun() {
+  const configDir = getConfigDir();
+  if (!configDir) return false;
+  const dataDir = process.platform === 'win32'
+    ? path.join(configDir, '.SifrekasamV2')
+    : path.join(configDir, 'sifrekasam');
+  try {
+    return !fs.existsSync(path.join(dataDir, 'cert.pem'));
+  } catch (_) {
+    return false;
+  }
 }
 
 function readThemeFile() {
