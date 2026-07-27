@@ -548,9 +548,7 @@ def inject_globals():
 _PUBLIC_ENDPOINTS = {'login', 'static', 'loading_page', 'manifest_json', 'sw',
                      'settings_language'}
 _TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'settings_tray', 'lan_info',
-                    'settings_runtime',
-                    'serve_custom_background', 'upload_custom_background',
-                    'delete_custom_background'}
+                    'settings_runtime'}
 
 def _is_local_request() -> bool:
     remote = request.remote_addr or '127.0.0.1'
@@ -1491,6 +1489,7 @@ def _find_custom_background():
 
 
 @app.route('/api/background/upload', methods=['POST'])
+@login_required
 def upload_custom_background():
     if 'file' not in request.files:
         return jsonify({'error': 'Dosya seçilmedi.'}), 400
@@ -1517,6 +1516,7 @@ def upload_custom_background():
 
 
 @app.route('/api/background/current')
+@login_required
 def serve_custom_background():
     bg_path = _find_custom_background()
     if not bg_path:
@@ -1525,6 +1525,7 @@ def serve_custom_background():
 
 
 @app.route('/api/background', methods=['DELETE'])
+@login_required
 def delete_custom_background():
     _remove_old_custom_backgrounds()
     if get_saved_background_style() == 'custom':

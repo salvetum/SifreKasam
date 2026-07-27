@@ -327,6 +327,9 @@ class CustomBackgroundUploadTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = app_module.app.test_client()
         self._token = {'X-App-Token': app_module.APP_TOKEN}
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
 
     def tearDown(self) -> None:
         bg_dir = app_module.BACKGROUND_DIR
@@ -462,11 +465,26 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         response = self.client.get('/api/background/current')
         self.assertEqual(response.status_code, 403)
 
+    def test_token_without_session_redirects_to_login(self) -> None:
+        with self.client.session_transaction() as session:
+            session.clear()
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'test.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login', response.headers.get('Location', ''))
+
     def test_custom_background_endpoints_not_in_public_endpoints(self) -> None:
         public = app_module._PUBLIC_ENDPOINTS
         self.assertNotIn('upload_custom_background', public)
         self.assertNotIn('delete_custom_background', public)
         self.assertNotIn('serve_custom_background', public)
+
+    def test_custom_background_endpoints_not_in_token_endpoints(self) -> None:
+        token_eps = app_module._TOKEN_ENDPOINTS
+        self.assertNotIn('upload_custom_background', token_eps)
+        self.assertNotIn('delete_custom_background', token_eps)
+        self.assertNotIn('serve_custom_background', token_eps)
 
 
 if __name__ == "__main__":
