@@ -710,6 +710,7 @@
                             <input type="file" id="custom-bg-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
                         </div>
                     </div>
+                    <div class="chroma-toggle-row">
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
                             <h4 id="setting-chroma-title" class="text-sm font-medium mb-0.5">{{ _('Chroma RGB') }}</h4>
@@ -730,6 +731,7 @@
                             <option value="30" {% if CHROMA_ACCENT_SPEED == 30 %}selected{% endif %}>{{ _('30 saniye · Sakin') }}</option>
                             <option value="60" {% if CHROMA_ACCENT_SPEED == 60 %}selected{% endif %}>{{ _('60 saniye · Çok sakin') }}</option>
                         </select>
+                    </div>
                     </div>
                     </section>
                     <section id="settings-panel-performance" class="settings-panel" role="tabpanel"

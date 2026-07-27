@@ -4126,7 +4126,9 @@ html[data-glass-effects="off"] .settings-appearance-card {
     line-height: 1.45;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card) {
+.settings-panel > .glass-sm:not(.settings-appearance-card),
+.chroma-toggle-row > .glass-sm,
+.chroma-toggle-row > .settings-chroma-speed-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -4149,26 +4151,48 @@ html[data-glass-effects="off"] .settings-appearance-card {
     align-content: center;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card) > div:first-child {
+.settings-panel > .glass-sm:not(.settings-appearance-card) > div:first-child,
+.chroma-toggle-row > .glass-sm > div:first-child {
     display: grid;
     align-content: center;
     gap: 0.12rem;
 }
 
 .settings-panel > .glass-sm:not(.settings-appearance-card) h6,
-.settings-panel > .glass-sm:not(.settings-appearance-card) h4 {
+.settings-panel > .glass-sm:not(.settings-appearance-card) h4,
+.chroma-toggle-row > .glass-sm h6,
+.chroma-toggle-row > .glass-sm h4 {
     margin: 0;
     line-height: 1.3;
     text-align: left;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card) p {
+.settings-panel > .glass-sm:not(.settings-appearance-card) p,
+.chroma-toggle-row > .glass-sm p {
     margin: 0;
     line-height: 1.35;
     text-align: left;
 }
 
 .settings-glass-quality-card,
+.chroma-toggle-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: stretch;
+    gap: 0.7rem;
+}
+
+.chroma-toggle-row > :first-child {
+    flex: 2;
+    min-width: 0;
+}
+
+.chroma-toggle-row > .settings-chroma-speed-card {
+    flex: 3;
+    min-width: 0;
+    grid-column: auto;
+}
+
 .settings-chroma-speed-card {
     min-height: 72px;
     overflow: hidden;
@@ -4213,12 +4237,13 @@ html[data-glass-effects="off"] .settings-appearance-card {
     clip-path: none;
 }
 
-.kasa-modal.is-open .settings-panel.active > *:not(.settings-glass-quality-card):not(.settings-chroma-speed-card) {
+.kasa-modal.is-open .settings-panel.active > *:not(.settings-glass-quality-card):not(.settings-chroma-speed-card):not(.chroma-toggle-row) {
     animation: settingsItemIn 280ms var(--ease-out) both;
 }
 
 .kasa-modal.is-open .settings-panel.active > .settings-glass-quality-card:not(.is-collapsed),
-.kasa-modal.is-open .settings-panel.active > .settings-chroma-speed-card:not(.is-collapsed) {
+.kasa-modal.is-open .settings-panel.active > .settings-chroma-speed-card:not(.is-collapsed),
+.kasa-modal.is-open .settings-panel.active > .chroma-toggle-row {
     animation: settingsItemIn 280ms var(--ease-out) 66ms backwards;
 }
 
@@ -4461,8 +4486,14 @@ html[data-kasa-motion="on"] .appearance-preview {
         display: none;
     }
 
-    .settings-panel > .glass-sm:not(.settings-appearance-card) {
+    .settings-panel > .glass-sm:not(.settings-appearance-card),
+    .chroma-toggle-row > .glass-sm,
+    .chroma-toggle-row > .settings-chroma-speed-card {
         align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .chroma-toggle-row {
         flex-direction: column;
     }
 
@@ -5503,7 +5534,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .settings-inline-select {
-    width: min(220px, 48vw);
+    width: min(260px, 48vw);
     flex: 0 0 auto;
 }
 
@@ -5592,6 +5623,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 [data-bs-theme="light"] .settings-panel > .glass-sm:not(.settings-appearance-card),
+[data-bs-theme="light"] .chroma-toggle-row > .glass-sm,
 [data-bs-theme="light"] .settings-toggle-card,
 [data-bs-theme="light"] .settings-select-card,
 [data-bs-theme="light"] .settings-action-card,
@@ -5625,6 +5657,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 html[data-glass-effects="off"] .settings-nav,
 html[data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card),
+html[data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
 html[data-glass-effects="off"] .settings-toggle-card,
 html[data-glass-effects="off"] .settings-select-card,
 html[data-glass-effects="off"] .settings-action-card,
@@ -5659,6 +5692,7 @@ html[data-glass-effects="off"] .settings-switch-input:checked {
 
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-nav,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card),
+html[data-bs-theme="light"][data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-toggle-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-select-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-action-card,

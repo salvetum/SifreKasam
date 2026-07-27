@@ -265,8 +265,10 @@
                 btn.className = 'kasa-calendar-day';
                 btn.textContent = d;
                 btn.dataset.day = d;
+                btn.tabIndex = -1;
                 if (selected && viewYear === selected.getFullYear() && viewMonth === selected.getMonth() && d === selected.getDate()) {
                     btn.classList.add('is-selected');
+                    btn.tabIndex = 0;
                 }
                 if (viewYear === today.getFullYear() && viewMonth === today.getMonth() && d === today.getDate()) {
                     btn.classList.add('is-today');
@@ -286,14 +288,21 @@
             viewMonth = dt.getMonth();
             popup.hidden = false;
             displayInput.setAttribute('aria-expanded', 'true');
+            const panel = wrapper.closest('.vault-form-panel');
+            if (panel) panel.classList.add('has-open-select-layer');
             render();
             const selected = gridEl.querySelector('.is-selected') || gridEl.querySelector('.kasa-calendar-day:not(.kasa-calendar-day-empty)');
-            if (selected) selected.focus();
+            if (selected) {
+                selected.setAttribute('tabindex', '0');
+                selected.focus();
+            }
         }
 
         function closePopup() {
             popup.hidden = true;
             displayInput.setAttribute('aria-expanded', 'false');
+            const panel = wrapper.closest('.vault-form-panel');
+            if (panel) panel.classList.remove('has-open-select-layer');
             displayInput.focus();
         }
 
@@ -332,6 +341,75 @@
 
         popup.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') closePopup();
+        });
+
+        gridEl.addEventListener('keydown', function (e) {
+            const days = Array.from(gridEl.querySelectorAll('.kasa-calendar-day:not(.kasa-calendar-day-empty)'));
+            const idx = days.indexOf(document.activeElement);
+            if (idx < 0) return;
+            const curDay = +days[idx].dataset.day;
+            let target = null;
+
+            if (e.key === 'ArrowRight') { target = curDay + 1; e.preventDefault(); }
+            else if (e.key === 'ArrowLeft') { target = curDay - 1; e.preventDefault(); }
+            else if (e.key === 'ArrowDown') { target = curDay + 7; e.preventDefault(); }
+            else if (e.key === 'ArrowUp') { target = curDay - 7; e.preventDefault(); }
+            else if (e.key === 'Home') { target = 1; e.preventDefault(); }
+            else if (e.key === 'End') {
+                target = new Date(viewYear, viewMonth + 1, 0).getDate();
+                e.preventDefault();
+            }
+            else if (e.key === 'PageUp') {
+                viewMonth--;
+                if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+                render();
+                var first = gridEl.querySelector('.kasa-calendar-day:not(.kasa-calendar-day-empty)');
+                if (first) { first.tabIndex = 0; first.focus(); }
+                e.preventDefault();
+                return;
+            }
+            else if (e.key === 'PageDown') {
+                viewMonth++;
+                if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+                render();
+                var first = gridEl.querySelector('.kasa-calendar-day:not(.kasa-calendar-day-empty)');
+                if (first) { first.tabIndex = 0; first.focus(); }
+                e.preventDefault();
+                return;
+            }
+            else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                var sel = parseDate(hiddenInput.value);
+                var active = document.activeElement;
+                if (active && active.dataset.day) {
+                    hiddenInput.value = toISO(viewYear, viewMonth, +active.dataset.day);
+                    syncDisplay();
+                    closePopup();
+                }
+                return;
+            }
+            else return;
+
+            var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+            if (target < 1) {
+                viewMonth--;
+                if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+                render();
+                var newDays = Array.from(gridEl.querySelectorAll('.kasa-calendar-day:not(.kasa-calendar-day-empty)'));
+                var focusDay = newDays[newDays.length - 1];
+                if (focusDay) { focusDay.tabIndex = 0; focusDay.focus(); }
+            } else if (target > daysInMonth) {
+                viewMonth++;
+                if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+                render();
+                var newDays = Array.from(gridEl.querySelectorAll('.kasa-calendar-day:not(.kasa-calendar-day-empty)'));
+                var focusDay = newDays[0];
+                if (focusDay) { focusDay.tabIndex = 0; focusDay.focus(); }
+            } else {
+                days[idx].tabIndex = -1;
+                var next = gridEl.querySelector('[data-day="' + target + '"]');
+                if (next) { next.tabIndex = 0; next.focus(); }
+            }
         });
 
         document.addEventListener('click', function (e) {
