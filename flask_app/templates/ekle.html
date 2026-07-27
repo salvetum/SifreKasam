@@ -31,11 +31,11 @@
                 <div class="vault-field">
                     <label for="kayit_tipi">{{ _('Kayıt Tipi') }}</label>
                     <select name="kayit_tipi" id="kayit_tipi" required class="kasa-field" data-custom-select>
-                        <option value="Website"    {% if kayit and kayit.full_data['Website name'] %}selected{% endif %}>🌐 {{ _('Website') }}</option>
-                        <option value="Application"{% if kayit and kayit.full_data['Application'] %}selected{% endif %}>💻 {{ _('Uygulama') }}</option>
-                        <option value="CreditCard" {% if kayit and kayit.full_data['CreditCard'] %}selected{% endif %}>💳 {{ _('Kredi Kartı') }}</option>
-                        <option value="SecureNote" {% if kayit and kayit.full_data['SecureNote'] %}selected{% endif %}>📝 {{ _('Not') }}</option>
-                        <option value="Other"      {% if kayit and kayit.full_data['Account name'] %}selected{% endif %}>📁 {{ _('Diğer') }}</option>
+                        <option value="Website"    data-icon="fa-globe"      {% if kayit and kayit.full_data['Website name'] %}selected{% endif %}>{{ _('Website') }}</option>
+                        <option value="Application" data-icon="fa-desktop"    {% if kayit and kayit.full_data['Application'] %}selected{% endif %}>{{ _('Uygulama') }}</option>
+                        <option value="CreditCard"  data-icon="fa-credit-card" {% if kayit and kayit.full_data['CreditCard'] %}selected{% endif %}>{{ _('Kredi Kartı') }}</option>
+                        <option value="SecureNote"  data-icon="fa-note-sticky" {% if kayit and kayit.full_data['SecureNote'] %}selected{% endif %}>{{ _('Not') }}</option>
+                        <option value="Other"       data-icon="fa-folder"     {% if kayit and kayit.full_data['Account name'] %}selected{% endif %}>{{ _('Diğer') }}</option>
                     </select>
                 </div>
 

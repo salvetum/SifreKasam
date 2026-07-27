@@ -664,9 +664,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const optionText = document.createElement('span');
       optionText.textContent = option.textContent.trim();
+      const optionIcon = option.dataset.icon
+        ? createIcon(`fa-solid ${option.dataset.icon}`)
+        : null;
+      if (optionIcon) {
+        optionIcon.setAttribute('aria-hidden', 'true');
+        optionIcon.classList.add('kasa-custom-select-option-icon');
+        button.classList.add('has-icon');
+      }
       const check = createIcon('fa-solid fa-check');
       check.setAttribute('aria-hidden', 'true');
-      button.append(optionText, check);
+      if (optionIcon) button.append(optionIcon, optionText, check);
+      else button.append(optionText, check);
       menu.appendChild(button);
       return button;
     });
@@ -698,7 +707,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const syncCustomSelect = () => {
       const selectedOption = select.selectedOptions[0] || select.options[0];
-      valueNode.textContent = selectedOption?.textContent.trim() || '';
+      valueNode.textContent = '';
+      if (selectedOption?.dataset.icon) {
+        const icon = createIcon(`fa-solid ${selectedOption.dataset.icon}`);
+        icon.setAttribute('aria-hidden', 'true');
+        icon.classList.add('kasa-custom-select-value-icon');
+        valueNode.append(icon, document.createTextNode(' '));
+      }
+      valueNode.append(document.createTextNode(selectedOption?.textContent.trim() || ''));
       trigger.disabled = select.disabled;
       wrapper.classList.toggle('is-disabled', select.disabled);
       optionButtons.forEach((button, optionIndex) => {

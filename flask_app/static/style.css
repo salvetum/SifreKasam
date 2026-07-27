@@ -3282,6 +3282,9 @@ textarea.kasa-field {
 }
 
 .kasa-custom-select-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
     overflow: hidden;
     color: var(--text);
     font-size: 0.86rem;
@@ -3343,6 +3346,21 @@ textarea.kasa-field {
     font-weight: 700;
     cursor: pointer;
     transition: color 150ms ease, background 150ms ease, border-color 150ms ease, transform 150ms var(--ease-out);
+}
+
+.kasa-custom-select-option.has-icon {
+    grid-template-columns: auto minmax(0, 1fr) 24px;
+}
+
+.kasa-custom-select-option-icon,
+.kasa-custom-select-value-icon {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    font-size: 0.78rem;
+    color: var(--accent-2);
+    flex-shrink: 0;
 }
 
 .kasa-custom-select-option:hover,
