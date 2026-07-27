@@ -1118,6 +1118,10 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     margin-left: auto;
 }
 
+#bulk-and-search-group {
+    flex-wrap: nowrap;
+}
+
 #bulk-toolbar {
     position: fixed;
     bottom: 1.5rem;
@@ -3372,7 +3376,7 @@ textarea.kasa-field {
     transform: translateX(2px);
 }
 
-.kasa-custom-select-option > i {
+.kasa-custom-select-option > i:not(.kasa-custom-select-option-icon) {
     display: grid;
     place-items: center;
     width: 24px;
@@ -3388,7 +3392,7 @@ textarea.kasa-field {
     background: rgba(var(--accent-rgb), 0.14);
 }
 
-.kasa-custom-select-option.is-selected > i {
+.kasa-custom-select-option.is-selected > i:not(.kasa-custom-select-option-icon) {
     color: #fff;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
@@ -5257,6 +5261,168 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: scale(1.05);
 }
 
+/* === Custom Calendar Date Picker === */
+.kasa-calendar-wrapper {
+    position: relative;
+}
+
+.kasa-calendar-trigger {
+    cursor: pointer;
+}
+
+.kasa-calendar-trigger[readonly] {
+    opacity: 1;
+}
+
+.kasa-calendar-popup {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 100;
+    width: 280px;
+    padding: 0.6rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.25);
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 50%),
+        rgba(16, 18, 34, 0.97);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    transform-origin: top left;
+    transition: opacity 150ms ease, transform 180ms var(--ease-out);
+}
+
+.kasa-calendar-popup[hidden] {
+    display: none;
+}
+
+.kasa-calendar-popup:not([hidden]) {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.kasa-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.kasa-calendar-title {
+    flex: 1;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.kasa-calendar-nav {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.kasa-calendar-nav:hover {
+    color: var(--text);
+    border-color: rgba(var(--accent-rgb), 0.20);
+    background: rgba(var(--accent-rgb), 0.08);
+}
+
+.kasa-calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 0.25rem;
+}
+
+.kasa-calendar-weekday {
+    text-align: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding: 0.2rem 0;
+}
+
+.kasa-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.kasa-calendar-day {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.kasa-calendar-day:hover {
+    color: var(--text);
+    border-color: rgba(var(--accent-rgb), 0.18);
+    background: rgba(var(--accent-rgb), 0.06);
+}
+
+.kasa-calendar-day:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+}
+
+.kasa-calendar-day.is-today {
+    color: var(--accent-2);
+    font-weight: 800;
+}
+
+.kasa-calendar-day.is-selected {
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-color: transparent;
+}
+
+.kasa-calendar-day-empty {
+    pointer-events: none;
+}
+
+.kasa-calendar-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid rgba(var(--accent-rgb), 0.12);
+}
+
+.kasa-calendar-footer .kasa-btn {
+    flex: 1;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
+}
+
+[data-bs-theme="light"] .kasa-calendar-popup {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.07), transparent 50%),
+        rgba(255, 255, 255, 0.98);
+    box-shadow: 0 12px 32px rgba(31, 41, 55, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.70);
+}
+
 .kasa-field:-webkit-autofill,
 .kasa-field:-webkit-autofill:hover,
 .kasa-field:-webkit-autofill:focus {
@@ -5337,7 +5503,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .settings-inline-select {
-    width: min(180px, 42vw);
+    width: min(220px, 48vw);
     flex: 0 0 auto;
 }
 

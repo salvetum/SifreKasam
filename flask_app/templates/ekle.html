@@ -158,10 +158,30 @@
                 </div>
 
                 <div class="vault-field">
-                    <label for="expiry_date">{{ _('Son Kullanma Tarihi') }}</label>
-                    <input type="date" name="expiry_date" id="expiry_date"
-                        value="{{ kayit.full_data.expiry_date if kayit and kayit.full_data.expiry_date }}"
-                        class="kasa-field" aria-describedby="expiry-help">
+                    <label for="expiry_date_display">{{ _('Son Kullanma Tarihi') }}</label>
+                    <div class="kasa-calendar-wrapper" id="expiry-calendar-wrapper">
+                        <input type="text" id="expiry_date_display" readonly
+                            placeholder="GG.AA.YYYY"
+                            class="kasa-field kasa-calendar-trigger" aria-describedby="expiry-help"
+                            aria-haspopup="dialog" aria-expanded="false">
+                        <input type="hidden" name="expiry_date" id="expiry_date"
+                            value="{{ kayit.full_data.expiry_date if kayit and kayit.full_data.expiry_date }}">
+                        <div class="kasa-calendar-popup" id="expiry-calendar-popup" role="dialog" aria-label="{{ _('Tarih seçici') }}" hidden>
+                            <div class="kasa-calendar-header">
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-prev-year" aria-label="{{ _('Önceki yıl') }}"><i class="fa-solid fa-angles-left"></i></button>
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-prev-month" aria-label="{{ _('Önceki ay') }}"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span class="kasa-calendar-title" id="expiry-calendar-title"></span>
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-next-month" aria-label="{{ _('Sonraki ay') }}"><i class="fa-solid fa-chevron-right"></i></button>
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-next-year" aria-label="{{ _('Sonraki yıl') }}"><i class="fa-solid fa-angles-right"></i></button>
+                            </div>
+                            <div class="kasa-calendar-weekdays" id="expiry-calendar-weekdays"></div>
+                            <div class="kasa-calendar-grid" id="expiry-calendar-grid"></div>
+                            <div class="kasa-calendar-footer">
+                                <button type="button" class="kasa-calendar-today-btn kasa-btn kasa-btn-muted text-xs">{{ _('Bugün') }}</button>
+                                <button type="button" class="kasa-calendar-clear-btn kasa-btn kasa-btn-muted text-xs">{{ _('Temizle') }}</button>
+                            </div>
+                        </div>
+                    </div>
                     <p class="vault-help" id="expiry-help">{{ _('Tarih geçtiğinde kayıt süresi dolmuş olarak işaretlenir.') }}</p>
                 </div>
             </section>
@@ -191,5 +211,134 @@
             btn.classList.add('is-submitting');
         }
     });
+
+    (function () {
+        const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+        const WEEKDAYS = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+        const hiddenInput = document.getElementById('expiry_date');
+        const displayInput = document.getElementById('expiry_date_display');
+        const wrapper = document.getElementById('expiry-calendar-wrapper');
+        const popup = document.getElementById('expiry-calendar-popup');
+        const titleEl = document.getElementById('expiry-calendar-title');
+        const weekdaysEl = document.getElementById('expiry-calendar-weekdays');
+        const gridEl = document.getElementById('expiry-calendar-grid');
+        let viewYear, viewMonth;
+
+        function parseDate(val) {
+            if (!val) return null;
+            const parts = val.split('-');
+            if (parts.length !== 3) return null;
+            return new Date(+parts[0], +parts[1] - 1, +parts[2]);
+        }
+
+        function toISO(y, m, d) {
+            return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        }
+
+        function toDisplay(y, m, d) {
+            return String(d).padStart(2, '0') + '.' + String(m + 1).padStart(2, '0') + '.' + y;
+        }
+
+        function syncDisplay() {
+            const dt = parseDate(hiddenInput.value);
+            displayInput.value = dt ? toDisplay(dt.getFullYear(), dt.getMonth(), dt.getDate()) : '';
+        }
+
+        function render() {
+            titleEl.textContent = MONTHS_TR[viewMonth] + ' ' + viewYear;
+            while (gridEl.firstChild) gridEl.removeChild(gridEl.firstChild);
+            const first = new Date(viewYear, viewMonth, 1);
+            let startDay = first.getDay();
+            startDay = startDay === 0 ? 6 : startDay - 1;
+            const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+            const today = new Date();
+            const selected = parseDate(hiddenInput.value);
+
+            for (let i = 0; i < startDay; i++) {
+                const empty = document.createElement('span');
+                empty.className = 'kasa-calendar-day kasa-calendar-day-empty';
+                gridEl.appendChild(empty);
+            }
+            for (let d = 1; d <= daysInMonth; d++) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'kasa-calendar-day';
+                btn.textContent = d;
+                btn.dataset.day = d;
+                if (selected && viewYear === selected.getFullYear() && viewMonth === selected.getMonth() && d === selected.getDate()) {
+                    btn.classList.add('is-selected');
+                }
+                if (viewYear === today.getFullYear() && viewMonth === today.getMonth() && d === today.getDate()) {
+                    btn.classList.add('is-today');
+                }
+                btn.addEventListener('click', function () {
+                    hiddenInput.value = toISO(viewYear, viewMonth, d);
+                    syncDisplay();
+                    closePopup();
+                });
+                gridEl.appendChild(btn);
+            }
+        }
+
+        function openPopup() {
+            const dt = parseDate(hiddenInput.value) || new Date();
+            viewYear = dt.getFullYear();
+            viewMonth = dt.getMonth();
+            popup.hidden = false;
+            displayInput.setAttribute('aria-expanded', 'true');
+            render();
+            const selected = gridEl.querySelector('.is-selected') || gridEl.querySelector('.kasa-calendar-day:not(.kasa-calendar-day-empty)');
+            if (selected) selected.focus();
+        }
+
+        function closePopup() {
+            popup.hidden = true;
+            displayInput.setAttribute('aria-expanded', 'false');
+            displayInput.focus();
+        }
+
+        WEEKDAYS.forEach(function (w) {
+            var span = document.createElement('span');
+            span.className = 'kasa-calendar-weekday';
+            span.textContent = w;
+            weekdaysEl.appendChild(span);
+        });
+
+        displayInput.addEventListener('click', function () { if (popup.hidden) openPopup(); else closePopup(); });
+        displayInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (popup.hidden) openPopup(); else closePopup(); }
+            if (e.key === 'Escape') closePopup();
+        });
+
+        popup.addEventListener('click', function (e) { e.stopPropagation(); });
+
+        wrapper.querySelector('.kasa-calendar-prev-month').addEventListener('click', function () { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } render(); });
+        wrapper.querySelector('.kasa-calendar-next-month').addEventListener('click', function () { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } render(); });
+        wrapper.querySelector('.kasa-calendar-prev-year').addEventListener('click', function () { viewYear--; render(); });
+        wrapper.querySelector('.kasa-calendar-next-year').addEventListener('click', function () { viewYear++; render(); });
+        wrapper.querySelector('.kasa-calendar-today-btn').addEventListener('click', function () {
+            var now = new Date();
+            viewYear = now.getFullYear();
+            viewMonth = now.getMonth();
+            hiddenInput.value = toISO(viewYear, viewMonth, now.getDate());
+            syncDisplay();
+            render();
+        });
+        wrapper.querySelector('.kasa-calendar-clear-btn').addEventListener('click', function () {
+            hiddenInput.value = '';
+            syncDisplay();
+            closePopup();
+        });
+
+        popup.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closePopup();
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!popup.hidden && !wrapper.contains(e.target)) closePopup();
+        });
+
+        syncDisplay();
+    })();
 </script>
 {% endblock %}

@@ -14,17 +14,17 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-            <!-- Sağlık raporu -->
-            <a href="{{ url_for('saglik_raporu') }}" title="{{ _('Şifre Sağlık Raporu') }}"
-               class="kasa-btn kasa-btn-danger">
-                <i class="fa-solid fa-heart-pulse"></i> {{ _('Şifre Sağlığı') }}
-            </a>
             <!-- Şifre üretici -->
             <button type="button" data-kasa-modal="passwordGeneratorModal" title="{{ _('Şifre Üret') }}"
                 aria-haspopup="dialog" aria-controls="passwordGeneratorModal"
                 class="kasa-btn kasa-btn-muted">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> {{ _('Üretici') }}
             </button>
+            <!-- Sağlık raporu -->
+            <a href="{{ url_for('saglik_raporu') }}" title="{{ _('Şifre Sağlık Raporu') }}"
+               class="kasa-btn kasa-btn-danger">
+                <i class="fa-solid fa-heart-pulse"></i> {{ _('Şifre Sağlığı') }}
+            </a>
             <!-- Kasayı Kilitle -->
             <button type="button" id="lock-vault-btn" title="{{ _('Kasayı Kilitle') }}"
                 class="kasa-btn kasa-btn-danger">
@@ -96,6 +96,8 @@
             <button type="button" data-filter="Other"
                 class="filter-btn" aria-pressed="false"><i class="fa-solid fa-folder"></i> {{ _('Diğer') }}</button>
         </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0" id="bulk-and-search-group">
             <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
                 class="kasa-btn kasa-btn-muted kasa-transition-fast">
                 <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
@@ -104,11 +106,11 @@
                 <input type="checkbox" id="select-all" class="bulk-select-checkbox">
                 {{ _('Tümünü seç') }}
             </label>
-        </div>
-        <div class="record-search-wrap">
-            <label for="search-input" class="sr-only">{{ _('Kayıt ara') }}</label>
-            <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
-                class="w-full px-3 py-2 kasa-field text-sm">
+            <div class="record-search-wrap">
+                <label for="search-input" class="sr-only">{{ _('Kayıt ara') }}</label>
+                <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
+                    class="w-full px-3 py-2 kasa-field text-sm">
+            </div>
         </div>
     </div>
 
@@ -710,7 +712,7 @@
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h4 id="setting-chroma-title" class="text-sm font-medium mb-0.5"><i class="fa-solid fa-wand-magic-sparkles modal-icon-accent"></i>{{ _('Chroma RGB') }}</h4>
+                            <h4 id="setting-chroma-title" class="text-sm font-medium mb-0.5">{{ _('Chroma RGB') }}</h4>
                             <p class="text-xs text-kasa-text-muted mb-0">{{ _('Vurgu rengini yumuşak bir renk döngüsünde değiştir.') }}</p>
                         </div>
                         <div class="settings-switch-control">

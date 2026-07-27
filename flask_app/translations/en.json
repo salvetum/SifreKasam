@@ -384,5 +384,12 @@
   "Arka plan güncellendi.": "Background updated.",
   "Yükleme başarısız oldu.": "Upload failed.",
   "Desteklenmeyen dosya formatı. PNG, JPEG, WebP veya GIF yükleyin.": "Unsupported file format. Please upload PNG, JPEG, WebP, or GIF.",
-  "Dosya boyutu sınırını aşıyor.": "File size exceeds the limit."
+  "Dosya boyutu sınırını aşıyor.": "File size exceeds the limit.",
+  "Önceki yıl": "Previous year",
+  "Önceki ay": "Previous month",
+  "Sonraki ay": "Next month",
+  "Sonraki yıl": "Next year",
+  "Tarih seçici": "Date picker",
+  "Bugün": "Today",
+  "Temizle": "Clear"
 }
