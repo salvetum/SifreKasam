@@ -440,6 +440,34 @@ class CustomBackgroundUploadTests(unittest.TestCase):
             files = [f for f in os.listdir(bg_dir) if os.path.isfile(os.path.join(bg_dir, f))]
             self.assertEqual(len(files), 1)
 
+    def test_rejects_text_content_with_png_extension(self) -> None:
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(b'This is plain text, not an image.'), 'fake.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertIn('error', data)
+
+    def test_unauthorized_upload_without_token(self) -> None:
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'test.png'),
+        }, content_type='multipart/form-data')
+        self.assertEqual(response.status_code, 403)
+
+    def test_unauthorized_delete_without_token(self) -> None:
+        response = self.client.delete('/api/background')
+        self.assertEqual(response.status_code, 403)
+
+    def test_unauthorized_serve_without_token(self) -> None:
+        response = self.client.get('/api/background/current')
+        self.assertEqual(response.status_code, 403)
+
+    def test_custom_background_endpoints_not_in_public_endpoints(self) -> None:
+        public = app_module._PUBLIC_ENDPOINTS
+        self.assertNotIn('upload_custom_background', public)
+        self.assertNotIn('delete_custom_background', public)
+        self.assertNotIn('serve_custom_background', public)
+
 
 if __name__ == "__main__":
     unittest.main()
