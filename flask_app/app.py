@@ -1507,6 +1507,9 @@ def upload_custom_background():
     filepath = os.path.join(BACKGROUND_DIR, filename)
     uploaded.save(filepath)
 
+    save_background_style('custom')
+    db.session.commit()
+
     is_gif = ext == '.gif'
     return jsonify({
         'status': 'ok',

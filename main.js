@@ -74,6 +74,8 @@ const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.2-beta.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.2-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.2',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.2',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.1',
@@ -184,7 +186,7 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
   'sifrekasam',
   'SifreKasam',
-  'sifrekasam-v2.6.2-beta.1',
+  'sifrekasam-v2.6.2-beta.2',
   'sifrekasam-v2.6.1',
   'sifrekasam-v2.6.0',
   'sifrekasam-v2.5.12',
@@ -954,9 +956,13 @@ function stopFlaskServer() {
 
     setTimeout(() => {
       if (settled) return;
-      kill(proc.pid, 'SIGTERM', () => {
-        setTimeout(finish, 250);
-      });
+      try {
+        kill(proc.pid, 'SIGTERM', () => {
+          setTimeout(finish, 250);
+        });
+      } catch (_) {
+        finish();
+      }
     }, 1000);
   });
 }
@@ -1044,6 +1050,9 @@ app.on('will-quit', () => {
 function shutdownFlask() {
   if (!flaskProcess) return;
 
+  const pid = flaskProcess.pid;
+  flaskProcess = null;
+
   const req = https.request({
     hostname: HOST, port: PORT, path: '/shutdown',
     method: 'POST', headers: { 'X-App-Token': APP_TOKEN },
@@ -1052,11 +1061,13 @@ function shutdownFlask() {
   req.on('error', () => {});
   req.end();
 
-  kill(flaskProcess.pid, 'SIGTERM', (err) => {
-    if (err) kill(flaskProcess.pid, 'SIGKILL');
-  });
-
-  flaskProcess = null;
+  try {
+    kill(pid, 'SIGTERM', (err) => {
+      if (err) {
+        try { kill(pid, 'SIGKILL'); } catch (_) {}
+      }
+    });
+  } catch (_) {}
 }
 
 // ─── YARDIMCI FONKSİYONLAR ───────────────────────────────────────────────────
@@ -1092,8 +1103,13 @@ async function loadBackendPage(pathname) {
   if (!mainWindow || mainWindow.isDestroyed()) {
     throw new Error('Ana pencere kullanılamıyor.');
   }
-  const targetUrl = `${PROTOCOL}://${HOST}:${PORT}${pathname}`;
-  await mainWindow.loadURL(targetUrl);
+  try {
+    const targetUrl = `${PROTOCOL}://${HOST}:${PORT}${pathname}`;
+    await mainWindow.loadURL(targetUrl);
+  } catch (err) {
+    console.error('loadBackendPage failed:', pathname, err.message);
+    throw err;
+  }
 }
 
 function getConfigDir() {

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark light">
-    <style nonce="{{ csp_nonce }}" id="kasa-runtime-styles"></style>
     <script nonce="{{ csp_nonce }}">
         window.LANG = {{ CURRENT_LANG|tojson }};
         window.TRANSLATIONS = {{ TRANSLATIONS|tojson }};
@@ -13,13 +12,24 @@
             return window.TRANSLATIONS[key] || key;
         };
 
-        const kasaRuntimeStyles = new Map();
+        const kasaRuntimeNonce = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') || '{{ csp_nonce }}';
         window.KASA_SET_RUNTIME_STYLE = function (key, cssText) {
-            const runtimeStyle = document.getElementById('kasa-runtime-styles');
-            if (!runtimeStyle || !key) return;
-            if (cssText) kasaRuntimeStyles.set(key, cssText);
-            else kasaRuntimeStyles.delete(key);
-            runtimeStyle.textContent = Array.from(kasaRuntimeStyles.values()).join('\n');
+            if (!key) return;
+            const id = 'kasa-runtime-style-' + key;
+            let styleEl = document.getElementById(id);
+            if (!cssText) {
+                if (styleEl) styleEl.remove();
+                return;
+            }
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = id;
+                styleEl.setAttribute('nonce', '{{ csp_nonce }}');
+                document.head.appendChild(styleEl);
+            }
+            if (styleEl.textContent !== cssText) {
+                styleEl.textContent = cssText;
+            }
         };
 
         const storedTheme = localStorage.getItem('kasa-theme') || "{{ SAVED_THEME }}";

@@ -486,6 +486,14 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         self.assertNotIn('delete_custom_background', token_eps)
         self.assertNotIn('serve_custom_background', token_eps)
 
+    def test_upload_atomically_sets_background_style_to_custom(self) -> None:
+        png_data = self._make_png()
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(png_data), 'atom.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(app_module.get_saved_background_style(), 'custom')
+
 
 if __name__ == "__main__":
     unittest.main()

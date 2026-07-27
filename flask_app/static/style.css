@@ -4066,6 +4066,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
 
 .settings-panel > .settings-section-heading,
 .settings-panel > .settings-appearance-card,
+.settings-panel > .settings-bg-card,
 .settings-panel > .settings-action-grid,
 .settings-panel > .lan-warning-card,
 .settings-panel > #lan-info-box,
@@ -4077,7 +4078,8 @@ html[data-glass-effects="off"] .settings-appearance-card {
 .settings-panel > .grid,
 .settings-panel > .kasa-btn,
 .settings-panel > #lan-info-box,
-.settings-appearance-card {
+.settings-appearance-card,
+.settings-bg-card {
     width: 100%;
     margin-inline: auto;
 }
@@ -4271,12 +4273,12 @@ html[data-glass-effects="off"] .settings-appearance-card {
 }
 
 .settings-appearance-card .settings-appearance-head,
-.settings-appearance-card .background-choice-grid {
+.settings-bg-card .background-choice-grid {
     grid-column: 1 / -1;
 }
 
 .settings-appearance-card .accent-preset-row,
-.settings-appearance-card .background-choice-grid {
+.settings-bg-card .background-choice-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -4499,7 +4501,7 @@ html[data-kasa-motion="on"] .appearance-preview {
 
     .settings-appearance-card,
     .settings-appearance-grid,
-    .settings-appearance-card .background-choice-grid {
+    .settings-bg-card .background-choice-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
