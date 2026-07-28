@@ -699,6 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.closest('.vault-form-panel'),
         wrapper.closest('.settings-panel'),
         wrapper.closest('.settings-body'),
+        wrapper.closest('.settings-modal-content'),
       ].filter((layerHost, layerIndex, layerHosts) => (
         layerHost && layerHosts.indexOf(layerHost) === layerIndex
       )),
@@ -1098,10 +1099,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  let appearanceSavePromise = null;
+
   const queueAppearanceSave = (accent, background) => {
     clearTimeout(appearanceSaveTimer);
     appearanceSaveTimer = setTimeout(() => {
-      apiPost('/settings/appearance', {
+      appearanceSavePromise = apiPost('/settings/appearance', {
         accent_color: accent,
         background_style: background,
         chroma_accent_enabled: chromaAccentEnabled,
@@ -1109,8 +1112,25 @@ document.addEventListener('DOMContentLoaded', () => {
         animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
         interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
         gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
-      });
+      }).finally(() => { appearanceSavePromise = null; });
     }, 250);
+  };
+
+  const flushAppearanceSave = () => {
+    clearTimeout(appearanceSaveTimer);
+    if (appearanceSavePromise) return appearanceSavePromise;
+    const accent = accentInput?.value || currentAppearance.accent;
+    const background = backgroundHidden?.value || currentAppearance.background;
+    appearanceSavePromise = apiPost('/settings/appearance', {
+      accent_color: accent,
+      background_style: background,
+      chroma_accent_enabled: chromaAccentEnabled,
+      chroma_accent_speed: chromaAccentSpeed,
+      animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
+      interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
+      gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
+    }).finally(() => { appearanceSavePromise = null; });
+    return appearanceSavePromise;
   };
 
   const syncChromaSpeedVisibility = (enabled, animate = true) => {
@@ -1288,6 +1308,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     settingsModal?.addEventListener('kasa:modal-closing', () => {
+      flushAppearanceSave();
       setColorPickerOpen(false);
     });
     document.addEventListener('keydown', event => {

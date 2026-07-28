@@ -777,7 +777,8 @@ html[data-kasa-animations="off"] *::after {
     overflow: visible;
 }
 
-.settings-body.has-open-select-layer {
+.settings-body.has-open-select-layer,
+.settings-modal-content.has-open-select-layer {
     overflow: visible;
 }
 
@@ -4020,7 +4021,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
     max-height: none;
     min-height: 0;
     margin: 0;
-    overflow: hidden;
+    overflow: hidden auto;
     padding: 0 !important;
 }
 
@@ -4032,7 +4033,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
     height: 100%;
     min-height: 0;
     padding: 0.15rem;
-    overflow: hidden;
+    overflow: hidden auto;
 }
 
 .settings-panel > *,
@@ -4130,6 +4131,8 @@ html[data-glass-effects="off"] .settings-appearance-card {
 
 .settings-panel > .glass-sm:not(.settings-appearance-card),
 .chroma-toggle-row > .glass-sm,
+.glass-toggle-row > .glass-sm,
+.glass-toggle-row > .settings-glass-quality-card,
 .chroma-toggle-row > .settings-chroma-speed-card {
     display: flex;
     align-items: center;
@@ -4177,6 +4180,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
 }
 
 .settings-glass-quality-card,
+.glass-toggle-row,
 .chroma-toggle-row {
     grid-column: 1 / -1;
     display: flex;
@@ -4190,6 +4194,24 @@ html[data-glass-effects="off"] .settings-appearance-card {
 }
 
 .chroma-toggle-row > .settings-chroma-speed-card {
+    flex: 3;
+    min-width: 0;
+    grid-column: auto;
+}
+
+.glass-toggle-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: stretch;
+    gap: 0.7rem;
+}
+
+.glass-toggle-row > :first-child {
+    flex: 2;
+    min-width: 0;
+}
+
+.glass-toggle-row > .settings-glass-quality-card {
     flex: 3;
     min-width: 0;
     grid-column: auto;
@@ -4243,7 +4265,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
     animation: settingsItemIn 280ms var(--ease-out) both;
 }
 
-.kasa-modal.is-open .settings-panel.active > .settings-glass-quality-card:not(.is-collapsed),
+.kasa-modal.is-open .settings-panel.active > .glass-toggle-row > .settings-glass-quality-card:not(.is-collapsed),
 .kasa-modal.is-open .settings-panel.active > .settings-chroma-speed-card:not(.is-collapsed),
 .kasa-modal.is-open .settings-panel.active > .chroma-toggle-row {
     animation: settingsItemIn 280ms var(--ease-out) 66ms backwards;
@@ -4490,12 +4512,15 @@ html[data-kasa-motion="on"] .appearance-preview {
 
     .settings-panel > .glass-sm:not(.settings-appearance-card),
     .chroma-toggle-row > .glass-sm,
-    .chroma-toggle-row > .settings-chroma-speed-card {
+    .chroma-toggle-row > .settings-chroma-speed-card,
+    .glass-toggle-row > .glass-sm,
+    .glass-toggle-row > .settings-glass-quality-card {
         align-items: flex-start;
         flex-direction: column;
     }
 
-    .chroma-toggle-row {
+    .chroma-toggle-row,
+    .glass-toggle-row {
         flex-direction: column;
     }
 
@@ -5626,6 +5651,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 [data-bs-theme="light"] .settings-panel > .glass-sm:not(.settings-appearance-card),
 [data-bs-theme="light"] .chroma-toggle-row > .glass-sm,
+[data-bs-theme="light"] .glass-toggle-row > .glass-sm,
 [data-bs-theme="light"] .settings-toggle-card,
 [data-bs-theme="light"] .settings-select-card,
 [data-bs-theme="light"] .settings-action-card,
@@ -5660,6 +5686,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 html[data-glass-effects="off"] .settings-nav,
 html[data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card),
 html[data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
+html[data-glass-effects="off"] .glass-toggle-row > .glass-sm,
 html[data-glass-effects="off"] .settings-toggle-card,
 html[data-glass-effects="off"] .settings-select-card,
 html[data-glass-effects="off"] .settings-action-card,
@@ -5695,6 +5722,7 @@ html[data-glass-effects="off"] .settings-switch-input:checked {
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-nav,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card),
 html[data-bs-theme="light"][data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
+html[data-bs-theme="light"][data-glass-effects="off"] .glass-toggle-row > .glass-sm,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-toggle-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-select-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-action-card,

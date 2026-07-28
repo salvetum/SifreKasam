@@ -764,6 +764,7 @@
                             <input class="settings-switch-input" type="checkbox" name="interface_animations_enabled" id="interface-animations-toggle" {% if INTERFACE_ANIMATIONS_ENABLED %}checked{% endif %} aria-labelledby="setting-interface-animations-title">
                         </div>
                     </div>
+                    <div class="glass-toggle-row">
                     <div id="glass-effects-card" class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
                             <h4 id="setting-glass-title" class="text-sm font-medium mb-0.5">{{ _('Cam Efektleri') }}</h4>
@@ -785,6 +786,7 @@
                             <option value="normal" {% if GLASS_QUALITY == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
                             <option value="high" {% if GLASS_QUALITY == 'high' %}selected{% endif %}>{{ _('Yüksek') }}</option>
                         </select>
+                    </div>
                     </div>
                     </section>
                     <section id="settings-panel-behavior" class="settings-panel" role="tabpanel"
