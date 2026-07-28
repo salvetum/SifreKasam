@@ -4129,7 +4129,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
     line-height: 1.45;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card),
+.settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
 .chroma-toggle-row > .glass-sm,
 .glass-toggle-row > .glass-sm,
 .glass-toggle-row > .settings-glass-quality-card,
