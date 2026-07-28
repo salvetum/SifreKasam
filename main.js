@@ -186,7 +186,7 @@ function cleanupApplicationData(currentInstallRoot) {
     '.SifrekasamV2',
   'sifrekasam',
   'SifreKasam',
-  'sifrekasam-v2.6.2-beta.2',
+  'sifrekasam',
   'sifrekasam-v2.6.1',
   'sifrekasam-v2.6.0',
   'sifrekasam-v2.5.12',

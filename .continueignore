@@ -1,0 +1,10 @@
+node_modules/
+backend/
+out/
+flask_app/build/
+flask_app/dist/
+flask_app/venv/
+.git/
+*.db
+*.bat
+*.sh
