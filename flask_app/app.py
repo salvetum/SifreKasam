@@ -146,8 +146,9 @@ DB_FILE   = os.path.join(DATA_DIR, 'sifreler.db')
 TXT_FILE  = os.path.join(DATA_DIR, 'sifreler.txt')
 THEME_FILE = os.path.join(DATA_DIR, 'theme.json')
 VAULT_INIT_FILE = os.path.join(DATA_DIR, 'vault.initialized')
-CERT_FILE  = os.path.join(DATA_DIR, 'cert.pem')
-KEY_FILE   = os.path.join(DATA_DIR, 'key.pem')
+SSL_DIR    = os.path.join(DATA_DIR, 'ssl')
+CERT_FILE  = os.path.join(SSL_DIR, 'cert.pem')
+KEY_FILE   = os.path.join(SSL_DIR, 'key.pem')
 BACKGROUND_DIR = get_backgrounds_dir()
 
 app.config['SQLALCHEMY_DATABASE_URI']        = f"sqlite:///{DB_FILE}"
@@ -244,17 +245,18 @@ def _check_heartbeat():
 
 threading.Thread(target=_check_heartbeat, daemon=True).start()
 
-_vault_keys: dict[str, str] = {}
+_vault_keys: dict[str, bytes] = {}
 _vault_keys_lock = threading.Lock()
 
-def _set_vault_password(master_password: str):
+def _set_vault_key(master_password: str):
     old_sid = session.pop('vault_session_id', None)
     session.pop('master_password', None)
     new_sid = uuid.uuid4().hex
+    key = derive_key(master_password)
     with _vault_keys_lock:
         if old_sid:
             _vault_keys.pop(old_sid, None)
-        _vault_keys[new_sid] = master_password
+        _vault_keys[new_sid] = key
     if old_sid:
         _remove_vault_report_cache(old_sid)
     session['vault_session_id'] = new_sid
@@ -267,16 +269,11 @@ def _clear_vault_password():
             _vault_keys.pop(sid, None)
         _remove_vault_report_cache(sid)
 
-def _get_vault_password() -> str | None:
+def _get_vault_key() -> bytes | None:
     sid = session.get('vault_session_id')
     if sid:
         with _vault_keys_lock:
             return _vault_keys.get(sid)
-
-    legacy_password = session.pop('master_password', None)
-    if legacy_password:
-        _set_vault_password(legacy_password)
-        return legacy_password
     return None
 
 # ─── KRİPTOGRAFİ ──────────────────────────────────────────────────────────────
@@ -302,10 +299,10 @@ def derive_key(master_password: str) -> bytes:
     )
 
 def get_fernet() -> Fernet:
-    mp = _get_vault_password()
-    if not mp:
+    key = _get_vault_key()
+    if not key:
         abort(401)
-    return Fernet(derive_key(mp))
+    return Fernet(key)
 
 def _reencrypt_record(record: Record, old_fernet: Fernet, new_fernet: Fernet,
                       allow_legacy_prefix: bool = False) -> None:
@@ -915,7 +912,7 @@ def login():
 
     _reset_login_failures(attempt_key)
     session.permanent = True
-    _set_vault_password(mp)
+    _set_vault_key(mp)
     login_user(User("admin"), remember=False)
     return redirect(url_for('index'))
 @app.route('/')
@@ -1513,7 +1510,7 @@ def upload_custom_background():
     is_gif = ext == '.gif'
     return jsonify({
         'status': 'ok',
-        'url': url_for('serve_custom_background'),
+        'url': url_for('serve_custom_background') + '?v=' + str(int(time.time())),
         'is_gif': is_gif,
     })
 
@@ -1524,7 +1521,7 @@ def serve_custom_background():
     bg_path = _find_custom_background()
     if not bg_path:
         abort(404)
-    return send_file(bg_path)
+    return send_file(bg_path, max_age=0)
 
 
 @app.route('/api/background', methods=['DELETE'])
@@ -1554,16 +1551,15 @@ def _prune_reencrypt_state(max_entries: int = 20) -> None:
         for task_id in removable[:len(_reencrypt_state) - max_entries]:
             _reencrypt_state.pop(task_id, None)
 
-def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | None):
+def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str, vault_sid: str | None):
     _vault_write_locked.set()
     error_message = _REENCRYPT_ERROR_MESSAGE
     try:
         with app.app_context():
             error_message = _(_REENCRYPT_ERROR_MESSAGE)
             backup_database()
-            old_fernet = Fernet(derive_key(old_pw))
-            new_fernet = Fernet(derive_key(new_pw))
-            new_hash   = hash_master_password(new_pw)
+            old_fernet = Fernet(old_key)
+            new_fernet = Fernet(new_key)
 
             rows      = Record.query.all()
             hist_rows = PasswordHistory.query.all()
@@ -1599,9 +1595,8 @@ def _reencrypt_task(task_id: str, old_pw: str, new_pw: str, vault_sid: str | Non
             invalidate_vault_report_cache()
             if vault_sid:
                 with _vault_keys_lock:
-                    # Kullanıcı işlem sırasında çıkış yaptıysa silinmiş anahtarı yeniden ekleme.
-                    if _vault_keys.get(vault_sid) == old_pw:
-                        _vault_keys[vault_sid] = new_pw
+                    if vault_sid in _vault_keys:
+                        _vault_keys[vault_sid] = new_key
             log.info("Ana ?ifre ba?ar?yla de?i?tirildi.")
             with _reencrypt_lock:
                 _reencrypt_state[task_id] = {'progress': 100, 'total': total, 'done': True}
@@ -1645,6 +1640,9 @@ def change_password():
 
         task_id = uuid.uuid4().hex
         vault_sid = session.get('vault_session_id')
+        old_key = derive_key(old_pw)
+        new_key = derive_key(new_pw)
+        new_hash = hash_master_password(new_pw)
         _prune_reencrypt_state()
         # Polling ilk istekte görevi yanlışlıkla tamamlanmış sanmasın.
         with _reencrypt_lock:
@@ -1654,7 +1652,7 @@ def change_password():
                 'done': False,
             }
         threading.Thread(target=_reencrypt_task,
-                         args=(task_id, old_pw, new_pw, vault_sid),
+                         args=(task_id, old_key, new_key, new_hash, vault_sid),
                          daemon=True).start()
         return jsonify({'task_id': task_id})
     except Exception:
@@ -1696,7 +1694,17 @@ def migrate_txt_to_db(mp: str):
 
 # ─── SSL SERTİFİKASI (self-signed) ─────────────────────────────────────────────
 
+def _migrate_legacy_ssl_files():
+    old_cert = os.path.join(DATA_DIR, 'cert.pem')
+    old_key  = os.path.join(DATA_DIR, 'key.pem')
+    os.makedirs(SSL_DIR, exist_ok=True)
+    for old, new in ((old_cert, CERT_FILE), (old_key, KEY_FILE)):
+        if os.path.exists(old) and not os.path.exists(new):
+            os.replace(old, new)
+            log.info("SSL dosyasi %s -> %s tasindi", old, new)
+
 def _ensure_self_signed_cert():
+    _migrate_legacy_ssl_files()
     ensure_self_signed_cert(CERT_FILE, KEY_FILE, log)
 
 _ensure_self_signed_cert()

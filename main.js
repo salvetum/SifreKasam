@@ -1124,7 +1124,7 @@ function isFirstRun() {
     ? path.join(configDir, '.SifrekasamV2')
     : path.join(configDir, 'sifrekasam');
   try {
-    return !fs.existsSync(path.join(dataDir, 'cert.pem'));
+    return !fs.existsSync(path.join(dataDir, 'ssl', 'cert.pem'));
   } catch (_) {
     return false;
   }

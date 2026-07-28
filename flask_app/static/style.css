@@ -4156,15 +4156,15 @@ html[data-glass-effects="off"] .settings-appearance-card {
     align-content: center;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card) > div:first-child,
+.settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) > div:first-child,
 .chroma-toggle-row > .glass-sm > div:first-child {
     display: grid;
     align-content: center;
     gap: 0.12rem;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card) h6,
-.settings-panel > .glass-sm:not(.settings-appearance-card) h4,
+.settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) h6,
+.settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) h4,
 .chroma-toggle-row > .glass-sm h6,
 .chroma-toggle-row > .glass-sm h4 {
     margin: 0;
@@ -4172,7 +4172,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
     text-align: left;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card) p,
+.settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) p,
 .chroma-toggle-row > .glass-sm p {
     margin: 0;
     line-height: 1.35;
@@ -4280,18 +4280,26 @@ html[data-glass-effects="off"] .settings-appearance-card {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.settings-appearance-card {
+.settings-appearance-card,
+.settings-bg-card {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
     align-items: stretch;
     justify-content: stretch;
     gap: 0.65rem;
     padding: 0.8rem !important;
     border-radius: 18px !important;
+    border-color: rgba(var(--accent-rgb), 0.18);
     background:
         radial-gradient(circle at 10% 0%, rgba(var(--accent-rgb), 0.13), transparent 34%),
         linear-gradient(145deg, rgba(255,255,255,0.085), rgba(255,255,255,0.034)),
         var(--glass);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.07),
+        0 10px 26px rgba(var(--accent-rgb),0.045);
+}
+
+.settings-appearance-card {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
 }
 
 .settings-appearance-card .settings-appearance-head,
@@ -4487,7 +4495,8 @@ html[data-kasa-motion="on"] .appearance-preview {
     }
 
     .settings-panel > .settings-section-heading,
-    .settings-panel > .settings-appearance-card {
+    .settings-panel > .settings-appearance-card,
+    .settings-panel > .settings-bg-card {
         grid-column: 1 / -1;
     }
 }
@@ -4510,7 +4519,7 @@ html[data-kasa-motion="on"] .appearance-preview {
         display: none;
     }
 
-    .settings-panel > .glass-sm:not(.settings-appearance-card),
+    .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
     .chroma-toggle-row > .glass-sm,
     .chroma-toggle-row > .settings-chroma-speed-card,
     .glass-toggle-row > .glass-sm,
@@ -5649,13 +5658,14 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
         rgba(242,245,251,0.78);
 }
 
-[data-bs-theme="light"] .settings-panel > .glass-sm:not(.settings-appearance-card),
+[data-bs-theme="light"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
 [data-bs-theme="light"] .chroma-toggle-row > .glass-sm,
 [data-bs-theme="light"] .glass-toggle-row > .glass-sm,
 [data-bs-theme="light"] .settings-toggle-card,
 [data-bs-theme="light"] .settings-select-card,
 [data-bs-theme="light"] .settings-action-card,
-[data-bs-theme="light"] .settings-appearance-card {
+[data-bs-theme="light"] .settings-appearance-card,
+[data-bs-theme="light"] .settings-bg-card {
     color: var(--text);
     border-color: rgba(45,58,82,0.14) !important;
     background:
@@ -5684,12 +5694,14 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 html[data-glass-effects="off"] .settings-nav,
-html[data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card),
+html[data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
 html[data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
 html[data-glass-effects="off"] .glass-toggle-row > .glass-sm,
 html[data-glass-effects="off"] .settings-toggle-card,
 html[data-glass-effects="off"] .settings-select-card,
 html[data-glass-effects="off"] .settings-action-card,
+html[data-glass-effects="off"] .settings-appearance-card,
+html[data-glass-effects="off"] .settings-bg-card,
 html[data-glass-effects="off"] .background-choice-grid button,
 html[data-glass-effects="off"] .accent-preset-row button {
     backdrop-filter: none !important;
@@ -5720,12 +5732,14 @@ html[data-glass-effects="off"] .settings-switch-input:checked {
 }
 
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-nav,
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card),
+html[data-bs-theme="light"][data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
 html[data-bs-theme="light"][data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
 html[data-bs-theme="light"][data-glass-effects="off"] .glass-toggle-row > .glass-sm,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-toggle-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-select-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-action-card,
+html[data-bs-theme="light"][data-glass-effects="off"] .settings-appearance-card,
+html[data-bs-theme="light"][data-glass-effects="off"] .settings-bg-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .background-choice-grid button,
 html[data-bs-theme="light"][data-glass-effects="off"] .accent-preset-row button {
     border-color: rgba(var(--accent-rgb),0.18) !important;

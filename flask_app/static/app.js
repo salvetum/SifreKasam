@@ -962,7 +962,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const accentSaturationValue = document.getElementById('accent-saturation-value');
   const accentBrightnessValue = document.getElementById('accent-brightness-value');
   const settingsModal = document.getElementById('settingsModal');
-  const backgroundSelect = document.getElementById('background-style-select');
   const backgroundHidden = document.getElementById('background-style-hidden');
   const accentHidden = document.getElementById('accent-color-hidden');
   const chromaToggle = document.getElementById('chroma-accent-toggle');
@@ -975,6 +974,8 @@ document.addEventListener('DOMContentLoaded', () => {
     accent: localStorage.getItem('kasa-accent') || '#7c6ff7',
     background: localStorage.getItem('kasa-background') || 'aurora',
   };
+  const getCurrentBackground = () =>
+    backgroundHidden?.value || window.KASA_APPEARANCE?.background || currentAppearance.background;
   let appearanceSaveTimer = 0;
   let accentContrastWarningTimer = 0;
   let lightAccentWarningShown = false;
@@ -1074,10 +1075,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (accentInput) accentInput.value = normalizeHexColor(accent);
     if (accentTextInput) accentTextInput.value = normalizeHexColor(accent);
     if (accentHidden) accentHidden.value = normalizeHexColor(accent);
-    if (backgroundSelect) {
-      backgroundSelect.value = background;
-      backgroundSelect.kasaSyncCustomSelect?.();
-    }
     if (backgroundHidden) backgroundHidden.value = background;
     if (appearancePreview) {
       window.KASA_SET_RUNTIME_STYLE?.(
@@ -1177,7 +1174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (persist) {
       queueAppearanceSave(
         accentInput?.value || currentAppearance.accent,
-        backgroundSelect?.value || currentAppearance.background
+        getCurrentBackground()
       );
     }
   };
@@ -1189,7 +1186,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (persist) queueAppearanceSave(next.accent, next.background);
   };
 
-  if (accentInput || accentTextInput || backgroundSelect) {
+  if (accentInput || accentTextInput || backgroundHidden || backgroundButtons.length) {
     syncAppearanceControls(currentAppearance.accent, currentAppearance.background);
     applyAppearance(currentAppearance.accent, currentAppearance.background, false);
     setChromaAccentPreference(chromaAccentEnabled, chromaAccentSpeed, false, false);
@@ -1209,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
     accentColorReset?.addEventListener('click', () => {
       updateAppearance(
         accentColorReset.dataset.defaultAccent || '#7c6ff7',
-        backgroundSelect?.value || currentAppearance.background
+        getCurrentBackground()
       );
     });
     [accentHueInput, accentSaturationInput, accentBrightnessInput].forEach(input => {
@@ -1225,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', () => {
             colorPickerState.saturation,
             colorPickerState.brightness
           ),
-          backgroundSelect?.value || currentAppearance.background,
+          getCurrentBackground(),
           true,
           true
         );
@@ -1235,7 +1232,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (/^#?[0-9a-fA-F]{6}$/.test(accentTextInput.value.trim())) {
         updateAppearance(
           accentTextInput.value,
-          backgroundSelect?.value || currentAppearance.background
+          getCurrentBackground()
         );
       }
     });
@@ -1243,21 +1240,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const fallback = accentInput?.value || currentAppearance.accent;
       updateAppearance(
         normalizeHexColor(accentTextInput.value, fallback),
-        backgroundSelect?.value || currentAppearance.background
+        getCurrentBackground()
       );
     });
-    backgroundSelect?.addEventListener('change', () =>
-      updateAppearance(
-        accentInput?.value || currentAppearance.accent,
-        backgroundSelect.value,
-        true,
-        true
-      )
-    );
-
     accentPresetButtons.forEach(btn => {
       btn.addEventListener('click', () =>
-        updateAppearance(btn.dataset.accentPreset, backgroundSelect?.value || currentAppearance.background)
+        updateAppearance(btn.dataset.accentPreset, getCurrentBackground())
       );
     });
     backgroundButtons.forEach(btn => {
@@ -1640,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.accent_color || data.background_style) {
           updateAppearance(
             data.accent_color || accentInput?.value,
-            data.background_style || backgroundSelect?.value,
+            data.background_style || getCurrentBackground(),
             false
           );
         }

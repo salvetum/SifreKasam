@@ -20,6 +20,7 @@ def ensure_self_signed_cert(
 ) -> None:
     if os.path.exists(cert_file) and os.path.exists(key_file):
         return
+    os.makedirs(os.path.dirname(cert_file), exist_ok=True)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name(
         [x509.NameAttribute(NameOID.COMMON_NAME, "ŞifreKasam")]
