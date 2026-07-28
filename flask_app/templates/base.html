@@ -118,16 +118,22 @@
                 --accent-2-rgb: ${hexToRgb(accent2)};
             }`);
             document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
-            var customLayer = document.getElementById('custom-bg-layer');
-            if (customLayer) {
-                var bgUrl = customLayer.getAttribute('data-bg-url');
-                var isActive = normalizedBackground === 'custom' && bgUrl;
+            var activateCustomLayer = function () {
+                var customLayer = document.getElementById('custom-bg-layer');
+                if (!customLayer) return;
+                var url = customLayer.getAttribute('data-bg-url');
+                var isActive = normalizedBackground === 'custom' && url;
                 customLayer.classList.toggle('is-active', isActive);
                 if (isActive) {
-                    window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + bgUrl + '); }');
+                    window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + url + '); }');
                 } else {
                     window.KASA_SET_RUNTIME_STYLE('custom-background', '');
                 }
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', activateCustomLayer);
+            } else {
+                activateCustomLayer();
             }
             localStorage.setItem('kasa-accent', normalizedAccent);
             localStorage.setItem('kasa-background', normalizedBackground);

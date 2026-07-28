@@ -1191,6 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (accentInput || accentTextInput || backgroundSelect) {
     syncAppearanceControls(currentAppearance.accent, currentAppearance.background);
+    applyAppearance(currentAppearance.accent, currentAppearance.background, false);
     setChromaAccentPreference(chromaAccentEnabled, chromaAccentSpeed, false, false);
 
     chromaToggle?.addEventListener('change', () => {
