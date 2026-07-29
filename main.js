@@ -20,13 +20,31 @@ function createUserErrorCode(area, error) {
   return `SK-${area}-${suffix}`;
 }
 
+function getDataDir() {
+  const configDir = process.platform === 'win32'
+    ? process.env.APPDATA
+    : process.env.XDG_CONFIG_HOME || path.join(process.env.HOME, '.config');
+  if (!configDir) return null;
+  return process.platform === 'win32'
+    ? path.join(configDir, '.SifrekasamV2')
+    : path.join(configDir, 'sifrekasam');
+}
+
+function getLogFilePath() {
+  const dataDir = getDataDir();
+  if (!dataDir) return null;
+  const logsDir = path.join(dataDir, 'logs');
+  try { fs.mkdirSync(logsDir, { recursive: true }); } catch (_) {}
+  return path.join(logsDir, 'sifrekasam-errors.log');
+}
+
 function writeFatalDiagnostic(code, error) {
+  const logFile = getLogFilePath();
+  if (!logFile) return;
   try {
-    const logsDir = app.getPath('logs');
-    fs.mkdirSync(logsDir, { recursive: true });
     const detail = error instanceof Error ? (error.stack || error.message) : String(error || 'unknown');
     fs.appendFileSync(
-      path.join(logsDir, 'sifrekasam-errors.log'),
+      logFile,
       `[${new Date().toISOString()}] ${code}\n${detail}\n\n`,
       'utf8'
     );
@@ -41,15 +59,21 @@ function showFriendlyFatalError(area, error, message = 'Kurulum veya başlatma i
   console.error(`[${code}]`, error);
 
   const showDialog = () => {
-    dialog.showMessageBoxSync({
+    const logFile = getLogFilePath();
+    const detail = `Hata kodu: ${code}\n\n${logFile ? 'Detaylar için Log Dosyasını Aç butonuna tıklayın.' : 'Lütfen bu kodu geliştiriciye bildirin.'}`;
+    const buttons = logFile ? ['Log Dosyasını Aç', 'Tamam'] : ['Tamam'];
+    const result = dialog.showMessageBoxSync({
       type: 'error',
       title: 'ŞifreKasam',
       message,
-      detail: `Hata kodu: ${code}\n\nLütfen bu kodu geliştiriciye bildirin.`,
-      buttons: ['Tamam'],
-      defaultId: 0,
+      detail,
+      buttons,
+      defaultId: 1,
       noLink: true,
     });
+    if (result === 0 && logFile) {
+      shell.openPath(logFile).catch(() => {});
+    }
     app.exit(1);
   };
 
@@ -74,6 +98,8 @@ const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.3-beta.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.3-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.2-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.2-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.2',

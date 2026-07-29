@@ -3,6 +3,7 @@ import base64
 import io
 import json
 import logging
+import logging.handlers
 import os
 import secrets
 import shutil
@@ -150,6 +151,17 @@ SSL_DIR    = os.path.join(DATA_DIR, 'ssl')
 CERT_FILE  = os.path.join(SSL_DIR, 'cert.pem')
 KEY_FILE   = os.path.join(SSL_DIR, 'key.pem')
 BACKGROUND_DIR = get_backgrounds_dir()
+LOGS_DIR    = os.path.join(DATA_DIR, 'logs')
+
+os.makedirs(LOGS_DIR, exist_ok=True)
+_file_handler = logging.handlers.RotatingFileHandler(
+    os.path.join(LOGS_DIR, 'sifrekasam-backend.log'),
+    maxBytes=1024 * 1024,
+    backupCount=3,
+    encoding='utf-8',
+)
+_file_handler.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s %(message)s'))
+logging.getLogger().addHandler(_file_handler)
 
 app.config['SQLALCHEMY_DATABASE_URI']        = f"sqlite:///{DB_FILE}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
