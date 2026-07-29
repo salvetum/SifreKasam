@@ -1,7 +1,9 @@
 """Persistent appearance and general setting access."""
 
 import json
+import logging
 import os
+import time
 import uuid
 from typing import Any
 
@@ -23,6 +25,8 @@ from kasa_core.validation import (
     normalize_theme,
     normalize_theme_option,
 )
+
+log = logging.getLogger(__name__)
 
 
 class AppearanceSettings:
@@ -48,13 +52,26 @@ class AppearanceSettings:
         try:
             with open(temporary_file, "w", encoding="utf-8") as file_handle:
                 json.dump(data, file_handle, ensure_ascii=False)
-            os.replace(temporary_file, self.theme_file)
-        finally:
+            for attempt in range(3):
+                try:
+                    os.replace(temporary_file, self.theme_file)
+                    break
+                except PermissionError:
+                    if attempt < 2:
+                        log.warning("theme.json kilitli, %d. deneme...", attempt + 1)
+                        time.sleep(0.2)
+                    else:
+                        log.warning("theme.json atomic replace basarisiz, direct write fallback")
+                        with open(self.theme_file, "w", encoding="utf-8") as f:
+                            json.dump(data, f, ensure_ascii=False)
+                        os.unlink(temporary_file)
+        except Exception:
             if os.path.exists(temporary_file):
                 try:
                     os.unlink(temporary_file)
                 except OSError:
                     pass
+            raise
 
     @staticmethod
     def get_setting(key: str) -> str | None:

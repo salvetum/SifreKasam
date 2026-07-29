@@ -177,11 +177,15 @@ function handleSquirrelEvent() {
 
   const runUpdate = (args) => {
     try {
-      spawnSync(updateDotExe, args, {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-    } catch (_) {}
+      const result = spawnSync(updateDotExe, args, { stdio: 'pipe', windowsHide: true });
+      if (result.error) {
+        writeFatalDiagnostic('SQUIRREL_UPD', result.error);
+      } else if (result.status !== 0) {
+        writeFatalDiagnostic('SQUIRREL_UPD', new Error(`Update.exe exit code ${result.status}: ${result.stderr?.toString().slice(0, 500)}`));
+      }
+    } catch (err) {
+      writeFatalDiagnostic('SQUIRREL_UPD', err);
+    }
   };
 
   switch (squirrelEvent) {
