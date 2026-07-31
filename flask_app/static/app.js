@@ -1287,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
           showSuccessToast(window._('Arka plan güncellendi.'));
+          refreshCustomBgGallery();
         } catch {
           showWarningToast(window._('Yükleme başarısız oldu.'));
         } finally {
@@ -1295,6 +1296,160 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
+
+    // ── Özel Arka Plan Galerisi ──
+    const customBgGallery = document.getElementById('custom-bg-gallery');
+    const customBgGalleryGrid = document.getElementById('custom-bg-gallery-grid');
+    const customBgGalleryClear = document.getElementById('custom-bg-gallery-clear');
+
+    const refreshCustomBgGallery = async () => {
+      if (!customBgGallery || !customBgGalleryGrid) return;
+      const resp = await apiFetch('/api/background/history');
+      if (!resp?.ok) {
+        customBgGallery.classList.add('hidden');
+        return;
+      }
+      const data = await resp.json();
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      const customLayer = document.getElementById('custom-bg-layer');
+      const currentUrl = customLayer?.getAttribute('data-bg-url');
+      const currentIsGif = customLayer?.getAttribute('data-animated') === 'true';
+      const isCustomActive = getCurrentBackground() === 'custom';
+
+      if (entries.length === 0 && (!isCustomActive || !currentUrl)) {
+        customBgGallery.classList.add('hidden');
+        return;
+      }
+      customBgGallery.classList.remove('hidden');
+      customBgGalleryGrid.replaceChildren();
+
+      const makeThumb = (item) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'custom-bg-thumb' + (item.active ? ' is-active' : '');
+        wrap.setAttribute('role', 'button');
+        wrap.setAttribute('tabindex', '0');
+        wrap.setAttribute('aria-label', item.active
+          ? window._('Aktif')
+          : window._('Arkaplan aktifleştirildi.'));
+
+        const img = document.createElement('img');
+        img.src = item.url;
+        img.alt = '';
+        img.loading = 'lazy';
+        wrap.appendChild(img);
+
+        if (item.active) {
+          const badge = document.createElement('span');
+          badge.className = 'custom-bg-thumb-badge';
+          badge.textContent = window._('Aktif');
+          wrap.appendChild(badge);
+        }
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'custom-bg-thumb-del';
+        del.setAttribute('aria-label', window._('Arkaplan silindi.'));
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-xmark';
+        del.appendChild(icon);
+        wrap.appendChild(del);
+
+        const activate = async () => {
+          if (!item.active) {
+            const actResp = await apiFetch(
+              `/api/background/history/${encodeURIComponent(item.id)}/activate`,
+              { method: 'POST' }
+            );
+            if (!actResp?.ok) {
+              showWarningToast(window._('Arkaplan aktifleştirilmedi.'));
+              return;
+            }
+            const actData = await actResp.json();
+            const layer = document.getElementById('custom-bg-layer');
+            if (layer && actData.url) {
+              layer.setAttribute('data-bg-url', actData.url);
+              if (actData.is_gif) layer.setAttribute('data-animated', 'true');
+              else layer.removeAttribute('data-animated');
+            }
+            updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+            showSuccessToast(window._('Arkaplan aktifleştirildi.'));
+          }
+          refreshCustomBgGallery();
+        };
+
+        const remove = async () => {
+          const delResp = item.active
+            ? await apiFetch('/api/background', { method: 'DELETE' })
+            : await apiFetch(`/api/background/history/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+          if (!delResp?.ok) {
+            showWarningToast(window._('Silme işlemi başarısız oldu.'));
+            return;
+          }
+          const layer = document.getElementById('custom-bg-layer');
+          if (item.active) {
+            if (layer) {
+              layer.removeAttribute('data-bg-url');
+              layer.removeAttribute('data-animated');
+              layer.classList.remove('is-active');
+            }
+            updateAppearance(accentInput?.value || currentAppearance.accent, 'aurora', true, true);
+          } else {
+            showSuccessToast(window._('Arkaplan silindi.'));
+          }
+          refreshCustomBgGallery();
+        };
+
+        const handleClick = (event) => {
+          if (event.target.closest('.custom-bg-thumb-del')) return;
+          activate();
+        };
+        wrap.addEventListener('click', handleClick);
+        wrap.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleClick(event);
+          }
+        });
+        del.addEventListener('click', (event) => {
+          event.stopPropagation();
+          remove();
+        });
+
+        return wrap;
+      };
+
+      if (isCustomActive && currentUrl) {
+        customBgGalleryGrid.appendChild(makeThumb({
+          id: null, url: currentUrl, isGif: currentIsGif, active: true,
+        }));
+      }
+      entries.forEach(entry => {
+        customBgGalleryGrid.appendChild(makeThumb({
+          id: entry.id, url: entry.url, isGif: entry.is_gif, active: false,
+        }));
+      });
+    };
+
+    if (customBgGalleryClear) {
+      customBgGalleryClear.addEventListener('click', async () => {
+        const resp = await apiFetch('/api/background', { method: 'DELETE' });
+        if (!resp?.ok) {
+          showWarningToast(window._('Silme işlemi başarısız oldu.'));
+          return;
+        }
+        const layer = document.getElementById('custom-bg-layer');
+        if (layer) {
+          layer.removeAttribute('data-bg-url');
+          layer.removeAttribute('data-animated');
+          layer.classList.remove('is-active');
+        }
+        updateAppearance(accentInput?.value || currentAppearance.accent, 'aurora', true, true);
+        showSuccessToast(window._('Arkaplan silindi.'));
+        refreshCustomBgGallery();
+      });
+    }
+
+    refreshCustomBgGallery();
 
     settingsModal?.addEventListener('kasa:modal-closing', () => {
       flushAppearanceSave();
@@ -1392,6 +1547,10 @@ document.addEventListener('DOMContentLoaded', () => {
     showWarningToast(
       event.detail?.message || window._('Ana \u015fifre de\u011fi\u015ftiriliyor, i\u015flem bitince tekrar deneyin.')
     );
+  });
+
+  window.kasaIpc?.onSecondInstance(() => {
+    showWarningToast(window._('ŞifreKasam zaten çal\u0131\u015f\u0131yor.'));
   });
 
   document.querySelectorAll('[data-export-format]').forEach(exportButton => {
@@ -1992,6 +2151,69 @@ document.addEventListener('DOMContentLoaded', () => {
       || visibleModals[visibleModals.length - 1];
     event.preventDefault();
     window.kasaModalKapat(topModal.id);
+  });
+
+  // ─── 6b. BAŞLIK DROPDOWN (Ayarlar) ──────────────────────────────────────
+  const headerDropdowns = Array.from(document.querySelectorAll('[data-kasa-dropdown]'));
+
+  const closeHeaderDropdowns = (except) => {
+    headerDropdowns.forEach(dropdown => {
+      if (dropdown === except) return;
+      const trigger = dropdown.querySelector('.kasa-dropdown-trigger');
+      const menu = dropdown.querySelector('.kasa-dropdown-menu');
+      if (!menu) return;
+      menu.classList.remove('is-open');
+      trigger?.setAttribute('aria-expanded', 'false');
+      clearTimeout(dropdown._kasaMenuHideTimeout);
+      dropdown._kasaMenuHideTimeout = setTimeout(() => { menu.hidden = true; }, 120);
+    });
+  };
+
+  headerDropdowns.forEach(dropdown => {
+    const trigger = dropdown.querySelector('.kasa-dropdown-trigger');
+    const menu = dropdown.querySelector('.kasa-dropdown-menu');
+    if (!trigger || !menu) return;
+
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (menu.hidden) {
+        closeHeaderDropdowns(dropdown);
+        clearTimeout(dropdown._kasaMenuHideTimeout);
+        menu.hidden = false;
+        requestAnimationFrame(() => menu.classList.add('is-open'));
+        trigger.setAttribute('aria-expanded', 'true');
+      } else {
+        closeHeaderDropdowns();
+      }
+    });
+
+    dropdown.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+
+    menu.addEventListener('click', (event) => {
+      if (event.target.closest('.kasa-dropdown-item')) closeHeaderDropdowns();
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-kasa-dropdown]')) closeHeaderDropdowns();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const hasVisibleModal = document.querySelector('.kasa-modal.is-visible:not(.is-closing)');
+    if (hasVisibleModal) return;
+    const openDropdown = headerDropdowns.find(dropdown => {
+      const menu = dropdown.querySelector('.kasa-dropdown-menu');
+      return menu && !menu.hidden;
+    });
+    if (openDropdown) {
+      event.preventDefault();
+      closeHeaderDropdowns();
+      openDropdown.querySelector('.kasa-dropdown-trigger')?.focus({ preventScroll: true });
+    }
   });
 
   // ─── 7. ŞİFRE GÜCÜ ───────────────────────────────────────────────────────

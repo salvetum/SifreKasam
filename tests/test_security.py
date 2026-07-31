@@ -339,6 +339,13 @@ class CustomBackgroundUploadTests(unittest.TestCase):
                     os.unlink(os.path.join(bg_dir, name))
                 except OSError:
                     pass
+            history_dir = os.path.join(bg_dir, 'history')
+            if os.path.isdir(history_dir):
+                for name in os.listdir(history_dir):
+                    try:
+                        os.unlink(os.path.join(history_dir, name))
+                    except OSError:
+                        pass
 
     def _make_png(self, size_bytes: int = 100) -> bytes:
         from PIL import Image
@@ -426,7 +433,9 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         }, content_type='multipart/form-data', headers=self._token)
         bg_dir = app_module.BACKGROUND_DIR
         if os.path.isdir(bg_dir):
-            for name in os.listdir(bg_dir):
+            files = [f for f in os.listdir(bg_dir) if os.path.isfile(os.path.join(bg_dir, f))]
+            self.assertTrue(files)
+            for name in files:
                 self.assertRegex(name, r'^[0-9a-f]{32}\.png$')
                 self.assertNotIn('..', name)
                 self.assertNotIn('etc', name)
@@ -493,6 +502,145 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         }, content_type='multipart/form-data', headers=self._token)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(app_module.get_saved_background_style(), 'custom')
+
+    def test_history_list_empty_by_default(self) -> None:
+        response = self.client.get('/api/background/history', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['entries'], [])
+
+    def test_history_serve_rejects_non_uuid_name(self) -> None:
+        for name in ('not-a-real-name.png', '..%2F..%2Fetc%2Fpasswd', '', '12345.png'):
+            response = self.client.get(
+                f'/api/background/history/{name}', headers=self._token
+            )
+            self.assertEqual(response.status_code, 404, name)
+
+    def test_history_activate_rejects_invalid_id(self) -> None:
+        response = self.client.post(
+            '/api/background/history/../activate', headers=self._token
+        )
+        self.assertEqual(response.status_code, 404)
+        response = self.client.post(
+            '/api/background/history/missing.png/activate', headers=self._token
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_history_delete_rejects_invalid_id(self) -> None:
+        response = self.client.delete(
+            '/api/background/history/../', headers=self._token
+        )
+        self.assertEqual(response.status_code, 404)
+        response = self.client.delete(
+            '/api/background/history/missing.png', headers=self._token
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_history_endpoints_not_in_public_endpoints(self) -> None:
+        public = app_module._PUBLIC_ENDPOINTS
+        self.assertNotIn('list_custom_background_history', public)
+        self.assertNotIn('serve_history_background', public)
+        self.assertNotIn('activate_history_background', public)
+        self.assertNotIn('delete_history_background', public)
+
+    def test_history_endpoints_not_in_token_endpoints(self) -> None:
+        token_eps = app_module._TOKEN_ENDPOINTS
+        self.assertNotIn('list_custom_background_history', token_eps)
+        self.assertNotIn('serve_history_background', token_eps)
+        self.assertNotIn('activate_history_background', token_eps)
+        self.assertNotIn('delete_history_background', token_eps)
+
+    def _current_background_id(self):
+        if not os.path.isdir(app_module.BACKGROUND_DIR):
+            return None
+        for name in os.listdir(app_module.BACKGROUND_DIR):
+            if app_module._safe_background_filename(name):
+                return name
+        return None
+
+    def test_new_upload_moves_previous_into_history(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'first.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        first_id = self._current_background_id()
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'second.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        bg_dir = app_module.BACKGROUND_DIR
+        root_files = [f for f in os.listdir(bg_dir) if os.path.isfile(os.path.join(bg_dir, f))]
+        self.assertEqual(len(root_files), 1)
+        response = self.client.get('/api/background/history', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        entries = response.get_json()['entries']
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['id'], first_id)
+
+    def test_activate_history_background_becomes_current(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'first.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        first_id = self._current_background_id()
+        self.assertIsNotNone(first_id)
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'second.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertNotEqual(self._current_background_id(), first_id)
+
+        response = self.client.post(
+            f'/api/background/history/{first_id}/activate', headers=self._token
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._current_background_id(), first_id)
+        self.assertEqual(app_module.get_saved_background_style(), 'custom')
+        serve = self.client.get('/api/background/current', headers=self._token)
+        self.assertEqual(serve.status_code, 200)
+
+    def test_delete_history_background_removes_entry(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'first.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        first_id = self._current_background_id()
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'second.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        second_id = self._current_background_id()
+
+        response = self.client.delete(
+            f'/api/background/history/{first_id}', headers=self._token
+        )
+        self.assertEqual(response.status_code, 200)
+        entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
+        self.assertEqual(entries, [])
+        self.assertEqual(self._current_background_id(), second_id)
+
+    def test_delete_background_clears_history_too(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'first.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'second.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+
+        response = self.client.delete('/api/background', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.client.get('/api/background/current', headers=self._token).status_code,
+            404,
+        )
+        entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
+        self.assertEqual(entries, [])
+        self.assertEqual(app_module.get_saved_background_style(), 'aurora')
+
+    def test_history_reports_gif_flag(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_gif()), 'anim.gif'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'photo.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0]['is_gif'])
 
 
 if __name__ == "__main__":

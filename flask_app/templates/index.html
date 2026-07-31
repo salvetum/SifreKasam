@@ -7,10 +7,31 @@
 
     <!-- Üst satır: Başlık + Aksiyonlar -->
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div class="flex items-center gap-2">
             <h1 id="dashboard-title" class="text-4xl kasa-page-title brand-title-animated leading-tight">
                 {{ _('ŞifreKasam') }}
             </h1>
+            <!-- Ayarlar (başlık yanı dropdown) -->
+            <div class="kasa-dropdown" data-kasa-dropdown>
+                <button type="button" id="settings-dropdown-trigger" class="kasa-dropdown-trigger"
+                    title="{{ _('Ayarlar') }}" aria-haspopup="menu" aria-expanded="false"
+                    aria-controls="settings-dropdown-menu">
+                    <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                    <span>{{ _('Ayarlar') }}</span>
+                    <i class="fa-solid fa-chevron-down kasa-dropdown-caret" aria-hidden="true"></i>
+                </button>
+                <div id="settings-dropdown-menu" class="kasa-dropdown-menu" role="menu"
+                    aria-labelledby="settings-dropdown-trigger" hidden>
+                    <button type="button" role="menuitem" class="kasa-dropdown-item"
+                        data-kasa-modal="settingsModal">
+                        <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                        <span class="kasa-dropdown-item-copy">
+                            <strong>{{ _('Ayarlar') }}</strong>
+                        </span>
+                        <i class="fa-solid fa-chevron-right kasa-dropdown-item-arrow" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
@@ -29,12 +50,6 @@
             <button type="button" id="lock-vault-btn" title="{{ _('Kasayı Kilitle') }}"
                 class="kasa-btn kasa-btn-danger">
                 <i class="fa-solid fa-lock"></i> {{ _('Kilitle') }}
-            </button>
-            <!-- Ayarlar -->
-            <button type="button" data-kasa-modal="settingsModal" title="{{ _('Ayarlar') }}"
-                aria-haspopup="dialog" aria-controls="settingsModal"
-                class="kasa-btn kasa-btn-muted">
-                <i class="fa-solid fa-gear"></i> {{ _('Ayarlar') }}
             </button>
             <!-- Yeni Ekle -->
             <a href="{{ url_for('ekle_sayfasi') }}"
@@ -98,14 +113,14 @@
         </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0" id="bulk-and-search-group">
-            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
-                class="kasa-btn kasa-btn-muted kasa-transition-fast">
-                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
-            </button>
             <label class="bulk-select-all-control flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" for="select-all" hidden>
                 <input type="checkbox" id="select-all" class="bulk-select-checkbox">
                 {{ _('Tümünü seç') }}
             </label>
+            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
+                class="kasa-btn kasa-btn-muted kasa-transition-fast">
+                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
+            </button>
             <div class="record-search-wrap">
                 <label for="search-input" class="sr-only">{{ _('Kayıt ara') }}</label>
                 <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
@@ -712,6 +727,15 @@
                             </button>
                             <input type="file" id="custom-bg-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
                         </div>
+                        <div id="custom-bg-gallery" class="custom-bg-gallery hidden" aria-live="polite">
+                            <div class="custom-bg-gallery-head">
+                                <span class="text-xs text-kasa-text-muted">{{ _('Arkaplan geçmişi') }}</span>
+                                <button type="button" id="custom-bg-gallery-clear" class="kasa-btn kasa-btn-muted">
+                                    <i class="fa-solid fa-trash-can"></i> {{ _('Tümünü Sil') }}
+                                </button>
+                            </div>
+                            <div id="custom-bg-gallery-grid" class="custom-bg-gallery-grid"></div>
+                        </div>
                     </div>
                     <div class="chroma-toggle-row">
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
@@ -933,15 +957,17 @@
                         </div>
                     </div>
                     <!-- Ana Şifre Değiştir -->
-                    <button type="button" data-kasa-modal="changePasswordModal"
-                        class="settings-action-card w-full">
-                        <span class="settings-action-icon"><i class="fa-solid fa-key"></i></span>
-                        <span class="settings-action-copy">
-                            <strong>{{ _('Ana Şifreyi Değiştir') }}</strong>
-                            <small>{{ _('Kasa kilidini ve şifreleme anahtarını güncelle.') }}</small>
-                        </span>
-                        <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
-                    </button>
+                    <div class="settings-action-grid settings-action-grid-single">
+                        <button type="button" data-kasa-modal="changePasswordModal"
+                            class="settings-action-card">
+                            <span class="settings-action-icon"><i class="fa-solid fa-key"></i></span>
+                            <span class="settings-action-copy">
+                                <strong>{{ _('Ana Şifreyi Değiştir') }}</strong>
+                                <small>{{ _('Kasa kilidini ve şifreleme anahtarını güncelle.') }}</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                        </button>
+                    </div>
                     </section>
                     <section id="settings-panel-application" class="settings-panel" role="tabpanel"
                              aria-labelledby="settings-tab-application" data-settings-panel="application" hidden>

@@ -1,5 +1,12 @@
 {
   "language_name": "English",
+  "ŞifreKasam zaten çalışıyor.": "ŞifreKasam is already running.",
+  "Arkaplan geçmişi": "Background history",
+  "Tümünü Sil": "Delete All",
+  "Aktif": "Active",
+  "Arkaplan aktifleştirildi.": "Background activated.",
+  "Arkaplan aktifleştirilmedi.": "Background could not be activated.",
+  "Arkaplan silindi.": "Background deleted.",
   "Şifre Yöneticisi": "Password Manager",
   "Güvenli, hızlı ve modern masaüstü şifre yöneticisi": "Secure, fast and modern desktop password manager",
   "Ana şifrenizle kilidi açın": "Unlock with your master password",

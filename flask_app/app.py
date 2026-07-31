@@ -5,6 +5,7 @@ import json
 import logging
 import logging.handlers
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -26,6 +27,7 @@ from kasa_core.appearance import AppearanceSettings
 from kasa_core.certificates import ensure_self_signed_cert
 from kasa_core.constants import (
     APP_VERSION_DEFAULT,
+    CUSTOM_BACKGROUND_HISTORY_LIMIT,
     CUSTOM_BACKGROUND_MAX_GIF_BYTES,
     CUSTOM_BACKGROUND_MAX_IMAGE_BYTES,
     DEFAULT_ACCENT_COLOR,
@@ -1497,6 +1499,92 @@ def _find_custom_background():
     return None
 
 
+_CUSTOM_BACKGROUND_NAME_RE = re.compile(r'^[0-9a-f]{32}\.(png|jpg|webp|gif)$')
+
+
+def _custom_background_history_dir():
+    history_dir = os.path.join(BACKGROUND_DIR, 'history')
+    os.makedirs(history_dir, exist_ok=True)
+    try:
+        os.chmod(history_dir, 0o700)
+    except OSError:
+        pass
+    return history_dir
+
+
+def _safe_background_filename(name):
+    """Return the basename only if it is a known UUID-style background file."""
+    base = os.path.basename(name or '')
+    if base and _CUSTOM_BACKGROUND_NAME_RE.match(base):
+        return base
+    return None
+
+
+def _list_custom_background_history():
+    """Return history entries as [{filename, mtime}] sorted newest-first."""
+    history_dir = _custom_background_history_dir()
+    entries = []
+    try:
+        for name in os.listdir(history_dir):
+            filename = _safe_background_filename(name)
+            if not filename:
+                continue
+            filepath = os.path.join(history_dir, filename)
+            try:
+                mtime = os.path.getmtime(filepath)
+            except OSError:
+                continue
+            entries.append({'filename': filename, 'mtime': mtime})
+    except OSError:
+        return []
+    entries.sort(key=lambda entry: entry['mtime'], reverse=True)
+    return entries
+
+
+def _prune_custom_background_history():
+    """Delete the oldest history entries beyond the configured limit."""
+    history_dir = _custom_background_history_dir()
+    for entry in _list_custom_background_history()[CUSTOM_BACKGROUND_HISTORY_LIMIT:]:
+        filepath = os.path.join(history_dir, entry['filename'])
+        try:
+            os.unlink(filepath)
+        except OSError:
+            pass
+
+
+def _move_current_to_history():
+    """Move the current root background into history (if any) and prune."""
+    if not os.path.isdir(BACKGROUND_DIR):
+        return
+    history_dir = _custom_background_history_dir()
+    for name in os.listdir(BACKGROUND_DIR):
+        filename = _safe_background_filename(name)
+        if not filename:
+            continue
+        source = os.path.join(BACKGROUND_DIR, filename)
+        if not os.path.isfile(source):
+            continue
+        try:
+            shutil.move(source, os.path.join(history_dir, filename))
+        except OSError:
+            pass
+    _prune_custom_background_history()
+
+
+def _clear_custom_background_history():
+    """Delete all files in the history directory (full reset)."""
+    history_dir = os.path.join(BACKGROUND_DIR, 'history')
+    if not os.path.isdir(history_dir):
+        return
+    for name in os.listdir(history_dir):
+        filepath = os.path.join(history_dir, name)
+        if os.path.isfile(filepath):
+            try:
+                os.unlink(filepath)
+            except OSError:
+                pass
+
+
 @app.route('/api/background/upload', methods=['POST'])
 @login_required
 def upload_custom_background():
@@ -1511,7 +1599,7 @@ def upload_custom_background():
     if error:
         return jsonify({'error': error}), 400
 
-    _remove_old_custom_backgrounds()
+    _move_current_to_history()
     filename = f"{uuid.uuid4().hex}{ext}"
     filepath = os.path.join(BACKGROUND_DIR, filename)
     uploaded.save(filepath)
@@ -1540,10 +1628,79 @@ def serve_custom_background():
 @login_required
 def delete_custom_background():
     _remove_old_custom_backgrounds()
+    _clear_custom_background_history()
     if get_saved_background_style() == 'custom':
         save_background_style('aurora')
     db.session.commit()
     return jsonify({'status': 'ok', 'background_style': get_saved_background_style()})
+
+
+@app.route('/api/background/history')
+@login_required
+def list_custom_background_history():
+    entries = []
+    for item in _list_custom_background_history():
+        filename = item['filename']
+        entries.append({
+            'id': filename,
+            'url': url_for('serve_history_background', filename=filename) + '?v=' + str(int(item['mtime'])),
+            'is_gif': filename.endswith('.gif'),
+            'created_at': datetime.fromtimestamp(item['mtime']).isoformat(),
+        })
+    return jsonify({'status': 'ok', 'entries': entries})
+
+
+@app.route('/api/background/history/<filename>')
+@login_required
+def serve_history_background(filename):
+    name = _safe_background_filename(filename)
+    if not name:
+        abort(404)
+    filepath = os.path.join(_custom_background_history_dir(), name)
+    if not os.path.isfile(filepath):
+        abort(404)
+    return send_file(filepath, max_age=0)
+
+
+@app.route('/api/background/history/<id>/activate', methods=['POST'])
+@login_required
+def activate_history_background(id):
+    name = _safe_background_filename(id)
+    if not name:
+        return jsonify({'error': 'Geçersiz arkaplan.'}), 404
+    history_dir = _custom_background_history_dir()
+    source = os.path.join(history_dir, name)
+    if not os.path.isfile(source):
+        return jsonify({'error': 'Arkaplan bulunamadı.'}), 404
+
+    _move_current_to_history()
+    shutil.move(source, os.path.join(BACKGROUND_DIR, name))
+
+    save_background_style('custom')
+    db.session.commit()
+
+    is_gif = name.endswith('.gif')
+    return jsonify({
+        'status': 'ok',
+        'url': url_for('serve_custom_background') + '?v=' + str(int(time.time())),
+        'is_gif': is_gif,
+    })
+
+
+@app.route('/api/background/history/<id>', methods=['DELETE'])
+@login_required
+def delete_history_background(id):
+    name = _safe_background_filename(id)
+    if not name:
+        return jsonify({'error': 'Geçersiz arkaplan.'}), 404
+    filepath = os.path.join(_custom_background_history_dir(), name)
+    if not os.path.isfile(filepath):
+        return jsonify({'error': 'Arkaplan bulunamadı.'}), 404
+    try:
+        os.unlink(filepath)
+    except OSError:
+        return jsonify({'error': 'Arkaplan silinemedi.'}), 500
+    return jsonify({'status': 'ok'})
 
 # ─── ŞİFRE DEĞİŞTİRME ────────────────────────────────────────────────────────
 

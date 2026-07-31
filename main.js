@@ -8,7 +8,7 @@ const http   = require('http');
 const https  = require('https');
 const crypto = require('crypto');
 const kill   = require('tree-kill');
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, execSync } = require('child_process');
 
 let fatalErrorShown = false;
 
@@ -36,6 +36,16 @@ function getLogFilePath() {
   const logsDir = path.join(dataDir, 'logs');
   try { fs.mkdirSync(logsDir, { recursive: true }); } catch (_) {}
   return path.join(logsDir, 'sifrekasam-errors.log');
+}
+
+function isRunningAsAdmin() {
+  if (process.platform !== 'win32') return false;
+  try {
+    execSync('net session', { stdio: 'ignore', timeout: 3000 });
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function writeFatalDiagnostic(code, error) {
@@ -415,6 +425,9 @@ if (!gotTheLock) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     if (!mainWindow.isVisible())  mainWindow.show();
     mainWindow.focus();
+    if (mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send('kasa:second-instance');
+    }
   });
 
   // Self-signed SSL sertifikasını kabul et
@@ -467,6 +480,18 @@ async function onAppReady() {
     };
 
     const flaskTimeoutMs = isFirstRun() ? FLASK_TIMEOUT_FIRST_RUN_MS : FLASK_TIMEOUT_MS;
+
+    if (isRunningAsAdmin()) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'ŞifreKasam',
+        message: 'ŞifreKasam yönetici (Administrator) olarak çalışıyor.',
+        detail: 'Yönetici yetkileri güvenlik riski oluşturabilir. Gerekmiyorsa programı normal kullanıcı olarak çalıştırmanız önerilir.',
+        buttons: ['Devam Et'],
+        defaultId: 0,
+        noLink: true,
+      });
+    }
 
     try {
       progressTimer = setTimeout(showProgressMessage, 12_000);
@@ -569,6 +594,7 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
       devTools: !app.isPackaged,
       spellcheck: false,
       enableWebSQL: false,
@@ -829,7 +855,10 @@ function checkMinimizeToTray() {
 
 // ─── FLASK SUNUCUSU ───────────────────────────────────────────────────────────
 
-function startFlaskServer(timeoutMs) {
+async function startFlaskServer(timeoutMs) {
+  if (flaskProcess) {
+    await stopFlaskServer();
+  }
   return new Promise((resolve, reject) => {
     const isWin = process.platform === 'win32';
     const backendBinary = isWin ? 'SifreKasam.exe' : 'SifreKasam';
@@ -977,23 +1006,38 @@ function stopFlaskServer() {
     const finish = () => {
       if (settled) return;
       settled = true;
-      flaskProcess = null;
+      if (flaskProcess === proc) flaskProcess = null;
       resolve();
     };
+    const onExit = () => {
+      if (flaskProcess === proc) flaskProcess = null;
+      finish();
+    };
 
-    proc.once('exit', finish);
+    proc.once('exit', onExit);
+    proc.once('error', onExit);
+
     requestBackendJson('/shutdown', { method: 'POST', timeout: 800 }).catch(() => {});
 
-    setTimeout(() => {
+    try {
+      kill(proc.pid, 'SIGTERM', () => {});
+    } catch (_) {
+      finish();
+      return;
+    }
+
+    // SIGTERM sonrası belirli bir süre içinde çıkmazsa SIGKILL'e yükselt.
+    const killTimer = setTimeout(() => {
       if (settled) return;
-      try {
-        kill(proc.pid, 'SIGTERM', () => {
-          setTimeout(finish, 250);
-        });
-      } catch (_) {
-        finish();
-      }
-    }, 1000);
+      try { kill(proc.pid, 'SIGKILL'); } catch (_) { finish(); }
+    }, 2000);
+
+    // Güvenlik ağı: beklenmedik bir durumda promise asla asılı kalmaz.
+    const fallbackTimer = setTimeout(finish, 5000);
+    proc.once('exit', () => {
+      clearTimeout(killTimer);
+      clearTimeout(fallbackTimer);
+    });
   });
 }
 
@@ -1070,6 +1114,11 @@ function findFreePort() {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  isQuiting = true;
+  shutdownFlask();
 });
 
 app.on('will-quit', () => {
