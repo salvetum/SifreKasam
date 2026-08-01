@@ -1,0 +1,316 @@
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE / MOBILE
+   ════════════════════════════════════════════════════════════════ */
+
+
+/* Wide / fullscreen layout */
+@media (min-width: 1280px) {
+  .max-w-6xl {
+    max-width: min(92vw, 88rem) !important;
+  }
+
+  #stats-bar {
+    width: 100%;
+    padding: 0.75rem 1.15rem !important;
+    gap: 0.75rem 1rem !important;
+  }
+
+  #stats-bar > div {
+    flex: 1 1 150px;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  #card-container {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 1.1rem !important;
+  }
+
+  .vault-card-body {
+    min-height: 252px;
+  }
+
+}
+
+@media (min-width: 1600px) {
+  .max-w-6xl {
+    max-width: min(94vw, 106rem) !important;
+  }
+
+  header.flex.mb-8 {
+    margin-bottom: 2.25rem;
+  }
+
+  #stats-bar {
+    max-width: none;
+    padding: 0.85rem 1.35rem !important;
+  }
+
+  #stats-bar > div {
+    flex-basis: 170px;
+  }
+
+  #card-container {
+    grid-template-columns: repeat(5, minmax(260px, 1fr)) !important;
+    gap: 1.15rem !important;
+  }
+
+  .vault-card-body {
+    min-height: 268px;
+  }
+
+}
+
+@media (min-width: 1920px) {
+  .max-w-6xl {
+    max-width: min(94vw, 118rem) !important;
+  }
+
+  #card-container {
+    grid-template-columns: repeat(5, minmax(300px, 1fr)) !important;
+    gap: 1.25rem !important;
+  }
+
+  .vault-card-body {
+    min-height: 286px;
+  }
+}
+
+/* 1280×720 ve benzeri kısa masaüstü ekranları */
+@media (min-width: 1024px) and (max-height: 800px) {
+  .max-w-6xl {
+    padding-top: 1rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+
+  header.flex.mb-8 {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  #stats-bar {
+    padding-block: 0.5rem !important;
+  }
+
+  .vault-card-body {
+    min-height: 220px;
+  }
+
+  .kasa-modal {
+    padding: 0.65rem;
+  }
+
+  .kasa-modal .modal-body {
+    max-height: calc(100dvh - 9rem);
+  }
+
+  .kasa-modal .modal-body.generator-modal-body {
+    max-height: calc(100dvh - 8.5rem);
+    padding: 0.75rem;
+  }
+
+  .generator-layout {
+    gap: 0.65rem;
+  }
+
+  .generator-output-card,
+  .generator-options-card {
+    padding: 0.8rem;
+  }
+
+  .generator-output-card {
+    min-height: 148px;
+  }
+
+  .gen-history-body {
+    max-height: 180px;
+  }
+}
+
+/* 2560×1440 sınıfı ekranlar */
+@media (min-width: 2400px) and (min-height: 1200px) {
+  .max-w-6xl {
+    max-width: min(92vw, 148rem) !important;
+  }
+
+  #card-container {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 1.35rem !important;
+  }
+
+  .vault-card-body {
+    min-height: 292px;
+  }
+
+  .kasa-modal .modal-dialog.generator-modal-dialog {
+    width: min(92vw, 1100px);
+    max-width: 1100px;
+  }
+
+  .settings-modal-dialog {
+    width: min(90vw, 900px);
+    max-width: 900px;
+  }
+}
+
+/* 3840×2160 sınıfı ekranlar */
+@media (min-width: 3200px) and (min-height: 1800px) {
+  html {
+    font-size: 18px;
+  }
+
+  .max-w-6xl {
+    max-width: min(92vw, 220rem) !important;
+  }
+
+  #card-container {
+    grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+    gap: 1.5rem !important;
+  }
+
+  .vault-card-body {
+    min-height: 306px;
+  }
+
+  .kasa-modal .modal-dialog.generator-modal-dialog {
+    width: min(88vw, 1280px);
+    max-width: 1280px;
+  }
+
+  .settings-modal-dialog {
+    width: min(86vw, 980px);
+    max-width: 980px;
+  }
+}
+@media (max-width: 640px) {
+  .kasa-modal { padding: 0.5rem; }
+  .kasa-modal .modal-body { padding: 0.85rem; }
+  .kasa-modal .modal-header { padding: 0.7rem 0.85rem; }
+  .kasa-modal .modal-footer { padding: 0.6rem 0.85rem; }
+  .kasa-modal .modal-dialog { max-width: 100%; margin: 0.25rem; }
+
+  .vault-card-body { padding: 0.7rem 0.7rem 0.5rem; }
+  .vault-detail-row,
+  .vault-detail-main {
+    grid-template-columns: minmax(72px,0.38fr) minmax(0,1fr);
+    gap: 0.35rem;
+    padding: 0.35rem 0.45rem;
+    min-height: 32px;
+  }
+  .vault-detail-label { font-size: 0.68rem; }
+  .vault-detail-value { font-size: 0.8rem; }
+  .vault-detail-list { gap: 0.4rem; }
+  .vault-note-row { min-height: 52px; }
+
+  .vault-card-header { margin-bottom: 0.5rem; }
+  .vault-title-line .vault-card-title { font-size: 0.82rem; }
+  .vault-type-icon { width: 28px; height: 28px; font-size: 0.8rem; }
+  .vault-card-body .card-icon-btn { width: 28px; height: 28px; font-size: 0.7rem; }
+  .card-star-icon { font-size: 0.85rem !important; }
+
+  .kasa-page-title { font-size: 1.4rem; }
+
+  .filter-btn { padding: 4px 10px; font-size: 0.72rem; }
+
+  .page-loading-card { padding: 22px 16px; }
+
+  #stats-bar { font-size: 0.72rem; padding: 0.45rem 0.65rem; }
+  #search-input { min-width: 130px; font-size: 0.82rem; padding: 0.45rem 0.65rem; }
+
+  .vault-card-shell .footer-action-btn { font-size: 0.74rem; }
+  .vault-card-shell > .flex:last-child { padding: 0.5rem 0.7rem !important; gap: 0.6rem !important; flex-wrap: wrap !important; }
+
+  .card-animated { animation: none !important; }
+
+  header.flex.mb-8 { margin-bottom: 1rem; }
+  header .flex-wrap.gap-3 > div:first-child h1 { font-size: 1.4rem; }
+  header .flex-wrap.gap-3 > div:last-child { gap: 0.35rem; }
+  header .kasa-btn { font-size: 0.75rem; min-height: 34px; padding: 0.35rem 0.55rem; }
+
+  #bulk-toolbar { bottom: 0.75rem; padding: 0.5rem 0.75rem; gap: 0.4rem; border-radius: 12px; }
+  #bulk-toolbar .kasa-btn { font-size: 0.7rem; min-height: 30px; padding: 0.25rem 0.45rem; }
+  #bulk-toolbar span.text-sm { font-size: 0.74rem; }
+
+  #category-filter { gap: 0.35rem; flex-wrap: wrap; }
+  #category-filter .filter-btn { padding: 3px 8px; font-size: 0.68rem; }
+
+  .vault-card-shell.rounded-2xl { border-radius: 12px; }
+  #card-container { gap: 0.65rem; }
+
+  .kasa-panel { padding: 1.5rem; }
+}
+
+@media (max-width: 480px) {
+  .kasa-modal { padding: 0.35rem; }
+  .kasa-modal .modal-body { padding: 0.7rem; }
+  .kasa-modal .modal-header { padding: 0.6rem 0.7rem; }
+  .kasa-modal .modal-footer { padding: 0.5rem 0.7rem; }
+  .kasa-modal .modal-dialog { margin: 0.2rem; }
+
+  .vault-card-body { padding: 0.6rem 0.6rem 0.4rem; }
+
+  /* Vault detay satırları: etiket üstte, değer altta */
+  .vault-detail-row {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+    padding: 0.4rem 0.5rem;
+    min-height: auto;
+  }
+  .vault-detail-row.vault-detail-row-action {
+    grid-template-columns: 1fr auto;
+  }
+  .vault-detail-row.vault-detail-row-action .vault-detail-main {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+  .vault-detail-main {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+  .vault-detail-label {
+    font-size: 0.65rem;
+    opacity: 0.7;
+  }
+  .vault-detail-value {
+    font-size: 0.85rem;
+    white-space: normal;
+    word-break: break-all;
+  }
+  .vault-note-row { min-height: 40px; }
+  .vault-secret { letter-spacing: 0.06em; word-break: break-all; }
+
+  .vault-card-body .card-icon-btn { width: 30px; height: 30px; font-size: 0.72rem; }
+  .vault-card-header { margin-bottom: 0.4rem; }
+
+  header .flex-wrap.gap-3 > div:first-child h1 { font-size: 1.25rem; }
+  header .flex-wrap.gap-3 > div:last-child { gap: 0.3rem; }
+  header .kasa-btn { font-size: 0.7rem; min-height: 30px; padding: 0.25rem 0.4rem; }
+
+  .filter-btn { font-size: 0.65rem; padding: 3px 7px; }
+  #search-input { font-size: 0.78rem; min-width: 100px; }
+
+  #stats-bar { font-size: 0.68rem; padding: 0.35rem 0.5rem; }
+
+  .kasa-page-title { font-size: 1.2rem; }
+  .vault-title-line .vault-card-title { font-size: 0.78rem; }
+
+  .vault-card-shell .footer-action-btn { font-size: 0.7rem; }
+  .vault-card-shell > .flex:last-child { padding: 0.4rem 0.55rem !important; gap: 0.4rem !important; }
+
+  .max-w-6xl { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+  #card-container { gap: 0.5rem; }
+
+  /* Login sayfası 480 */
+  .kasa-panel { padding: 1.25rem 1rem; }
+  .kasa-panel input.kasa-field { font-size: 1rem; padding: 0.65rem 0.75rem; }
+
+  /* Generator / Ekle sayfası 480 */
+  .kasa-panel .grid-cols-1.md\:grid-cols-2.gap-4 { gap: 0.5rem; }
+  .kasa-panel .flex.gap-3.pt-1 { gap: 0.4rem; }
+  .kasa-panel .kasa-btn { font-size: 0.78rem; min-height: 36px; padding: 0.4rem 0.7rem; }
+  .kasa-panel .text-sm { font-size: 0.72rem; }
+  .generator-panel.p-4 { padding: 0.75rem !important; }
+  .generator-checkboxes { gap: 0.4rem; }
+  .generator-checkboxes label { font-size: 0.7rem; }
+}
+

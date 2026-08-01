@@ -1,0 +1,508 @@
+/* Password generator */
+.kasa-modal .modal-dialog.generator-modal-dialog {
+    width: min(96vw, 980px);
+    max-width: 980px;
+}
+.generator-modal-content {
+    overflow: hidden;
+}
+.kasa-modal .modal-body.generator-modal-body {
+    max-height: min(74vh, 720px);
+    padding: 0.55rem 1rem 1rem;
+    overflow-y: auto;
+}
+.generator-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+        "output"
+        "options"
+        "history";
+    gap: 0.9rem;
+}
+.generator-output-card,
+.generator-options-card,
+.generator-history-card {
+    border-radius: 18px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+}
+.generator-output-card {
+    grid-area: output;
+    display: grid;
+    align-content: center;
+    gap: 0.9rem;
+    min-height: 172px;
+    padding: 1rem;
+    background:
+        radial-gradient(circle at 8% 0%, rgba(124,111,247,0.18), transparent 36%),
+        var(--card-bg);
+}
+.generator-output-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.generator-output-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    align-items: stretch;
+}
+.generator-output-row .generator-copy-btn {
+    width: 100%;
+    flex-basis: auto;
+}
+.generator-output-row .kasa-field {
+    min-height: 46px;
+    font-size: 0.92rem;
+}
+.generator-strength-card {
+    padding: 0.75rem;
+    border-radius: 14px;
+    background: rgba(0,0,0,0.12);
+    border: 1px solid rgba(255,255,255,0.055);
+}
+.generator-options-card {
+    grid-area: options;
+    display: grid;
+    align-content: center;
+    gap: 0.75rem;
+    padding: 1rem;
+}
+.generator-option-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+}
+.generator-option-grid label {
+    min-height: 38px;
+    padding: 0.55rem 0.65rem;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.generator-history-card {
+    grid-area: history;
+    margin: 0 !important;
+    overflow: hidden;
+}
+
+@media (min-width: 700px) {
+    .generator-layout {
+        grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+        grid-template-areas:
+            "output options"
+            "history history";
+    }
+
+    .generator-output-row {
+        flex-direction: row;
+    }
+
+    .generator-output-row .generator-copy-btn {
+        width: 44px;
+        flex-basis: 44px;
+    }
+
+    .generator-option-grid {
+        grid-template-columns: var(--grid-2);
+    }
+}
+
+/* === Vault Form Page === */
+.kasa-form-page-shell {
+    width: min(100%, 1180px);
+}
+
+.vault-form-page {
+    display: grid;
+    gap: 1rem;
+}
+
+.vault-form-hero,
+.vault-form-panel,
+.vault-form-actions {
+    border: var(--border-glass);
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.032));
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.vault-form-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 22px;
+}
+
+.vault-form-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+}
+
+.vault-form-title-wrap p,
+.vault-section-head p,
+.vault-help {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.vault-form-icon,
+.vault-section-head > span {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    color: #fff;
+    background: linear-gradient(135deg, rgba(124,111,247,0.95), rgba(79,145,255,0.86));
+}
+
+.vault-form-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+    box-shadow: 0 14px 32px rgba(124,111,247,0.25);
+}
+
+.vault-form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.vault-form-panel {
+    position: relative;
+    z-index: 0;
+    display: grid;
+    align-content: start;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 20px;
+}
+
+.vault-form-panel.has-open-select-layer,
+.settings-panel.has-open-select-layer {
+    position: relative;
+    z-index: 100;
+    overflow: visible;
+}
+
+.settings-body.has-open-select-layer,
+.settings-modal-content.has-open-select-layer {
+    overflow: visible;
+}
+
+.vault-section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.vault-section-head > span {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.vault-section-head h2 {
+    margin: 0 0 0.15rem;
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.vault-field {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.vault-field label {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.vault-field .kasa-field,
+.vault-field textarea.kasa-field {
+    width: 100%;
+    min-height: 44px;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.88rem;
+}
+
+.vault-field textarea.kasa-field {
+    min-height: 132px;
+    line-height: 1.5;
+}
+
+.vault-form-row {
+    display: grid;
+    gap: 1rem;
+}
+
+.vault-password-line {
+    display: block;
+    position: relative;
+}
+
+.vault-password-input {
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+}
+
+.vault-strength {
+    display: grid;
+    gap: 0.35rem;
+    min-height: 1.75rem;
+}
+
+.vault-generator-panel {
+    display: grid;
+    gap: 0.85rem;
+    padding: 1rem;
+    border: 1px solid rgba(124,111,247,0.18);
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at top left, rgba(124,111,247,0.13), transparent 40%),
+        rgba(255,255,255,0.038);
+}
+
+.vault-generator-panel .page-generator-options {
+    display: grid;
+    grid-template-columns: var(--grid-2);
+    gap: 0.55rem;
+}
+
+.vault-generator-panel .page-generator-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 38px;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.035);
+    font-size: 0.76rem;
+    cursor: pointer;
+}
+
+.vault-form-side {
+    display: grid;
+    gap: 1rem;
+}
+
+.vault-form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 20px;
+}
+
+.vault-form-actions .kasa-btn {
+    min-height: 44px;
+}
+
+@media (min-width: 760px) {
+    .vault-form-row-two {
+        grid-template-columns: var(--grid-2);
+    }
+
+    .vault-form-actions {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+}
+
+@media (min-width: 1180px) {
+    .kasa-form-page-shell {
+        width: min(94vw, 1360px);
+    }
+
+    .vault-form-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.32fr);
+        grid-template-areas:
+            "main side"
+            "access side"
+            "notes side";
+        align-items: start;
+        gap: 1.1rem;
+    }
+
+    .vault-form-main { grid-area: main; }
+    .vault-form-access { grid-area: access; }
+    .vault-form-notes { grid-area: notes; }
+    .vault-form-side {
+        grid-area: side;
+        position: sticky;
+        top: 1rem;
+    }
+
+    .vault-form-panel,
+    .vault-form-actions {
+        padding: 1.15rem;
+    }
+}
+
+@media (min-width: 1540px) {
+    .kasa-form-page-shell {
+        width: min(94vw, 1540px);
+    }
+
+    .vault-form-grid {
+        grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.35fr);
+        gap: 1.25rem;
+    }
+
+    .vault-form-access .vault-form-row-two {
+        grid-template-columns: minmax(280px, 0.9fr) minmax(420px, 1.1fr);
+    }
+
+    .vault-generator-panel {
+        grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1fr) auto;
+        align-items: center;
+    }
+}
+
+@media (max-width: 560px) {
+    .kasa-form-page-shell {
+        padding: 0.75rem !important;
+    }
+
+    .vault-form-hero {
+        align-items: flex-start;
+        flex-direction: column;
+        border-radius: 18px;
+    }
+
+    .vault-form-back {
+        width: 100%;
+    }
+
+    .vault-generator-panel .page-generator-options {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Form elemanları — ortak temel */
+.kasa-field {
+    isolation: isolate;
+    background: rgba(255,255,255,0.065) !important;
+    border: var(--border-glass) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+.kasa-field:focus {
+    border-color: var(--glass-border-hi) !important;
+    background-color: var(--surface-hover) !important;
+    box-shadow: 0 0 0 3px rgba(124,111,247,0.12) !important;
+}
+.kasa-field::placeholder { color: var(--text-muted); opacity: 0.75; }
+
+.kasa-field option { background: #131527; color: var(--text); }
+
+.kasa-field {
+    transition:
+        transform 160ms cubic-bezier(0.16,1,0.3,1),
+        border-color 160ms ease,
+        background-color 160ms ease,
+        box-shadow 160ms ease;
+}
+
+.kasa-field:focus {
+    transform: translateY(-1px);
+}
+
+.kasa-field-invalid,
+.kasa-field.kasa-field-invalid {
+    border-color: rgba(239,68,68,0.72) !important;
+    background-color: rgba(239,68,68,0.075) !important;
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.13) !important;
+    animation: invalidFieldPulse 320ms var(--ease-out) both;
+}
+
+@keyframes invalidFieldPulse {
+    0% { transform: translateX(0); }
+    35% { transform: translateX(-3px); }
+    70% { transform: translateX(3px); }
+    100% { transform: translateX(0); }
+}
+
+.toastify.kasa-toast {
+    min-height: 54px;
+    padding: 0.85rem 1rem 0.85rem 3.25rem !important;
+    border-radius: 15px !important;
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 700 !important;
+    line-height: 1.45;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+    overflow: hidden;
+}
+
+.toastify.kasa-toast::before {
+    position: absolute;
+    top: 50%;
+    left: 0.9rem;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid currentColor;
+    border-radius: 10px;
+    font-size: 0.84rem;
+    font-weight: 900;
+    transform: translateY(-50%);
+}
+
+.toastify.kasa-toast-warning::before { content: '!'; }
+.toastify.kasa-toast-success::before { content: '✓'; }
+.toastify.kasa-toast-info::before { display: none; }
+.toastify.kasa-toast-info {
+    padding-left: 1rem !important;
+    background: rgba(var(--accent-rgb), 0.14);
+}
+.toastify.kasa-toast-info i {
+    margin-right: 0.5rem;
+}
+
+html[data-glass-effects="off"] .toastify.kasa-toast {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.32) !important;
+}
+
+.kasa-alert-danger {
+    color: #fecaca;
+    background: rgba(239,68,68,0.11);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 12px;
+}
+
+/* ── PROGRESS BAR ────────────────────────────────────────────── */
+.progress-bar { transition: width 0.3s ease, background-color 0.3s ease; }
+

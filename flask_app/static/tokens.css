@@ -1,0 +1,164 @@
+/* ════════════════════════════════════════════════════════════════
+   ŞifreKasam v2.6.1 — Main Stylesheet
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── FONT ────────────────────────────────────────────────────── */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('fonts/space-grotesk.woff2') format('woff2');
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Sora';
+    font-style: normal;
+    font-weight: 300 700;
+    src: url('fonts/sora.woff2') format('woff2');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400 700;
+    src: url('fonts/jetbrains-mono.woff2') format('woff2');
+    font-display: swap;
+}
+
+/* ── CSS DEĞİŞKENLERİ ────────────────────────────────────────── */
+:root {
+    /* Renkler */
+    --bg:            #080912;
+    --bg-2:          #131527;
+    --surface:       rgba(255,255,255,0.05);
+    --surface-hover: rgba(255,255,255,0.09);
+    --border:        rgba(255,255,255,0.08);
+    --border-hi:     rgba(255,255,255,0.16);
+    --text:          #e8eaf2;
+    --text-muted:    #8b92a5;
+    --accent:        #7c6ff7;
+    --accent-2:      #4f91ff;
+    --accent-rgb:    124, 111, 247;
+    --accent-2-rgb:  79, 145, 255;
+    --accent-glow:   rgba(124,111,247,0.3);
+    --danger:        #ef4444;
+    --warning:       #f59e0b;
+    --success:       #22c55e;
+    --info:          #38bdf8;
+    --focus-ring:    0 0 0 3px rgba(124,111,247,0.18);
+    --shadow-soft:   0 12px 30px rgba(0,0,0,0.18);
+    --shadow-panel:  0 18px 48px rgba(0,0,0,0.28);
+    --shadow-modal:  0 24px 64px rgba(0,0,0,0.5);
+    --card-border:   rgba(255,255,255,0.08);
+    --card-bg:       rgba(255,255,255,0.045);
+    --editor-gap:    clamp(0.95rem, 1.1vw, 1.35rem);
+    --editor-pad:    clamp(1rem, 1.2vw, 1.4rem);
+
+    /* Tipografi */
+    --font-main:    'Sora', sans-serif;
+    --font-display: 'Space Grotesk', var(--font-main);
+    --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* Şekil & Hız */
+    --radius:    14px;
+    --radius-sm: 10px;
+    --speed:     0.16s;
+    --motion-fast: 180ms;
+    --motion-normal: 260ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --control-height: 44px;
+    --control-radius: 14px;
+    --panel-radius: 22px;
+    --grid-2: repeat(2, minmax(0, 1fr));
+
+}
+
+[data-bs-theme="light"] {
+    --bg:            #e8edf7;
+    --bg-2:          #f3f6fb;
+    --surface:       rgba(239,243,250,0.76);
+    --surface-hover: rgba(247,249,253,0.92);
+    --border:        rgba(45,58,82,0.12);
+    --border-hi:     rgba(45,58,82,0.20);
+    --text:          #1d2940;
+    --text-muted:    #59677e;
+    --accent-glow:   rgba(79,145,255,0.18);
+}
+
+/* ── GLOBAL RESET ────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html { scrollbar-gutter: stable; }
+
+html {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+}
+
+button,
+input,
+optgroup,
+select,
+textarea {
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+}
+
+button,
+select {
+    text-transform: none;
+}
+
+button:not(:disabled),
+[type="button"]:not(:disabled),
+[type="reset"]:not(:disabled),
+[type="submit"]:not(:disabled),
+[role="button"] {
+    cursor: pointer;
+}
+
+textarea { resize: vertical; }
+img, svg { vertical-align: middle; }
+
+*:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid transparent;
+    box-shadow: var(--focus-ring);
+}
+
+body {
+    font-family: var(--font-main);
+    background-color: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    margin: 0;
+    overflow-x: hidden;
+    position: relative;
+    z-index: 0;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color var(--speed) ease;
+}
+a:hover { color: var(--accent-2); }
+

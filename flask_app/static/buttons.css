@@ -1,0 +1,368 @@
+/* ════════════════════════════════════════════════════════════════
+   BUTONLAR
+   ════════════════════════════════════════════════════════════════ */
+
+/* kasa-btn — özel buton sistemi */
+.kasa-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 38px;
+    padding: 0.55rem 0.9rem;
+    border-radius: 12px;
+    border: var(--border-glass);
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    font-family: var(--font-main);
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 22px rgba(0,0,0,0.14);
+    transition: transform var(--speed) ease, border-color var(--speed) ease,
+                background var(--speed) ease, color var(--speed) ease, box-shadow var(--speed) ease;
+}
+.kasa-btn:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.095);
+    border-color: var(--glass-border-hi);
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 26px rgba(0,0,0,0.18);
+}
+.kasa-btn:active { transform: translateY(0); }
+.kasa-btn.justify-start { justify-content: flex-start; }
+
+.kasa-btn-primary {
+    border-color: rgba(124,111,247,0.38);
+    background: linear-gradient(135deg, rgba(124,111,247,0.96), rgba(79,145,255,0.9));
+    color: #fff;
+    box-shadow: 0 12px 30px rgba(124,111,247,0.26);
+}
+.kasa-btn-primary:hover {
+    color: #fff;
+    border-color: rgba(255,255,255,0.28);
+    background: linear-gradient(135deg, #887cff, #5c9cff);
+}
+.kasa-btn-danger {
+    color: #fca5a5;
+    border-color: rgba(239,68,68,0.22);
+    background: rgba(239,68,68,0.08);
+}
+.kasa-btn-danger:hover {
+    color: #fecaca;
+    border-color: rgba(239,68,68,0.34);
+    background: rgba(239,68,68,0.13);
+}
+.kasa-btn-muted  { color: var(--text-muted); }
+.kasa-btn-icon   { width: 36px; height: 36px; min-height: 36px; padding: 0; }
+
+.generator-copy-btn {
+    width: 44px;
+    min-height: 42px;
+    height: auto;
+    align-self: stretch;
+    flex: 0 0 44px;
+}
+
+/* ── Header ikon butonları */
+.icon-btn {
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--glass);
+    border: var(--border-glass);
+    cursor: pointer;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: all var(--speed) ease;
+}
+.icon-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--glass-border-hi);
+    transform: translateY(-1px);
+}
+
+/* ── Filtre butonları */
+.filter-btn {
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    justify-content: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    font-family: var(--font-main);
+    background: rgba(255,255,255,0.06);
+    border: var(--border-glass);
+    color: var(--text-muted);
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 18px rgba(0,0,0,0.12);
+    transition: all var(--speed) ease;
+}
+.filter-btn:hover {
+    background: rgba(124,111,247,0.10);
+    border-color: rgba(124,111,247,0.30);
+    color: var(--text);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+.filter-btn-active,
+.filter-btn.active {
+    background: linear-gradient(110deg, rgba(124,111,247,0.32), rgba(79,145,255,0.22)) !important;
+    border-color: rgba(124,111,247,0.45);
+    color: #c4baff;
+    box-shadow: 0 4px 12px rgba(124,111,247,0.2);
+}
+.filter-btn:focus-visible { box-shadow: var(--focus-ring); }
+
+.filter-btn.filter-activating {
+    animation: filterPillActivate 0.3s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes filterPillActivate {
+    0%   { transform: translateY(0) scale(0.94); }
+    58%  { transform: translateY(-2px) scale(1.06); }
+    100% { transform: translateY(0) scale(1); }
+}
+
+/* ── Kart footer butonları */
+.footer-action-btn {
+    background: transparent !important;
+    border: none !important;
+    padding: 0;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    text-decoration: none;
+    outline: none;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    transition: color var(--speed) ease;
+}
+.footer-action-btn:hover,
+.footer-action-btn:focus:not(:focus-visible),
+.footer-action-btn:active {
+    background: transparent !important;
+    color: var(--text) !important;
+    text-decoration: none !important;
+    outline: none;
+    box-shadow: none;
+}
+.footer-action-btn:focus-visible { color: var(--text) !important; box-shadow: var(--focus-ring) !important; }
+
+/* ── Kart göz/kopyala butonları */
+.card-icon-btn {
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--glass);
+    border: var(--border-glass);
+    color: var(--text-muted);
+    cursor: pointer;
+    outline: none;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: all var(--speed) ease;
+}
+.card-icon-btn:hover { background: var(--surface-hover) !important; color: var(--text); border-color: var(--accent); }
+.card-icon-btn:focus-visible,
+.card-star-btn:focus-visible { box-shadow: var(--focus-ring) !important; }
+
+/* ── Kart favori butonu */
+.card-star-icon {
+    font-size: 0.9rem;
+    transform-origin: center;
+    transition: color 0.18s ease, filter 0.18s ease;
+}
+.card-star-unpinned { color: #8b92a5; }
+[data-bs-theme="light"] .card-star-unpinned { color: #98a1b5; }
+
+.card-star-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    outline: none;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform var(--speed) ease;
+}
+.card-star-btn::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 2px solid rgba(245, 158, 11, 0.58);
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.35);
+}
+.card-star-btn:hover { transform: scale(1.2); }
+.card-star-btn:disabled { cursor: pointer; }
+.card-star-btn.is-favoriting .card-star-icon {
+    animation: favoriteStarIn 0.48s cubic-bezier(0.2, 0.9, 0.25, 1.35);
+}
+.card-star-btn.is-favoriting::after {
+    animation: favoriteRingOut 0.52s ease-out;
+}
+.card-star-btn.is-unfavoriting .card-star-icon {
+    animation: favoriteStarOut 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.filter-btn:active,
+.card-icon-btn:active,
+.card-star-btn:active { outline: none; box-shadow: none; }
+
+@keyframes favoriteStarIn {
+    0%   { transform: scale(0.58) rotate(-18deg); filter: brightness(1); }
+    55%  { transform: scale(1.38) rotate(10deg); filter: brightness(1.35); }
+    78%  { transform: scale(0.92) rotate(-4deg); }
+    100% { transform: scale(1) rotate(0); filter: brightness(1); }
+}
+
+@keyframes favoriteStarOut {
+    0%   { transform: scale(1) rotate(0); opacity: 1; }
+    45%  { transform: scale(0.62) rotate(-14deg); opacity: 0.62; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+@keyframes favoriteRingOut {
+    0%   { opacity: 0.75; transform: scale(0.35); }
+    100% { opacity: 0; transform: scale(1.55); }
+}
+
+/* ── Modal kapat butonu */
+.kasa-close-btn {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid rgba(var(--accent-rgb), 0.20);
+    border-radius: 11px;
+    background: rgba(255,255,255,0.055);
+    cursor: pointer;
+    color: var(--text);
+    font-size: 1.1rem;
+    line-height: 1;
+    outline: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        transform var(--motion-fast) var(--ease-out),
+        border-color var(--motion-fast) ease,
+        background var(--motion-fast) ease,
+        color var(--motion-fast) ease,
+        box-shadow var(--motion-fast) ease;
+}
+.kasa-close-btn:hover {
+    border-color: rgba(var(--accent-rgb), 0.42);
+    background: rgba(var(--accent-rgb), 0.14);
+    color: #fff;
+    transform: rotate(3deg) scale(1.04);
+}
+.kasa-close-btn:active { transform: scale(0.94); }
+.kasa-close-btn:focus-visible {
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+}
+
+/* ── Toplu seçim kontrolleri */
+#bulk-toggle-btn i { font-size: 1rem; }
+
+.bulk-select-all-control {
+    align-items: center !important;
+    min-height: 34px;
+    padding: 0.25rem 0.45rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.16);
+    border-radius: 11px;
+    background: rgba(var(--accent-rgb), 0.055);
+}
+
+.bulk-select-control {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    flex: 0 0 30px;
+    border: 1px solid rgba(var(--accent-rgb), 0.20);
+    border-radius: 10px;
+    background: rgba(var(--accent-rgb), 0.065);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease, transform var(--motion-fast) var(--ease-out);
+}
+
+.bulk-select-control:hover {
+    border-color: rgba(var(--accent-rgb), 0.42);
+    background: rgba(var(--accent-rgb), 0.12);
+    transform: scale(1.04);
+}
+
+.bulk-select-checkbox {
+    display: inline-grid;
+    place-content: center;
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid rgba(var(--accent-rgb), 0.42);
+    border-radius: 7px;
+    background: rgba(8,9,18,0.34);
+    cursor: pointer;
+    transition: transform var(--motion-fast) var(--ease-out), border-color var(--motion-fast) ease, background var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+.bulk-select-checkbox::before {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: translate(-0.5px, -0.5px) rotate(45deg) scale(0);
+    transform-origin: center;
+    transition: transform var(--motion-fast) var(--ease-out);
+}
+
+.bulk-select-checkbox:hover { transform: scale(1.08); }
+.bulk-select-checkbox:checked {
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 5px 14px rgba(var(--accent-rgb), 0.26);
+}
+.bulk-select-checkbox:checked::before { transform: translate(-0.5px, -0.5px) rotate(45deg) scale(1); }
+.bulk-select-checkbox:indeterminate::before {
+    width: 9px;
+    height: 2px;
+    border: 0;
+    border-radius: 999px;
+    background: #fff;
+    transform: scale(1);
+}
+.bulk-select-checkbox:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+

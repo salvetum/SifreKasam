@@ -1,0 +1,383 @@
+/* === Vault Form Spacing & Generator Refinement === */
+.kasa-form-page-shell {
+    padding-top: clamp(1.5rem, 4vh, 3.25rem) !important;
+    padding-bottom: clamp(1.75rem, 4.5vh, 3.5rem) !important;
+}
+
+.vault-form-page {
+    gap: clamp(1rem, 2vw, 1.4rem);
+}
+
+.vault-form-hero,
+.vault-form-panel,
+.vault-form-actions {
+    border-color: var(--glass-border);
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 38%),
+        var(--panel-bg);
+}
+
+.vault-form-icon,
+.vault-section-head > span {
+    background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.96), rgba(var(--accent-2-rgb), 0.86));
+    box-shadow: 0 14px 32px rgba(var(--accent-rgb), 0.22);
+}
+
+.vault-form-access .vault-form-row-two {
+    align-items: start;
+}
+
+.vault-password-input {
+    width: 100%;
+    padding-right: calc(var(--control-height) + 1rem) !important;
+}
+
+.vault-password-line .generator-copy-btn {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    width: 36px;
+    min-height: 36px;
+    height: 36px;
+    padding: 0 !important;
+    transform: translateY(-50%);
+    border-radius: 12px !important;
+}
+
+.vault-password-line .generator-copy-btn:hover {
+    transform: translateY(calc(-50% - 1px));
+}
+
+.vault-password-line .generator-copy-btn:active {
+    transform: translateY(-50%) scale(0.97);
+}
+
+.vault-strength-card {
+    display: grid;
+    grid-template-columns: minmax(190px, 0.42fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.85rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.18);
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 40%),
+        rgba(255,255,255,0.035);
+}
+
+.vault-strength-head {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.vault-strength-head > span {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border: 1px solid rgba(var(--accent-rgb), 0.24);
+    border-radius: 12px;
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.10);
+}
+
+.vault-strength-head strong,
+.vault-strength-head small {
+    display: block;
+}
+
+.vault-strength-head strong {
+    color: var(--text);
+    font-size: 0.84rem;
+}
+
+.vault-strength-head small {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+
+.vault-strength {
+    min-height: auto;
+}
+
+.vault-generator-panel {
+    overflow: hidden;
+    max-height: 460px;
+    opacity: 1;
+    transform: translateY(0);
+    border-color: rgba(var(--accent-rgb), 0.20);
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.13), transparent 42%),
+        rgba(255,255,255,0.038);
+    transition:
+        max-height 260ms cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 210ms ease,
+        transform 230ms cubic-bezier(0.16, 1, 0.3, 1),
+        padding 230ms ease,
+        margin 230ms ease,
+        border-color 230ms ease;
+}
+
+.vault-generator-panel.is-collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-top: -0.5rem;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-color: transparent;
+    transform: translateY(-8px);
+    pointer-events: none;
+}
+
+.vault-generator-panel input[type="range"] {
+    accent-color: var(--accent);
+}
+
+.vault-generator-panel .page-generator-options label {
+    border-color: rgba(var(--accent-rgb), 0.16);
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 44%),
+        rgba(255,255,255,0.038);
+    transition:
+        transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
+        border-color 170ms ease,
+        background 170ms ease;
+}
+
+.vault-generator-panel .page-generator-options label:hover {
+    transform: translateY(-1px);
+    border-color: rgba(var(--accent-rgb), 0.34);
+}
+
+@media (min-width: 1540px) {
+    .vault-form-access .vault-form-row-two {
+        grid-template-columns: var(--grid-2);
+    }
+}
+
+@media (max-width: 720px) {
+    .settings-action-grid,
+    .vault-strength-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .settings-action-card {
+        grid-template-columns: 40px minmax(0, 1fr);
+    }
+
+    .settings-action-arrow {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .kasa-form-page-shell {
+        padding: 1rem 0.75rem 1.35rem !important;
+    }
+
+    .generator-modal-content .modal-footer {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .generator-modal-content .modal-footer .kasa-btn {
+        width: 100%;
+    }
+
+    #modal-create-record-from-password {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+}
+
+/* === Accent Consistency Overrides === */
+.kasa-btn-primary {
+    border-color: rgba(var(--accent-rgb), 0.38) !important;
+    background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.96), rgba(var(--accent-2-rgb), 0.90)) !important;
+    box-shadow: 0 12px 30px rgba(var(--accent-rgb), 0.22);
+}
+
+.generator-output-card,
+.generator-options-card,
+.generator-history-card,
+.generator-strength-card {
+    border-color: rgba(var(--accent-rgb), 0.16);
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        rgba(255,255,255,0.045);
+}
+
+.generator-options-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-color: rgba(var(--accent-rgb), 0.24);
+    background:
+        radial-gradient(ellipse at left center, rgba(var(--accent-rgb), 0.16), transparent 44%),
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        rgba(255,255,255,0.045);
+}
+
+.generator-options-card::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    inset: 0 auto 0 0;
+    width: 4px;
+    border-radius: inherit;
+    background: linear-gradient(180deg, var(--accent), var(--accent-2));
+    box-shadow: 9px 0 28px rgba(var(--accent-rgb), 0.38);
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.generator-options-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+.brand-title-animated {
+    background:
+        linear-gradient(
+            100deg,
+            var(--accent) 0%,
+            var(--accent-2) 34%,
+            color-mix(in srgb, var(--accent) 62%, #ffffff) 52%,
+            var(--accent-2) 68%,
+            var(--accent) 100%
+        );
+    background-size: 240% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    animation: brandTitleFlow 3.4s ease-in-out infinite alternate;
+}
+
+@keyframes brandTitleFlow {
+    from { background-position: 0% 50%; }
+    to { background-position: 100% 50%; }
+}
+
+.generator-output-kicker i,
+.gen-history-header i {
+    color: var(--accent-2);
+}
+
+.generator-options-card input[type="range"],
+#modal-length {
+    accent-color: var(--accent);
+}
+
+#modal-length-display {
+    min-width: 2rem;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.28);
+    border-radius: 999px;
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.12);
+    text-align: center;
+}
+
+.generator-length-range {
+    --generator-range-progress: 33.333%;
+    height: 7px;
+    border: 0;
+    border-radius: 999px;
+    outline: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background:
+        linear-gradient(
+            90deg,
+            var(--accent) 0,
+            var(--accent-2) var(--generator-range-progress),
+            rgba(255, 255, 255, 0.14) var(--generator-range-progress),
+            rgba(255, 255, 255, 0.14) 100%
+        );
+}
+
+.generator-length-range::-webkit-slider-runnable-track {
+    height: 7px;
+    border-radius: 999px;
+    background: transparent;
+}
+
+.generator-length-range::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+    margin-top: -5.5px;
+    border: 2px solid rgba(255, 255, 255, 0.92);
+    border-radius: 50%;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--accent);
+    box-shadow: 0 3px 12px rgba(var(--accent-rgb), 0.38);
+    cursor: grab;
+}
+
+.generator-length-range:active::-webkit-slider-thumb {
+    cursor: grabbing;
+    transform: scale(1.08);
+}
+
+.generator-length-range:focus-visible::-webkit-slider-thumb {
+    box-shadow:
+        0 0 0 4px rgba(var(--accent-rgb), 0.2),
+        0 3px 12px rgba(var(--accent-rgb), 0.38);
+}
+
+.generator-length-range::-moz-range-track {
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.generator-length-range::-moz-range-progress {
+    height: 7px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+.generator-length-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.92);
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 3px 12px rgba(var(--accent-rgb), 0.38);
+    cursor: grab;
+}
+
+/* === Native Control Polish === */
+input.kasa-field[type="date"] {
+    color-scheme: dark;
+}
+
+[data-bs-theme="light"] input.kasa-field[type="date"] {
+    color-scheme: light;
+}
+
+input.kasa-field[type="date"]::-webkit-calendar-picker-indicator {
+    padding: 0.38rem;
+    border-radius: 9px;
+    background-color: rgba(var(--accent-rgb), 0.10);
+    cursor: pointer;
+    opacity: 0.82;
+    transition:
+        opacity var(--motion-fast) ease,
+        background-color var(--motion-fast) ease,
+        transform var(--motion-fast) var(--ease-out);
+}
+
+input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
+    background-color: rgba(var(--accent-rgb), 0.18);
+    opacity: 1;
+    transform: scale(1.05);
+}
+

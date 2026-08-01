@@ -1,0 +1,303 @@
+/* ════════════════════════════════════════════════════════════════
+   REVİZYON KATMANI — TEMA, FORM VE GENERATOR TUTARLILIĞI
+   ════════════════════════════════════════════════════════════════ */
+
+
+body {
+    background:
+        radial-gradient(circle at 18% 10%, rgba(var(--accent-rgb), 0.30), transparent 34%),
+        radial-gradient(circle at 86% 84%, rgba(var(--accent-2-rgb), 0.22), transparent 38%),
+        linear-gradient(145deg, var(--bg), var(--bg-2));
+}
+
+html[data-kasa-background="midnight"] body {
+    background:
+        radial-gradient(circle at 50% -10%, rgba(var(--accent-rgb), 0.20), transparent 38%),
+        linear-gradient(145deg, #050713, #101326 58%, #060816);
+}
+
+html[data-kasa-background="mesh"] body {
+    background:
+        radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), 0.28), transparent 34%),
+        radial-gradient(circle at 90% 12%, rgba(var(--accent-2-rgb), 0.22), transparent 34%),
+        radial-gradient(circle at 70% 88%, rgba(34,197,94,0.12), transparent 36%),
+        linear-gradient(145deg, var(--bg), #111827);
+}
+
+html[data-kasa-background="plain"] body {
+    background: linear-gradient(145deg, var(--bg), var(--bg-2));
+}
+
+body::before {
+    background: radial-gradient(circle, rgba(var(--accent-rgb), 0.40) 0%, transparent 70%);
+}
+
+body::after {
+    background: radial-gradient(circle, rgba(var(--accent-2-rgb), 0.35) 0%, transparent 70%);
+}
+
+.blob-accent {
+    background: radial-gradient(circle, rgba(var(--accent-rgb), 0.18) 0%, transparent 70%);
+}
+
+html[data-bs-theme="light"] body {
+    background:
+        radial-gradient(circle at 18% 10%, rgba(var(--accent-rgb), 0.14), transparent 34%),
+        radial-gradient(circle at 86% 84%, rgba(var(--accent-2-rgb), 0.12), transparent 38%),
+        linear-gradient(145deg, #eef2ff, #ffffff);
+}
+
+html[data-bs-theme="light"] body::before {
+    background: radial-gradient(circle, rgba(var(--accent-rgb), 0.17) 0%, transparent 70%);
+}
+
+html[data-bs-theme="light"] body::after {
+    background: radial-gradient(circle, rgba(var(--accent-2-rgb), 0.14) 0%, transparent 70%);
+}
+
+html[data-kasa-background="plain"] body::before,
+html[data-kasa-background="plain"] body::after,
+html[data-kasa-background="plain"] .blob-accent {
+    display: none !important;
+}
+
+/* ── ÖZEL ARKA PLAN ─────────────────────────────────────────── */
+#custom-bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    display: none;
+    pointer-events: none;
+}
+
+#custom-bg-layer.is-active {
+    display: block;
+}
+
+#custom-bg-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(8, 9, 18, 0.16) 0%, rgba(8, 9, 18, 0.30) 140%),
+        linear-gradient(rgba(8, 9, 18, 0.50), rgba(8, 9, 18, 0.50));
+    pointer-events: none;
+}
+
+html[data-bs-theme="light"] #custom-bg-layer::after {
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.20) 140%),
+        linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42));
+}
+
+html[data-kasa-background="custom"] body::before,
+html[data-kasa-background="custom"] body::after,
+html[data-kasa-background="custom"] .blob-accent {
+    display: none !important;
+}
+
+html[data-kasa-low-power="on"] #custom-bg-layer[data-animated="true"] {
+    display: none !important;
+}
+
+html[data-kasa-motion="off"] #custom-bg-layer[data-animated="true"] {
+    display: none !important;
+}
+
+/* ── ÖZEL ARKA PLAN OKUNABİLİRLİK ────────────────────────────── */
+/* Arkaplan doğrudan zemin üzerindeki başlık metinlerine yumuşak gölge ver. */
+html[data-kasa-background="custom"] .kasa-page-title,
+html[data-kasa-background="custom"] h1,
+html[data-kasa-background="custom"] h2,
+html[data-kasa-background="custom"] h3,
+html[data-kasa-background="custom"] h4 {
+    text-shadow: 0 1px 2px rgba(8, 9, 18, 0.55);
+}
+
+html[data-bs-theme="light"][data-kasa-background="custom"] .kasa-page-title,
+html[data-bs-theme="light"][data-kasa-background="custom"] h1,
+html[data-bs-theme="light"][data-kasa-background="custom"] h2,
+html[data-bs-theme="light"][data-kasa-background="custom"] h3,
+html[data-bs-theme="light"][data-kasa-background="custom"] h4 {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.65);
+}
+
+/* ── ÖZEL ARKA PLAN GALERİSİ ──────────────────────────────────── */
+.custom-bg-gallery {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.custom-bg-gallery-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.custom-bg-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 0.5rem;
+}
+
+.custom-bg-thumb {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: border-color var(--speed) ease, transform var(--speed) ease, box-shadow var(--speed) ease;
+}
+
+.custom-bg-thumb:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.custom-bg-thumb.is-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.35);
+}
+
+.custom-bg-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+}
+
+.custom-bg-thumb-badge {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(var(--accent-rgb), 0.85);
+    pointer-events: none;
+}
+
+.custom-bg-thumb-del {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(8, 9, 18, 0.62);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: background var(--speed) ease;
+}
+
+.custom-bg-thumb-del:hover {
+    background: rgba(239, 68, 68, 0.85);
+}
+
+html[data-kasa-gradient="off"] body {
+    background: var(--bg) !important;
+}
+
+html[data-bs-theme="light"][data-kasa-gradient="off"] body {
+    background: #f8fafc !important;
+}
+
+html[data-kasa-gradient="off"] body::before,
+html[data-kasa-gradient="off"] body::after,
+html[data-kasa-gradient="off"] .blob-accent {
+    display: none !important;
+}
+
+html[data-kasa-gradient="off"] .kasa-panel,
+html[data-kasa-gradient="off"] .kasa-panel-soft,
+html[data-kasa-gradient="off"] .vault-form-hero,
+html[data-kasa-gradient="off"] .vault-form-panel,
+html[data-kasa-gradient="off"] .vault-form-actions,
+html[data-kasa-gradient="off"] .generator-output-card,
+html[data-kasa-gradient="off"] .generator-options-card,
+html[data-kasa-gradient="off"] .generator-history-card,
+html[data-kasa-gradient="off"] .generator-panel,
+html[data-kasa-gradient="off"] .settings-appearance-card,
+html[data-kasa-gradient="off"] .page-loading-card {
+    background: var(--glass) !important;
+}
+
+html[data-glass-effects="off"][data-kasa-gradient="off"] .settings-appearance-card,
+html[data-glass-effects="off"][data-kasa-gradient="off"] .generator-output-card,
+html[data-glass-effects="off"][data-kasa-gradient="off"] .generator-options-card,
+html[data-glass-effects="off"][data-kasa-gradient="off"] .generator-history-card,
+html[data-glass-effects="off"][data-kasa-gradient="off"] .generator-panel {
+    background: rgba(24,27,48,0.98) !important;
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .settings-appearance-card,
+html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .generator-output-card,
+html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .generator-options-card,
+html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .generator-history-card,
+html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .generator-panel {
+    background: rgba(255,255,255,0.96) !important;
+    border-color: rgba(var(--accent-rgb), 0.16) !important;
+}
+
+html[data-kasa-gradient="off"] .kasa-btn-primary,
+html[data-bs-theme="light"][data-kasa-gradient="off"] .kasa-btn-primary {
+    background: var(--accent) !important;
+}
+
+.kasa-panel,
+.kasa-panel-soft,
+.vault-form-hero,
+.vault-form-panel,
+.vault-form-actions,
+.generator-output-card,
+.generator-options-card,
+.generator-history-card,
+.generator-panel,
+.page-loading-card {
+    border-color: var(--glass-border);
+}
+
+.kasa-field,
+input.kasa-field,
+select.kasa-field,
+textarea.kasa-field {
+    min-height: var(--control-height);
+    padding: 0.72rem 0.85rem;
+    border-radius: var(--control-radius) !important;
+    line-height: 1.35;
+    font-size: 0.9rem;
+}
+
+select.kasa-field {
+    display: block;
+    padding-right: 2.2rem;
+}
+
+textarea.kasa-field {
+    min-height: 128px;
+    resize: vertical;
+}
+
+.kasa-field:focus {
+    border-color: rgba(var(--accent-rgb), 0.48) !important;
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15) !important;
+}
+
