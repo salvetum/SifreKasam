@@ -73,14 +73,6 @@
     --panel-radius: 22px;
     --grid-2: repeat(2, minmax(0, 1fr));
 
-    /* Glass */
-    --glass:          rgba(255,255,255,0.06);
-    --glass-border:   rgba(255,255,255,0.12);
-    --glass-border-hi:rgba(255,255,255,0.25);
-    --glass-blur:     blur(18px);
-    --glass-blur-sm:  blur(10px);
-    --border-glass:   1px solid var(--glass-border);
-    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.078), rgba(255,255,255,0.034));
 }
 
 [data-bs-theme="light"] {
@@ -93,44 +85,6 @@
     --text:          #1d2940;
     --text-muted:    #59677e;
     --accent-glow:   rgba(79,145,255,0.18);
-    --glass:         rgba(232,238,248,0.72);
-    --glass-border:  rgba(45,58,82,0.14);
-    --glass-border-hi: rgba(79,145,255,0.30);
-    --panel-bg:      linear-gradient(145deg, rgba(247,249,253,0.88), rgba(226,233,246,0.72));
-}
-
-html[data-glass-quality="low"] {
-    --glass:          rgba(255,255,255,0.052);
-    --glass-border:   rgba(255,255,255,0.105);
-    --glass-border-hi:rgba(255,255,255,0.20);
-    --glass-blur:     blur(8px);
-    --glass-blur-sm:  blur(4px);
-    --shadow-panel:   0 14px 34px rgba(0,0,0,0.24);
-    --shadow-modal:   0 20px 52px rgba(0,0,0,0.44);
-    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.032));
-}
-
-html[data-glass-quality="high"] {
-    --glass:          rgba(255,255,255,0.075);
-    --glass-border:   rgba(255,255,255,0.15);
-    --glass-border-hi:rgba(255,255,255,0.30);
-    --glass-blur:     blur(24px);
-    --glass-blur-sm:  blur(14px);
-    --shadow-panel:   0 22px 58px rgba(0,0,0,0.32);
-    --shadow-modal:   0 30px 78px rgba(0,0,0,0.56);
-    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.092), rgba(255,255,255,0.04));
-}
-
-html[data-bs-theme="light"][data-glass-quality="low"] {
-    --glass:          rgba(255,255,255,0.82);
-    --glass-border:   rgba(31,41,55,0.10);
-    --glass-border-hi:rgba(79,145,255,0.22);
-}
-
-html[data-bs-theme="light"][data-glass-quality="high"] {
-    --glass:          rgba(255,255,255,0.58);
-    --glass-border:   rgba(31,41,55,0.14);
-    --glass-border-hi:rgba(79,145,255,0.34);
 }
 
 /* ── GLOBAL RESET ────────────────────────────────────────────── */
@@ -265,8 +219,6 @@ html[data-kasa-low-power="on"] .blob-accent {
     display: none !important;
 }
 
-html[data-kasa-low-power="on"] .glass,
-html[data-kasa-low-power="on"] .glass-sm,
 html[data-kasa-low-power="on"] .kasa-panel,
 html[data-kasa-low-power="on"] .kasa-modal .modal-content,
 html[data-kasa-low-power="on"] .kasa-modal-content {
@@ -420,17 +372,6 @@ body::after {
     background: radial-gradient(circle, rgba(34,197,94,0.10) 0%, transparent 70%);
 }
 
-/* ── GLASS YARDIMCI SINIFLARI ────────────────────────────────── */
-/* Ortak glass özellikleri */
-.glass, .glass-sm {
-    isolation: isolate;
-    background: var(--glass);
-    border: var(--border-glass);
-}
-.glass {
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-}
 /* ── GRADİYAN YAZI ───────────────────────────────────────────── */
 .gradient-text {
     background: linear-gradient(110deg, var(--accent), var(--accent-2));
@@ -1058,6 +999,14 @@ html[data-kasa-animations="off"] *::after {
 
 .toastify.kasa-toast-warning::before { content: '!'; }
 .toastify.kasa-toast-success::before { content: '✓'; }
+.toastify.kasa-toast-info::before { display: none; }
+.toastify.kasa-toast-info {
+    padding-left: 1rem !important;
+    background: rgba(var(--accent-rgb), 0.14);
+}
+.toastify.kasa-toast-info i {
+    margin-right: 0.5rem;
+}
 
 html[data-glass-effects="off"] .toastify.kasa-toast {
     backdrop-filter: none;
@@ -1733,11 +1682,6 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     transform: translateY(-1px) scale(0.998);
 }
 .vault-card-shell  { position: relative; border-radius: 16px; }
-html[data-glass-quality="low"] .vault-card-shell.glass,
-html[data-glass-quality="normal"] .vault-card-shell.glass {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
 .vault-card-body   { min-height: 240px; }
 .vault-card-header { min-height: 34px; }
 .vault-title-line  { min-width: 0; }
@@ -2403,19 +2347,6 @@ html.swal2-shown, html.swal2-height-auto { padding-right: 0 !important; }
    GLASS EFFECTS KAPALI  (data-glass-effects="off")
    ════════════════════════════════════════════════════════════════ */
 
-html[data-glass-effects="off"] {
-    --glass:          rgba(19,21,39,0.96);
-    --surface:        rgba(24,27,48,0.96);
-    --surface-hover:  rgba(33,37,64,0.98);
-    --glass-blur:     none;
-    --glass-blur-sm:  none;
-}
-html[data-bs-theme="light"][data-glass-effects="off"] {
-    --glass:          rgba(255,255,255,0.96);
-    --surface:        rgba(255,255,255,0.96);
-    --surface-hover:  rgba(255,255,255,0.98);
-}
-
 /* Blob'ları kapat */
 html[data-glass-effects="off"] body::before,
 html[data-glass-effects="off"] body::after,
@@ -2426,8 +2357,6 @@ html[data-glass-effects="off"] .blob-accent {
 }
 
 /* Tüm backdrop-filter'ları kaldır */
-html[data-glass-effects="off"] .glass,
-html[data-glass-effects="off"] .glass-sm,
 html[data-glass-effects="off"] .kasa-panel,
 html[data-glass-effects="off"] .kasa-panel-soft,
 html[data-glass-effects="off"] .kasa-field,
@@ -2450,8 +2379,6 @@ html[data-glass-effects="off"] .swal2-container {
 }
 
 /* Katı arka planlar */
-html[data-glass-effects="off"] .glass,
-html[data-glass-effects="off"] .glass-sm,
 html[data-glass-effects="off"] .kasa-panel,
 html[data-glass-effects="off"] .kasa-panel-soft,
 html[data-glass-effects="off"] .generator-output-card,
@@ -2461,8 +2388,6 @@ html[data-glass-effects="off"] .generator-panel {
     background: var(--glass) !important;
     box-shadow: 0 12px 30px rgba(0,0,0,0.18) !important;
 }
-html[data-bs-theme="light"][data-glass-effects="off"] .glass,
-html[data-bs-theme="light"][data-glass-effects="off"] .glass-sm,
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-panel,
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-panel-soft,
 html[data-bs-theme="light"][data-glass-effects="off"] .generator-output-card,
@@ -2477,7 +2402,6 @@ html[data-glass-effects="off"] .page-loading-overlay { background: rgba(8,9,18,0
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-modal::before,
 html[data-bs-theme="light"][data-glass-effects="off"] .page-loading-overlay { background: rgba(238,242,255,0.82) !important; }
 
-html[data-glass-effects="off"] .vault-card-shell.glass,
 html[data-glass-effects="off"] .settings-appearance-card,
 html[data-glass-effects="off"] .generator-output-card,
 html[data-glass-effects="off"] .generator-options-card,
@@ -2490,7 +2414,6 @@ html[data-glass-effects="off"] .generator-panel {
     border-color: rgba(var(--accent-rgb), 0.20) !important;
 }
 
-html[data-bs-theme="light"][data-glass-effects="off"] .vault-card-shell.glass,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-appearance-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .generator-output-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .generator-options-card,
@@ -2532,8 +2455,6 @@ html[data-glass-effects="off"] .history-entry {
 
 [data-bs-theme="light"] body { background-color: var(--bg); color: var(--text); }
 
-[data-bs-theme="light"] .glass,
-[data-bs-theme="light"] .glass-sm,
 [data-bs-theme="light"] .kasa-panel,
 [data-bs-theme="light"] .kasa-panel-soft,
 [data-bs-theme="light"] .generator-panel {
@@ -3137,19 +3058,6 @@ html[data-bs-theme="light"][data-kasa-background="custom"] h4 {
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.65);
 }
 
-/* Yoğun özel arkaplanlarda cam yüzeyleri daha opak yap. */
-html[data-kasa-background="custom"] .glass,
-html[data-kasa-background="custom"] .glass-sm {
-    background: rgba(19, 21, 39, 0.72);
-    border-color: rgba(255, 255, 255, 0.16);
-}
-
-html[data-bs-theme="light"][data-kasa-background="custom"] .glass,
-html[data-bs-theme="light"][data-kasa-background="custom"] .glass-sm {
-    background: rgba(255, 255, 255, 0.86);
-    border-color: rgba(45, 58, 82, 0.16);
-}
-
 /* ── ÖZEL ARKA PLAN GALERİSİ ──────────────────────────────────── */
 .custom-bg-gallery {
     margin-top: 0.75rem;
@@ -3249,8 +3157,6 @@ html[data-kasa-gradient="off"] .blob-accent {
     display: none !important;
 }
 
-html[data-kasa-gradient="off"] .glass,
-html[data-kasa-gradient="off"] .glass-sm,
 html[data-kasa-gradient="off"] .kasa-panel,
 html[data-kasa-gradient="off"] .kasa-panel-soft,
 html[data-kasa-gradient="off"] .vault-form-hero,
@@ -3265,7 +3171,6 @@ html[data-kasa-gradient="off"] .page-loading-card {
     background: var(--glass) !important;
 }
 
-html[data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell.glass,
 html[data-glass-effects="off"][data-kasa-gradient="off"] .settings-appearance-card,
 html[data-glass-effects="off"][data-kasa-gradient="off"] .generator-output-card,
 html[data-glass-effects="off"][data-kasa-gradient="off"] .generator-options-card,
@@ -3275,7 +3180,6 @@ html[data-glass-effects="off"][data-kasa-gradient="off"] .generator-panel {
     border-color: rgba(var(--accent-rgb), 0.20) !important;
 }
 
-html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell.glass,
 html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .settings-appearance-card,
 html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .generator-output-card,
 html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .generator-options-card,
@@ -3290,8 +3194,6 @@ html[data-bs-theme="light"][data-kasa-gradient="off"] .kasa-btn-primary {
     background: var(--accent) !important;
 }
 
-.glass,
-.glass-sm,
 .kasa-panel,
 .kasa-panel-soft,
 .vault-form-hero,
@@ -4249,92 +4151,44 @@ html[data-glass-effects="off"] .settings-appearance-card {
     line-height: 1.45;
 }
 
-.settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
-.chroma-toggle-row > .glass-sm,
-.glass-toggle-row > .glass-sm,
-.glass-toggle-row > .settings-glass-quality-card,
-.chroma-toggle-row > .settings-chroma-speed-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    min-height: 62px;
-    padding: 0.7rem 0.85rem !important;
-    border-color: rgba(var(--accent-rgb), 0.18);
-    border-radius: 16px !important;
-    background:
-        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
-        linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.032)),
-        var(--glass);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.07),
-        0 10px 26px rgba(var(--accent-rgb),0.045);
-}
-
 .settings-section-heading > div {
     display: grid;
     align-content: center;
 }
 
 .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) > div:first-child,
-.chroma-toggle-row > .glass-sm > div:first-child {
+.chroma-toggle-row > .glass-sm > div:first-child,
+.glass-toggle-row > .glass-sm > div:first-child,
+.glass-toggle-row > .settings-glass-quality-card > div:first-child {
     display: grid;
     align-content: center;
     gap: 0.12rem;
+    min-width: 0;
 }
 
 .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) h6,
 .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) h4,
 .chroma-toggle-row > .glass-sm h6,
-.chroma-toggle-row > .glass-sm h4 {
+.chroma-toggle-row > .glass-sm h4,
+.glass-toggle-row > .glass-sm h6,
+.glass-toggle-row > .glass-sm h4,
+.glass-toggle-row > .settings-glass-quality-card h6,
+.glass-toggle-row > .settings-glass-quality-card h4 {
     margin: 0;
     line-height: 1.3;
     text-align: left;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) p,
-.chroma-toggle-row > .glass-sm p {
+.chroma-toggle-row > .glass-sm p,
+.glass-toggle-row > .glass-sm p,
+.glass-toggle-row > .settings-glass-quality-card p {
     margin: 0;
     line-height: 1.35;
     text-align: left;
-}
-
-.settings-glass-quality-card,
-.glass-toggle-row,
-.chroma-toggle-row {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: stretch;
-    gap: 0.7rem;
-}
-
-.chroma-toggle-row > :first-child {
-    flex: 2;
-    min-width: 0;
-}
-
-.chroma-toggle-row > .settings-chroma-speed-card {
-    flex: 3;
-    min-width: 0;
-    grid-column: auto;
-}
-
-.glass-toggle-row {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: stretch;
-    gap: 0.7rem;
-}
-
-.glass-toggle-row > :first-child {
-    flex: 2;
-    min-width: 0;
-}
-
-.glass-toggle-row > .settings-glass-quality-card {
-    flex: 3;
-    min-width: 0;
-    grid-column: auto;
+    overflow-wrap: break-word;
 }
 
 .settings-chroma-speed-card {
@@ -4443,6 +4297,25 @@ html[data-glass-effects="off"] .settings-appearance-card {
 .settings-appearance-head > div,
 .appearance-field {
     min-width: 0;
+}
+
+.settings-appearance-card.is-chroma-locked #accent-color-picker,
+.settings-appearance-card.is-chroma-locked .accent-preset-row {
+    opacity: 0.5;
+    filter: grayscale(0.85);
+    pointer-events: none;
+}
+
+.settings-appearance-card.is-chroma-locked .accent-preset-row button,
+.settings-appearance-card.is-chroma-locked #accent-color-trigger {
+    cursor: not-allowed;
+}
+
+.settings-appearance-card.is-chroma-locked .accent-preset-row button:hover,
+.settings-appearance-card.is-chroma-locked #accent-color-trigger:hover {
+    transform: none;
+    background: rgba(255,255,255,0.045);
+    border-color: var(--glass-border);
 }
 
 .appearance-preview {
@@ -4637,20 +4510,6 @@ html[data-kasa-motion="on"] .appearance-preview {
 
     .settings-nav-btn span {
         display: none;
-    }
-
-    .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
-    .chroma-toggle-row > .glass-sm,
-    .chroma-toggle-row > .settings-chroma-speed-card,
-    .glass-toggle-row > .glass-sm,
-    .glass-toggle-row > .settings-glass-quality-card {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .chroma-toggle-row,
-    .glass-toggle-row {
-        flex-direction: column;
     }
 
     .settings-appearance-card,
@@ -5778,9 +5637,6 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
         rgba(242,245,251,0.78);
 }
 
-[data-bs-theme="light"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
-[data-bs-theme="light"] .chroma-toggle-row > .glass-sm,
-[data-bs-theme="light"] .glass-toggle-row > .glass-sm,
 [data-bs-theme="light"] .settings-toggle-card,
 [data-bs-theme="light"] .settings-select-card,
 [data-bs-theme="light"] .settings-action-card,
@@ -5814,9 +5670,6 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 html[data-glass-effects="off"] .settings-nav,
-html[data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
-html[data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
-html[data-glass-effects="off"] .glass-toggle-row > .glass-sm,
 html[data-glass-effects="off"] .settings-toggle-card,
 html[data-glass-effects="off"] .settings-select-card,
 html[data-glass-effects="off"] .settings-action-card,
@@ -5852,9 +5705,6 @@ html[data-glass-effects="off"] .settings-switch-input:checked {
 }
 
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-nav,
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
-html[data-bs-theme="light"][data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
-html[data-bs-theme="light"][data-glass-effects="off"] .glass-toggle-row > .glass-sm,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-toggle-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-select-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-action-card,
@@ -6033,8 +5883,7 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-appearance-card 
 }
 
 /* === Gradient-Off Accent Preservation === */
-html[data-kasa-gradient="off"] #stats-bar,
-html[data-kasa-gradient="off"] .vault-card-shell.glass {
+html[data-kasa-gradient="off"] #stats-bar {
     border-color: rgba(var(--accent-rgb), 0.22) !important;
     background: rgba(var(--accent-rgb), 0.065) !important;
     box-shadow:
@@ -6042,8 +5891,7 @@ html[data-kasa-gradient="off"] .vault-card-shell.glass {
         0 12px 28px rgba(0,0,0,0.14) !important;
 }
 
-html[data-bs-theme="light"][data-kasa-gradient="off"] #stats-bar,
-html[data-bs-theme="light"][data-kasa-gradient="off"] .vault-card-shell.glass {
+html[data-bs-theme="light"][data-kasa-gradient="off"] #stats-bar {
     border-color: rgba(var(--accent-rgb), 0.18) !important;
     background: rgba(var(--accent-rgb), 0.045) !important;
     box-shadow:
@@ -6341,45 +6189,6 @@ html[data-kasa-gradient="off"] .filter-empty-state {
     .filter-empty-state.is-visible {
         animation: none;
     }
-}
-
-/* ══ BÖLÜM 5 — Frosted Glass grain (Google "Material You" yaklaşımı) ══
-   Mevcut .glass/.glass-sm sistemine EKLEME. Ek blur yok; tek statik,
-   tam ekran, düşük opaklıklı grain katmanı cam yüzeylere mat/buzlu bir
-   doku kazandırır. data-glass-quality="low" ve data-glass-effects="off"
-   modlarında hiçbir yeni katman render edilmez. */
-:root {
-    --glass-grain-opacity: 0.045;
-    --glass-grain-opacity-high: 0.06;
-    --glass-grain-blend: overlay;
-    --glass-grain-size: 168px;
-}
-
-html[data-bs-theme="light"] {
-    --glass-grain-opacity: 0.03;
-    --glass-grain-opacity-high: 0.042;
-}
-
-.glass-grain {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    pointer-events: none;
-    opacity: var(--glass-grain-opacity);
-    mix-blend-mode: var(--glass-grain-blend);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='168' height='168'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='168' height='168' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: var(--glass-grain-size) var(--glass-grain-size);
-    background-repeat: repeat;
-}
-
-html[data-glass-quality="high"] .glass-grain {
-    opacity: var(--glass-grain-opacity-high);
-}
-
-html[data-glass-quality="low"] .glass-grain,
-html[data-kasa-low-power="on"] .glass-grain,
-html[data-glass-effects="off"] .glass-grain {
-    display: none !important;
 }
 
 /* ══ BÖLÜM 6 — Başlık yanı Ayarlar dropdown'u ══ */

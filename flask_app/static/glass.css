@@ -1,0 +1,365 @@
+/* ════════════════════════════════════════════════════════════════
+   CAM (GLASS) YÜZEY TANIMLARI
+   .glass / .glass-sm yüzeylerinin görsel tanımı ve bu yüzeylerin
+   data-glass-quality / data-glass-effects / tema / arkaplan
+   durumlarına göre değişen versiyonları.
+   style.css'in ardından yüklenir; değerler birebir taşınmıştır.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── CAM MALZEME TOKENLARI (varsayılan koyu) ──────────────────── */
+:root {
+    /* Glass */
+    --glass:          rgba(255,255,255,0.06);
+    --glass-border:   rgba(255,255,255,0.12);
+    --glass-border-hi:rgba(255,255,255,0.25);
+    --glass-blur:     blur(18px);
+    --glass-blur-sm:  blur(10px);
+    --border-glass:   1px solid var(--glass-border);
+    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.078), rgba(255,255,255,0.034));
+}
+
+/* ── CAM MALZEME TOKENLARI (açık tema) ────────────────────────── */
+[data-bs-theme="light"] {
+    --glass:         rgba(232,238,248,0.72);
+    --glass-border:  rgba(45,58,82,0.14);
+    --glass-border-hi: rgba(79,145,255,0.30);
+    --panel-bg:      linear-gradient(145deg, rgba(247,249,253,0.88), rgba(226,233,246,0.72));
+}
+
+/* ── CAM KALİTESİ: düşük (performans) ─────────────────────────── */
+html[data-glass-quality="low"] {
+    --glass:          rgba(255,255,255,0.052);
+    --glass-border:   rgba(255,255,255,0.105);
+    --glass-border-hi:rgba(255,255,255,0.20);
+    --glass-blur:     blur(8px);
+    --glass-blur-sm:  blur(4px);
+    --shadow-panel:   0 14px 34px rgba(0,0,0,0.24);
+    --shadow-modal:   0 20px 52px rgba(0,0,0,0.44);
+    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.032));
+}
+
+/* ── CAM KALİTESİ: yüksek ─────────────────────────────────────── */
+html[data-glass-quality="high"] {
+    --glass:          rgba(255,255,255,0.075);
+    --glass-border:   rgba(255,255,255,0.15);
+    --glass-border-hi:rgba(255,255,255,0.30);
+    --glass-blur:     blur(24px);
+    --glass-blur-sm:  blur(14px);
+    --shadow-panel:   0 22px 58px rgba(0,0,0,0.32);
+    --shadow-modal:   0 30px 78px rgba(0,0,0,0.56);
+    --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.092), rgba(255,255,255,0.04));
+}
+
+/* ── CAM KALİTESİ: açık tema + düşük ──────────────────────────── */
+html[data-bs-theme="light"][data-glass-quality="low"] {
+    --glass:          rgba(255,255,255,0.82);
+    --glass-border:   rgba(31,41,55,0.10);
+    --glass-border-hi:rgba(79,145,255,0.22);
+}
+
+/* ── CAM KALİTESİ: açık tema + yüksek ─────────────────────────── */
+html[data-bs-theme="light"][data-glass-quality="high"] {
+    --glass:          rgba(255,255,255,0.58);
+    --glass-border:   rgba(31,41,55,0.14);
+    --glass-border-hi:rgba(79,145,255,0.34);
+}
+
+/* ── DÜŞÜK GÜÇ: cam yüzeylerde blur'u kaldır ──────────────────── */
+html[data-kasa-low-power="on"] .glass,
+html[data-kasa-low-power="on"] .glass-sm {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* ── GLASS YARDIMCI SINIFLARI ────────────────────────────────── */
+/* Ortak glass özellikleri */
+.glass, .glass-sm {
+    isolation: isolate;
+    background: var(--glass);
+    border: var(--border-glass);
+}
+.glass {
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+.glass-sm {
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+}
+
+/* ── CAM KALİTESİ: kasa kartlarında blur'u kaldır ─────────────── */
+html[data-glass-quality="low"] .vault-card-shell.glass,
+html[data-glass-quality="normal"] .vault-card-shell.glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GLASS EFFECTS KAPALI  (data-glass-effects="off")
+   ════════════════════════════════════════════════════════════════ */
+
+html[data-glass-effects="off"] {
+    --glass:          rgba(19,21,39,0.96);
+    --surface:        rgba(24,27,48,0.96);
+    --surface-hover:  rgba(33,37,64,0.98);
+    --glass-blur:     none;
+    --glass-blur-sm:  none;
+}
+html[data-bs-theme="light"][data-glass-effects="off"] {
+    --glass:          rgba(255,255,255,0.96);
+    --surface:        rgba(255,255,255,0.96);
+    --surface-hover:  rgba(255,255,255,0.98);
+}
+
+/* Cam yüzeylerden blur'u kaldır */
+html[data-glass-effects="off"] .glass,
+html[data-glass-effects="off"] .glass-sm {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Katı arka planlar */
+html[data-glass-effects="off"] .glass,
+html[data-glass-effects="off"] .glass-sm {
+    background: var(--glass) !important;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.18) !important;
+}
+html[data-bs-theme="light"][data-glass-effects="off"] .glass,
+html[data-bs-theme="light"][data-glass-effects="off"] .glass-sm {
+    box-shadow: 0 12px 30px rgba(31,41,55,0.08) !important;
+}
+
+html[data-glass-effects="off"] .vault-card-shell.glass {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.14), transparent 42%),
+        linear-gradient(145deg, rgba(var(--accent-rgb), 0.085), rgba(var(--accent-2-rgb), 0.045)),
+        rgba(19,21,39,0.96) !important;
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .vault-card-shell.glass {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.10), transparent 42%),
+        linear-gradient(145deg, rgba(var(--accent-rgb), 0.055), rgba(var(--accent-2-rgb), 0.035)),
+        rgba(255,255,255,0.96) !important;
+    border-color: rgba(var(--accent-rgb), 0.16) !important;
+}
+
+/* ── LIGHT TEMA: cam yüzeyler ─────────────────────────────────── */
+[data-bs-theme="light"] .glass,
+[data-bs-theme="light"] .glass-sm {
+    background: rgba(255,255,255,0.68) !important;
+    border-color: var(--glass-border) !important;
+    box-shadow: 0 18px 42px rgba(31,41,55,0.10);
+}
+
+/* ── ÖZEL ARKAPLAN: cam yüzeyleri daha opak yap ──────────────── */
+html[data-kasa-background="custom"] .glass,
+html[data-kasa-background="custom"] .glass-sm {
+    background: rgba(19, 21, 39, 0.72);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+html[data-bs-theme="light"][data-kasa-background="custom"] .glass,
+html[data-bs-theme="light"][data-kasa-background="custom"] .glass-sm {
+    background: rgba(255, 255, 255, 0.86);
+    border-color: rgba(45, 58, 82, 0.16);
+}
+
+/* ── GRADİYAN KAPALI: cam yüzeyler ────────────────────────────── */
+html[data-kasa-gradient="off"] .glass,
+html[data-kasa-gradient="off"] .glass-sm {
+    background: var(--glass) !important;
+}
+
+html[data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell.glass {
+    background: rgba(24,27,48,0.98) !important;
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell.glass {
+    background: rgba(255,255,255,0.96) !important;
+    border-color: rgba(var(--accent-rgb), 0.16) !important;
+}
+
+/* ── ORTAK BORDER RENGİ (cam yüzeyler) ────────────────────────── */
+.glass,
+.glass-sm {
+    border-color: var(--glass-border);
+}
+
+/* ── AYARLAR PANELİ: cam kart yüzeyleri ───────────────────────── */
+.settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
+.chroma-toggle-row > .glass-sm,
+.glass-toggle-row > .glass-sm,
+.glass-toggle-row > .settings-glass-quality-card,
+.chroma-toggle-row > .settings-chroma-speed-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 62px;
+    padding: 0.7rem 0.85rem !important;
+    border-color: rgba(var(--accent-rgb), 0.18);
+    border-radius: 16px !important;
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.032)),
+        var(--glass);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.07),
+        0 10px 26px rgba(var(--accent-rgb),0.045);
+}
+
+/* ── CAM KART DİZİLİMİ (glass toggle satırları) ──────────────── */
+.settings-glass-quality-card,
+.glass-toggle-row,
+.chroma-toggle-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: stretch;
+    gap: 0.7rem;
+}
+
+.chroma-toggle-row > :first-child {
+    flex: 2;
+    min-width: 0;
+}
+
+.chroma-toggle-row > .settings-chroma-speed-card {
+    flex: 3;
+    min-width: 0;
+    grid-column: auto;
+}
+
+.glass-toggle-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: stretch;
+    gap: 0.7rem;
+}
+
+.glass-toggle-row > :first-child {
+    flex: 2;
+    min-width: 0;
+}
+
+.glass-toggle-row > .settings-glass-quality-card {
+    flex: 3;
+    min-width: 0;
+    grid-column: auto;
+}
+
+/* ── DAR EKRAN: cam kartlar alt alta ──────────────────────────── */
+@media (max-width: 620px) {
+    .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
+    .chroma-toggle-row > .glass-sm,
+    .chroma-toggle-row > .settings-chroma-speed-card,
+    .glass-toggle-row > .glass-sm,
+    .glass-toggle-row > .settings-glass-quality-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .chroma-toggle-row,
+    .glass-toggle-row {
+        flex-direction: column;
+    }
+}
+
+/* ── LIGHT TEMA: ayarlar cam kart yüzeyleri ───────────────────── */
+[data-bs-theme="light"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
+[data-bs-theme="light"] .chroma-toggle-row > .glass-sm,
+[data-bs-theme="light"] .glass-toggle-row > .glass-sm {
+    color: var(--text);
+    border-color: rgba(45,58,82,0.14) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb),0.075), transparent 42%),
+        linear-gradient(145deg, rgba(241,245,251,0.90), rgba(224,231,244,0.78)) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.70),
+        0 10px 26px rgba(65,80,108,0.07);
+}
+
+/* ── EFFECTS OFF: ayarlar cam kart yüzeyleri ──────────────────── */
+html[data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
+html[data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
+html[data-glass-effects="off"] .glass-toggle-row > .glass-sm {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-color: rgba(var(--accent-rgb),0.20) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb),0.10), transparent 42%),
+        linear-gradient(145deg, rgba(29,33,55,0.97), rgba(20,23,42,0.97)) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.07),
+        0 10px 26px rgba(0,0,0,0.12);
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
+html[data-bs-theme="light"][data-glass-effects="off"] .chroma-toggle-row > .glass-sm,
+html[data-bs-theme="light"][data-glass-effects="off"] .glass-toggle-row > .glass-sm {
+    border-color: rgba(var(--accent-rgb),0.18) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb),0.07), transparent 42%),
+        linear-gradient(145deg, #edf1f8, #dde5f2) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.72),
+        0 9px 24px rgba(60,74,101,0.07);
+}
+
+/* ── GRADİYAN KAPALI: kasa kart cam yüzeyi ────────────────────── */
+html[data-kasa-gradient="off"] .vault-card-shell.glass {
+    border-color: rgba(var(--accent-rgb), 0.22) !important;
+    background: rgba(var(--accent-rgb), 0.065) !important;
+    box-shadow:
+        0 16px 34px rgba(var(--accent-rgb), 0.08),
+        0 12px 28px rgba(0,0,0,0.14) !important;
+}
+
+html[data-bs-theme="light"][data-kasa-gradient="off"] .vault-card-shell.glass {
+    border-color: rgba(var(--accent-rgb), 0.18) !important;
+    background: rgba(var(--accent-rgb), 0.045) !important;
+    box-shadow:
+        0 16px 34px rgba(var(--accent-rgb), 0.07),
+        0 12px 28px rgba(31,41,55,0.06) !important;
+}
+
+/* ══ BÖLÜM 5 — Frosted Glass grain (Google "Material You" yaklaşımı) ══
+   Mevcut .glass/.glass-sm sistemine EKLEME. Ek blur yok; tek statik,
+   tam ekran, düşük opaklıklı grain katmanı cam yüzeylere mat/buzlu bir
+   doku kazandırır. data-glass-quality="low" ve data-glass-effects="off"
+   modlarında hiçbir yeni katman render edilmez. */
+:root {
+    --glass-grain-opacity: 0.045;
+    --glass-grain-opacity-high: 0.06;
+    --glass-grain-blend: overlay;
+    --glass-grain-size: 168px;
+}
+
+html[data-bs-theme="light"] {
+    --glass-grain-opacity: 0.03;
+    --glass-grain-opacity-high: 0.042;
+}
+
+.glass-grain {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: var(--glass-grain-opacity);
+    mix-blend-mode: var(--glass-grain-blend);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='168' height='168'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='168' height='168' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: var(--glass-grain-size) var(--glass-grain-size);
+    background-repeat: repeat;
+}
+
+html[data-glass-quality="high"] .glass-grain {
+    opacity: var(--glass-grain-opacity-high);
+}
+
+html[data-glass-quality="low"] .glass-grain,
+html[data-kasa-low-power="on"] .glass-grain,
+html[data-glass-effects="off"] .glass-grain {
+    display: none !important;
+}

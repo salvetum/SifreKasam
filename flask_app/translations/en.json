@@ -378,6 +378,7 @@
   "İndigo": "Indigo",
   "İşlem tamamlanamadı.": "The operation could not be completed.",
   "Chroma RGB": "Chroma RGB",
+  "Önce Chroma RGB efektini kapatın": "Turn off the Chroma RGB effect first.",
   "Vurgu rengini yumuşak bir renk döngüsünde değiştir.": "Cycle the accent color smoothly through the spectrum.",
   "Renk Döngüsü Hızı": "Color Cycle Speed",
   "Tam bir renk döngüsünün süresini seçin.": "Choose the duration of a full color cycle.",

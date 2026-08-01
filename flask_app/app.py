@@ -1440,16 +1440,18 @@ _ALLOWED_IMAGE_MIMES = {
 }
 
 def _validate_custom_background(file_storage):
-    """Validate uploaded file via magic bytes and size limits."""
-    file_storage.seek(0)
+    """Validate uploaded file via Pillow header sniffing and size limits.
 
+    Image.open() is lazy: only the file header (and first frame for GIFs) is
+    read, so format validation does not decode the whole payload.
+    """
     from PIL import Image
-    import io as _io
+
     try:
+        file_storage.seek(0, 2)
+        size = file_storage.tell()
         file_storage.seek(0)
-        raw = file_storage.read()
-        file_storage.seek(0)
-        img = Image.open(_io.BytesIO(raw))
+        img = Image.open(file_storage.stream)
         fmt = (img.format or '').upper()
     except Exception:
         file_storage.seek(0)
@@ -1461,10 +1463,6 @@ def _validate_custom_background(file_storage):
     mime = mime_map.get(fmt)
     if not mime:
         return None, 'Desteklenmeyen dosya formatı. PNG, JPEG, WebP veya GIF yükleyin.'
-
-    file_storage.seek(0, 2)
-    size = file_storage.tell()
-    file_storage.seek(0)
 
     is_gif = mime == 'image/gif'
     max_bytes = CUSTOM_BACKGROUND_MAX_GIF_BYTES if is_gif else CUSTOM_BACKGROUND_MAX_IMAGE_BYTES

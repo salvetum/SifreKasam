@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.1 - Main JavaScript
+ * ŞifreKasam v2.6.3-beta.2 - Main JavaScript
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -962,6 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const accentSaturationValue = document.getElementById('accent-saturation-value');
   const accentBrightnessValue = document.getElementById('accent-brightness-value');
   const settingsModal = document.getElementById('settingsModal');
+  const appearanceCard = document.querySelector('.settings-appearance-card');
   const backgroundHidden = document.getElementById('background-style-hidden');
   const accentHidden = document.getElementById('accent-color-hidden');
   const chromaToggle = document.getElementById('chroma-accent-toggle');
@@ -1171,6 +1172,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     syncChromaSpeedVisibility(next.enabled, animate);
 
+    if (appearanceCard) {
+      appearanceCard.classList.toggle('is-chroma-locked', next.enabled);
+      accentPresetButtons.forEach(btn => { btn.disabled = next.enabled; });
+      if (accentColorTrigger) accentColorTrigger.disabled = next.enabled;
+      if (next.enabled) setColorPickerOpen(false);
+    }
+
     if (persist) {
       queueAppearanceSave(
         accentInput?.value || currentAppearance.accent,
@@ -1196,6 +1204,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     chromaSpeedSelect?.addEventListener('change', () => {
       setChromaAccentPreference(chromaToggle?.checked ?? chromaAccentEnabled, chromaSpeedSelect.value);
+    });
+
+    appearanceCard?.addEventListener('click', (event) => {
+      if (!appearanceCard.classList.contains('is-chroma-locked')) return;
+      if (event.target.closest('.settings-appearance-head')) return;
+      event.preventDefault();
+      showWarningToast(window._('Önce Chroma RGB efektini kapatın'));
     });
 
     accentColorTrigger?.addEventListener('click', () => {
@@ -1271,6 +1286,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData();
         formData.append('file', file);
         customBgBtn.disabled = true;
+        showToast({
+          ...TOAST_BASE,
+          text: '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> ' + window._('Yükleniyor...'),
+          escapeHTML: false,
+          duration: 30000,
+          className: 'kasa-toast kasa-toast-info',
+        });
         try {
           const resp = await apiFetch('/api/background/upload', { method: 'POST', body: formData });
           if (!resp || !resp.ok) {
@@ -1280,14 +1302,25 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           const data = await resp.json();
           const customLayer = document.getElementById('custom-bg-layer');
+          const applyUploaded = () => {
+            if (customLayer && data.url) {
+              customLayer.setAttribute('data-bg-url', data.url);
+              if (data.is_gif) customLayer.setAttribute('data-animated', 'true');
+              else customLayer.removeAttribute('data-animated');
+              customLayer.classList.add('is-active');
+            }
+            updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+            showSuccessToast(window._('Arka plan güncellendi.'));
+            refreshCustomBgGallery();
+          };
           if (customLayer && data.url) {
-            customLayer.setAttribute('data-bg-url', data.url);
-            if (data.is_gif) customLayer.setAttribute('data-animated', 'true');
-            else customLayer.removeAttribute('data-animated');
+            const preloadImg = new Image();
+            preloadImg.onload = applyUploaded;
+            preloadImg.onerror = applyUploaded;
+            preloadImg.src = data.url;
+          } else {
+            applyUploaded();
           }
-          updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
-          showSuccessToast(window._('Arka plan güncellendi.'));
-          refreshCustomBgGallery();
         } catch {
           showWarningToast(window._('Yükleme başarısız oldu.'));
         } finally {
@@ -1367,12 +1400,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const actData = await actResp.json();
             const layer = document.getElementById('custom-bg-layer');
             if (layer && actData.url) {
-              layer.setAttribute('data-bg-url', actData.url);
-              if (actData.is_gif) layer.setAttribute('data-animated', 'true');
-              else layer.removeAttribute('data-animated');
+              const applyActivated = () => {
+                layer.setAttribute('data-bg-url', actData.url);
+                if (actData.is_gif) layer.setAttribute('data-animated', 'true');
+                else layer.removeAttribute('data-animated');
+                layer.classList.add('is-active');
+                updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+                showSuccessToast(window._('Arkaplan aktifleştirildi.'));
+              };
+              const preloadImg = new Image();
+              preloadImg.onload = applyActivated;
+              preloadImg.onerror = applyActivated;
+              preloadImg.src = actData.url;
+            } else {
+              showSuccessToast(window._('Arkaplan aktifleştirildi.'));
             }
-            updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
-            showSuccessToast(window._('Arkaplan aktifleştirildi.'));
           }
           refreshCustomBgGallery();
         };
