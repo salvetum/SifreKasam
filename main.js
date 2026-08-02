@@ -413,6 +413,7 @@ let rendererLowPowerRequested = false;
 let backendPageRecoveryAttempts = 0;
 
 app.commandLine.appendSwitch('disable-spell-checking');
+app.commandLine.appendSwitch('log-level', '3');
 if (safeModeRequested) app.disableHardwareAcceleration();
 
 // ─── TEK ÖRNEK KİLİDİ ────────────────────────────────────────────────────────
@@ -575,6 +576,7 @@ async function onAppReady() {
         await mainWindow.webContents.executeJavaScript('transitionToApp()');
       } catch (_) { /* loading.html henüz yüklenmemiş olabilir */ }
       mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
+      applyContentProtection();
       await loadBackendPage('/login?entry=loading');
     }
   } catch (err) {
@@ -752,6 +754,15 @@ async function createWindow() {
     }
   );
 
+  mainWindow.webContents.session.webRequest.onCompleted(
+    { urls: [`${PROTOCOL}://${HOST}:${PORT}/settings/content-protection`] },
+    (details) => {
+      if (details.method === 'POST' && details.statusCode >= 200 && details.statusCode < 300) {
+        setTimeout(applyContentProtection, 250);
+      }
+    }
+  );
+
   // Kapat yerine gizle / tepside çalışmaya devam et
   mainWindow.on('close', (event) => {
     if (isQuiting) return;
@@ -853,6 +864,21 @@ function checkMinimizeToTray() {
     req.on('timeout', () => { req.destroy(); resolve(false); });
     req.end();
   });
+}
+
+// Ekran yakalama engeli yalnızca Windows/macOS native API'lerinde çalışır;
+// Linux'ta setContentProtection no-op'tur, bu yüzden çağrıyı hiç yapmıyoruz.
+async function applyContentProtection() {
+  if (!PORT) return;
+  if (process.platform !== 'win32' && process.platform !== 'darwin') return;
+  try {
+    const state = await requestBackendJson('/settings/content-protection');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setContentProtection(state.content_protection_enabled === true);
+    }
+  } catch (_) {
+    /* Backend henüz hazır değilse sessizce atla; değişiklik hook'u tekrar dener. */
+  }
 }
 
 // ─── FLASK SUNUCUSU ───────────────────────────────────────────────────────────

@@ -472,6 +472,26 @@ export function initVaultIndex({
         apiPost('/settings/tray', { minimize_to_tray: trayToggle.checked })
       );
     }
+
+    // Ekran Yakalamayı Engelle
+    const contentProtectionToggle = document.getElementById('setting-content-protection');
+    if (contentProtectionToggle) {
+      const isLinux = /Linux/i.test(navigator.userAgent || '')
+        || (navigator.platform || '').toLowerCase().includes('linux');
+      if (isLinux) {
+        contentProtectionToggle.disabled = true;
+        const linuxNote = document.getElementById('content-protection-linux-note');
+        if (linuxNote) linuxNote.hidden = false;
+      }
+
+      apiJson('/settings/content-protection')
+        .then(data => { contentProtectionToggle.checked = data.content_protection_enabled; })
+        .catch(() => {});
+
+      contentProtectionToggle.addEventListener('change', () =>
+        apiPost('/settings/content-protection', { content_protection_enabled: contentProtectionToggle.checked })
+      );
+    }
   }
 
 }

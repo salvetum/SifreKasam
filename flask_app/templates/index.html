@@ -968,6 +968,19 @@
                             <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                         </button>
                     </div>
+                    <!-- Ekran Yakalamayı Engelle -->
+                    <div class="settings-toggle-card" id="content-protection-card">
+                        <div class="settings-toggle-main">
+                            <div class="settings-toggle-copy">
+                                <h4 id="setting-content-protection-title" class="text-sm font-medium mb-0.5">{{ _('Ekran Yakalamayı Engelle') }}</h4>
+                                <p class="text-xs text-kasa-text-muted mb-0">{{ _("Ekran kaydı ve ekran görüntüsü araçlarında pencereyi gizler. Yalnızca Windows ve macOS'ta çalışır.") }}</p>
+                            </div>
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" id="setting-content-protection" aria-labelledby="setting-content-protection-title">
+                            </div>
+                        </div>
+                        <p class="text-xs text-amber-400 mb-0 mt-1" id="content-protection-linux-note" hidden>{{ _("Linux'ta desteklenmiyor.") }}</p>
+                    </div>
                     </section>
                     <section id="settings-panel-application" class="settings-panel" role="tabpanel"
                              aria-labelledby="settings-tab-application" data-settings-panel="application" hidden>

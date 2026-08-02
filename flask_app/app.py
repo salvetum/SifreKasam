@@ -36,6 +36,7 @@ from kasa_core.constants import (
     DEFAULT_CHROMA_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_CATEGORY,
+    DEFAULT_CONTENT_PROTECTION_ENABLED,
     DEFAULT_GLASS_QUALITY,
     DEFAULT_GRADIENTS_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
@@ -559,7 +560,7 @@ def inject_globals():
 _PUBLIC_ENDPOINTS = {'login', 'static', 'loading_page', 'manifest_json', 'sw',
                      'settings_language'}
 _TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'settings_tray', 'lan_info',
-                    'settings_runtime'}
+                    'settings_runtime', 'settings_content_protection'}
 
 def _is_local_request() -> bool:
     remote = request.remote_addr or '127.0.0.1'
@@ -1285,6 +1286,17 @@ def settings_tray():
     s        = Setting.query.filter_by(key='minimize_to_tray').first()
     minimize = bool(s and s.value == 'true')
     return jsonify({"minimize_to_tray": minimize})
+
+@app.route('/settings/content-protection', methods=['GET', 'POST'])
+def settings_content_protection():
+    if request.method == 'POST':
+        val = request_json().get('content_protection_enabled')
+        _set_setting('content_protection_enabled', str(val).lower())
+        db.session.commit()
+        return jsonify({"status": "ok"})
+    s       = Setting.query.filter_by(key='content_protection_enabled').first()
+    enabled = (s.value == 'true') if s else DEFAULT_CONTENT_PROTECTION_ENABLED
+    return jsonify({"content_protection_enabled": enabled})
 
 @app.route('/settings/runtime')
 def settings_runtime():
