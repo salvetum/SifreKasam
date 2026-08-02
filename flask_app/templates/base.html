@@ -243,7 +243,7 @@
     <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.9" defer></script>
+    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.10" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script nonce="{{ csp_nonce }}">

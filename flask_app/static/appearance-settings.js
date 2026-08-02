@@ -1,0 +1,708 @@
+/**
+ * ŞifreKasam v2.6.3-beta.2 - Görünüm Ayarları modülü (ES Module)
+ *
+ * 3. bölüm: tema/efekt toggle'ları, glass kalitesi, vurgu rengi seçici,
+ * chroma akcent, özel arka plan yükleme/galeri.
+ * initAppearanceSettings, app.js içindeki DOMContentLoaded sırasında çağrılır;
+ * ayarlar formu (bölüm 4) için gerekli referansları döndürür.
+ */
+
+export function initAppearanceSettings({
+  apiPost,
+  apiFetch,
+  themeFeatureEnabled,
+  applyThemeFeature,
+  normalizeGlassQuality,
+  applyGlassQuality,
+  normalizeHexColor,
+  hexToRgb,
+  hexToHsv,
+  hsvToHex,
+  accentLooksTooLight,
+  applyAppearance,
+  normalizeChromaSpeed,
+  initialChromaAccentEnabled,
+  initialChromaAccentSpeed,
+  showToast,
+  showWarningToast,
+  showSuccessToast,
+  TOAST_BASE,
+}) {
+  let chromaAccentEnabled = initialChromaAccentEnabled;
+  let chromaAccentSpeed = initialChromaAccentSpeed;
+
+  const themeToggleBtn = document.getElementById('theme-toggle');
+  if (themeToggleBtn) {
+    const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+    if (themeToggleBtn.type === 'checkbox') themeToggleBtn.checked = currentTheme === 'dark';
+
+    const applyTheme = (theme) => {
+      document.documentElement.setAttribute('data-bs-theme', theme);
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      if (themeToggleBtn.type === 'checkbox') themeToggleBtn.checked = theme === 'dark';
+      localStorage.setItem('kasa-theme', theme);
+      apiPost('/settings/theme', { theme });
+    };
+
+    themeToggleBtn.addEventListener(
+      themeToggleBtn.type === 'checkbox' ? 'change' : 'click',
+      () => applyTheme(
+        document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark'
+      )
+    );
+  }
+
+  const glassToggle = document.getElementById('glass-effects-toggle');
+  const glassQualityCard = document.getElementById('glass-quality-card');
+  const glassQualitySelect = document.getElementById('glass-quality-select');
+  let glassQualitySyncFrame = 0;
+
+  const syncGlassQualityVisibility = (enabled, animate = true) => {
+    if (!glassQualityCard) return;
+    animate = animate
+      && document.documentElement.getAttribute('data-kasa-animations') !== 'off'
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldShow = Boolean(enabled);
+    cancelAnimationFrame(glassQualitySyncFrame);
+    glassQualityCard.setAttribute('aria-hidden', String(!shouldShow));
+    if (glassQualitySelect) {
+      glassQualitySelect.disabled = !shouldShow;
+      glassQualitySelect.tabIndex = glassQualitySelect.dataset.customSelectReady === 'true'
+        ? -1
+        : (shouldShow ? 0 : -1);
+      glassQualitySelect.kasaSyncCustomSelect?.();
+    }
+
+    glassQualityCard.classList.toggle('is-no-transition', !animate);
+    glassQualityCard.classList.toggle('is-collapsed', !shouldShow);
+    if (!animate) {
+      glassQualitySyncFrame = requestAnimationFrame(() => {
+        glassQualityCard.classList.remove('is-no-transition');
+      });
+    }
+  };
+
+  if (glassToggle) {
+    glassToggle.checked =
+      document.documentElement.getAttribute('data-glass-effects') !== 'off';
+    syncGlassQualityVisibility(glassToggle.checked, false);
+
+    glassToggle.addEventListener('change', () => {
+      const value = glassToggle.checked ? 'on' : 'off';
+      document.documentElement.setAttribute('data-glass-effects', value);
+      localStorage.setItem('kasa-glass-effects', value);
+      syncGlassQualityVisibility(glassToggle.checked);
+      apiPost('/settings/glass-effects', { enabled: glassToggle.checked });
+    });
+  }
+
+  const motionToggle = document.getElementById('animated-backgrounds-toggle');
+  const interfaceAnimationsToggle = document.getElementById('interface-animations-toggle');
+  const gradientsToggle = document.getElementById('gradients-toggle');
+
+  const setupThemeFeatureToggle = (toggle, attribute, storageKey, apiKey) => {
+    if (!toggle) return;
+    toggle.checked = themeFeatureEnabled(attribute);
+    toggle.addEventListener('change', () => {
+      applyThemeFeature(attribute, storageKey, toggle.checked);
+      apiPost('/settings/appearance', { [apiKey]: toggle.checked });
+    });
+  };
+
+  setupThemeFeatureToggle(
+    motionToggle,
+    'data-kasa-motion',
+    'kasa-animated-backgrounds',
+    'animated_backgrounds_enabled'
+  );
+  setupThemeFeatureToggle(
+    interfaceAnimationsToggle,
+    'data-kasa-animations',
+    'kasa-interface-animations',
+    'interface_animations_enabled'
+  );
+  setupThemeFeatureToggle(
+    gradientsToggle,
+    'data-kasa-gradient',
+    'kasa-gradients',
+    'gradients_enabled'
+  );
+
+  const accentInput = document.getElementById('accent-color-input');
+  const accentTextInput = document.getElementById('accent-color-text');
+  const accentColorPicker = document.getElementById('accent-color-picker');
+  const accentColorTrigger = document.getElementById('accent-color-trigger');
+  const accentColorPopover = document.getElementById('accent-color-popover');
+  const accentColorScrim = document.getElementById('accent-color-scrim');
+  const accentColorClose = document.getElementById('accent-color-close');
+  const accentColorReset = document.getElementById('accent-color-reset');
+  const accentColorTriggerValue = document.getElementById('accent-color-trigger-value');
+  const accentColorPickerValue = document.getElementById('accent-color-picker-value');
+  const accentColorRgb = document.getElementById('accent-color-rgb');
+  const accentHueInput = document.getElementById('accent-hue-input');
+  const accentSaturationInput = document.getElementById('accent-saturation-input');
+  const accentBrightnessInput = document.getElementById('accent-brightness-input');
+  const accentHueValue = document.getElementById('accent-hue-value');
+  const accentSaturationValue = document.getElementById('accent-saturation-value');
+  const accentBrightnessValue = document.getElementById('accent-brightness-value');
+  const settingsModal = document.getElementById('settingsModal');
+  const appearanceCard = document.querySelector('.settings-appearance-card');
+  const backgroundHidden = document.getElementById('background-style-hidden');
+  const accentHidden = document.getElementById('accent-color-hidden');
+  const chromaToggle = document.getElementById('chroma-accent-toggle');
+  const chromaSpeedCard = document.getElementById('chroma-speed-card');
+  const chromaSpeedSelect = document.getElementById('chroma-speed-select');
+  const appearancePreview = document.getElementById('appearance-preview');
+  const backgroundButtons = document.querySelectorAll('[data-background-option]');
+  const accentPresetButtons = document.querySelectorAll('[data-accent-preset]');
+  const currentAppearance = window.KASA_APPEARANCE || {
+    accent: localStorage.getItem('kasa-accent') || '#7c6ff7',
+    background: localStorage.getItem('kasa-background') || 'aurora',
+  };
+  const getCurrentBackground = () =>
+    backgroundHidden?.value || window.KASA_APPEARANCE?.background || currentAppearance.background;
+  let appearanceSaveTimer = 0;
+  let accentContrastWarningTimer = 0;
+  let lightAccentWarningShown = false;
+  let colorPickerCloseTimer = 0;
+  let chromaSpeedSyncFrame = 0;
+  let colorPickerState = hexToHsv(currentAppearance.accent);
+
+  if (settingsModal && accentColorScrim && accentColorPopover) {
+    settingsModal.append(accentColorScrim, accentColorPopover);
+  }
+
+  if (glassQualitySelect) {
+    glassQualitySelect.value = normalizeGlassQuality(
+      document.documentElement.getAttribute('data-glass-quality')
+    );
+    glassQualitySelect.kasaSyncCustomSelect?.();
+    glassQualitySelect.addEventListener('change', () => {
+      const glassQuality = applyGlassQuality(glassQualitySelect.value);
+      glassQualitySelect.value = glassQuality;
+      glassQualitySelect.kasaSyncCustomSelect?.();
+      apiPost('/settings/appearance', { glass_quality: glassQuality });
+    });
+  }
+
+  const queueAccentContrastWarning = (accent) => {
+    const normalizedAccent = normalizeHexColor(accent);
+    clearTimeout(accentContrastWarningTimer);
+
+    if (!accentLooksTooLight(normalizedAccent)) {
+      lightAccentWarningShown = false;
+      return;
+    }
+
+    accentContrastWarningTimer = setTimeout(() => {
+      if (lightAccentWarningShown) return;
+      lightAccentWarningShown = true;
+      showWarningToast(window._('Bu renk yazıları veya simgeleri okunmaz yapabilir.'));
+    }, 320);
+  };
+
+  const setColorPickerOpen = (open) => {
+    if (!accentColorPicker || !accentColorPopover || !accentColorTrigger) return;
+    clearTimeout(colorPickerCloseTimer);
+    accentColorTrigger.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+      accentColorPopover.hidden = false;
+      if (accentColorScrim) accentColorScrim.hidden = false;
+      requestAnimationFrame(() => {
+        accentColorPicker.classList.add('is-open');
+        accentColorScrim?.classList.add('is-open');
+        accentColorPopover.classList.add('is-open');
+        accentHueInput?.focus({ preventScroll: true });
+      });
+      return;
+    }
+
+    accentColorPicker.classList.remove('is-open');
+    accentColorScrim?.classList.remove('is-open');
+    accentColorPopover.classList.remove('is-open');
+    colorPickerCloseTimer = setTimeout(() => {
+      accentColorPopover.hidden = true;
+      if (accentColorScrim) accentColorScrim.hidden = true;
+    }, 180);
+  };
+
+  const syncColorPickerControls = (accent, preservePickerState = false) => {
+    if (!accentColorPicker) return;
+    const normalizedAccent = normalizeHexColor(accent);
+    const pickerColor = preservePickerState
+      ? { ...colorPickerState }
+      : hexToHsv(normalizedAccent);
+    colorPickerState = pickerColor;
+    const hueColor = hsvToHex(pickerColor.hue, 100, 100);
+    const fullBrightnessColor = hsvToHex(pickerColor.hue, pickerColor.saturation, 100);
+
+    if (accentHueInput) accentHueInput.value = String(pickerColor.hue);
+    if (accentSaturationInput) accentSaturationInput.value = String(pickerColor.saturation);
+    if (accentBrightnessInput) accentBrightnessInput.value = String(pickerColor.brightness);
+    if (accentHueValue) accentHueValue.value = `${pickerColor.hue}°`;
+    if (accentSaturationValue) accentSaturationValue.value = `${pickerColor.saturation}%`;
+    if (accentBrightnessValue) accentBrightnessValue.value = `${pickerColor.brightness}%`;
+    if (accentColorTriggerValue) accentColorTriggerValue.textContent = normalizedAccent;
+    if (accentColorPickerValue) accentColorPickerValue.textContent = normalizedAccent;
+    if (accentColorRgb) accentColorRgb.value = `RGB ${hexToRgb(normalizedAccent)}`;
+    window.KASA_SET_RUNTIME_STYLE?.(
+      'accent-color-picker',
+      `#accent-color-picker, #accent-color-popover {
+        --picker-color: ${normalizedAccent};
+        --picker-hue: ${hueColor};
+        --picker-full-brightness: ${fullBrightnessColor};
+      }`
+    );
+  };
+
+  const syncAppearanceControls = (accent, background, preservePickerState = false) => {
+    if (accentInput) accentInput.value = normalizeHexColor(accent);
+    if (accentTextInput) accentTextInput.value = normalizeHexColor(accent);
+    if (accentHidden) accentHidden.value = normalizeHexColor(accent);
+    if (backgroundHidden) backgroundHidden.value = background;
+    if (appearancePreview) {
+      window.KASA_SET_RUNTIME_STYLE?.(
+        'appearance-preview',
+        `#appearance-preview { --preview-accent: ${normalizeHexColor(accent)}; }`
+      );
+      appearancePreview.dataset.previewBackground = background;
+    }
+    syncColorPickerControls(accent, preservePickerState);
+    backgroundButtons.forEach(btn => {
+      const isActive = btn.dataset.backgroundOption === background;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+    accentPresetButtons.forEach(btn => {
+      const isActive = normalizeHexColor(btn.dataset.accentPreset) === normalizeHexColor(accent);
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+  };
+
+  let appearanceSavePromise = null;
+
+  const queueAppearanceSave = (accent, background) => {
+    clearTimeout(appearanceSaveTimer);
+    appearanceSaveTimer = setTimeout(() => {
+      appearanceSavePromise = apiPost('/settings/appearance', {
+        accent_color: accent,
+        background_style: background,
+        chroma_accent_enabled: chromaAccentEnabled,
+        chroma_accent_speed: chromaAccentSpeed,
+        animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
+        interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
+        gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
+      }).finally(() => { appearanceSavePromise = null; });
+    }, 250);
+  };
+
+  const flushAppearanceSave = () => {
+    clearTimeout(appearanceSaveTimer);
+    if (appearanceSavePromise) return appearanceSavePromise;
+    const accent = accentInput?.value || currentAppearance.accent;
+    const background = backgroundHidden?.value || currentAppearance.background;
+    appearanceSavePromise = apiPost('/settings/appearance', {
+      accent_color: accent,
+      background_style: background,
+      chroma_accent_enabled: chromaAccentEnabled,
+      chroma_accent_speed: chromaAccentSpeed,
+      animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
+      interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
+      gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
+    }).finally(() => { appearanceSavePromise = null; });
+    return appearanceSavePromise;
+  };
+
+  const syncChromaSpeedVisibility = (enabled, animate = true) => {
+    if (!chromaSpeedCard) return;
+    const shouldAnimate = animate
+      && document.documentElement.getAttribute('data-kasa-animations') !== 'off'
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldShow = Boolean(enabled);
+    cancelAnimationFrame(chromaSpeedSyncFrame);
+    chromaSpeedCard.setAttribute('aria-hidden', String(!shouldShow));
+
+    if (chromaSpeedSelect) {
+      chromaSpeedSelect.disabled = !shouldShow;
+      chromaSpeedSelect.tabIndex = chromaSpeedSelect.dataset.customSelectReady === 'true'
+        ? -1
+        : (shouldShow ? 0 : -1);
+      chromaSpeedSelect.kasaSyncCustomSelect?.();
+    }
+
+    chromaSpeedCard.classList.toggle('is-no-transition', !shouldAnimate);
+    chromaSpeedCard.classList.toggle('is-collapsed', !shouldShow);
+    if (!shouldAnimate) {
+      chromaSpeedSyncFrame = requestAnimationFrame(() => {
+        chromaSpeedCard.classList.remove('is-no-transition');
+      });
+    }
+  };
+
+  const setChromaAccentPreference = (enabled, speed = chromaAccentSpeed, persist = true, animate = true) => {
+    const next = window.KASA_SET_CHROMA_ACCENT?.(enabled, speed) || {
+      enabled: Boolean(enabled),
+      speed: normalizeChromaSpeed(speed),
+    };
+    chromaAccentEnabled = next.enabled;
+    chromaAccentSpeed = next.speed;
+
+    if (chromaToggle) chromaToggle.checked = next.enabled;
+    if (chromaSpeedSelect) {
+      chromaSpeedSelect.value = String(next.speed);
+      chromaSpeedSelect.kasaSyncCustomSelect?.();
+    }
+    syncChromaSpeedVisibility(next.enabled, animate);
+
+    if (appearanceCard) {
+      appearanceCard.classList.toggle('is-chroma-locked', next.enabled);
+      accentPresetButtons.forEach(btn => { btn.disabled = next.enabled; });
+      if (accentColorTrigger) accentColorTrigger.disabled = next.enabled;
+      if (next.enabled) setColorPickerOpen(false);
+    }
+
+    if (persist) {
+      queueAppearanceSave(
+        accentInput?.value || currentAppearance.accent,
+        getCurrentBackground()
+      );
+    }
+  };
+
+  const updateAppearance = (accent, background, persist = true, preservePickerState = false) => {
+    const next = applyAppearance(accent, background);
+    syncAppearanceControls(next.accent, next.background, preservePickerState);
+    queueAccentContrastWarning(next.accent);
+    if (persist) queueAppearanceSave(next.accent, next.background);
+  };
+
+  if (accentInput || accentTextInput || backgroundHidden || backgroundButtons.length) {
+    syncAppearanceControls(currentAppearance.accent, currentAppearance.background);
+    applyAppearance(currentAppearance.accent, currentAppearance.background, false);
+    setChromaAccentPreference(chromaAccentEnabled, chromaAccentSpeed, false, false);
+
+    chromaToggle?.addEventListener('change', () => {
+      setChromaAccentPreference(chromaToggle.checked, chromaSpeedSelect?.value);
+    });
+    chromaSpeedSelect?.addEventListener('change', () => {
+      setChromaAccentPreference(chromaToggle?.checked ?? chromaAccentEnabled, chromaSpeedSelect.value);
+    });
+
+    appearanceCard?.addEventListener('click', (event) => {
+      if (!appearanceCard.classList.contains('is-chroma-locked')) return;
+      if (event.target.closest('.settings-appearance-head')) return;
+      event.preventDefault();
+      showWarningToast(window._('Önce Chroma RGB efektini kapatın'));
+    });
+
+    accentColorTrigger?.addEventListener('click', () => {
+      setColorPickerOpen(accentColorTrigger.getAttribute('aria-expanded') !== 'true');
+    });
+    accentColorScrim?.addEventListener('click', () => setColorPickerOpen(false));
+    accentColorClose?.addEventListener('click', () => setColorPickerOpen(false));
+    accentColorReset?.addEventListener('click', () => {
+      updateAppearance(
+        accentColorReset.dataset.defaultAccent || '#7c6ff7',
+        getCurrentBackground()
+      );
+    });
+    [accentHueInput, accentSaturationInput, accentBrightnessInput].forEach(input => {
+      input?.addEventListener('input', () => {
+        colorPickerState = {
+          hue: Number(accentHueInput?.value || 0),
+          saturation: Number(accentSaturationInput?.value || 0),
+          brightness: Number(accentBrightnessInput?.value || 0),
+        };
+        updateAppearance(
+          hsvToHex(
+            colorPickerState.hue,
+            colorPickerState.saturation,
+            colorPickerState.brightness
+          ),
+          getCurrentBackground(),
+          true,
+          true
+        );
+      });
+    });
+    accentTextInput?.addEventListener('input', () => {
+      if (/^#?[0-9a-fA-F]{6}$/.test(accentTextInput.value.trim())) {
+        updateAppearance(
+          accentTextInput.value,
+          getCurrentBackground()
+        );
+      }
+    });
+    accentTextInput?.addEventListener('change', () => {
+      const fallback = accentInput?.value || currentAppearance.accent;
+      updateAppearance(
+        normalizeHexColor(accentTextInput.value, fallback),
+        getCurrentBackground()
+      );
+    });
+    accentPresetButtons.forEach(btn => {
+      btn.addEventListener('click', () =>
+        updateAppearance(btn.dataset.accentPreset, getCurrentBackground())
+      );
+    });
+    backgroundButtons.forEach(btn => {
+      if (btn.id === 'custom-bg-btn') return;
+      btn.addEventListener('click', () =>
+        updateAppearance(
+          accentInput?.value || currentAppearance.accent,
+          btn.dataset.backgroundOption,
+          true,
+          true
+        )
+      );
+    });
+
+    // ── Özel Arka Plan Yükleme ──
+    const customBgBtn = document.getElementById('custom-bg-btn');
+    const customBgInput = document.getElementById('custom-bg-input');
+    if (customBgBtn && customBgInput) {
+      customBgBtn.addEventListener('click', () => customBgInput.click());
+      customBgInput.addEventListener('change', async () => {
+        const file = customBgInput.files?.[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        customBgBtn.disabled = true;
+        showToast({
+          ...TOAST_BASE,
+          text: '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> ' + window._('Yükleniyor...'),
+          escapeHTML: false,
+          duration: 30000,
+          className: 'kasa-toast kasa-toast-info',
+        });
+        try {
+          const resp = await apiFetch('/api/background/upload', { method: 'POST', body: formData });
+          if (!resp || !resp.ok) {
+            const data = await resp?.json?.().catch(() => ({}));
+            showWarningToast(window._(data?.error || 'Yükleme başarısız oldu.'));
+            return;
+          }
+          const data = await resp.json();
+          const customLayer = document.getElementById('custom-bg-layer');
+          const applyUploaded = () => {
+            if (customLayer && data.url) {
+              customLayer.setAttribute('data-bg-url', data.url);
+              if (data.is_gif) customLayer.setAttribute('data-animated', 'true');
+              else customLayer.removeAttribute('data-animated');
+              customLayer.classList.add('is-active');
+            }
+            updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+            showSuccessToast(window._('Arka plan güncellendi.'));
+            refreshCustomBgGallery();
+          };
+          if (customLayer && data.url) {
+            const preloadImg = new Image();
+            preloadImg.onload = applyUploaded;
+            preloadImg.onerror = applyUploaded;
+            preloadImg.src = data.url;
+          } else {
+            applyUploaded();
+          }
+        } catch {
+          showWarningToast(window._('Yükleme başarısız oldu.'));
+        } finally {
+          customBgBtn.disabled = false;
+          customBgInput.value = '';
+        }
+      });
+    }
+
+    // ── Özel Arka Plan Galerisi ──
+    const customBgGallery = document.getElementById('custom-bg-gallery');
+    const customBgGalleryGrid = document.getElementById('custom-bg-gallery-grid');
+    const customBgGalleryClear = document.getElementById('custom-bg-gallery-clear');
+
+    const refreshCustomBgGallery = async () => {
+      if (!customBgGallery || !customBgGalleryGrid) return;
+      const resp = await apiFetch('/api/background/history');
+      if (!resp?.ok) {
+        customBgGallery.classList.add('hidden');
+        return;
+      }
+      const data = await resp.json();
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      const customLayer = document.getElementById('custom-bg-layer');
+      const currentUrl = customLayer?.getAttribute('data-bg-url');
+      const currentIsGif = customLayer?.getAttribute('data-animated') === 'true';
+      const isCustomActive = getCurrentBackground() === 'custom';
+
+      if (entries.length === 0 && (!isCustomActive || !currentUrl)) {
+        customBgGallery.classList.add('hidden');
+        return;
+      }
+      customBgGallery.classList.remove('hidden');
+      customBgGalleryGrid.replaceChildren();
+
+      const makeThumb = (item) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'custom-bg-thumb' + (item.active ? ' is-active' : '');
+        wrap.setAttribute('role', 'button');
+        wrap.setAttribute('tabindex', '0');
+        wrap.setAttribute('aria-label', item.active
+          ? window._('Aktif')
+          : window._('Arkaplan aktifleştirildi.'));
+
+        const img = document.createElement('img');
+        img.src = item.url;
+        img.alt = '';
+        img.loading = 'lazy';
+        wrap.appendChild(img);
+
+        if (item.active) {
+          const badge = document.createElement('span');
+          badge.className = 'custom-bg-thumb-badge';
+          badge.textContent = window._('Aktif');
+          wrap.appendChild(badge);
+        }
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'custom-bg-thumb-del';
+        del.setAttribute('aria-label', window._('Arkaplan silindi.'));
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-xmark';
+        del.appendChild(icon);
+        wrap.appendChild(del);
+
+        const activate = async () => {
+          if (!item.active) {
+            const actResp = await apiFetch(
+              `/api/background/history/${encodeURIComponent(item.id)}/activate`,
+              { method: 'POST' }
+            );
+            if (!actResp?.ok) {
+              showWarningToast(window._('Arkaplan aktifleştirilmedi.'));
+              return;
+            }
+            const actData = await actResp.json();
+            const layer = document.getElementById('custom-bg-layer');
+            if (layer && actData.url) {
+              const applyActivated = () => {
+                layer.setAttribute('data-bg-url', actData.url);
+                if (actData.is_gif) layer.setAttribute('data-animated', 'true');
+                else layer.removeAttribute('data-animated');
+                layer.classList.add('is-active');
+                updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+                showSuccessToast(window._('Arkaplan aktifleştirildi.'));
+              };
+              const preloadImg = new Image();
+              preloadImg.onload = applyActivated;
+              preloadImg.onerror = applyActivated;
+              preloadImg.src = actData.url;
+            } else {
+              showSuccessToast(window._('Arkaplan aktifleştirildi.'));
+            }
+          }
+          refreshCustomBgGallery();
+        };
+
+        const remove = async () => {
+          const delResp = item.active
+            ? await apiFetch('/api/background', { method: 'DELETE' })
+            : await apiFetch(`/api/background/history/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+          if (!delResp?.ok) {
+            showWarningToast(window._('Silme işlemi başarısız oldu.'));
+            return;
+          }
+          const layer = document.getElementById('custom-bg-layer');
+          if (item.active) {
+            if (layer) {
+              layer.removeAttribute('data-bg-url');
+              layer.removeAttribute('data-animated');
+              layer.classList.remove('is-active');
+            }
+            updateAppearance(accentInput?.value || currentAppearance.accent, 'aurora', true, true);
+          } else {
+            showSuccessToast(window._('Arkaplan silindi.'));
+          }
+          refreshCustomBgGallery();
+        };
+
+        const handleClick = (event) => {
+          if (event.target.closest('.custom-bg-thumb-del')) return;
+          activate();
+        };
+        wrap.addEventListener('click', handleClick);
+        wrap.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleClick(event);
+          }
+        });
+        del.addEventListener('click', (event) => {
+          event.stopPropagation();
+          remove();
+        });
+
+        return wrap;
+      };
+
+      if (isCustomActive && currentUrl) {
+        customBgGalleryGrid.appendChild(makeThumb({
+          id: null, url: currentUrl, isGif: currentIsGif, active: true,
+        }));
+      }
+      entries.forEach(entry => {
+        customBgGalleryGrid.appendChild(makeThumb({
+          id: entry.id, url: entry.url, isGif: entry.is_gif, active: false,
+        }));
+      });
+    };
+
+    if (customBgGalleryClear) {
+      customBgGalleryClear.addEventListener('click', async () => {
+        const resp = await apiFetch('/api/background', { method: 'DELETE' });
+        if (!resp?.ok) {
+          showWarningToast(window._('Silme işlemi başarısız oldu.'));
+          return;
+        }
+        const layer = document.getElementById('custom-bg-layer');
+        if (layer) {
+          layer.removeAttribute('data-bg-url');
+          layer.removeAttribute('data-animated');
+          layer.classList.remove('is-active');
+        }
+        updateAppearance(accentInput?.value || currentAppearance.accent, 'aurora', true, true);
+        showSuccessToast(window._('Arkaplan silindi.'));
+        refreshCustomBgGallery();
+      });
+    }
+
+    refreshCustomBgGallery();
+
+    settingsModal?.addEventListener('kasa:modal-closing', () => {
+      flushAppearanceSave();
+      setColorPickerOpen(false);
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && accentColorTrigger?.getAttribute('aria-expanded') === 'true') {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        setColorPickerOpen(false);
+        accentColorTrigger.focus({ preventScroll: true });
+      }
+    });
+  }
+
+  return {
+    accentInput,
+    getCurrentBackground,
+    setChromaAccentPreference,
+    glassToggle,
+    syncGlassQualityVisibility,
+    glassQualitySelect,
+    motionToggle,
+    interfaceAnimationsToggle,
+    gradientsToggle,
+    updateAppearance,
+  };
+
+}

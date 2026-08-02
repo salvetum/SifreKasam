@@ -9,7 +9,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES_DIR = ROOT / "flask_app" / "templates"
-FIRST_PARTY_JAVASCRIPT = (ROOT / "flask_app" / "static" / "app.js",)
+FIRST_PARTY_JAVASCRIPT = (
+    ROOT / "flask_app" / "static" / "app.js",
+    ROOT / "flask_app" / "static" / "password-generator.js",
+    ROOT / "flask_app" / "static" / "toast.js",
+    ROOT / "flask_app" / "static" / "reveal-copy.js",
+    ROOT / "flask_app" / "static" / "password-strength.js",
+    ROOT / "flask_app" / "static" / "custom-controls.js",
+    ROOT / "flask_app" / "static" / "lan-settings.js",
+    ROOT / "flask_app" / "static" / "modal-system.js",
+    ROOT / "flask_app" / "static" / "heartbeat.js",
+    ROOT / "flask_app" / "static" / "appearance-settings.js",
+    ROOT / "flask_app" / "static" / "vault-index.js",
+    ROOT / "flask_app" / "static" / "vault-form.js",
+)
 CSP_SOURCE = ROOT / "flask_app" / "app.py"
 
 TEMPLATE_RULES = (
