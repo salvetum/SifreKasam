@@ -94,7 +94,12 @@
         }
 
         function applyAppearance(params) {
-            const theme = (params.get('theme') || localStorage.getItem('kasa-theme')) === 'light' ? 'light' : 'dark';
+            const storedThemeMode = params.get('themeMode') || localStorage.getItem('kasa-theme-mode');
+            const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            let themeMode = ['light', 'dark', 'system'].includes(storedThemeMode) ? storedThemeMode : 'dark';
+            const theme = themeMode === 'system'
+                ? (systemDarkQuery.matches ? 'dark' : 'light')
+                : (themeMode === 'light' ? 'light' : 'dark');
             const glass = (params.get('glassEffects') || localStorage.getItem('kasa-glass-effects')) === 'off' ? 'off' : 'on';
             const qualityValue = params.get('glassQuality') || localStorage.getItem('kasa-glass-quality');
             const glassQuality = ['low', 'normal', 'high'].includes(qualityValue) ? qualityValue : 'normal';

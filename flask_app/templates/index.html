@@ -14,10 +14,10 @@
             <!-- Ayarlar (başlık yanı dropdown) -->
             <div class="kasa-dropdown" data-kasa-dropdown>
                 <button type="button" id="settings-dropdown-trigger" class="kasa-dropdown-trigger"
-                    title="{{ _('Ayarlar') }}" aria-haspopup="menu" aria-expanded="false"
+                    title="{{ _('Ayarlar') }}" aria-label="{{ _('Ayarlar') }}"
+                    aria-haspopup="menu" aria-expanded="false"
                     aria-controls="settings-dropdown-menu">
                     <i class="fa-solid fa-gear" aria-hidden="true"></i>
-                    <span>{{ _('Ayarlar') }}</span>
                     <i class="fa-solid fa-chevron-down kasa-dropdown-caret" aria-hidden="true"></i>
                 </button>
                 <div id="settings-dropdown-menu" class="kasa-dropdown-menu" role="menu"
@@ -683,8 +683,8 @@
                             <button type="button" class="accent-preset-lime" data-accent-preset="#84cc16" aria-pressed="false"><span></span>{{ _('Lime') }}</button>
                         </div>
                     </div>
-                    <div class="settings-bg-card p-3 rounded-xl glass-sm">
-                        <h4 class="text-sm font-medium mb-4">{{ _('Arkaplan') }}</h4>
+                    <div class="settings-bg-card p-3 rounded-xl">
+                        <h4 class="text-sm font-medium mb-0">{{ _('Arkaplan') }}</h4>
                         <div class="background-choice-grid" role="group" aria-label="{{ _('Arkaplan seçenekleri') }}">
                             <button type="button" data-background-option="aurora" aria-pressed="false">
                                 <strong>{{ _('Aurora') }}</strong>
@@ -718,15 +718,19 @@
                             <div id="custom-bg-gallery-grid" class="custom-bg-gallery-grid"></div>
                         </div>
                     </div>
-                    <!-- Koyu Tema -->
-                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                    <!-- Tema Modu -->
+                    <div class="settings-select-card settings-theme-card flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>
-                            <h4 id="setting-theme-title" class="text-sm font-medium mb-0.5">{{ _('Koyu Tema') }}</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüzü koyu renklere çevir.') }}</p>
+                            <h4 id="setting-theme-title" class="text-sm font-medium mb-0.5">{{ _('Tema') }}</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Açık, koyu veya sistem temasını kullan.') }}</p>
                         </div>
-                        <div class="settings-switch-control">
-                            <input class="settings-switch-input" type="checkbox" id="theme-toggle" aria-labelledby="setting-theme-title">
-                        </div>
+                        <select name="theme_mode" id="theme-mode-select"
+                            class="kasa-field settings-inline-select" aria-labelledby="setting-theme-title"
+                            data-custom-select>
+                            <option value="light" {% if THEME_MODE == 'light' %}selected{% endif %}>{{ _('Açık') }}</option>
+                            <option value="dark" {% if THEME_MODE == 'dark' %}selected{% endif %}>{{ _('Koyu') }}</option>
+                            <option value="system" {% if THEME_MODE == 'system' %}selected{% endif %}>{{ _('Sistem') }}</option>
+                        </select>
                     </div>
                     <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
                         <div>

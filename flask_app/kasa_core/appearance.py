@@ -23,6 +23,7 @@ from kasa_core.validation import (
     normalize_glass_quality,
     normalize_hex_color,
     normalize_theme,
+    normalize_theme_mode,
     normalize_theme_option,
 )
 
@@ -210,6 +211,24 @@ class AppearanceSettings:
         self.set_setting("theme", theme)
         self.save_file(theme=theme)
         return theme
+
+    def get_theme_mode(self) -> str:
+        try:
+            value = self.get_setting("theme_mode")
+            if value:
+                return normalize_theme_mode(value)
+        except Exception:
+            pass
+        data = self.load_file()
+        if "theme_mode" in data:
+            return normalize_theme_mode(data["theme_mode"])
+        return self.get_saved_theme()
+
+    def save_theme_mode(self, value: object) -> str:
+        mode = normalize_theme_mode(value)
+        self.set_setting("theme_mode", mode)
+        self.save_file(theme_mode=mode)
+        return mode
 
     def save_accent_color(self, value: object) -> str:
         color = normalize_hex_color(value)

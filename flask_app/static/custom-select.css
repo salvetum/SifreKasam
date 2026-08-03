@@ -243,6 +243,13 @@
     font-weight: 700;
 }
 
+.appearance-field > span {
+    color: var(--text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+}
+
 .accent-control-row {
     position: relative;
     display: block;

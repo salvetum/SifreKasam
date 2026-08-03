@@ -32,15 +32,24 @@
             }
         };
 
-        const storedTheme = localStorage.getItem('kasa-theme') || "{{ SAVED_THEME }}";
-        if (storedTheme === 'light') {
+        const savedThemeMode = localStorage.getItem('kasa-theme-mode');
+        const storedThemeMode = ['light', 'dark', 'system'].includes(savedThemeMode)
+            ? savedThemeMode
+            : "{{ THEME_MODE|default('dark') }}";
+        const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const effectiveTheme = storedThemeMode === 'system'
+            ? (systemDarkQuery.matches ? 'dark' : 'light')
+            : (storedThemeMode === 'light' ? 'light' : 'dark');
+        if (effectiveTheme === 'light') {
             document.documentElement.classList.remove('dark');
             document.documentElement.setAttribute('data-bs-theme', 'light');
         } else {
             document.documentElement.classList.add('dark');
             document.documentElement.setAttribute('data-bs-theme', 'dark');
         }
-        localStorage.setItem('kasa-theme', storedTheme === 'light' ? 'light' : 'dark');
+        localStorage.setItem('kasa-theme', effectiveTheme);
+        localStorage.setItem('kasa-theme-mode', storedThemeMode);
+        document.documentElement.setAttribute('data-theme-mode', storedThemeMode);
 
         const storedGlassEffects = localStorage.getItem('kasa-glass-effects') || "{{ 'on' if GLASS_EFFECTS_ENABLED else 'off' }}";
         const normalizedGlassEffects = storedGlassEffects === 'off' ? 'off' : 'on';

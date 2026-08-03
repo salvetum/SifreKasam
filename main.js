@@ -1,6 +1,6 @@
 // ─── IMPORTS ──────────────────────────────────────────────────────────────────
 
-const { app, BrowserWindow, shell, dialog, Tray, Menu } = require('electron');
+const { app, BrowserWindow, shell, dialog, Tray, Menu, nativeTheme } = require('electron');
 const path   = require('path');
 const fs     = require('fs');
 const net    = require('net');
@@ -617,7 +617,8 @@ async function createWindow() {
   setTimeout(showWindow, 1_200);
   await mainWindow.loadFile(resolveLoadingPagePath(), {
     query: {
-      theme:        getSavedTheme(),
+      theme:        resolveEffectiveTheme(),
+      themeMode:    getSavedThemeMode(),
       glassEffects: getSavedGlassEffects() ? 'on' : 'off',
       glassQuality: getSavedGlassQuality(),
       animations:   getSavedInterfaceAnimations() ? 'on' : 'off',
@@ -1254,6 +1255,23 @@ function getSavedTheme() {
   } catch (_) { return 'dark'; }
 }
 
+function getSavedThemeMode() {
+  try {
+    const data = readThemeFile();
+    return ['light', 'dark', 'system'].includes(data?.theme_mode) ? data.theme_mode : 'dark';
+  } catch (_) { return 'dark'; }
+}
+
+function resolveEffectiveTheme() {
+  const mode = getSavedThemeMode();
+  if (mode === 'system') {
+    return process.platform === 'darwin' || process.platform === 'win32'
+      ? nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+      : 'dark';
+  }
+  return mode === 'light' ? 'light' : 'dark';
+}
+
 function getSavedGlassEffects() {
   try {
     const data = readThemeFile();
@@ -1301,7 +1319,7 @@ function getSavedBackgroundStyle() {
 }
 
 function getSavedWindowBackgroundColor() {
-  if (getSavedTheme() === 'light') return '#eef2ff';
+  if (resolveEffectiveTheme() === 'light') return '#eef2ff';
   switch (getSavedBackgroundStyle()) {
     case 'plain':
       return '#080912';

@@ -31,25 +31,48 @@ export function initAppearanceSettings({
   let chromaAccentEnabled = initialChromaAccentEnabled;
   let chromaAccentSpeed = initialChromaAccentSpeed;
 
-  const themeToggleBtn = document.getElementById('theme-toggle');
-  if (themeToggleBtn) {
-    const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
-    if (themeToggleBtn.type === 'checkbox') themeToggleBtn.checked = currentTheme === 'dark';
+  const themeModeSelect = document.getElementById('theme-mode-select');
+  const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const VALID_THEME_MODES = ['light', 'dark', 'system'];
 
-    const applyTheme = (theme) => {
-      document.documentElement.setAttribute('data-bs-theme', theme);
-      document.documentElement.classList.toggle('dark', theme === 'dark');
-      if (themeToggleBtn.type === 'checkbox') themeToggleBtn.checked = theme === 'dark';
-      localStorage.setItem('kasa-theme', theme);
-      apiPost('/settings/theme', { theme });
+  const resolveEffectiveTheme = (mode) => {
+    if (mode === 'system') return systemThemeQuery.matches ? 'dark' : 'light';
+    return mode === 'light' ? 'light' : 'dark';
+  };
+
+  const applyEffectiveTheme = (mode) => {
+    const effective = resolveEffectiveTheme(mode);
+    document.documentElement.setAttribute('data-bs-theme', effective);
+    document.documentElement.classList.toggle('dark', effective === 'dark');
+    localStorage.setItem('kasa-theme', effective);
+    return effective;
+  };
+
+  if (themeModeSelect) {
+    let initialMode = themeModeSelect.value;
+    if (!VALID_THEME_MODES.includes(initialMode)) {
+      initialMode = document.documentElement.getAttribute('data-theme-mode') || 'dark';
+    }
+    themeModeSelect.value = initialMode;
+    themeModeSelect.kasaSyncCustomSelect?.();
+    applyEffectiveTheme(initialMode);
+    localStorage.setItem('kasa-theme-mode', initialMode);
+
+    themeModeSelect.addEventListener('change', () => {
+      const mode = themeModeSelect.value;
+      applyEffectiveTheme(mode);
+      localStorage.setItem('kasa-theme-mode', mode);
+      apiPost('/settings/theme-mode', { theme_mode: mode });
+    });
+
+    const syncSystemTheme = () => {
+      if (themeModeSelect.value === 'system') applyEffectiveTheme('system');
     };
-
-    themeToggleBtn.addEventListener(
-      themeToggleBtn.type === 'checkbox' ? 'change' : 'click',
-      () => applyTheme(
-        document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark'
-      )
-    );
+    if (systemThemeQuery.addEventListener) {
+      systemThemeQuery.addEventListener('change', syncSystemTheme);
+    } else {
+      systemThemeQuery.addListener(syncSystemTheme);
+    }
   }
 
   const glassToggle = document.getElementById('glass-effects-toggle');

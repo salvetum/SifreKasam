@@ -239,6 +239,11 @@
     gap: 1rem;
 }
 
+.settings-theme-card {
+    grid-column: auto;
+    min-width: 0;
+}
+
 .settings-inline-select {
     width: min(260px, 48vw);
     flex: 0 0 auto;

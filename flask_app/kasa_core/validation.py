@@ -7,10 +7,12 @@ from kasa_core.constants import (
     DEFAULT_BACKGROUND_STYLE,
     DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GLASS_QUALITY,
+    DEFAULT_THEME_MODE,
     VALID_BACKGROUND_STYLES,
     VALID_CHROMA_ACCENT_SPEEDS,
     VALID_GLASS_QUALITIES,
     VALID_RECORD_TYPES,
+    VALID_THEME_MODES,
 )
 
 
@@ -39,6 +41,11 @@ def normalize_url(value: object | None) -> str:
 
 def normalize_theme(value: object) -> str:
     return "light" if value == "light" else "dark"
+
+
+def normalize_theme_mode(value: object) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in VALID_THEME_MODES else DEFAULT_THEME_MODE
 
 
 def normalize_glass_effects(value: object) -> bool:

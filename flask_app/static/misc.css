@@ -82,9 +82,9 @@ html[data-kasa-gradient="off"] .filter-empty-state {
 .kasa-dropdown-trigger {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.3rem;
     min-height: 32px;
-    padding: 0.3rem 0.6rem;
+    padding: 0.3rem 0.5rem;
     border: 1px solid var(--glass-border);
     border-radius: 999px;
     color: var(--text-muted);

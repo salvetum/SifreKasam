@@ -32,6 +32,7 @@ EXPECTED_ROUTES = {
     "api_stats": ("/api/stats", {"GET"}),
     "saglik_raporu": ("/saglik", {"GET"}),
     "save_settings": ("/save_settings", {"POST"}),
+    "settings_theme_mode": ("/settings/theme-mode", {"GET", "POST"}),
     "export_data": ("/export", {"GET"}),
     "import_data": ("/import", {"POST"}),
     "bulk_delete": ("/api/bulk/delete", {"POST"}),

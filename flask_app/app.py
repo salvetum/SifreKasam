@@ -190,6 +190,8 @@ get_interface_animations_enabled = _appearance_settings.get_interface_animations
 get_gradients_enabled = _appearance_settings.get_gradients_enabled
 save_glass_effects = _appearance_settings.save_glass_effects
 save_theme = _appearance_settings.save_theme
+get_theme_mode = _appearance_settings.get_theme_mode
+save_theme_mode = _appearance_settings.save_theme_mode
 save_accent_color = _appearance_settings.save_accent_color
 save_background_style = _appearance_settings.save_background_style
 save_chroma_accent_enabled = _appearance_settings.save_chroma_accent_enabled
@@ -515,6 +517,7 @@ def inject_globals():
         if t is not None:
             auto_lock_timeout = int(t)
         theme         = get_saved_theme()
+        theme_mode    = get_theme_mode()
         glass_effects = get_glass_effects_enabled()
         accent_color  = get_saved_accent_color()
         background_style = get_saved_background_style()
@@ -537,6 +540,7 @@ def inject_globals():
         'AUTO_LOCK_ENABLED':     auto_lock_enabled,
         'AUTO_LOCK_TIMEOUT':     auto_lock_timeout,
         'SAVED_THEME':           theme,
+        'THEME_MODE':            theme_mode,
         'GLASS_EFFECTS_ENABLED': glass_effects,
         'ACCENT_COLOR':          accent_color,
         'BACKGROUND_STYLE':      background_style,
@@ -1363,6 +1367,17 @@ def settings_theme():
         db.session.commit()
         return jsonify({"status": "ok", "theme": theme})
     return jsonify({"theme": get_saved_theme()})
+
+@app.route('/settings/theme-mode', methods=['GET', 'POST'])
+@login_required
+def settings_theme_mode():
+    if request.method == 'POST':
+        mode = save_theme_mode(request_json().get('theme_mode'))
+        if mode != 'system':
+            save_theme(mode)
+        db.session.commit()
+        return jsonify({"status": "ok", "theme_mode": mode})
+    return jsonify({"theme_mode": get_theme_mode()})
 
 @app.route('/settings/language', methods=['GET', 'POST'])
 def settings_language():

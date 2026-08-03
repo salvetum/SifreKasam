@@ -211,6 +211,11 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-switch-input:che
     font-size: 0.6rem;
 }
 
+.settings-theme-card .kasa-custom-select {
+    width: min(150px, 34vw);
+    flex: 0 0 auto;
+}
+
 @media (max-width: 620px) {
     .settings-appearance-head {
         grid-template-columns: minmax(0, 1fr) 58px;
