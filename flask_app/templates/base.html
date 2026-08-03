@@ -220,6 +220,16 @@
     <div id="custom-bg-layer" aria-hidden="true"{% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL %} data-bg-url="{{ CUSTOM_BACKGROUND_URL }}"{% endif %}></div>
     <!-- BÖLÜM 5: Frosted Glass grain (Material You) -->
     <div class="glass-grain" aria-hidden="true"></div>
+    <!-- BÖLÜM 6: Liquid Glass — paylaşılan SVG filter tanımları.
+         #kasa-glass-noise: normal kalite cam yüzeylerin buzlu mat dokusu
+         (tek tanım, tüm .glass/.glass-sm ::after katmanları paylaşır). -->
+    <svg class="kasa-svg-filters" width="0" height="0" aria-hidden="true" focusable="false">
+        <filter id="kasa-glass-noise">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2"/>
+            <feColorMatrix type="saturate" values="0"/>
+            <feComponentTransfer><feFuncA type="linear" slope="0.035"/></feComponentTransfer>
+        </filter>
+    </svg>
 
     <div class="page-loading-overlay" role="status" aria-live="polite" aria-hidden="true" aria-label="{{ _('Sayfa yükleniyor') }}">
         <div class="page-loading-card">
@@ -253,6 +263,10 @@
 
     <!-- Our Custom Scripts -->
     <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.10" defer></script>
+    <!-- Liquid Glass refraction (kube.io tekniği, Chromium-only) —
+         yalnızca .settings-modal-content ve .entry-login-card'da,
+         data-glass-quality="high" iken. -->
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=1" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script nonce="{{ csp_nonce }}">

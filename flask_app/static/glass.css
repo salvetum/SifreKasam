@@ -43,10 +43,10 @@ html[data-glass-quality="high"] {
     --glass:          rgba(255,255,255,0.075);
     --glass-border:   rgba(255,255,255,0.15);
     --glass-border-hi:rgba(255,255,255,0.30);
-    --glass-blur:     blur(24px);
-    --glass-blur-sm:  blur(14px);
-    --shadow-panel:   0 22px 58px rgba(0,0,0,0.32);
-    --shadow-modal:   0 30px 78px rgba(0,0,0,0.56);
+    --glass-blur:     blur(28px) saturate(1.4);
+    --glass-blur-sm:  blur(16px) saturate(1.25);
+    --shadow-panel:   0 2px 4px rgba(0,0,0,0.14), 0 10px 20px rgba(0,0,0,0.18), 0 26px 64px rgba(0,0,0,0.34);
+    --shadow-modal:   0 2px 6px rgba(0,0,0,0.16), 0 14px 28px rgba(0,0,0,0.24), 0 34px 88px rgba(0,0,0,0.52);
     --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.092), rgba(255,255,255,0.04));
 }
 
@@ -74,6 +74,7 @@ html[data-kasa-low-power="on"] .glass-sm {
 /* ── GLASS YARDIMCI SINIFLARI ────────────────────────────────── */
 /* Ortak glass özellikleri */
 .glass, .glass-sm {
+    position: relative;
     isolation: isolate;
     background: var(--glass);
     border: var(--border-glass);
@@ -349,4 +350,115 @@ html[data-glass-quality="low"] .glass-grain,
 html[data-kasa-low-power="on"] .glass-grain,
 html[data-glass-effects="off"] .glass-grain {
     display: none !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   BÖLÜM 6 — 3 KADEMELİ CAM ENRICHMENT (SAF CSS)
+   Mevcut token yapısının ÜZERİNE inşa edilir; token'lar yeniden
+   yapılandırılmaz. Yeni katmanlar yalnızca ::before/::after
+   pseudo-elementleriyle eklenir:
+     data-glass-quality="low"    : minimal, YENİ KATMAN YOK
+     data-glass-quality="normal" : buzlu mat cam (grain + tek iç highlight)
+     data-glass-quality="high"   : parlak premium cam (edge highlight +
+                                   specular parlama + satürasyon)
+   data-glass-effects="off", data-kasa-low-power="on" ve quality="low"
+   modlarında hiçbir yeni katman render edilmez.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+    --glass-specular: radial-gradient(circle at 22% 18%, rgba(255,255,255,0.16), transparent 34%);
+    --glass-edge-highlight: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.05) 45%, transparent 70%);
+}
+
+[data-bs-theme="light"] {
+    --glass-specular: radial-gradient(circle at 22% 18%, rgba(255,255,255,0.10), transparent 32%);
+    --glass-edge-highlight: linear-gradient(180deg, rgba(31,41,55,0.10), transparent 50%);
+}
+
+/* base.html / liquid-glass.js tarafından enjekte edilen ortak SVG
+   filter tanımları (grain + refraction). Layout'a hiçbir etkileri yok. */
+.kasa-svg-filters {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Pseudo-element iskeleti: normal/high kademelerinde yüzeyi kaplar,
+   içerikten önce (z-index -1) çizilir. */
+html[data-glass-quality="normal"] .glass::before,
+html[data-glass-quality="normal"] .glass::after,
+html[data-glass-quality="normal"] .glass-sm::before,
+html[data-glass-quality="normal"] .glass-sm::after,
+html[data-glass-quality="high"] .glass::before,
+html[data-glass-quality="high"] .glass::after,
+html[data-glass-quality="high"] .glass-sm::before,
+html[data-glass-quality="high"] .glass-sm::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* ── NORMAL: tek iç highlight (üst kenar) ─────────────────────── */
+html[data-glass-quality="normal"] .glass::before,
+html[data-glass-quality="normal"] .glass-sm::before {
+    box-shadow: inset 0 1px 0 var(--glass-border-hi);
+    background: none;
+}
+
+/* ── NORMAL: buzlu mat doku (paylaşılan SVG feTurbulence grain) ──
+   base.html'deki #kasa-glass-noise filter'ı (fractalNoise + saturate 0
+   + slope 0.035 alpha) tüm .glass/.glass-sm ::after katmanlarınca
+   ORTAKLAŞA kullanılır; her element için ayrı SVG render edilmez.
+   Chromium/Electron'da SVG filter'ları backdrop-filter olarak
+   desteklenir (kube.io tekniği). Ağır kalırsa 64x64 base64 noise PNG
+   arkaplan görseline geçilebilir. */
+html[data-glass-quality="normal"] .glass::after,
+html[data-glass-quality="normal"] .glass-sm::after {
+    backdrop-filter: url(#kasa-glass-noise);
+    -webkit-backdrop-filter: url(#kasa-glass-noise);
+}
+
+/* ── HIGH: üstten ışık yansıması (1px ince edge gradient) ─────── */
+html[data-glass-quality="high"] .glass::before,
+html[data-glass-quality="high"] .glass-sm::before {
+    padding: 1px;
+    background: var(--glass-edge-highlight);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+/* ── HIGH: specular parlama noktası (sol-üst) ─────────────────── */
+html[data-glass-quality="high"] .glass::after,
+html[data-glass-quality="high"] .glass-sm::after {
+    background: var(--glass-specular);
+}
+
+/* ── GÜVENLİK VALFİ: yeni katmanların kesinlikle render edilmediği
+      modlar (düşük kalite, efekt kapalı, güç tasarrufu) ────────── */
+html[data-glass-quality="low"] .glass::before,
+html[data-glass-quality="low"] .glass::after,
+html[data-glass-quality="low"] .glass-sm::before,
+html[data-glass-quality="low"] .glass-sm::after,
+html[data-glass-effects="off"] .glass::before,
+html[data-glass-effects="off"] .glass::after,
+html[data-glass-effects="off"] .glass-sm::before,
+html[data-glass-effects="off"] .glass-sm::after,
+html[data-kasa-low-power="on"] .glass::before,
+html[data-kasa-low-power="on"] .glass::after,
+html[data-kasa-low-power="on"] .glass-sm::before,
+html[data-kasa-low-power="on"] .glass-sm::after {
+    content: none !important;
+}
+
+/* ── LIGHT TEMA: iç highlight beyaz parıltı olur (mavi ton yerine) ─ */
+[data-bs-theme="light"][data-glass-quality="normal"] .glass::before,
+[data-bs-theme="light"][data-glass-quality="normal"] .glass-sm::before {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
 }

@@ -1,4 +1,4 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v71';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v73';
 const ASSETS = [
   '{{ url_for("static", filename="tokens.css") }}',
   '{{ url_for("static", filename="base.css") }}',
@@ -22,6 +22,7 @@ const ASSETS = [
   '{{ url_for("static", filename="sweetalert2.min.css") }}',
   '{{ url_for("static", filename="toastify.min.css") }}',
   '{{ url_for("static", filename="app.js") }}',
+  '{{ url_for("static", filename="liquid-glass.js") }}',
   '{{ url_for("static", filename="password-generator.js") }}',
   '{{ url_for("static", filename="toast.js") }}',
   '{{ url_for("static", filename="reveal-copy.js") }}',
