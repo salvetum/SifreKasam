@@ -187,6 +187,7 @@
                         <!-- Favori Butonu -->
                         <form action="{{ url_for('pin_kayit', kayit_id=kayit.id) }}" method="POST"
                               class="flex-shrink-0 pin-form m-0 p-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="card-star-btn" title="{{ _('Favorile') }}" aria-label="{{ _('Favorile') }}"
                                     aria-pressed="{{ 'true' if kayit.full_data.is_pinned else 'false' }}">
                                 <i class="fa-{{ 'solid' if kayit.full_data.is_pinned else 'regular' }} fa-star card-star-icon{{ ' is-pinned' if kayit.full_data.is_pinned else ' card-star-unpinned' }}"></i>
@@ -267,6 +268,7 @@
                     </a>
                     <form action="{{ url_for('sil_kayit', kayit_id=kayit.id) }}" method="POST"
                           class="inline m-0 p-0 delete-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit" class="footer-action-btn text-red-400 hover:text-red-300">
                             <i class="fa-solid fa-trash-can mr-1 text-xs"></i>{{ _('Sil') }}
                         </button>
@@ -432,6 +434,7 @@
             </div>
             <div class="modal-body p-4">
                 <form id="import-form" action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div class="mb-4">
                         <label for="import-file" class="block text-sm font-medium text-kasa-text-muted mb-2">{{ _('Dosya Seçin') }}</label>
                         <input type="file" class="import-file-input" id="import-file" name="file"
@@ -556,6 +559,7 @@
                 </button>
             </div>
             <form action="{{ url_for('save_settings') }}" method="POST" data-settings-form aria-labelledby="settings-modal-title">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="settings-workspace">
                     <nav class="settings-nav" role="tablist" aria-label="{{ _('Ayar kategorileri') }}">
                         <button type="button" id="settings-tab-appearance" class="settings-nav-btn active" role="tab"
@@ -1275,7 +1279,7 @@ document.getElementById('settings-language-select')?.addEventListener('change', 
     });
     fetch('/settings/language', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' },
         body: JSON.stringify({ language: lang })
     }).then(function (response) {
         if (!response.ok) throw new Error('language-save-failed');
@@ -1316,7 +1320,11 @@ function handlePasswordChangeSubmit(e) {
         title: _('Ana şifre güncelleniyor'),
         subtitle: _('Kayıtlar yeniden şifreleniyor…')
     });
-    fetch('/change-password', { method: 'POST', body: fd })
+    fetch('/change-password', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' },
+        body: fd
+    })
         .then(function (r) {
             if (!r.ok) {
                 return r.json().then(function (d) { throw new Error(d.error || _('Bir hata oluştu.')); });
@@ -1386,7 +1394,10 @@ document.addEventListener('DOMContentLoaded', function () {
         spinner.className = 'fa-solid fa-spinner fa-spin mr-2';
         this.replaceChildren(spinner, document.createTextNode(_('Evet, Kilitle')));
 
-        fetch('{{ url_for("lock") }}', { method: 'POST' })
+        fetch('{{ url_for("lock") }}', {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' }
+        })
             .then(function (response) {
                 if (!response.ok) throw new Error('lock-failed');
                 window.location.href = '{{ url_for("login") }}';

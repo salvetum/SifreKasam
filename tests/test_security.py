@@ -643,5 +643,56 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         self.assertTrue(entries[0]['is_gif'])
 
 
+class CsrfAndPasswordStrengthTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+
+    def _extract_csrf_token(self, html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        self.assertIsNotNone(match)
+        return match.group(1)
+
+    def test_login_page_injects_csrf_token(self) -> None:
+        html = self.client.get('/login').get_data(as_text=True)
+        self.assertIn('name="csrf_token"', html)
+        self.assertIn('window.KASA_CSRF_TOKEN', html)
+
+    def test_login_post_rejects_wrong_csrf_token(self) -> None:
+        self.client.get('/login')
+        response = self.client.post('/login', data={
+            'master_password': 'ignored', 'csrf_token': 'forged-token',
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_login_post_rejects_missing_csrf_token(self) -> None:
+        self.client.get('/login')
+        response = self.client.post('/login', data={'master_password': 'ignored'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_first_setup_rejects_weak_master_password(self) -> None:
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False):
+            token = self._extract_csrf_token(
+                self.client.get('/login').get_data(as_text=True)
+            )
+            response = self.client.post('/login', data={
+                'master_password': '1234567890123456',
+                'csrf_token': token,
+            })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('çok zayıf', response.get_data(as_text=True))
+
+    def test_change_password_rejects_weak_new_password(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+        response = self.client.post('/change-password', data={
+            'old_password': 'whatever',
+            'new_password': '1234567890123456',
+        }, headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('çok zayıf', response.get_json()['error'])
+
+
 if __name__ == "__main__":
     unittest.main()

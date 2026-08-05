@@ -407,5 +407,11 @@
   "Sonraki yıl": "Next year",
   "Tarih seçici": "Date picker",
   "Bugün": "Today",
-  "Temizle": "Clear"
+  "Temizle": "Clear",
+  "Güvenlik doğrulaması başarısız. Lütfen sayfayı yenileyip tekrar deneyin.": "Security verification failed. Please refresh the page and try again.",
+  "Belirlediğiniz ana şifre çok zayıf. En az 12 karakter ve karışık karakter türleri kullanın.": "The master password you chose is too weak. Use at least 12 characters with a mix of character types.",
+  "Yeni ana şifre çok zayıf. En az 12 karakter ve karışık karakter türleri kullanın.": "The new master password is too weak. Use at least 12 characters with a mix of character types.",
+  "En az 12 karakter kullanmalısınız.": "You must use at least 12 characters.",
+  "Bu gereksinimler zorunludur; zayıf şifreler kabul edilmez.": "These requirements are mandatory; weak passwords are not accepted.",
+  "Evet, Aç": "Yes, Enable"
 }

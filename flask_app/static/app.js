@@ -35,11 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const apiFetch = async (path, opts = {}) => {
+    const method = String(opts.method || 'GET').toUpperCase();
+    const headers = { ...opts.headers };
+    if (window.KASA_CSRF_TOKEN && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      headers['X-CSRF-Token'] = window.KASA_CSRF_TOKEN;
+    }
     try {
       const response = await fetch(path, {
         ...opts,
         credentials: 'same-origin',
-        headers: { ...opts.headers },
+        headers,
       });
       await notifyVaultWriteLocked(response);
       return response;
@@ -700,6 +705,41 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const submitButton = settingsForm.querySelector('button[type="submit"]');
+
+      if (lanToggle) {
+        const lanWasEnabled = (() => {
+          try {
+            return JSON.parse(settingsFormSnapshot)
+              .some(([name, value]) => name === 'lan_enabled' && value === '1');
+          } catch (_) { return false; }
+        })();
+        if (lanToggle.checked && !lanWasEnabled) {
+          const confirmation = await Swal.fire({
+            title: window._('LAN Erişimi'),
+            text: window._('LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.'),
+            icon: 'warning',
+            showCancelButton: true,
+            heightAuto: false,
+            scrollbarPadding: false,
+            confirmButtonText: window._('Evet, Aç'),
+            cancelButtonText: window._('Vazgeç'),
+            color: 'var(--text)',
+            buttonsStyling: false,
+            customClass: {
+              popup: 'kasa-swal-popup', title: 'kasa-swal-title',
+              htmlContainer: 'kasa-swal-text', actions: 'kasa-swal-actions',
+              confirmButton: 'kasa-btn kasa-btn-primary',
+              cancelButton: 'kasa-btn kasa-btn-muted'
+            }
+          });
+          if (!confirmation.isConfirmed) {
+            lanToggle.checked = false;
+            lanInfoBox?.classList.add('hidden');
+            return;
+          }
+        }
+      }
+
       setPageLoading(true);
       submitButton?.setAttribute('aria-disabled', 'true');
       if (submitButton) submitButton.disabled = true;

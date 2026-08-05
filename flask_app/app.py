@@ -87,6 +87,7 @@ from kasa_core.paths import (
 )
 from kasa_core.password_strength import (
     analyze_password,
+    password_is_weak as _password_is_weak,
     score_password as _score_password,
 )
 from kasa_core.records import (
@@ -556,6 +557,7 @@ def inject_globals():
         'AVAILABLE_LANGS':       available_langs,
         'TRANSLATIONS':          lang_translations,
         'csp_nonce':             getattr(g, 'csp_nonce', ''),
+        'csrf_token':            getattr(g, 'csrf_token', ''),
         '_':                     _,
     }
 
@@ -703,6 +705,27 @@ def _same_origin_state_change() -> bool:
     parsed = urlparse(origin)
     return parsed.netloc == request.host and parsed.scheme == request.scheme
 
+# ─── CSRF KORUMASI ─────────────────────────────────────────────────────────────
+
+def _get_csrf_token() -> str:
+    """Oturum başına sabit, imzalı çerezde saklanan CSRF belirtecini üretir."""
+    token = session.get('csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['csrf_token'] = token
+    return token
+
+def _csrf_authorized() -> bool:
+    # Ana süreç imzası (X-App-Token) başka bir kaynaktan öğrenilemez; bu istekler
+    # CSRF saldırısına karşı bağışıktır. Belirteç yalnızca ana süreçte üretilir ve
+    # yalnızca ana süreç isteklerine eklenir.
+    if request.headers.get('X-App-Token') == APP_TOKEN:
+        return True
+    if request.endpoint in _TOKEN_ENDPOINTS:
+        return True
+    supplied = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    return bool(supplied) and secrets.compare_digest(str(supplied), _get_csrf_token())
+
 @app.before_request
 def check_token_and_auth():
     # Her yanıt için ayrı nonce kullanarak yalnızca onaylı inline blokları çalıştır.
@@ -712,6 +735,21 @@ def check_token_and_auth():
 
     if not _same_origin_state_change():
         abort(403)
+
+    # Oturum çereziyle kimlik doğrulanan durum değiştiren isteklerde CSRF belirteci zorunludur.
+    # Yerel ana süreç istekleri X-App-Token imzasıyla geldiği için belirteç zaten kabul edilir;
+    # burada CSRF yalnızca herkese açık uçlar ve LAN üzerinden gelen oturum istekleri için kritiktir.
+    if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+        will_proceed = (
+            token == APP_TOKEN
+            or endpoint in _PUBLIC_ENDPOINTS
+            or (not _is_local_request() and current_user.is_authenticated)
+        )
+        if will_proceed and not _csrf_authorized():
+            return jsonify({
+                'error': _('Güvenlik doğrulaması başarısız. Lütfen sayfayı yenileyip tekrar deneyin.'),
+            }), 400
+    g.csrf_token = _get_csrf_token()
 
     # Re-encrypt sürerken eski anahtarla yeni veri yazılmasını engeller.
     if (request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}
@@ -909,6 +947,12 @@ def login():
                 first_setup=False,
             ), 403
         log.info("İlk kurulum: Ana şifre belirleniyor...")
+        if _password_is_weak(mp):
+            return render_template(
+                'login.html',
+                error=_('Belirlediğiniz ana şifre çok zayıf. En az 12 karakter ve karışık karakter türleri kullanın.'),
+                first_setup=True,
+            ), 400
         Setting.query.filter_by(key='master_hash').delete()
         db.session.add(Setting(key='master_hash', value=hash_master_password(mp)))
         _create_pbkdf2_salt()
@@ -1818,6 +1862,8 @@ def change_password():
     new_pw = request.form.get('new_password', '')
     if not old_pw or not new_pw:
         return jsonify({'error': _('Eksik bilgi.')}), 400
+    if _password_is_weak(new_pw):
+        return jsonify({'error': _('Yeni ana şifre çok zayıf. En az 12 karakter ve karışık karakter türleri kullanın.')}), 400
 
     # Lock writes before re-encrypt starts to close the race window.
     with _reencrypt_lock:
@@ -1902,6 +1948,31 @@ def _ensure_self_signed_cert():
     ensure_self_signed_cert(CERT_FILE, KEY_FILE, log)
 
 _ensure_self_signed_cert()
+
+# Normalize double-encoded PEM files (some installers produced a PEM that base64-encodes
+# a PEM block, which breaks Python's SSL PEM parser). If detected, fix in-place.
+def _normalize_pem_files():
+    try:
+        if os.path.exists(CERT_FILE):
+            with open(CERT_FILE, 'rb') as f:
+                data = f.read()
+            # If cert file contains a base64 blob which decodes to a PEM, replace it.
+            import re, base64
+            m = re.search(b'-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----', data, re.S)
+            if m:
+                inner = m.group(1).strip()
+                try:
+                    dec = base64.b64decode(inner)
+                    if b'-----BEGIN CERTIFICATE-----' in dec:
+                        with open(CERT_FILE, 'wb') as f:
+                            f.write(dec)
+                        log.info('Double-encoded PEM detected and normalized for %s', CERT_FILE)
+                except Exception:
+                    pass
+    except Exception:
+        log.debug('PEM normalization failed', exc_info=True)
+
+_normalize_pem_files()
 
 # ─── BAŞLATMA ─────────────────────────────────────────────────────────────────
 

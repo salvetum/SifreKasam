@@ -8,6 +8,7 @@
         window.LANG = {{ CURRENT_LANG|tojson }};
         window.TRANSLATIONS = {{ TRANSLATIONS|tojson }};
         window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson }};
+        window.KASA_CSRF_TOKEN = {{ csrf_token|tojson }};
         window._ = function (key) {
             return window.TRANSLATIONS[key] || key;
         };
@@ -264,9 +265,10 @@
     <!-- Our Custom Scripts -->
     <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.10" defer></script>
     <!-- Liquid Glass refraction (kube.io tekniği, Chromium-only) —
-         yalnızca .settings-modal-content ve .entry-login-card'da,
-         data-glass-quality="high" iken. -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=1" defer></script>
+         tüm .glass / .glass-sm yüzeylerde, data-glass-quality="high"
+         iken; özel yüzeyler (.settings-modal-content, .entry-login-card)
+         sabit parametre alır, diğerleri boyuta göre kademeli. -->
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=2" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script nonce="{{ csp_nonce }}">
@@ -288,7 +290,10 @@
         function lockVaultAndRedirect() {
             if (automaticLockPending) return;
             automaticLockPending = true;
-            fetch('{{ url_for("lock") }}', { method: 'POST' })
+            fetch('{{ url_for("lock") }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' }
+            })
                 .then(function (response) {
                     if (!response.ok) throw new Error('lock-failed');
                     window.location.replace('{{ url_for("login") }}');
@@ -322,7 +327,10 @@
                     if (typeof lockVaultAndRedirect === 'function') {
                         lockVaultAndRedirect();
                     } else {
-                        fetch('{{ url_for("lock") }}', { method: 'POST' })
+                        fetch('{{ url_for("lock") }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' }
+                        })
                             .then(function (response) {
                                 if (!response.ok) throw new Error('lock-failed');
                                 window.location.replace('{{ url_for("login") }}');

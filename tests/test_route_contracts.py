@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_DIR = Path(tempfile.mkdtemp(prefix="sifrekasam-route-tests-"))
-os.environ.setdefault("APPDATA", str(RUNTIME_DIR))
-os.environ.setdefault("XDG_CONFIG_HOME", str(RUNTIME_DIR))
+os.environ["APPDATA"] = str(RUNTIME_DIR)
+os.environ["XDG_CONFIG_HOME"] = str(RUNTIME_DIR)
 sys.path.insert(0, str(ROOT / "flask_app"))
 
 import app as app_module  # noqa: E402

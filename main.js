@@ -434,17 +434,132 @@ if (!gotTheLock) {
   });
 
   // Self-signed SSL sertifikasını kabul et
+  // Not: birden fazla kaynak için aynı sertifika hatası tekrar tekrar gelebilir. Bu yüzden
+  // - aynı sertifikayı geçici olarak güvenmek için fingerprint önbelleği tutuyoruz,
+  // - uygulamanın kendi ürettiği self-signed sertifikayı tanıyınca otomatik kabul ediyoruz,
+  // - yalnızca beklenmeyen sertifikalar için kullanıcıya prompt gösteriyoruz.
+  const _temporaryTrustedFingerprints = new Set();
+  function _fpHex(buf) {
+    try { return crypto.createHash('sha256').update(buf).digest('hex'); } catch (_) { return null; }
+  }
+
+  function _isExpectedLocalCertificate(certBuffer) {
+    if (!certBuffer) return false;
+    try {
+      const pemOrBuffer = Buffer.isBuffer(certBuffer) ? certBuffer : Buffer.from(String(certBuffer));
+      const cert = new crypto.X509Certificate(pemOrBuffer);
+      const subject = cert.subject || '';
+      const issuer = cert.issuer || '';
+      const san = cert.subjectAltName || '';
+      const matchesAppName = subject.includes('CN=ŞifreKasam') || subject.includes('CN=SifreKasam');
+      const isSelfSigned = subject === issuer;
+      const hasLocalHosts = san.includes('DNS:localhost') || san.includes('IP Address:127.0.0.1') || san.includes('IP Address:::1');
+      return Boolean(matchesAppName && isSelfSigned && hasLocalHosts);
+    } catch (_) {
+      return false;
+    }
+  }
+
   app.on('certificate-error', (event, _webContents, url, _error, _certificate, callback) => {
-    if (url.startsWith(`https://${HOST}:`)) {
-      event.preventDefault();
+    if (!url.startsWith(`https://${HOST}:`)) {
+      callback(false);
+      return;
+    }
+
+    event.preventDefault();
+    try { loadPinnedCertificate(); } catch (_) {}
+    const presented = _certificate && _certificate.data ? Buffer.from(_certificate.data) : null;
+    const presentedFp = presented ? _fpHex(presented) : null;
+
+    // Aynı sertifikayı daha önce geçici olarak kabul ettiysek direkt kabul et
+    if (presentedFp && _temporaryTrustedFingerprints.has(presentedFp)) {
+      callback(true);
+      return;
+    }
+
+    // Pinned sertifika ile tam eşleşiyorsa kabul et
+    if (pinnedCertificateDer && presented
+        && presented.length === pinnedCertificateDer.length
+        && presented.equals(pinnedCertificateDer)) {
       if (!hasReportedLocalCertificateNoise) {
         hasReportedLocalCertificateNoise = true;
-        console.warn('Yerel self-signed SSL sertifikası kabul edildi; tekrar eden Chromium sertifika logları susturuldu.');
+        console.warn('Yerel self-signed SSL sertifikasi kabul edildi; tekrar eden Chromium sertifika loglari susturuldu.');
       }
       callback(true);
-    } else {
-      callback(false);
+      return;
     }
+
+    // Uygulamanın ürettiği expected local self-signed sertifika ise otomatik kabul et
+    if (_isExpectedLocalCertificate(presented)) {
+      if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
+      console.warn('Beklenen yerel self-signed sertifika otomatik olarak kabul edildi.');
+      callback(true);
+      return;
+    }
+
+    // Sunulan sertifikayı PEM formatına dönüştür (kullanıcıya göstermek ve kaydetmek için)
+    let presentedPem = null;
+    if (presented) {
+      const asUtf = presented.toString('utf8');
+      if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
+        presentedPem = asUtf;
+      } else {
+        const certBase64 = presented.toString('base64');
+        const chunks = certBase64.match(/.{1,64}/g) || [certBase64];
+        presentedPem = `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n`;
+      }
+    }
+
+    const message = pinnedCertificateDer
+      ? 'Sunulan yerel SSL sertifikası beklenenle eşleşmiyor.'
+      : 'Yerel SSL sertifikası bulunamadı.';
+    const detail = 'Bu uygulamanın arka plan hizmeti self-signed bir sertifika kullanıyor. Sertifikayı kabul etmek güvenli olabilir ancak yalnızca cihazınızda çalıştığınıza emin olun. İsterseniz sertifikayı kalıcı olarak kaydedebilirsiniz (daha sonra otomatik olarak doğrulanır), yalnızca bu oturum için geçici olarak kabul edebilir veya bağlantıyı reddedebilirsiniz.';
+    const buttons = presentedPem ? ['Güven ve Kaydet', 'Geçici Güven', 'Reddet'] : ['Geçici Güven', 'Reddet'];
+
+    dialog.showMessageBox({
+      type: 'warning',
+      title: 'ŞifreKasam - Sertifika Doğrulama',
+      message,
+      detail,
+      buttons,
+      defaultId: 0,
+      noLink: true,
+    }).then(({ response }) => {
+      // 0 = Güven ve Kaydet, 1 = Geçici Güven, 2 = Reddet
+      if (presentedPem && response === 0) {
+        try {
+          const dataDir = getDataDir();
+          const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
+          if (certPath) {
+            try { fs.mkdirSync(path.dirname(certPath), { recursive: true }); } catch (_) {}
+            fs.writeFileSync(certPath, presentedPem, { encoding: 'utf8' });
+            pinnedCertificatePem = fs.readFileSync(certPath);
+            try { pinnedCertificateDer = Buffer.from(new crypto.X509Certificate(pinnedCertificatePem).raw); } catch (_) { pinnedCertificateDer = presented; }
+            console.warn('Yerel sertifika kaydedildi ve pin güncellendi.');
+            callback(true);
+            return;
+          }
+        } catch (err) {
+          console.warn('Sertifika kaydedilemedi, geçici güven veriliyor:', err.message);
+          if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
+          callback(true);
+          return;
+        }
+      }
+
+      const tempTrustIndex = presentedPem ? 1 : 0;
+      if (response === tempTrustIndex) {
+        if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
+        console.warn('Kullanıcı sertifikayı geçici olarak kabul etti. (kaydedilmedi)');
+        callback(true);
+        return;
+      }
+
+      callback(false);
+    }).catch((err) => {
+      console.warn('Sertifika onay diyaloğu açılamadı, bağlantı reddediliyor:', err.message);
+      callback(false);
+    });
   });
 
   app.whenReady()
@@ -452,6 +567,42 @@ if (!gotTheLock) {
     .catch((err) => {
       showFriendlyFatalError('BAS', err);
     });
+}
+
+// ─── YEREL SERTİFİKA SABİTLEME ───────────────────────────────────────────────
+
+let pinnedCertificatePem = null;
+let pinnedCertificateDer = null;
+let warnedPinnedCertificateUnavailable = false;
+
+function loadPinnedCertificate() {
+  if (pinnedCertificatePem !== null) return true;
+  try {
+    const dataDir = getDataDir();
+    const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
+    if (certPath && fs.existsSync(certPath)) {
+      pinnedCertificatePem = fs.readFileSync(certPath);
+      pinnedCertificateDer = Buffer.from(new crypto.X509Certificate(pinnedCertificatePem).raw);
+      return true;
+    }
+  } catch (error) {
+    if (!warnedPinnedCertificateUnavailable) {
+      warnedPinnedCertificateUnavailable = true;
+      console.warn('Yerel SSL sertifikasi okunamadi:', error.message);
+    }
+  }
+  if (!warnedPinnedCertificateUnavailable) {
+    warnedPinnedCertificateUnavailable = true;
+    console.warn('Yerel SSL sertifikasi bulunamadi; ana istekler sertifika dogrulamasi olmadan yapilacak.');
+  }
+  return false;
+}
+
+function getPinnedHttpsOptions() {
+  if (loadPinnedCertificate()) {
+    return { rejectUnauthorized: true, ca: pinnedCertificatePem };
+  }
+  return { rejectUnauthorized: false };
 }
 
 // ─── UYGULAMA HAZIR ───────────────────────────────────────────────────────────
@@ -851,7 +1002,7 @@ function checkMinimizeToTray() {
     const req = https.request(
       { hostname: HOST, port: PORT, path: '/settings/tray',
         method: 'GET', headers: { 'X-App-Token': APP_TOKEN }, timeout: 1000,
-        rejectUnauthorized: false },
+        ...getPinnedHttpsOptions() },
       (res) => {
         let data = '';
         res.on('data', (chunk) => { data += chunk; });
@@ -959,7 +1110,7 @@ function requestBackendJson(pathname, { method = 'GET', body = null, timeout = 1
         path: pathname,
         method,
         timeout,
-        rejectUnauthorized: false,
+        ...getPinnedHttpsOptions(),
         headers: {
           'X-App-Token': APP_TOKEN,
           ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
@@ -1010,7 +1161,11 @@ async function restartFlaskServer(nextLanEnabled) {
     }
     await stopFlaskServer();
     lanRuntimeEnabled = nextLanEnabled;
-    await startFlaskServer();
+    await startFlaskServer(60000); // LAN restart için uzun timeout
+    // Flask başarıyla restart olduktan sonra, sayfayı yeniden yükle
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      await loadBackendPage('/login?entry=loading');
+    }
   } catch (err) {
     dialog.showErrorBox('Ağ Ayarı Uygulanamadı', err.message);
   } finally {
@@ -1100,7 +1255,7 @@ function waitForBackendReady(resolve, reject, timeoutMs) {
       path: '/heartbeat',
       method: 'POST',
       timeout: BACKEND_PROBE_TIMEOUT_MS,
-      rejectUnauthorized: false,
+      ...getPinnedHttpsOptions(),
       headers: { 'X-App-Token': APP_TOKEN },
     }, (response) => {
       response.resume();
@@ -1164,7 +1319,7 @@ function shutdownFlask() {
   const req = https.request({
     hostname: HOST, port: PORT, path: '/shutdown',
     method: 'POST', headers: { 'X-App-Token': APP_TOKEN },
-    rejectUnauthorized: false,
+    ...getPinnedHttpsOptions(),
   });
   req.on('error', () => {});
   req.end();

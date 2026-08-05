@@ -56,4 +56,20 @@ def ensure_self_signed_cert(
                 serialization.NoEncryption(),
             )
         )
+    _restrict_private_permissions(cert_file, key_file, logger)
     logger.info("Self-signed SSL sertifikasi olusturuldu")
+
+
+def _restrict_private_permissions(
+    cert_file: str,
+    key_file: str,
+    logger: logging.Logger,
+) -> None:
+    """Özel anahtar dizinini ve dosyalarını yalnızca kullanıcıya görünür yapar."""
+    try:
+        os.chmod(os.path.dirname(cert_file), 0o700)
+        os.chmod(cert_file, 0o600)
+        os.chmod(key_file, 0o600)
+    except OSError:
+        # Windows'ta chmod sınırlıdır; en iyi çaba modu olarak sessizce geç.
+        logger.debug("SSL dosya izinleri ayarlanamadi", exc_info=True)

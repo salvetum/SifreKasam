@@ -9,6 +9,7 @@
     <title>SifreKasam</title>
     <style nonce="{{ csp_nonce }}" id="loading-runtime-styles"></style>
     <script nonce="{{ csp_nonce }}">
+        const KASA_CSRF_TOKEN = {{ csrf_token|tojson }};
         const copy = {
             tr: {
                 language: 'Dil',
@@ -88,7 +89,7 @@
             document.querySelector('.loading-language-trigger')?.setAttribute('aria-expanded', 'false');
             fetch('/settings/language', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': KASA_CSRF_TOKEN || '' },
                 body: JSON.stringify({ language }),
             }).catch(() => {});
         }
@@ -826,8 +827,8 @@
             </section>
         </main>
     </div>
-    <!-- Liquid Glass refraction (kube.io tekniği) — .entry-login-card'da,
-         data-glass-quality="high" iken. -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=1" defer></script>
+    <!-- Liquid Glass refraction (kube.io tekniği) — tüm .glass/.glass-sm
+         yüzeylerde, data-glass-quality="high" iken. -->
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=2" defer></script>
 </body>
 </html>

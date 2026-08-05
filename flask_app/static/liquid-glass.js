@@ -4,11 +4,16 @@
    Chromium/Electron'a özel: SVG filter'ları backdrop-filter olarak
    kullanılır (CSS spec'te yok, yalnızca Chromium destekler).
 
-   SINIRLI KAPSAM: yalnızca 2 büyük/öne çıkan yüzeyde gerçek kırılma:
-     .settings-modal-content  →  #kasa-liquid-settings
-     .entry-login-card        →  #kasa-liquid-login
-   Diğer tüm .glass/.glass-sm yüzeylerde yalnızca KATMAN 1 (ucuz)
-   çalışır; bu script onlara dokunmaz.
+   KAPSAM: iki özel yüzeyde sabit parametreler, diğer tüm
+   .glass / .glass-sm yüzeylerde boyut-tabanlı kademeli kırılma:
+     .settings-modal-content  →  #kasa-liquid-settings  (blur 22)
+     .entry-login-card        →  #kasa-liquid-login     (blur 13)
+     .glass / .glass-sm       →  boyuta göre tier:
+         büyük yüzeyler (≥150000 px²) : blur 20, saturate 1.4
+         orta yüzeyler   (≥40000 px²)  : blur 14, saturate 1.3
+         küçük yüzeyler               : blur  9, saturate 1.25
+   Aynı boyut + aynı parametrelere sahip yüzeyler TEK SVG filter'ı
+   paylaşır (filter sayısı sınırlı kalır).
 
    Yöntem:
      1. "Lip bezel" yüzey profili (kenarda dışbükey, ortada hafif
@@ -19,6 +24,9 @@
      4. Elemente inline backdrop-filter: url(#filter) uygulanır.
         (modals.css'in !important blur'undan kurtulmak için
          style.setProperty(..., 'important').)
+
+   Tek yüzeyi devre dışı bırakmak için o elemente
+   data-kasa-refraction="off" ekleyin.
 
    data-glass-quality ≠ high, data-glass-effects="off" veya
    data-kasa-low-power="on" → hiçbir katman uygulanmaz, blur CSS'e
@@ -32,9 +40,9 @@
   var svgRoot = null;
   var mapCache = {};
 
-  var TARGETS = [
-    { selector: '.settings-modal-content', filterId: 'kasa-liquid-settings', blur: 22, saturate: 1.4 },
-    { selector: '.entry-login-card', filterId: 'kasa-liquid-login', blur: 13, saturate: 1.3 }
+  var SPECIAL = [
+    { selector: '.settings-modal-content', id: 'kasa-liquid-settings', blur: 22, saturate: 1.4 },
+    { selector: '.entry-login-card', id: 'kasa-liquid-login', blur: 13, saturate: 1.3 }
   ];
 
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
@@ -58,13 +66,27 @@
            el.getAttribute('data-kasa-low-power') !== 'on';
   }
 
-  function elementVisible(el) {
-    if (!el || !el.isConnected) return false;
+  /* Görünür ve uygulanabilir yüzeyler için rect döner; görünmez/
+     çok küçük/kapalı modal içindeki yüzeyler için null. */
+  function visibleRect(el) {
+    if (!el || !el.isConnected) return null;
+    if (el.getAttribute && el.getAttribute('data-kasa-refraction') === 'off') return null;
     var rect = el.getBoundingClientRect();
-    if (rect.width < 40 || rect.height < 40) return false;
+    if (rect.width < 40 || rect.height < 40) return null;
     var modal = el.closest('.kasa-modal');
-    if (modal && !modal.classList.contains('is-visible')) return false;
-    return true;
+    if (modal && !modal.classList.contains('is-visible')) return null;
+    return rect;
+  }
+
+  function tierParams(rect) {
+    var area = rect.width * rect.height;
+    if (area >= 150000) return { blur: 20, saturate: 1.4 };
+    if (area >= 40000) return { blur: 14, saturate: 1.3 };
+    return { blur: 9, saturate: 1.25 };
+  }
+
+  function makeFilterId(blur, saturate, w, h) {
+    return 'kasa-liquid-' + blur + '-' + saturate + '-' + w + 'x' + h;
   }
 
   /* Rounded-rect panel için displacement map üretir.
@@ -166,14 +188,19 @@
     return svgRoot;
   }
 
-  function buildRefractionFilter(target, w, h, map) {
+  function buildRefractionFilter(filterId, w, h, map, blur, saturate) {
     var root = ensureSvgRoot();
-    var existing = root.querySelector('#' + target.filterId);
-    if (existing) existing.parentNode.removeChild(existing);
+    var existing = root.querySelector('#' + filterId);
+    var paramsSig = w + 'x' + h + '|' + map.url + '|' + blur + '|' + saturate;
+    if (existing) {
+      if (existing.getAttribute('data-kasa-params') === paramsSig) return;
+      existing.parentNode.removeChild(existing);
+    }
 
     var defs = document.createElementNS(SVG_NS, 'defs');
     var filter = document.createElementNS(SVG_NS, 'filter');
-    filter.setAttribute('id', target.filterId);
+    filter.setAttribute('id', filterId);
+    filter.setAttribute('data-kasa-params', paramsSig);
     filter.setAttribute('filterUnits', 'userSpaceOnUse');
     filter.setAttribute('x', '0');
     filter.setAttribute('y', '0');
@@ -192,13 +219,13 @@
 
     var blurF = document.createElementNS(SVG_NS, 'feGaussianBlur');
     blurF.setAttribute('in', 'SourceGraphic');
-    blurF.setAttribute('stdDeviation', String(target.blur));
+    blurF.setAttribute('stdDeviation', String(blur));
     blurF.setAttribute('result', 'blurred');
 
     var sat = document.createElementNS(SVG_NS, 'feColorMatrix');
     sat.setAttribute('in', 'blurred');
     sat.setAttribute('type', 'saturate');
-    sat.setAttribute('values', String(target.saturate));
+    sat.setAttribute('values', String(saturate));
     sat.setAttribute('result', 'saturated');
 
     var disp = document.createElementNS(SVG_NS, 'feDisplacementMap');
@@ -216,39 +243,67 @@
     root.appendChild(defs);
   }
 
-  function removeFilter(target) {
-    if (!svgRoot || !svgRoot.isConnected) return;
-    var f = svgRoot.querySelector('#' + target.filterId);
-    if (f) f.parentNode.removeChild(f);
-  }
-
-  function applyTo(el, target) {
-    if (!el) return;
-    if (!refractionEnabled() || !elementVisible(el)) {
-      clearFrom(el);
-      removeFilter(target);
-      return;
-    }
-    var rect = el.getBoundingClientRect();
-    var w = Math.max(2, Math.round(rect.width));
-    var h = Math.max(2, Math.round(rect.height));
-    var map = generateDisplacementMap(w, h);
-    buildRefractionFilter(target, w, h, map);
-    /* modals.css'in !important blur'unu ezmek için inline important. */
-    el.style.setProperty('backdrop-filter', 'url(#' + target.filterId + ')', 'important');
-    el.style.setProperty('-webkit-backdrop-filter', 'url(#' + target.filterId + ')', 'important');
-  }
-
   function clearFrom(el) {
     if (!el) return;
     el.style.removeProperty('backdrop-filter');
     el.style.removeProperty('-webkit-backdrop-filter');
   }
 
-  function refreshAll() {
-    for (var i = 0; i < TARGETS.length; i++) {
-      applyTo(document.querySelector(TARGETS[i].selector), TARGETS[i]);
+  function applyTo(el, spec, enabled, keepIds) {
+    if (!enabled) {
+      clearFrom(el);
+      return;
     }
+    var rect = visibleRect(el);
+    if (!rect) {
+      clearFrom(el);
+      return;
+    }
+    var w = Math.max(2, Math.round(rect.width));
+    var h = Math.max(2, Math.round(rect.height));
+    var map = generateDisplacementMap(w, h);
+    var params = spec.params || tierParams(rect);
+    var filterId = spec.id || makeFilterId(params.blur, params.saturate, w, h);
+    buildRefractionFilter(filterId, w, h, map, params.blur, params.saturate);
+    keepIds[filterId] = true;
+    /* CSS blur'unu ezmek için inline important. */
+    el.style.setProperty('backdrop-filter', 'url(#' + filterId + ')', 'important');
+    el.style.setProperty('-webkit-backdrop-filter', 'url(#' + filterId + ')', 'important');
+  }
+
+  function pruneFilters(keepIds) {
+    if (!svgRoot || !svgRoot.isConnected) return;
+    var filters = svgRoot.querySelectorAll('filter[id^="kasa-liquid"]');
+    for (var i = 0; i < filters.length; i++) {
+      var f = filters[i];
+      if (!keepIds[f.id]) f.parentNode.removeChild(f);
+    }
+  }
+
+  function refreshAll() {
+    var enabled = refractionEnabled();
+    var keepIds = {};
+    var seen = new Set();
+    var i;
+
+    /* Özel yüzeyler: sabit parametreler. */
+    for (i = 0; i < SPECIAL.length; i++) {
+      var el = document.querySelector(SPECIAL[i].selector);
+      if (!el) continue;
+      seen.add(el);
+      applyTo(el, { id: SPECIAL[i].id, params: { blur: SPECIAL[i].blur, saturate: SPECIAL[i].saturate } }, enabled, keepIds);
+    }
+
+    /* Tüm diğer .glass / .glass-sm yüzeyler: boyut-tabanlı tier. */
+    var nodes = document.querySelectorAll('.glass, .glass-sm');
+    for (i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (seen.has(node)) continue;
+      seen.add(node);
+      applyTo(node, { params: null }, enabled, keepIds);
+    }
+
+    pruneFilters(keepIds);
   }
 
   function init() {
@@ -266,6 +321,16 @@
         attributeFilter: ['class']
       });
     }
+
+    /* Dinamik eklenen/çıkan cam yüzeyler için (debounced). */
+    var domTimer = null;
+    new MutationObserver(function () {
+      if (domTimer) return;
+      domTimer = setTimeout(function () {
+        domTimer = null;
+        refreshAll();
+      }, 120);
+    }).observe(document.body, { childList: true, subtree: true });
 
     var resizeTimer = null;
     window.addEventListener('resize', function () {

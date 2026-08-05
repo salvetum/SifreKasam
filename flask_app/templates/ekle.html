@@ -18,6 +18,7 @@
     </header>
 
     <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form aria-labelledby="vault-form-title">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <section class="vault-form-panel vault-form-main" aria-labelledby="vault-section-basic">
             <div class="vault-section-head">
                 <span><i class="fa-solid fa-layer-group"></i></span>

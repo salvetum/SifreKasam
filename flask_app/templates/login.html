@@ -587,11 +587,11 @@
                         <i class="fa-solid fa-shield-halved"></i>{{ _('İlk Kurulum') }}
                     </strong>
                     <ul>
-                        <li>{{ _('En az 12 karakter kullanmanız tavsiye edilir.') }}</li>
+                        <li>{{ _('En az 12 karakter kullanmalısınız.') }}</li>
                         <li>{{ _('Büyük ve küçük harf, sayı ve özel karakterleri birlikte kullanın.') }}</li>
                     </ul>
                     <p class="entry-first-setup-optional">
-                        {{ _('Bu öneriler zorunlu değildir; ancak uzun ve benzersiz bir şifre kasanızı daha iyi korur.') }}
+                        {{ _('Bu gereksinimler zorunludur; zayıf şifreler kabul edilmez.') }}
                     </p>
                     <p class="entry-first-setup-warning">
                         <i class="fa-solid fa-triangle-exclamation"></i>
@@ -601,6 +601,7 @@
                 {% endif %}
 
                 <form method="POST" class="space-y-4" data-loading-form>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <label class="sr-only" for="master-password">{{ _('Ana Şifre') }}</label>
                     <input type="password" name="master_password" id="master-password"
                         class="w-full px-4 py-3 text-center text-lg tracking-widest kasa-field"
@@ -624,7 +625,7 @@ document.getElementById('login-language-select')?.addEventListener('change', fun
     localStorage.setItem('kasa-lang', lang);
     fetch('/settings/language', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' },
         body: JSON.stringify({ language: lang })
     }).then(function () {
         window.location.href = '{{ url_for("login") }}';
