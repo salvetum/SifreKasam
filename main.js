@@ -416,7 +416,9 @@ let backendPageRecoveryAttempts = 0;
 
 app.commandLine.appendSwitch('disable-spell-checking');
 app.commandLine.appendSwitch('log-level', '3');
-if (safeModeRequested) app.disableHardwareAcceleration();
+if (safeModeRequested || !getSavedHardwareAcceleration()) {
+  app.disableHardwareAcceleration();
+}
 
 // ─── TEK ÖRNEK KİLİDİ ────────────────────────────────────────────────────────
 
@@ -1433,6 +1435,13 @@ function getSavedGlassEffects() {
   try {
     const data = readThemeFile();
     return !GLASS_EFFECTS_FALSY.has(String(data?.glass_effects_enabled).toLowerCase());
+  } catch (_) { return true; }
+}
+
+function getSavedHardwareAcceleration() {
+  try {
+    const data = readThemeFile();
+    return !GLASS_EFFECTS_FALSY.has(String(data?.hardware_acceleration_enabled).toLowerCase());
   } catch (_) { return true; }
 }
 

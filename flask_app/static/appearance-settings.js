@@ -122,6 +122,7 @@ export function initAppearanceSettings({
   const motionToggle = document.getElementById('animated-backgrounds-toggle');
   const interfaceAnimationsToggle = document.getElementById('interface-animations-toggle');
   const gradientsToggle = document.getElementById('gradients-toggle');
+  const hardwareAccelerationToggle = document.getElementById('hardware-acceleration-toggle');
 
   const setupThemeFeatureToggle = (toggle, attribute, storageKey, apiKey) => {
     if (!toggle) return;
@@ -150,6 +151,20 @@ export function initAppearanceSettings({
     'kasa-gradients',
     'gradients_enabled'
   );
+
+  if (hardwareAccelerationToggle) {
+    hardwareAccelerationToggle.addEventListener('change', () => {
+      const enabled = hardwareAccelerationToggle.checked;
+      apiPost('/settings/hardware-acceleration', {
+        hardware_acceleration_enabled: enabled,
+      });
+      const message = enabled
+        ? window._('Donanım hızlandırma açıldı. Değişiklik yeniden başlatmada uygulanır.')
+        : window._('Donanım hızlandırma kapatıldı. Görsel ve performans sorunları yaşayabilirsiniz. Değişiklik yeniden başlatmada uygulanır.');
+      if (enabled) showSuccessToast(message);
+      else showWarningToast(message);
+    });
+  }
 
   const accentInput = document.getElementById('accent-color-input');
   const accentTextInput = document.getElementById('accent-color-text');
@@ -581,15 +596,26 @@ export function initAppearanceSettings({
         img.loading = 'lazy';
         wrap.appendChild(img);
 
-        const metaText = [
-          item.width && item.height ? item.width + 'x' + item.height : '',
+        const fileTypeLabel = (mime) => {
+          const map = {
+            'image/jpeg': 'JPEG',
+            'image/png': 'PNG',
+            'image/webp': 'WebP',
+            'image/gif': 'GIF',
+          };
+          return map[mime] || (mime ? String(mime).split('/').pop().toUpperCase() : '');
+        };
+
+        const tooltipText = [
+          fileTypeLabel(item.mime),
           formatBytes(item.size),
+          item.width && item.height ? item.width + '×' + item.height : '',
         ].filter(Boolean).join(' · ');
-        if (metaText) {
-          const meta = document.createElement('span');
-          meta.className = 'custom-bg-thumb-meta';
-          meta.textContent = metaText;
-          wrap.appendChild(meta);
+        if (tooltipText) {
+          const tooltip = document.createElement('span');
+          tooltip.className = 'custom-bg-thumb-tooltip';
+          tooltip.textContent = tooltipText;
+          wrap.appendChild(tooltip);
         }
 
         if (item.is_active) {
@@ -690,13 +716,14 @@ export function initAppearanceSettings({
           width: entry.width,
           height: entry.height,
           size: entry.size,
+          mime: entry.mime,
         }));
       });
     };
 
     if (customBgGalleryClear) {
       customBgGalleryClear.addEventListener('click', async () => {
-        const resp = await apiFetch('/api/background', { method: 'DELETE' });
+        const resp = await apiFetch('/api/background/all', { method: 'DELETE' });
         if (!resp?.ok) {
           showWarningToast(window._('Silme işlemi başarısız oldu.'));
           return;
@@ -740,6 +767,7 @@ export function initAppearanceSettings({
     motionToggle,
     interfaceAnimationsToggle,
     gradientsToggle,
+    hardwareAccelerationToggle,
     updateAppearance,
   };
 

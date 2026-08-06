@@ -199,28 +199,39 @@ html[data-kasa-background="custom"] #settingsModal h4 {
     pointer-events: none;
 }
 
-.custom-bg-thumb-meta {
+.custom-bg-thumb-tooltip {
     position: absolute;
+    left: 4px;
     right: 4px;
     bottom: 4px;
-    max-width: calc(100% - 8px);
-    padding: 1px 6px;
-    border-radius: 999px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.58rem;
+    z-index: 5;
+    padding: 2px 8px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.6rem;
     font-weight: 600;
-    line-height: 1.4;
+    line-height: 1.5;
     color: rgba(255, 255, 255, 0.95);
-    background: rgba(8, 9, 18, 0.62);
+    background: rgba(8, 9, 18, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     pointer-events: none;
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity var(--speed) ease, transform var(--speed) ease;
 }
 
-.custom-bg-thumb.is-active .custom-bg-thumb-meta {
-    right: auto;
-    left: 4px;
-    bottom: 16px;
+.custom-bg-thumb:hover .custom-bg-thumb-tooltip,
+.custom-bg-thumb:focus-visible .custom-bg-thumb-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.custom-bg-thumb:hover .custom-bg-thumb-badge,
+.custom-bg-thumb:focus-visible .custom-bg-thumb-badge {
+    display: none;
 }
 
 .custom-bg-thumb-del {

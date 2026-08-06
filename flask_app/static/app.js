@@ -454,6 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
     motionToggle,
     interfaceAnimationsToggle,
     gradientsToggle,
+    hardwareAccelerationToggle,
     updateAppearance,
   } = initAppearanceSettings({
     apiPost,
@@ -788,6 +789,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof data.gradients_enabled === 'boolean' && gradientsToggle) {
           gradientsToggle.checked = data.gradients_enabled;
           applyThemeFeature('data-kasa-gradient', 'kasa-gradients', data.gradients_enabled);
+        }
+        if (typeof data.hardware_acceleration_enabled === 'boolean' && hardwareAccelerationToggle) {
+          hardwareAccelerationToggle.checked = data.hardware_acceleration_enabled;
         }
         if (typeof data.lan_enabled === 'boolean' && lanToggle && lanInfoBox) {
           lanToggle.checked = data.lan_enabled;

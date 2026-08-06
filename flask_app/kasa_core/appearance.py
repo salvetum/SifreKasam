@@ -12,6 +12,7 @@ from kasa_core.constants import (
     DEFAULT_CHROMA_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GRADIENTS_ENABLED,
+    DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
 )
 from kasa_core.extensions import db
@@ -282,4 +283,28 @@ class AppearanceSettings:
         enabled = normalize_theme_option(value, DEFAULT_GRADIENTS_ENABLED)
         self.set_setting("gradients_enabled", str(enabled).lower())
         self.save_file(gradients_enabled=enabled)
+        return enabled
+
+    def get_hardware_acceleration_enabled(self) -> bool:
+        try:
+            value = self.get_setting("hardware_acceleration_enabled")
+            if value is not None:
+                return normalize_theme_option(
+                    value,
+                    DEFAULT_HARDWARE_ACCELERATION_ENABLED,
+                )
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("hardware_acceleration_enabled"),
+            DEFAULT_HARDWARE_ACCELERATION_ENABLED,
+        )
+
+    def save_hardware_acceleration(self, value: object) -> bool:
+        enabled = normalize_theme_option(
+            value,
+            DEFAULT_HARDWARE_ACCELERATION_ENABLED,
+        )
+        self.set_setting("hardware_acceleration_enabled", str(enabled).lower())
+        self.save_file(hardware_acceleration_enabled=enabled)
         return enabled

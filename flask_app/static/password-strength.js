@@ -157,10 +157,14 @@ export function initPasswordStrength({ apiJson }) {
       contextInputs().some(value => contextMatchesPassword(password, value));
 
     let lastContextMatched = false;
+    let lastAppliedKey = '';
 
     const updatePagePasswordStrength = (skipIfUnchanged = false) => {
       const password = pagePassword.value;
       const userInputs = contextInputs();
+      const inputKey = userInputs.slice().sort().join('\u0001');
+      const strengthKey = password + '\u0001' + inputKey;
+      if (lastAppliedKey && strengthKey === lastAppliedKey) return;
       const matched = contextHasMatch(password);
       if (skipIfUnchanged && !matched && !lastContextMatched) {
         return;
@@ -170,7 +174,12 @@ export function initPasswordStrength({ apiJson }) {
         strengthBar,
         strengthText,
         userInputs,
-        { onResult: () => { lastContextMatched = matched; } },
+        {
+          onResult: () => {
+            lastContextMatched = matched;
+            lastAppliedKey = strengthKey;
+          },
+        },
       );
     };
 

@@ -39,6 +39,7 @@ from kasa_core.constants import (
     DEFAULT_CONTENT_PROTECTION_ENABLED,
     DEFAULT_GLASS_QUALITY,
     DEFAULT_GRADIENTS_ENABLED,
+    DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
     LEGACY_PBKDF2_ITERATIONS,
     LEGACY_PBKDF2_SALT,
@@ -189,6 +190,7 @@ get_glass_quality = _appearance_settings.get_glass_quality
 get_animated_backgrounds_enabled = _appearance_settings.get_animated_backgrounds_enabled
 get_interface_animations_enabled = _appearance_settings.get_interface_animations_enabled
 get_gradients_enabled = _appearance_settings.get_gradients_enabled
+get_hardware_acceleration_enabled = _appearance_settings.get_hardware_acceleration_enabled
 save_glass_effects = _appearance_settings.save_glass_effects
 save_theme = _appearance_settings.save_theme
 get_theme_mode = _appearance_settings.get_theme_mode
@@ -201,6 +203,7 @@ save_glass_quality = _appearance_settings.save_glass_quality
 save_animated_backgrounds = _appearance_settings.save_animated_backgrounds
 save_interface_animations = _appearance_settings.save_interface_animations
 save_gradients = _appearance_settings.save_gradients
+save_hardware_acceleration = _appearance_settings.save_hardware_acceleration
 
 _translation_service = TranslationService(
     os.path.join(os.path.dirname(__file__), 'translations'),
@@ -509,6 +512,7 @@ def inject_globals():
     animated_backgrounds = DEFAULT_ANIMATED_BACKGROUNDS_ENABLED
     interface_animations = DEFAULT_INTERFACE_ANIMATIONS_ENABLED
     gradients_enabled  = DEFAULT_GRADIENTS_ENABLED
+    hardware_acceleration = DEFAULT_HARDWARE_ACCELERATION_ENABLED
     lan_enabled        = False
     try:
         v = _get_setting('auto_lock_enabled')
@@ -528,6 +532,7 @@ def inject_globals():
         animated_backgrounds = get_animated_backgrounds_enabled()
         interface_animations = get_interface_animations_enabled()
         gradients_enabled = get_gradients_enabled()
+        hardware_acceleration = get_hardware_acceleration_enabled()
         le           = _get_setting('lan_enabled')
         if le is not None:
             lan_enabled = le.lower() == 'true'
@@ -552,6 +557,7 @@ def inject_globals():
         'ANIMATED_BACKGROUNDS_ENABLED': animated_backgrounds,
         'INTERFACE_ANIMATIONS_ENABLED': interface_animations,
         'GRADIENTS_ENABLED':     gradients_enabled,
+        'HARDWARE_ACCELERATION_ENABLED': hardware_acceleration,
         'LAN_ENABLED':           lan_enabled,
         'CURRENT_LANG':          current_lang,
         'AVAILABLE_LANGS':       available_langs,
@@ -566,7 +572,8 @@ def inject_globals():
 _PUBLIC_ENDPOINTS = {'login', 'static', 'loading_page', 'manifest_json', 'sw',
                      'settings_language'}
 _TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'settings_tray', 'lan_info',
-                    'settings_runtime', 'settings_content_protection'}
+                    'settings_runtime', 'settings_content_protection',
+                    'settings_hardware_acceleration'}
 
 def _is_local_request() -> bool:
     remote = request.remote_addr or '127.0.0.1'
@@ -1204,6 +1211,8 @@ def save_settings():
         'true' if request.form.get('interface_animations_enabled') else 'false')
     save_gradients(
         'true' if request.form.get('gradients_enabled') else 'false')
+    save_hardware_acceleration(
+        'true' if request.form.get('hardware_acceleration_enabled') else 'false')
     _set_setting('lan_enabled',
                  'true' if request.form.get('lan_enabled') else 'false')
     db.session.commit()
@@ -1219,6 +1228,7 @@ def save_settings():
             "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
             "interface_animations_enabled": get_interface_animations_enabled(),
             "gradients_enabled": get_gradients_enabled(),
+            "hardware_acceleration_enabled": get_hardware_acceleration_enabled(),
             "lan_enabled": _lan_access_enabled(),
         })
     return redirect(url_for('index'))
@@ -1345,6 +1355,17 @@ def settings_content_protection():
     s       = Setting.query.filter_by(key='content_protection_enabled').first()
     enabled = (s.value == 'true') if s else DEFAULT_CONTENT_PROTECTION_ENABLED
     return jsonify({"content_protection_enabled": enabled})
+
+@app.route('/settings/hardware-acceleration', methods=['GET', 'POST'])
+def settings_hardware_acceleration():
+    if request.method == 'POST':
+        val = request_json().get('hardware_acceleration_enabled')
+        save_hardware_acceleration('true' if val else 'false')
+        db.session.commit()
+        return jsonify({"status": "ok"})
+    return jsonify({
+        "hardware_acceleration_enabled": get_hardware_acceleration_enabled(),
+    })
 
 @app.route('/settings/runtime')
 def settings_runtime():
@@ -1797,6 +1818,31 @@ def serve_custom_background():
 @app.route('/api/background', methods=['DELETE'])
 @login_required
 def delete_custom_background():
+    """Delete only the active root background, keeping the history gallery."""
+    with _background_state_lock:
+        _remove_old_custom_backgrounds()
+        meta = _load_custom_background_metadata()
+        if meta:
+            history_dir = _custom_background_history_dir()
+            stale = [
+                name for name in meta
+                if _safe_background_filename(name)
+                and not os.path.isfile(os.path.join(history_dir, name))
+            ]
+            for name in stale:
+                meta.pop(name, None)
+            if stale:
+                _save_custom_background_metadata(meta)
+    if get_saved_background_style() == 'custom':
+        save_background_style('aurora')
+    db.session.commit()
+    return jsonify({'status': 'ok', 'background_style': get_saved_background_style()})
+
+
+@app.route('/api/background/all', methods=['DELETE'])
+@login_required
+def delete_custom_background_all():
+    """Delete the active background and the entire history gallery."""
     with _background_state_lock:
         _remove_old_custom_backgrounds()
         _clear_custom_background_history()

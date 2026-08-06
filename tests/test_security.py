@@ -487,12 +487,14 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         public = app_module._PUBLIC_ENDPOINTS
         self.assertNotIn('upload_custom_background', public)
         self.assertNotIn('delete_custom_background', public)
+        self.assertNotIn('delete_custom_background_all', public)
         self.assertNotIn('serve_custom_background', public)
 
     def test_custom_background_endpoints_not_in_token_endpoints(self) -> None:
         token_eps = app_module._TOKEN_ENDPOINTS
         self.assertNotIn('upload_custom_background', token_eps)
         self.assertNotIn('delete_custom_background', token_eps)
+        self.assertNotIn('delete_custom_background_all', token_eps)
         self.assertNotIn('serve_custom_background', token_eps)
 
     def test_upload_atomically_sets_background_style_to_custom(self) -> None:
@@ -619,13 +621,19 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         self.assertEqual(entries[0]['id'], second_id)
         self.assertEqual(self._current_background_id(), second_id)
 
-    def test_delete_background_clears_history_too(self) -> None:
+    def test_delete_active_background_keeps_history(self) -> None:
         self.client.post('/api/background/upload', data={
             'file': (io.BytesIO(self._make_png()), 'first.png'),
         }, content_type='multipart/form-data', headers=self._token)
+        first_id = self._current_background_id()
         self.client.post('/api/background/upload', data={
             'file': (io.BytesIO(self._make_png()), 'second.png'),
         }, content_type='multipart/form-data', headers=self._token)
+        second_id = self._current_background_id()
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'third.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        third_id = self._current_background_id()
 
         response = self.client.delete('/api/background', headers=self._token)
         self.assertEqual(response.status_code, 200)
@@ -634,8 +642,35 @@ class CustomBackgroundUploadTests(unittest.TestCase):
             404,
         )
         entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
+        self.assertEqual(len(entries), 2)
+        self.assertFalse(entries[0]['is_active'])
+        self.assertEqual(entries[0]['id'], second_id)
+        self.assertFalse(entries[1]['is_active'])
+        self.assertEqual(entries[1]['id'], first_id)
+        self.assertNotIn(third_id, [entry['id'] for entry in entries])
+        self.assertEqual(app_module.get_saved_background_style(), 'aurora')
+
+    def test_delete_all_backgrounds_clears_history_too(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'first.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'second.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+
+        response = self.client.delete('/api/background/all', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.client.get('/api/background/current', headers=self._token).status_code,
+            404,
+        )
+        entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
         self.assertEqual(entries, [])
         self.assertEqual(app_module.get_saved_background_style(), 'aurora')
+
+    def test_delete_all_backgrounds_requires_auth(self) -> None:
+        response = self.client.delete('/api/background/all')
+        self.assertEqual(response.status_code, 403)
 
     def test_history_reports_gif_flag(self) -> None:
         self.client.post('/api/background/upload', data={
@@ -714,6 +749,66 @@ class CsrfAndPasswordStrengthTests(unittest.TestCase):
         }, headers={'X-App-Token': app_module.APP_TOKEN})
         self.assertEqual(response.status_code, 400)
         self.assertIn('çok zayıf', response.get_json()['error'])
+
+
+class HardwareAccelerationSettingsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+    def test_index_renders_hardware_acceleration_toggle(self) -> None:
+        with patch.object(app_module, "get_fernet", return_value=Fernet(Fernet.generate_key())):
+            response = self.client.get('/', headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="hardware-acceleration-toggle"', html)
+        self.assertIn('name="hardware_acceleration_enabled"', html)
+
+    def test_settings_endpoint_round_trip(self) -> None:
+        response = self.client.post(
+            '/settings/hardware-acceleration',
+            json={'hardware_acceleration_enabled': False},
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(app_module.get_hardware_acceleration_enabled())
+        data = self.client.get(
+            '/settings/hardware-acceleration',
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        self.assertFalse(data['hardware_acceleration_enabled'])
+
+    def test_save_settings_persists_hardware_acceleration(self) -> None:
+        response = self.client.post('/save_settings', data={
+            'auto_lock_timeout': '5',
+        }, headers={
+            'X-App-Token': app_module.APP_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertFalse(data['hardware_acceleration_enabled'])
+        self.assertFalse(app_module.get_hardware_acceleration_enabled())
+
+        response = self.client.post('/save_settings', data={
+            'hardware_acceleration_enabled': 'on',
+            'auto_lock_timeout': '5',
+        }, headers={
+            'X-App-Token': app_module.APP_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(app_module.get_hardware_acceleration_enabled())
+
+    def test_settings_endpoint_reports_boolean(self) -> None:
+        data = self.client.get(
+            '/settings/hardware-acceleration',
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        self.assertIn('hardware_acceleration_enabled', data)
+        self.assertIsInstance(data['hardware_acceleration_enabled'], bool)
 
 
 if __name__ == "__main__":
