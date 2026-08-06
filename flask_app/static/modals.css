@@ -294,13 +294,10 @@
 
 /* ════════════════════════════════════════════════════════════════
    ŞİFRE ÜRETECİ PANELİ
+   Yüzey görünümü (background/border/radius) glass.css'teki
+   konsolide kart yüzeyleri bölümünde tanımlanır; burada yalnızca
+   düzen kuralları kalır.
    ════════════════════════════════════════════════════════════════ */
-
-.generator-panel {
-    background: var(--glass) !important;
-    border: var(--border-glass) !important;
-    border-radius: var(--radius-sm);
-}
 
 /* ── Özel checkbox */
 .kasa-checkbox {

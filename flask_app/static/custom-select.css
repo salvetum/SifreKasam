@@ -586,21 +586,10 @@
 .kasa-modal.is-open .generator-options-card { animation-delay: 45ms; }
 .kasa-modal.is-open .generator-history-card { animation-delay: 90ms; }
 
-.generator-output-card,
-.generator-options-card,
-.generator-history-card,
 .generator-strength-card,
 .generator-option-grid label,
 .gen-history-item {
     border-radius: var(--control-radius);
-}
-
-.generator-output-card,
-.generator-options-card,
-.generator-history-card {
-    background:
-        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 36%),
-        rgba(255,255,255,0.045);
 }
 
 .generator-output-kicker,

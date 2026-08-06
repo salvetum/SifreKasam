@@ -462,3 +462,134 @@ html[data-kasa-low-power="on"] .glass-sm::after {
 [data-bs-theme="light"][data-glass-quality="normal"] .glass-sm::before {
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
 }
+
+/* ════════════════════════════════════════════════════════════════
+   BÖLÜM 7 — KART YÜZEYLERİ KONSOLİDASYONU (TEK REFERANS YÜZEY)
+   Generator kart ailesi (output/options/history/strength) ve diğer
+   yüzeylerin background/border/radius/highlight tanımları TEK yerden
+   yönetilir. Tema/accent değişince tüm kartlar --accent-rgb üzerinden
+   anında güncellenir (hardcoded renk yok). data-glass-quality /
+   data-glass-effects / data-kasa-gradient kombinasyonlarının TÜMÜNDE
+   aynı görsel dil korunur: aynı köşe yarıçapı, aynı border tonu, aynı
+   iç highlight yaklaşımı.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+    --card-surface-radius: 18px;
+    --card-surface-border: rgba(var(--accent-rgb), 0.16);
+    --card-surface-bg:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        rgba(255,255,255,0.045);
+    --card-surface-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 12px 30px rgba(0,0,0,0.16);
+    --card-surface-border-light: rgba(var(--accent-rgb), 0.22);
+    --card-surface-bg-light:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 38%),
+        linear-gradient(145deg, rgba(247,249,253,0.92), rgba(226,233,246,0.82));
+}
+
+/* ── Ortak yüzey dili (varsayılan / koyu tema) ────────────────── */
+.generator-output-card,
+.generator-options-card,
+.generator-history-card {
+    border-radius: var(--card-surface-radius);
+    border: 1px solid var(--card-surface-border);
+    background: var(--card-surface-bg);
+    box-shadow: var(--card-surface-shadow);
+}
+
+.generator-strength-card {
+    border: 1px solid var(--card-surface-border);
+    border-radius: 14px;
+}
+
+/* ── Açık tema ────────────────────────────────────────────────── */
+[data-bs-theme="light"] .generator-output-card,
+[data-bs-theme="light"] .generator-options-card,
+[data-bs-theme="light"] .generator-history-card {
+    border-color: var(--card-surface-border-light);
+    background: var(--card-surface-bg-light);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.72),
+        0 16px 34px rgba(65,80,108,0.08);
+}
+
+/* theme-states.css'teki kalıntı .generator-panel yüzeyini etkisiz kıl:
+   aynı öğe (.generator-options-card) accent tonlu yüzeyi korur */
+[data-bs-theme="light"] .generator-panel {
+    background: var(--card-surface-bg-light) !important;
+}
+
+/* ── GRADİYAN KAPALI: accent tonu korunur, düz yüzey ──────────── */
+html[data-kasa-gradient="off"] .generator-output-card,
+html[data-kasa-gradient="off"] .generator-options-card,
+html[data-kasa-gradient="off"] .generator-history-card {
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        rgba(19,21,39,0.96) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 12px 30px rgba(0,0,0,0.18) !important;
+}
+
+html[data-bs-theme="light"][data-kasa-gradient="off"] .generator-output-card,
+html[data-bs-theme="light"][data-kasa-gradient="off"] .generator-options-card,
+html[data-bs-theme="light"][data-kasa-gradient="off"] .generator-history-card {
+    border-color: rgba(var(--accent-rgb), 0.18) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 38%),
+        rgba(255,255,255,0.96) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.72),
+        0 16px 34px rgba(65,80,108,0.08) !important;
+}
+
+/* ── EFEKTLER KAPALI: katı yüzey + accent (okunabilirlik için) ── */
+html[data-glass-effects="off"] .generator-output-card,
+html[data-glass-effects="off"] .generator-options-card,
+html[data-glass-effects="off"] .generator-history-card {
+    backdrop-filter: none !important;
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.14), transparent 42%),
+        linear-gradient(145deg, rgba(var(--accent-rgb), 0.085), rgba(var(--accent-2-rgb), 0.045)),
+        rgba(19,21,39,0.96) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 12px 30px rgba(0,0,0,0.18) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .generator-output-card,
+html[data-bs-theme="light"][data-glass-effects="off"] .generator-options-card,
+html[data-bs-theme="light"][data-glass-effects="off"] .generator-history-card {
+    border-color: rgba(var(--accent-rgb), 0.16) !important;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.10), transparent 42%),
+        linear-gradient(145deg, rgba(var(--accent-rgb), 0.055), rgba(var(--accent-2-rgb), 0.035)),
+        rgba(255,255,255,0.96) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.72),
+        0 16px 34px rgba(65,80,108,0.08) !important;
+}
+
+/* ── DÜŞÜK KALİTE: okunabilirlik için cam yüzeyi güçlendir ────── */
+html[data-glass-quality="low"] .glass,
+html[data-glass-quality="low"] .glass-sm {
+    background: rgba(14,17,34,0.88) !important;
+}
+
+html[data-bs-theme="light"][data-glass-quality="low"] .glass,
+html[data-bs-theme="light"][data-glass-quality="low"] .glass-sm {
+    background: rgba(255,255,255,0.92) !important;
+}
+
+/* ── ÖZEL ARKA PLAN (kullanıcı görseli) okunabilirlik: muted metin ── */
+html[data-kasa-background="custom"] .text-kasa-text-muted {
+    color: #d8ddeb;
+}
+
+html[data-bs-theme="light"][data-kasa-background="custom"] .text-kasa-text-muted {
+    color: #3a4a6b;
+}

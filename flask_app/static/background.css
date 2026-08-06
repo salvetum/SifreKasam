@@ -199,6 +199,30 @@ html[data-kasa-background="custom"] #settingsModal h4 {
     pointer-events: none;
 }
 
+.custom-bg-thumb-meta {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    max-width: calc(100% - 8px);
+    padding: 1px 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.58rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(8, 9, 18, 0.62);
+    pointer-events: none;
+}
+
+.custom-bg-thumb.is-active .custom-bg-thumb-meta {
+    right: auto;
+    left: 4px;
+    bottom: 16px;
+}
+
 .custom-bg-thumb-del {
     position: absolute;
     top: 4px;

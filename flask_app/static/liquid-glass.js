@@ -39,6 +39,7 @@
   var MAX_MAP_DIM = 480;
   var svgRoot = null;
   var mapCache = {};
+  var resizeObserver = null;
 
   var SPECIAL = [
     { selector: '.settings-modal-content', id: 'kasa-liquid-settings', blur: 22, saturate: 1.4 },
@@ -322,6 +323,30 @@
       });
     }
 
+    /* Element boyutu değişince displacement map'i yeniden hesapla.
+       ResizeObserver, pencere resize + modal açılış animasyonu + font
+       değişimi gibi tüm boyut değişimlerini yakalar. Sık sık hesaplama
+       yapmamak için 200ms debounce uygulanır. */
+    var resizeTimer = null;
+    var scheduleResizeRefresh = function () {
+      if (resizeTimer) return;
+      resizeTimer = setTimeout(function () {
+        resizeTimer = null;
+        refreshAll();
+      }, 200);
+    };
+
+    /* Gözlenen yüzey kümesini DOM ile senkron tut (yeni eklenen cam
+       yüzeyler de boyut değişiminde yeniden hesaplansın). */
+    function rescanObservedSurfaces() {
+      if (typeof ResizeObserver === 'undefined') return;
+      if (!resizeObserver) resizeObserver = new ResizeObserver(scheduleResizeRefresh);
+      resizeObserver.disconnect();
+      var els = document.querySelectorAll('.glass, .glass-sm');
+      for (var i = 0; i < els.length; i++) resizeObserver.observe(els[i]);
+    }
+    rescanObservedSurfaces();
+
     /* Dinamik eklenen/çıkan cam yüzeyler için (debounced). */
     var domTimer = null;
     new MutationObserver(function () {
@@ -329,17 +354,9 @@
       domTimer = setTimeout(function () {
         domTimer = null;
         refreshAll();
+        rescanObservedSurfaces();
       }, 120);
     }).observe(document.body, { childList: true, subtree: true });
-
-    var resizeTimer = null;
-    window.addEventListener('resize', function () {
-      if (resizeTimer) return;
-      resizeTimer = setTimeout(function () {
-        resizeTimer = null;
-        refreshAll();
-      }, 250);
-    });
   }
 
   if (document.readyState === 'loading') {

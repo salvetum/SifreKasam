@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.2 - Görünüm Ayarları modülü (ES Module)
+ * ŞifreKasam v2.6.3-beta.3 - Görünüm Ayarları modülü (ES Module)
  *
  * 3. bölüm: tema/efekt toggle'ları, glass kalitesi, vurgu rengi seçici,
  * chroma akcent, özel arka plan yükleme/galeri.
@@ -551,26 +551,29 @@ export function initAppearanceSettings({
       }
       const data = await resp.json();
       const entries = Array.isArray(data.entries) ? data.entries : [];
-      const customLayer = document.getElementById('custom-bg-layer');
-      const currentUrl = customLayer?.getAttribute('data-bg-url');
-      const currentIsGif = customLayer?.getAttribute('data-animated') === 'true';
-      const isCustomActive = getCurrentBackground() === 'custom';
 
-      if (entries.length === 0 && (!isCustomActive || !currentUrl)) {
+      if (entries.length === 0) {
         customBgGallery.classList.add('hidden');
         return;
       }
       customBgGallery.classList.remove('hidden');
       customBgGalleryGrid.replaceChildren();
 
+      const formatBytes = (bytes) => {
+        if (!Number.isFinite(bytes) || bytes <= 0) return '';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      };
+
       const makeThumb = (item) => {
         const wrap = document.createElement('div');
-        wrap.className = 'custom-bg-thumb' + (item.active ? ' is-active' : '');
+        wrap.className = 'custom-bg-thumb' + (item.is_active ? ' is-active' : '');
         wrap.setAttribute('role', 'button');
         wrap.setAttribute('tabindex', '0');
-        wrap.setAttribute('aria-label', item.active
+        wrap.setAttribute('aria-label', item.is_active
           ? window._('Aktif')
-          : window._('Arkaplan aktifleştirildi.'));
+          : window._('Bu arkaplanı aktifleştir'));
 
         const img = document.createElement('img');
         img.src = item.url;
@@ -578,7 +581,18 @@ export function initAppearanceSettings({
         img.loading = 'lazy';
         wrap.appendChild(img);
 
-        if (item.active) {
+        const metaText = [
+          item.width && item.height ? item.width + 'x' + item.height : '',
+          formatBytes(item.size),
+        ].filter(Boolean).join(' · ');
+        if (metaText) {
+          const meta = document.createElement('span');
+          meta.className = 'custom-bg-thumb-meta';
+          meta.textContent = metaText;
+          wrap.appendChild(meta);
+        }
+
+        if (item.is_active) {
           const badge = document.createElement('span');
           badge.className = 'custom-bg-thumb-badge';
           badge.textContent = window._('Aktif');
@@ -588,14 +602,14 @@ export function initAppearanceSettings({
         const del = document.createElement('button');
         del.type = 'button';
         del.className = 'custom-bg-thumb-del';
-        del.setAttribute('aria-label', window._('Arkaplan silindi.'));
+        del.setAttribute('aria-label', window._('Bu arkaplanı sil'));
         const icon = document.createElement('i');
         icon.className = 'fa-solid fa-xmark';
         del.appendChild(icon);
         wrap.appendChild(del);
 
         const activate = async () => {
-          if (!item.active) {
+          if (!item.is_active) {
             const actResp = await apiFetch(
               `/api/background/history/${encodeURIComponent(item.id)}/activate`,
               { method: 'POST' }
@@ -627,7 +641,7 @@ export function initAppearanceSettings({
         };
 
         const remove = async () => {
-          const delResp = item.active
+          const delResp = item.is_active
             ? await apiFetch('/api/background', { method: 'DELETE' })
             : await apiFetch(`/api/background/history/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
           if (!delResp?.ok) {
@@ -635,7 +649,7 @@ export function initAppearanceSettings({
             return;
           }
           const layer = document.getElementById('custom-bg-layer');
-          if (item.active) {
+          if (item.is_active) {
             if (layer) {
               layer.removeAttribute('data-bg-url');
               layer.removeAttribute('data-animated');
@@ -667,14 +681,15 @@ export function initAppearanceSettings({
         return wrap;
       };
 
-      if (isCustomActive && currentUrl) {
-        customBgGalleryGrid.appendChild(makeThumb({
-          id: null, url: currentUrl, isGif: currentIsGif, active: true,
-        }));
-      }
       entries.forEach(entry => {
         customBgGalleryGrid.appendChild(makeThumb({
-          id: entry.id, url: entry.url, isGif: entry.is_gif, active: false,
+          id: entry.id,
+          url: entry.url,
+          is_gif: entry.is_gif,
+          is_active: entry.is_active,
+          width: entry.width,
+          height: entry.height,
+          size: entry.size,
         }));
       });
     };

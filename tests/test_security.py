@@ -566,14 +566,18 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         self.client.post('/api/background/upload', data={
             'file': (io.BytesIO(self._make_png()), 'second.png'),
         }, content_type='multipart/form-data', headers=self._token)
+        second_id = self._current_background_id()
         bg_dir = app_module.BACKGROUND_DIR
         root_files = [f for f in os.listdir(bg_dir) if os.path.isfile(os.path.join(bg_dir, f))]
         self.assertEqual(len(root_files), 1)
         response = self.client.get('/api/background/history', headers=self._token)
         self.assertEqual(response.status_code, 200)
         entries = response.get_json()['entries']
-        self.assertEqual(len(entries), 1)
-        self.assertEqual(entries[0]['id'], first_id)
+        self.assertEqual(len(entries), 2)
+        self.assertTrue(entries[0]['is_active'])
+        self.assertEqual(entries[0]['id'], second_id)
+        self.assertFalse(entries[1]['is_active'])
+        self.assertEqual(entries[1]['id'], first_id)
 
     def test_activate_history_background_becomes_current(self) -> None:
         self.client.post('/api/background/upload', data={
@@ -610,7 +614,9 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
-        self.assertEqual(entries, [])
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0]['is_active'])
+        self.assertEqual(entries[0]['id'], second_id)
         self.assertEqual(self._current_background_id(), second_id)
 
     def test_delete_background_clears_history_too(self) -> None:
@@ -639,8 +645,24 @@ class CustomBackgroundUploadTests(unittest.TestCase):
             'file': (io.BytesIO(self._make_png()), 'photo.png'),
         }, content_type='multipart/form-data', headers=self._token)
         entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
+        self.assertEqual(len(entries), 2)
+        self.assertTrue(entries[0]['is_active'])
+        self.assertFalse(entries[0]['is_gif'])
+        self.assertFalse(entries[1]['is_active'])
+        self.assertTrue(entries[1]['is_gif'])
+
+    def test_history_reports_metadata_fields(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'first.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
         self.assertEqual(len(entries), 1)
-        self.assertTrue(entries[0]['is_gif'])
+        active = entries[0]
+        self.assertTrue(active['is_active'])
+        self.assertEqual(active['mime'], 'image/png')
+        self.assertEqual(active['width'], 4)
+        self.assertEqual(active['height'], 4)
+        self.assertGreater(active['size'], 0)
 
 
 class CsrfAndPasswordStrengthTests(unittest.TestCase):

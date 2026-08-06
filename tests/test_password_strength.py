@@ -82,6 +82,21 @@ class PasswordStrengthTests(unittest.TestCase):
         self.assertIn("kaan", folded_values)
         self.assertIn("example.com", folded_values)
 
+    def test_non_matching_context_never_changes_the_score(self) -> None:
+        password = "J7!vQ2#nL9@xR4$k"
+        baseline = analyze_password(password)["score"]
+
+        for values in (
+            ["AcmePortal", "https://acme.example", "admin@acme.example"],
+            ["tamamen alakasız", "x", "1234567890"],
+            ["OrnekFirma", "kullanici@ornek.com"],
+        ):
+            with self.subTest(values=values):
+                self.assertEqual(
+                    analyze_password(password, values)["score"],
+                    baseline,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

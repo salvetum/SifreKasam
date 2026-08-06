@@ -1589,9 +1589,85 @@ def _safe_background_filename(name):
     return None
 
 
+_BACKGROUND_METADATA_NAME = 'metadata.json'
+_background_state_lock = threading.Lock()
+_EXT_TO_MIME = {ext: mime for mime, ext in _ALLOWED_IMAGE_MIMES.items()}
+
+
+def _custom_background_metadata_path():
+    return os.path.join(_custom_background_history_dir(), _BACKGROUND_METADATA_NAME)
+
+
+def _load_custom_background_metadata():
+    """Load the {filename: {size,width,height,mime}} JSON index for history."""
+    meta_path = _custom_background_metadata_path()
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except (OSError, ValueError):
+        pass
+    return {}
+
+
+def _save_custom_background_metadata(meta):
+    """Atomically write the metadata index (temp file + os.replace)."""
+    meta_path = _custom_background_metadata_path()
+    tmp = meta_path + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(meta, f)
+        os.replace(tmp, meta_path)
+    except OSError:
+        try:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def _compute_background_metadata(filepath, ext):
+    """Return {size, width, height, mime} for a saved background file."""
+    info = {
+        'size': 0,
+        'width': None,
+        'height': None,
+        'mime': _EXT_TO_MIME.get((ext or '').lower(), ''),
+    }
+    try:
+        info['size'] = os.path.getsize(filepath)
+    except OSError:
+        pass
+    try:
+        from PIL import Image
+        with Image.open(filepath) as img:
+            info['width'] = img.width
+            info['height'] = img.height
+            mime_map = {'PNG': 'image/png', 'JPEG': 'image/jpeg', 'WEBP': 'image/webp', 'GIF': 'image/gif'}
+            info['mime'] = mime_map.get((img.format or '').upper(), info['mime'])
+    except Exception:
+        pass
+    return info
+
+
+def _ensure_background_metadata(meta, filename, filepath):
+    """Return metadata for a file, computing and caching it if missing."""
+    entry = meta.get(filename)
+    if entry is not None:
+        return entry
+    entry = _compute_background_metadata(filepath, os.path.splitext(filename)[1])
+    meta[filename] = entry
+    return entry
+
+
 def _list_custom_background_history():
-    """Return history entries as [{filename, mtime}] sorted newest-first."""
+    """Return history entries as [{filename, mtime, size, width, height, mime}]
+    sorted newest-first. Metadata is computed lazily for legacy files and
+    persisted back to the JSON index."""
     history_dir = _custom_background_history_dir()
+    meta = _load_custom_background_metadata()
+    changed = False
     entries = []
     try:
         for name in os.listdir(history_dir):
@@ -1603,22 +1679,42 @@ def _list_custom_background_history():
                 mtime = os.path.getmtime(filepath)
             except OSError:
                 continue
-            entries.append({'filename': filename, 'mtime': mtime})
+            existed = filename in meta
+            info = _ensure_background_metadata(meta, filename, filepath)
+            if not existed:
+                changed = True
+            entries.append({
+                'filename': filename,
+                'mtime': mtime,
+                'size': info.get('size'),
+                'width': info.get('width'),
+                'height': info.get('height'),
+                'mime': info.get('mime'),
+            })
     except OSError:
         return []
     entries.sort(key=lambda entry: entry['mtime'], reverse=True)
+    if changed:
+        _save_custom_background_metadata(meta)
     return entries
 
 
 def _prune_custom_background_history():
     """Delete the oldest history entries beyond the configured limit."""
     history_dir = _custom_background_history_dir()
+    pruned = []
     for entry in _list_custom_background_history()[CUSTOM_BACKGROUND_HISTORY_LIMIT:]:
         filepath = os.path.join(history_dir, entry['filename'])
         try:
             os.unlink(filepath)
+            pruned.append(entry['filename'])
         except OSError:
             pass
+    if pruned:
+        meta = _load_custom_background_metadata()
+        for name in pruned:
+            meta.pop(name, None)
+        _save_custom_background_metadata(meta)
 
 
 def _move_current_to_history():
@@ -1641,7 +1737,7 @@ def _move_current_to_history():
 
 
 def _clear_custom_background_history():
-    """Delete all files in the history directory (full reset)."""
+    """Delete all files (and the metadata index) in the history directory."""
     history_dir = os.path.join(BACKGROUND_DIR, 'history')
     if not os.path.isdir(history_dir):
         return
@@ -1668,10 +1764,15 @@ def upload_custom_background():
     if error:
         return jsonify({'error': error}), 400
 
-    _move_current_to_history()
-    filename = f"{uuid.uuid4().hex}{ext}"
-    filepath = os.path.join(BACKGROUND_DIR, filename)
-    uploaded.save(filepath)
+    with _background_state_lock:
+        _move_current_to_history()
+        filename = f"{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join(BACKGROUND_DIR, filename)
+        uploaded.save(filepath)
+
+    meta = _load_custom_background_metadata()
+    _ensure_background_metadata(meta, filename, filepath)
+    _save_custom_background_metadata(meta)
 
     save_background_style('custom')
     db.session.commit()
@@ -1696,12 +1797,39 @@ def serve_custom_background():
 @app.route('/api/background', methods=['DELETE'])
 @login_required
 def delete_custom_background():
-    _remove_old_custom_backgrounds()
-    _clear_custom_background_history()
+    with _background_state_lock:
+        _remove_old_custom_backgrounds()
+        _clear_custom_background_history()
     if get_saved_background_style() == 'custom':
         save_background_style('aurora')
     db.session.commit()
     return jsonify({'status': 'ok', 'background_style': get_saved_background_style()})
+
+
+def _active_custom_background_entry():
+    """Build the history entry for the currently active root background."""
+    filepath = _find_custom_background()
+    if not filepath:
+        return None
+    filename = os.path.basename(filepath)
+    mtime = 0
+    try:
+        mtime = os.path.getmtime(filepath)
+    except OSError:
+        pass
+    meta = _load_custom_background_metadata()
+    info = _ensure_background_metadata(meta, filename, filepath)
+    return {
+        'id': filename,
+        'url': url_for('serve_custom_background') + '?v=' + str(int(mtime)),
+        'is_gif': filename.endswith('.gif'),
+        'created_at': datetime.fromtimestamp(mtime).isoformat(),
+        'is_active': True,
+        'size': info.get('size'),
+        'width': info.get('width'),
+        'height': info.get('height'),
+        'mime': info.get('mime'),
+    }
 
 
 @app.route('/api/background/history')
@@ -1715,7 +1843,15 @@ def list_custom_background_history():
             'url': url_for('serve_history_background', filename=filename) + '?v=' + str(int(item['mtime'])),
             'is_gif': filename.endswith('.gif'),
             'created_at': datetime.fromtimestamp(item['mtime']).isoformat(),
+            'is_active': False,
+            'size': item.get('size'),
+            'width': item.get('width'),
+            'height': item.get('height'),
+            'mime': item.get('mime'),
         })
+    active = _active_custom_background_entry()
+    if active:
+        entries.insert(0, active)
     return jsonify({'status': 'ok', 'entries': entries})
 
 
@@ -1737,13 +1873,15 @@ def activate_history_background(id):
     name = _safe_background_filename(id)
     if not name:
         return jsonify({'error': 'Geçersiz arkaplan.'}), 404
-    history_dir = _custom_background_history_dir()
-    source = os.path.join(history_dir, name)
-    if not os.path.isfile(source):
-        return jsonify({'error': 'Arkaplan bulunamadı.'}), 404
 
-    _move_current_to_history()
-    shutil.move(source, os.path.join(BACKGROUND_DIR, name))
+    with _background_state_lock:
+        history_dir = _custom_background_history_dir()
+        source = os.path.join(history_dir, name)
+        if not os.path.isfile(source):
+            return jsonify({'error': 'Arkaplan bulunamadı.'}), 404
+
+        _move_current_to_history()
+        shutil.move(source, os.path.join(BACKGROUND_DIR, name))
 
     save_background_style('custom')
     db.session.commit()
@@ -1762,13 +1900,19 @@ def delete_history_background(id):
     name = _safe_background_filename(id)
     if not name:
         return jsonify({'error': 'Geçersiz arkaplan.'}), 404
-    filepath = os.path.join(_custom_background_history_dir(), name)
-    if not os.path.isfile(filepath):
-        return jsonify({'error': 'Arkaplan bulunamadı.'}), 404
-    try:
-        os.unlink(filepath)
-    except OSError:
-        return jsonify({'error': 'Arkaplan silinemedi.'}), 500
+
+    with _background_state_lock:
+        history_dir = _custom_background_history_dir()
+        filepath = os.path.join(history_dir, name)
+        if not os.path.isfile(filepath):
+            return jsonify({'error': 'Arkaplan bulunamadı.'}), 404
+        try:
+            os.unlink(filepath)
+        except OSError:
+            return jsonify({'error': 'Arkaplan silinemedi.'}), 500
+        meta = _load_custom_background_metadata()
+        meta.pop(name, None)
+        _save_custom_background_metadata(meta)
     return jsonify({'status': 'ok'})
 
 # ─── ŞİFRE DEĞİŞTİRME ────────────────────────────────────────────────────────

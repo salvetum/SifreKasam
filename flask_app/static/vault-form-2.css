@@ -202,25 +202,12 @@
     box-shadow: 0 12px 30px rgba(var(--accent-rgb), 0.22);
 }
 
-.generator-output-card,
-.generator-options-card,
-.generator-history-card,
-.generator-strength-card {
-    border-color: rgba(var(--accent-rgb), 0.16);
-    background:
-        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
-        rgba(255,255,255,0.045);
-}
+/* Kart yüzeyi (background/border) glass.css konsolide bölümünde tanımlı. */
 
 .generator-options-card {
     position: relative;
     isolation: isolate;
     overflow: hidden;
-    border-color: transparent;
-    background:
-        radial-gradient(ellipse at left center, rgba(var(--accent-rgb), 0.16), transparent 44%),
-        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 38%),
-        rgba(255,255,255,0.045);
 }
 
 .generator-options-card > * {

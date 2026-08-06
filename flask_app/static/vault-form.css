@@ -24,8 +24,6 @@
 .generator-options-card,
 .generator-history-card {
     border-radius: 18px;
-    border: 1px solid var(--card-border);
-    background: var(--card-bg);
 }
 .generator-output-card {
     grid-area: output;
@@ -34,9 +32,6 @@
     gap: 0.9rem;
     min-height: 172px;
     padding: 1rem;
-    background:
-        radial-gradient(circle at 8% 0%, rgba(124,111,247,0.18), transparent 36%),
-        var(--card-bg);
 }
 .generator-output-kicker {
     display: inline-flex;

@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.2 - LAN Erişimi modülü (ES Module)
+ * ŞifreKasam v2.6.3-beta.3 - LAN Erişimi modülü (ES Module)
  *
  * 3b. bölüm: LAN toggle / bilgi kutusu ve fetchLanInfo.
  * initLanSettings, app.js içindeki DOMContentLoaded sırasında çağrılır;

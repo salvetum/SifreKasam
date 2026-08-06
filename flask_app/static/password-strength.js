@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.2 - Şifre Gücü modülü (ES Module)
+ * ŞifreKasam v2.6.3-beta.3 - Şifre Gücü modülü (ES Module)
  *
  * 7. bölüm: window.updateStrengthMeter ve sayfa şifresi güç göstergesi.
  * initPasswordStrength, app.js içindeki DOMContentLoaded sırasında çağrılır.
@@ -47,7 +47,7 @@ export function initPasswordStrength({ apiJson }) {
   };
   const strengthMeterStates = new WeakMap();
 
-  window.updateStrengthMeter = (password, barEl, labelEl, userInputs = []) => {
+  window.updateStrengthMeter = (password, barEl, labelEl, userInputs = [], options = {}) => {
     if (!barEl || !labelEl) return;
     const previousState = strengthMeterStates.get(labelEl);
     if (previousState?.timer) clearTimeout(previousState.timer);
@@ -71,6 +71,7 @@ export function initPasswordStrength({ apiJson }) {
           }),
         });
         if (strengthMeterStates.get(labelEl)?.requestId !== requestId) return;
+        if (typeof options.onResult === 'function') options.onResult();
 
         const score = Math.max(0, Math.min(4, Number(result.score) || 0));
         const level = STRENGTH_LEVELS[score];
@@ -111,22 +112,72 @@ export function initPasswordStrength({ apiJson }) {
     const strengthContextFields = ['isim', 'login', 'website_url']
       .map(fieldId => document.getElementById(fieldId))
       .filter(Boolean);
-    const updatePagePasswordStrength = () => {
-      const userInputs = strengthContextFields
-        .map(field => field.value)
-        .filter(Boolean);
-      window.updateStrengthMeter(
-        pagePassword.value,
-        strengthBar,
-        strengthText,
-        userInputs,
+
+    const CONTEXT_TOKEN_SPLIT = /[^0-9A-Za-zÇĞİÖŞÜçğıöş]+/;
+
+    const contextVariants = (value) => {
+      const text = String(value || '').trim().slice(0, 200);
+      if (!text) return [];
+      const variants = new Set([text]);
+      const raw = text.includes('://') ? text : `//${text}`;
+      let hostname = '';
+      try {
+        hostname = new URL(raw, 'http://base.invalid').hostname || '';
+      } catch (e) { /* keep empty */ }
+      if (hostname) {
+        variants.add(hostname);
+        for (const part of hostname.split('.')) variants.add(part);
+      }
+      const atIndex = text.indexOf('@');
+      if (atIndex !== -1) {
+        const local = text.slice(0, atIndex);
+        const domain = text.slice(atIndex + 1);
+        if (local) variants.add(local);
+        if (domain) variants.add(domain);
+      }
+      for (const token of text.split(CONTEXT_TOKEN_SPLIT)) {
+        if (token.length >= 3) variants.add(token);
+      }
+      return [...variants];
+    };
+
+    const contextMatchesPassword = (password, value) => {
+      const foldedPassword = password.toLowerCase();
+      return contextVariants(value).some(
+        variant => variant.toLowerCase() && foldedPassword.includes(variant.toLowerCase()),
       );
     };
 
-    pagePassword.addEventListener('input', updatePagePasswordStrength);
+    const contextInputs = () =>
+      strengthContextFields
+        .map(field => field.value)
+        .filter(Boolean);
+
+    const contextHasMatch = (password) =>
+      contextInputs().some(value => contextMatchesPassword(password, value));
+
+    let lastContextMatched = false;
+
+    const updatePagePasswordStrength = (skipIfUnchanged = false) => {
+      const password = pagePassword.value;
+      const userInputs = contextInputs();
+      const matched = contextHasMatch(password);
+      if (skipIfUnchanged && !matched && !lastContextMatched) {
+        return;
+      }
+      window.updateStrengthMeter(
+        password,
+        strengthBar,
+        strengthText,
+        userInputs,
+        { onResult: () => { lastContextMatched = matched; } },
+      );
+    };
+
+    pagePassword.addEventListener('input', () => updatePagePasswordStrength(false));
     strengthContextFields.forEach(field => {
       field.addEventListener('input', () => {
-        if (pagePassword.value) updatePagePasswordStrength();
+        if (pagePassword.value) updatePagePasswordStrength(true);
       });
     });
     updatePagePasswordStrength();

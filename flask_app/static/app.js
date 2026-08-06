@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.2 - Main JavaScript
+ * ŞifreKasam v2.6.3-beta.3 - Main JavaScript
  */
 
 import { initPasswordGenerator } from './password-generator.js';
