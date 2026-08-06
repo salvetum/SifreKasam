@@ -1146,9 +1146,14 @@ async function syncLanRuntimeState() {
   if (!PORT || isRestartingFlask) return;
   try {
     const state = await requestBackendJson('/settings/runtime');
-    const nextLanEnabled = state.lan_enabled === true;
-    if (nextLanEnabled !== lanRuntimeEnabled) {
-      await restartFlaskServer(nextLanEnabled);
+    // Yalnizca kayitli (istenen) degerle gercek runtime'i kiyasla.
+    // lanRuntimeEnabled onbellek degeri restart yarida kalirsa gercekten
+    // kopabildigi icin kiyaslama olarak kullanilmaz; aksi halde her ayar
+    // kaydinda gereksiz restart tetiklenip yukleme ekrani kalici olabilir.
+    const desiredLanEnabled = state.lan_enabled === true;
+    const actualLanEnabled = state.runtime_lan_enabled === true;
+    if (desiredLanEnabled !== actualLanEnabled) {
+      await restartFlaskServer(desiredLanEnabled);
     }
   } catch (err) {
     console.warn(`LAN runtime senkronizasyonu atlandi: ${err.message}`);

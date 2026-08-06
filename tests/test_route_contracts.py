@@ -34,6 +34,7 @@ EXPECTED_ROUTES = {
     "save_settings": ("/save_settings", {"POST"}),
     "settings_theme_mode": ("/settings/theme-mode", {"GET", "POST"}),
     "settings_hardware_acceleration": ("/settings/hardware-acceleration", {"GET", "POST"}),
+    "settings_runtime": ("/settings/runtime", {"GET"}),
     "export_data": ("/export", {"GET"}),
     "import_data": ("/import", {"POST"}),
     "bulk_delete": ("/api/bulk/delete", {"POST"}),
@@ -61,6 +62,19 @@ class RouteContractTests(unittest.TestCase):
         for path in ("/login", "/loading", "/manifest.json", "/sw.js"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_settings_runtime_reports_desired_and_actual_lan_state(self) -> None:
+        with patch.dict(os.environ, {"FLASK_HOST": "0.0.0.0"}):
+            response = self.client.get(
+                "/settings/runtime",
+                headers={"X-App-Token": app_module.APP_TOKEN},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload["lan_enabled"], bool)
+        self.assertIsInstance(payload["runtime_lan_enabled"], bool)
+        self.assertTrue(payload["runtime_lan_enabled"])
 
     def test_vault_pages_require_authentication(self) -> None:
         for path in ("/", "/api/stats", "/saglik"):
