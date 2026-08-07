@@ -62,6 +62,11 @@ html[data-kasa-background="plain"] .blob-accent {
 }
 
 /* ── ÖZEL ARKA PLAN ─────────────────────────────────────────── */
+/* Not: background-attachment:fixed KASITLI KULLANILMIYOR. Katman zaten
+   position:fixed olduğu için arkaplan görseli zaten viewport'a sabit —
+   attachment:fixed yalnızca Chromium'un buggy görsel compositing yolunu
+   tetikliyordu ve backdrop-filter'lı cam yüzeylerde hover artefaktı
+   (gölge sızması) oluşturuyordu. */
 #custom-bg-layer {
     position: fixed;
     inset: 0;
@@ -69,7 +74,6 @@ html[data-kasa-background="plain"] .blob-accent {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-attachment: fixed;
     display: none;
     pointer-events: none;
 }
@@ -118,12 +122,28 @@ html[data-kasa-background="custom"] h4 {
     text-shadow: 0 1px 2px rgba(8, 9, 18, 0.55);
 }
 
+/* Canlı (vivid) cam kartlarda arkaplan rengi sızdığında bile kart
+   içindeki metnin net okunması için hafif metin gölgesi. */
+html[data-kasa-background="custom"] .vault-card .vault-card-title,
+html[data-kasa-background="custom"] .vault-card .vault-detail-label,
+html[data-kasa-background="custom"] .vault-card .vault-detail-value,
+html[data-kasa-background="custom"] .vault-card .vault-note-text {
+    text-shadow: 0 1px 2px rgba(8, 9, 18, 0.55);
+}
+
 html[data-bs-theme="light"][data-kasa-background="custom"] .kasa-page-title,
 html[data-bs-theme="light"][data-kasa-background="custom"] h1,
 html[data-bs-theme="light"][data-kasa-background="custom"] h2,
 html[data-bs-theme="light"][data-kasa-background="custom"] h3,
 html[data-bs-theme="light"][data-kasa-background="custom"] h4 {
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.65);
+}
+
+html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-card-title,
+html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-detail-label,
+html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-detail-value,
+html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-note-text {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
 }
 
 /* Ayarlar penceresinde özel arkaplan okunabilirlik gölgesini kapat. */
@@ -152,28 +172,36 @@ html[data-kasa-background="custom"] #settingsModal h4 {
 
 .custom-bg-gallery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
     gap: 0.5rem;
 }
 
 .custom-bg-thumb {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color var(--speed) ease, transform var(--speed) ease, box-shadow var(--speed) ease;
+}
+
+.custom-bg-thumb-photo {
     position: relative;
     aspect-ratio: 16 / 10;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid var(--glass-border);
     background: rgba(255, 255, 255, 0.06);
-    cursor: pointer;
     transition: border-color var(--speed) ease, transform var(--speed) ease, box-shadow var(--speed) ease;
 }
 
-.custom-bg-thumb:hover {
+.custom-bg-thumb:hover .custom-bg-thumb-photo {
     border-color: var(--accent);
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
 }
 
-.custom-bg-thumb.is-active {
+.custom-bg-thumb.is-active .custom-bg-thumb-photo {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.35);
 }
@@ -186,52 +214,33 @@ html[data-kasa-background="custom"] #settingsModal h4 {
     pointer-events: none;
 }
 
-.custom-bg-thumb-badge {
-    position: absolute;
-    left: 4px;
-    bottom: 4px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-size: 0.6rem;
-    font-weight: 600;
-    color: #fff;
-    background: rgba(var(--accent-rgb), 0.85);
-    pointer-events: none;
+.custom-bg-thumb-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    min-width: 0;
+    min-height: 14px;
 }
 
 .custom-bg-thumb-tooltip {
-    position: absolute;
-    left: 4px;
-    right: 4px;
-    bottom: 4px;
-    z-index: 5;
-    padding: 2px 8px;
-    border-radius: 8px;
-    text-align: center;
-    font-size: 0.6rem;
+    min-width: 0;
+    font-size: 0.58rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.custom-bg-thumb-badge {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.58rem;
     font-weight: 600;
-    line-height: 1.5;
-    color: rgba(255, 255, 255, 0.95);
-    background: rgba(8, 9, 18, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    pointer-events: none;
-    opacity: 0;
-    transform: translateY(3px);
-    transition: opacity var(--speed) ease, transform var(--speed) ease;
-}
-
-.custom-bg-thumb:hover .custom-bg-thumb-tooltip,
-.custom-bg-thumb:focus-visible .custom-bg-thumb-tooltip {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.custom-bg-thumb:hover .custom-bg-thumb-badge,
-.custom-bg-thumb:focus-visible .custom-bg-thumb-badge {
-    display: none;
+    color: #fff;
+    background: rgba(var(--accent-rgb), 0.85);
 }
 
 .custom-bg-thumb-del {

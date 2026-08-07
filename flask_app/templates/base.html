@@ -41,13 +41,7 @@
         const effectiveTheme = storedThemeMode === 'system'
             ? (systemDarkQuery.matches ? 'dark' : 'light')
             : (storedThemeMode === 'light' ? 'light' : 'dark');
-        if (effectiveTheme === 'light') {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.setAttribute('data-bs-theme', 'light');
-        } else {
-            document.documentElement.classList.add('dark');
-            document.documentElement.setAttribute('data-bs-theme', 'dark');
-        }
+        document.documentElement.setAttribute('data-bs-theme', effectiveTheme);
         localStorage.setItem('kasa-theme', effectiveTheme);
         localStorage.setItem('kasa-theme-mode', storedThemeMode);
         document.documentElement.setAttribute('data-theme-mode', storedThemeMode);
@@ -78,6 +72,21 @@
         const normalizedGradients = storedGradients === 'off' ? 'off' : 'on';
         document.documentElement.setAttribute('data-kasa-gradient', normalizedGradients);
         localStorage.setItem('kasa-gradients', normalizedGradients);
+
+        const storedCardSheen = localStorage.getItem('kasa-card-sheen') || "{{ 'on' if CARD_SHEEN_ENABLED else 'off' }}";
+        const normalizedCardSheen = storedCardSheen === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-kasa-card-sheen', normalizedCardSheen);
+        localStorage.setItem('kasa-card-sheen', normalizedCardSheen);
+
+        const storedCardFrame = localStorage.getItem('kasa-card-frame') || "{{ 'on' if CARD_FRAME_ENABLED else 'off' }}";
+        const normalizedCardFrame = storedCardFrame === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-kasa-card-frame', normalizedCardFrame);
+        localStorage.setItem('kasa-card-frame', normalizedCardFrame);
+
+        const storedCardDepth = localStorage.getItem('kasa-card-depth') || "{{ 'on' if CARD_DEPTH_ENABLED else 'off' }}";
+        const normalizedCardDepth = storedCardDepth === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-kasa-card-depth', normalizedCardDepth);
+        localStorage.setItem('kasa-card-depth', normalizedCardDepth);
 
         const normalizeChromaSpeed = function (value) {
             const speed = Number(value);
@@ -196,23 +205,23 @@
     <link href="{{ url_for('static', filename='toastify.min.css') }}" rel="stylesheet">
 
     <!-- Our Custom CSS -->
-    <link href="{{ url_for('static', filename='tokens.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='base.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='vault-form.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='utilities.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='buttons.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='cards.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='modals.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='theme-states.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='responsive.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='background.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='custom-select.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='settings-modal.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='vault-form-2.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='date-picker.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='theme-overrides.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='misc.css') }}?v=64" rel="stylesheet">
-    <link href="{{ url_for('static', filename='glass.css') }}?v=64" rel="stylesheet">
+    <link href="{{ url_for('static', filename='tokens.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='base.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vault-form.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='utilities.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='buttons.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='cards.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='modals.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='theme-states.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='responsive.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='background.css') }}?v=69" rel="stylesheet">
+    <link href="{{ url_for('static', filename='custom-select.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='settings-modal.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vault-form-2.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='date-picker.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='theme-overrides.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='misc.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='glass.css') }}?v=72" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -221,16 +230,6 @@
     <div id="custom-bg-layer" aria-hidden="true"{% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL %} data-bg-url="{{ CUSTOM_BACKGROUND_URL }}"{% endif %}></div>
     <!-- BÖLÜM 5: Frosted Glass grain (Material You) -->
     <div class="glass-grain" aria-hidden="true"></div>
-    <!-- BÖLÜM 6: Liquid Glass — paylaşılan SVG filter tanımları.
-         #kasa-glass-noise: normal kalite cam yüzeylerin buzlu mat dokusu
-         (tek tanım, tüm .glass/.glass-sm ::after katmanları paylaşır). -->
-    <svg class="kasa-svg-filters" width="0" height="0" aria-hidden="true" focusable="false">
-        <filter id="kasa-glass-noise">
-            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2"/>
-            <feColorMatrix type="saturate" values="0"/>
-            <feComponentTransfer><feFuncA type="linear" slope="0.035"/></feComponentTransfer>
-        </filter>
-    </svg>
 
     <div class="page-loading-overlay" role="status" aria-live="polite" aria-hidden="true" aria-label="{{ _('Sayfa yükleniyor') }}">
         <div class="page-loading-card">
@@ -263,7 +262,7 @@
     <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.10" defer></script>
+    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.11" defer></script>
     <!-- Liquid Glass refraction (kube.io tekniği, Chromium-only) —
          tüm .glass / .glass-sm yüzeylerde, data-glass-quality="high"
          iken; özel yüzeyler (.settings-modal-content, .entry-login-card)
@@ -383,7 +382,7 @@
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script nonce="{{ csp_nonce }}">
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v57';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v79';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>

@@ -454,8 +454,12 @@ document.addEventListener('DOMContentLoaded', () => {
     motionToggle,
     interfaceAnimationsToggle,
     gradientsToggle,
+    cardSheenToggle,
+    cardFrameToggle,
+    cardDepthToggle,
     hardwareAccelerationToggle,
     updateAppearance,
+    cancelPendingAppearanceSave,
   } = initAppearanceSettings({
     apiPost,
     apiFetch,
@@ -744,7 +748,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setPageLoading(true);
       submitButton?.setAttribute('aria-disabled', 'true');
       if (submitButton) submitButton.disabled = true;
-      clearTimeout(appearanceSaveTimer);
+      cancelPendingAppearanceSave?.();
 
       try {
         const data = await apiJson(settingsForm.action, {
@@ -789,6 +793,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof data.gradients_enabled === 'boolean' && gradientsToggle) {
           gradientsToggle.checked = data.gradients_enabled;
           applyThemeFeature('data-kasa-gradient', 'kasa-gradients', data.gradients_enabled);
+        }
+        if (typeof data.card_sheen_enabled === 'boolean' && cardSheenToggle) {
+          cardSheenToggle.checked = data.card_sheen_enabled;
+          applyThemeFeature('data-kasa-card-sheen', 'kasa-card-sheen', data.card_sheen_enabled);
+        }
+        if (typeof data.card_frame_enabled === 'boolean' && cardFrameToggle) {
+          cardFrameToggle.checked = data.card_frame_enabled;
+          applyThemeFeature('data-kasa-card-frame', 'kasa-card-frame', data.card_frame_enabled);
+        }
+        if (typeof data.card_depth_enabled === 'boolean' && cardDepthToggle) {
+          cardDepthToggle.checked = data.card_depth_enabled;
+          applyThemeFeature('data-kasa-card-depth', 'kasa-card-depth', data.card_depth_enabled);
         }
         if (typeof data.hardware_acceleration_enabled === 'boolean' && hardwareAccelerationToggle) {
           hardwareAccelerationToggle.checked = data.hardware_acceleration_enabled;

@@ -231,7 +231,8 @@
 .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) > div:first-child,
 .chroma-toggle-row > .glass-sm > div:first-child,
 .glass-toggle-row > .glass-sm > div:first-child,
-.glass-toggle-row > .settings-glass-quality-card > div:first-child {
+.glass-toggle-row > .settings-glass-quality-card > div:first-child,
+.card-detail-toggle-row > .vault-card-shell > div:first-child {
     display: grid;
     align-content: center;
     gap: 0.12rem;
@@ -245,7 +246,9 @@
 .glass-toggle-row > .glass-sm h6,
 .glass-toggle-row > .glass-sm h4,
 .glass-toggle-row > .settings-glass-quality-card h6,
-.glass-toggle-row > .settings-glass-quality-card h4 {
+.glass-toggle-row > .settings-glass-quality-card h4,
+.card-detail-toggle-row > .vault-card-shell h6,
+.card-detail-toggle-row > .vault-card-shell h4 {
     margin: 0;
     line-height: 1.3;
     text-align: left;
@@ -256,7 +259,8 @@
 .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card) p,
 .chroma-toggle-row > .glass-sm p,
 .glass-toggle-row > .glass-sm p,
-.glass-toggle-row > .settings-glass-quality-card p {
+.glass-toggle-row > .settings-glass-quality-card p,
+.card-detail-toggle-row > .vault-card-shell p {
     margin: 0;
     line-height: 1.35;
     text-align: left;

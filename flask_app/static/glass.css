@@ -12,10 +12,18 @@
     --glass:          rgba(255,255,255,0.06);
     --glass-border:   rgba(255,255,255,0.12);
     --glass-border-hi:rgba(255,255,255,0.25);
-    --glass-blur:     blur(18px);
-    --glass-blur-sm:  blur(10px);
+    --glass-blur:     blur(12px) saturate(1.35);
+    --glass-blur-sm:  blur(7px) saturate(1.3);
     --border-glass:   1px solid var(--glass-border);
     --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.078), rgba(255,255,255,0.034));
+
+    /* Canlı cam (vivid glass) — kalıcı varsayılan görünüm.
+       Arka plandaki renk kart içine belirgin şekilde sızar; okunabilirlik
+       gömülü scrim katmanından gelir (backdrop-filter durumundan bağımsız). */
+    --glass-vivid-blur: blur(10px) saturate(1.55);
+    --glass-vivid-veil: rgba(255,255,255,0.067);
+    --glass-vivid-tint: radial-gradient(circle at 16% 0%, rgba(var(--accent-rgb),0.20), transparent 46%);
+    --glass-vivid-scrim: linear-gradient(180deg, rgba(8,9,18,0.34), rgba(8,9,18,0.10) 42%, rgba(8,9,18,0.30));
 }
 
 /* ── CAM MALZEME TOKENLARI (açık tema) ────────────────────────── */
@@ -24,6 +32,10 @@
     --glass-border:  rgba(45,58,82,0.14);
     --glass-border-hi: rgba(79,145,255,0.30);
     --panel-bg:      linear-gradient(145deg, rgba(247,249,253,0.88), rgba(226,233,246,0.72));
+    --glass-vivid-blur: blur(10px) saturate(1.4);
+    --glass-vivid-veil: rgba(255,255,255,0.66);
+    --glass-vivid-tint: radial-gradient(circle at 16% 0%, rgba(var(--accent-rgb),0.10), transparent 46%);
+    --glass-vivid-scrim: linear-gradient(180deg, rgba(255,255,255,0.44), rgba(255,255,255,0.14) 42%, rgba(255,255,255,0.38));
 }
 
 /* ── CAM KALİTESİ: düşük (performans) ─────────────────────────── */
@@ -31,11 +43,17 @@ html[data-glass-quality="low"] {
     --glass:          rgba(255,255,255,0.052);
     --glass-border:   rgba(255,255,255,0.105);
     --glass-border-hi:rgba(255,255,255,0.20);
-    --glass-blur:     blur(8px);
-    --glass-blur-sm:  blur(4px);
+    --glass-blur:     blur(5px);
+    --glass-blur-sm:  blur(3px);
     --shadow-panel:   0 14px 34px rgba(0,0,0,0.24);
     --shadow-modal:   0 20px 52px rgba(0,0,0,0.44);
     --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.032));
+
+    /* Düşük kalite: daha sade / az saydam (performans) */
+    --glass-vivid-blur: none;
+    --glass-vivid-veil: rgba(255,255,255,0.09);
+    --glass-vivid-tint: radial-gradient(circle at 16% 0%, rgba(var(--accent-rgb),0.14), transparent 46%);
+    --glass-vivid-scrim: linear-gradient(180deg, rgba(8,9,18,0.44), rgba(8,9,18,0.22) 45%, rgba(8,9,18,0.40));
 }
 
 /* ── CAM KALİTESİ: yüksek ─────────────────────────────────────── */
@@ -43,11 +61,17 @@ html[data-glass-quality="high"] {
     --glass:          rgba(255,255,255,0.075);
     --glass-border:   rgba(255,255,255,0.15);
     --glass-border-hi:rgba(255,255,255,0.30);
-    --glass-blur:     blur(28px) saturate(1.4);
-    --glass-blur-sm:  blur(16px) saturate(1.25);
+    --glass-blur:     blur(18px) saturate(1.6);
+    --glass-blur-sm:  blur(11px) saturate(1.5);
     --shadow-panel:   0 2px 4px rgba(0,0,0,0.14), 0 10px 20px rgba(0,0,0,0.18), 0 26px 64px rgba(0,0,0,0.34);
     --shadow-modal:   0 2px 6px rgba(0,0,0,0.16), 0 14px 28px rgba(0,0,0,0.24), 0 34px 88px rgba(0,0,0,0.52);
     --panel-bg:       linear-gradient(145deg, rgba(255,255,255,0.092), rgba(255,255,255,0.04));
+
+    /* Yüksek kalite: en canlı / en saydam versiyon */
+    --glass-vivid-blur: blur(14px) saturate(1.8);
+    --glass-vivid-veil: rgba(255,255,255,0.055);
+    --glass-vivid-tint: radial-gradient(circle at 16% 0%, rgba(var(--accent-rgb),0.26), transparent 50%);
+    --glass-vivid-scrim: linear-gradient(180deg, rgba(8,9,18,0.26), rgba(8,9,18,0.06) 42%, rgba(8,9,18,0.22));
 }
 
 /* ── CAM KALİTESİ: açık tema + düşük ──────────────────────────── */
@@ -55,6 +79,7 @@ html[data-bs-theme="light"][data-glass-quality="low"] {
     --glass:          rgba(255,255,255,0.82);
     --glass-border:   rgba(31,41,55,0.10);
     --glass-border-hi:rgba(79,145,255,0.22);
+    --glass-vivid-veil: rgba(255,255,255,0.78);
 }
 
 /* ── CAM KALİTESİ: açık tema + yüksek ─────────────────────────── */
@@ -62,13 +87,41 @@ html[data-bs-theme="light"][data-glass-quality="high"] {
     --glass:          rgba(255,255,255,0.58);
     --glass-border:   rgba(31,41,55,0.14);
     --glass-border-hi:rgba(79,145,255,0.34);
+    --glass-vivid-blur: blur(14px) saturate(1.6);
+    --glass-vivid-veil: rgba(255,255,255,0.50);
 }
 
 /* ── DÜŞÜK GÜÇ: cam yüzeylerde blur'u kaldır ──────────────────── */
 html[data-kasa-low-power="on"] .glass,
-html[data-kasa-low-power="on"] .glass-sm {
+html[data-kasa-low-power="on"] .glass-sm,
+html[data-kasa-low-power="on"] .settings-action-card,
+html[data-kasa-low-power="on"] .settings-toggle-card,
+html[data-kasa-low-power="on"] .filter-btn,
+html[data-kasa-low-power="on"] .kasa-btn:not(.kasa-btn-primary),
+html[data-kasa-low-power="on"] .kasa-dropdown-trigger,
+html[data-kasa-low-power="on"] #search-input,
+html[data-kasa-low-power="on"] .bulk-select-all-control,
+html[data-kasa-low-power="on"] .background-choice-grid button,
+html[data-kasa-low-power="on"] .accent-preset-row button,
+html[data-kasa-low-power="on"] .settings-appearance-card,
+html[data-kasa-low-power="on"] .settings-bg-card,
+html[data-kasa-low-power="on"] .generator-output-card,
+html[data-kasa-low-power="on"] .generator-options-card,
+html[data-kasa-low-power="on"] .generator-history-card,
+html[data-kasa-low-power="on"] .generator-strength-card {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+}
+
+/* Kart üstü dekoratif katmanlar (üst ışıltı + buzlu çerçeve):
+   düşük güç / efekt kapalı / gradyan kapalı modlarında gizle. */
+html[data-kasa-low-power="on"] .vault-card-shell.glass::before,
+html[data-kasa-low-power="on"] .vault-card-shell.glass::after,
+html[data-glass-effects="off"] .vault-card-shell.glass::before,
+html[data-glass-effects="off"] .vault-card-shell.glass::after,
+html[data-kasa-gradient="off"] .vault-card-shell.glass::before,
+html[data-kasa-gradient="off"] .vault-card-shell.glass::after {
+    display: none !important;
 }
 
 /* ── GLASS YARDIMCI SINIFLARI ────────────────────────────────── */
@@ -88,11 +141,214 @@ html[data-kasa-low-power="on"] .glass-sm {
     -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
-/* ── CAM KALİTESİ: kasa kartlarında blur'u kaldır ─────────────── */
-html[data-glass-quality="low"] .vault-card-shell.glass,
-html[data-glass-quality="normal"] .vault-card-shell.glass {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+/* ── CAM YÜZEY AİLESİ: ayarlar kartları ve filtre butonları ───── */
+/* Vivid blur + arkaplanını korur (background burada ezilmez).
+   Not: .filter-btn uzun süre bilinçli olarak bu listeden çıkarılmıştı —
+   eski blur(24px) lensinde arkasındaki animasyonlu bloblar hover'da
+   beyaz/siyah ton dalgalanması oluşturuyordu. Lens artık
+   --glass-vivid-blur (blur 10px, saturate 1.55) ile çok daha hafif;
+   filtre hapı da cam ailesine dahil edildi. */
+.filter-btn,
+.settings-action-card,
+.settings-toggle-card,
+.kasa-btn:not(.kasa-btn-primary),
+.kasa-dropdown-trigger,
+#search-input,
+.bulk-select-all-control,
+.background-choice-grid button,
+.accent-preset-row button,
+.settings-appearance-card,
+.settings-bg-card,
+.generator-output-card,
+.generator-options-card,
+.generator-history-card,
+.generator-strength-card {
+    position: relative;
+    isolation: isolate;
+    backdrop-filter: var(--glass-vivid-blur);
+    -webkit-backdrop-filter: var(--glass-vivid-blur);
+}
+
+/* ── AYAR KARTI CAM DİLİ: diğer cam yüzeyler ───────────────────── */
+/* Ayar kartlarıyla aynı cam malzemesi (accent ışıltı + beyaz gradyan
+   + glass zemin). Hover/aktif durumlar kendi CSS'lerinde korunur. */
+.filter-btn,
+.kasa-btn:not(.kasa-btn-primary),
+.kasa-dropdown-trigger,
+.bulk-select-all-control,
+.generator-output-card,
+.generator-options-card,
+.generator-history-card,
+.generator-strength-card {
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.032)),
+        var(--glass);
+}
+.kasa-btn:not(.kasa-btn-primary):hover {
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.14), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.095), rgba(255,255,255,0.04)),
+        var(--glass);
+}
+
+/* Arama kutusu: ayar kartı cam dilinde saydam zemin + okunabilir metin */
+#search-input {
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.032)),
+        var(--glass-vivid-veil);
+    border: var(--border-glass);
+    color: var(--text);
+}
+#search-input::placeholder {
+    color: var(--text-muted);
+}
+#search-input:hover,
+#search-input:focus {
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.032)),
+        var(--glass-vivid-veil);
+    border-color: rgba(var(--accent-rgb), 0.48);
+}
+
+/* ── KASA KARTLARI: buğulu cam yüzey ───────────────────────────── */
+/* Buğuluk (frost) doğrudan zemin gradyanına gömülüdür — backdrop-
+   filter'dan bağımsız olarak kartlar buğulu görünür. Üst ışıltı (sheen)
+   ve buzlu çerçeve (frame) ayrı pseudo katmanlardan gelir; depth
+   gölgesi .card-wrapper üzerinde. */
+.vault-card-shell.glass {
+    position: relative;
+    isolation: isolate;
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        linear-gradient(160deg,
+            rgba(255,255,255,0.18),
+            rgba(255,255,255,0.10) 50%,
+            rgba(255,255,255,0.13));
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.14),
+        inset 0 0 0 1px rgba(255,255,255,0.06);
+    backdrop-filter: var(--glass-vivid-blur);
+    -webkit-backdrop-filter: var(--glass-vivid-blur);
+    /* Tema geçişinde background/backdrop-filter animasyonu devre dışı:
+       transition-all, koyu camdan beyaza aralık kareler çizerek flash
+       oluşturuyordu. Sadece transform/border-color animasyonu kalır. */
+    transition-property: transform, border-color;
+}
+
+/* DİKKAT: Cam yüzeylere will-change:transform KESİNLİKLE uygulanmaz.
+   Chromium'da backdrop-filter ile aynı elementte will-change/transform,
+   elementi kendi compositing katmanına alır ve arkaplan örneklemesini
+   boşaltır — camın buğu (blur) efekti tamamen kaybolur. Firefox sorunsuz
+   işlediği için "Firefox'da var, Chrome'da yok" farkı da buydu. */
+
+/* ── KATMANLI DERİNLİK GÖLGESİ (data-kasa-card-depth="off" ile kapatılır) ── */
+/* Dış gölgeler .card-wrapper.vault-card (backdrop-filter'sız) üzerinde
+   tutulur. Gölge doğrudan backdrop-filter'lı shell'e konunca üst kenarda
+   hafif beyazlama (compositing/contrast artefaktı) oluşuyordu; wrapper
+   filtresiz olduğu için gölge temiz render edilir. Hover'da derinlik
+   korunur ve mevcut accent glow üstüne eklenir. */
+html:not([data-kasa-card-depth="off"]) .card-wrapper.vault-card {
+    box-shadow:
+        0 1px 2px rgba(0,0,0,0.14),
+        0 10px 24px rgba(0,0,0,0.18),
+        0 28px 64px rgba(0,0,0,0.32);
+}
+html:not([data-kasa-card-depth="off"]) .card-wrapper.vault-card:hover {
+    box-shadow:
+        0 1px 2px rgba(0,0,0,0.14),
+        0 10px 24px rgba(0,0,0,0.18),
+        0 28px 64px rgba(0,0,0,0.32),
+        0 14px 34px var(--accent-glow);
+}
+
+/* Wrapper'sız mini kartlar (ayar modali içindeki sheen/frame/depth
+   satırları, .card-detail-toggle-row) için aynı dil, daha hafif. */
+html:not([data-kasa-card-depth="off"]) .card-detail-toggle-row .vault-card-shell.glass {
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.16),
+        inset 0 0 0 1px rgba(255,255,255,0.05),
+        0 1px 2px rgba(0,0,0,0.14),
+        0 8px 20px rgba(0,0,0,0.18);
+}
+
+/* ── ÜST KENAR IŞILTISI (data-kasa-card-sheen="off" ile kapatılır) ── */
+html:not([data-kasa-card-sheen="off"]) .vault-card-shell.glass::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.06), transparent 80%),
+        radial-gradient(120% 200% at 50% 0%, rgba(var(--accent-rgb), 0.10), transparent 62%);
+    border-top: 1px solid rgba(255,255,255,0.10);
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* ── BUZLU ÇERÇEVE (data-kasa-card-frame="off" ile kapatılır):
+   mask tabanlı gradyan halka yerine güvenilir inset halka kullanılır —
+   mask-composite bazı sürümlerde halkayı tüm karta yayıp beyazlatıyordu. */
+html:not([data-kasa-card-frame="off"]) .vault-card-shell.glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.09),
+        inset 1px 1px 0 0 rgba(255,255,255,0.10),
+        inset -1px -1px 0 0 rgba(255,255,255,0.04);
+    pointer-events: none;
+    z-index: 2;
+}
+
+[data-bs-theme="light"] .vault-card-shell.glass {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb),0.075), transparent 42%),
+        linear-gradient(145deg, rgba(241,245,251,0.90), rgba(224,231,244,0.78));
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.70),
+        inset 0 0 0 1px rgba(255,255,255,0.32);
+}
+
+html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-wrapper.vault-card {
+    box-shadow:
+        0 1px 2px rgba(31,41,55,0.06),
+        0 10px 24px rgba(65,80,108,0.12),
+        0 24px 56px rgba(65,80,108,0.14);
+}
+html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-wrapper.vault-card:hover {
+    box-shadow:
+        0 1px 2px rgba(31,41,55,0.06),
+        0 10px 24px rgba(65,80,108,0.12),
+        0 24px 56px rgba(65,80,108,0.14),
+        0 14px 34px var(--accent-glow);
+}
+
+html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-detail-toggle-row .vault-card-shell.glass {
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.70),
+        inset 0 0 0 1px rgba(255,255,255,0.32),
+        0 1px 2px rgba(31,41,55,0.06),
+        0 8px 20px rgba(65,80,108,0.10);
+}
+
+html:not([data-kasa-card-sheen="off"])[data-bs-theme="light"] .vault-card-shell.glass::before {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.50), transparent 80%),
+        radial-gradient(120% 200% at 50% 0%, rgba(var(--accent-rgb), 0.05), transparent 62%);
+    border-top: 1px solid rgba(255,255,255,0.55);
+}
+
+html:not([data-kasa-card-frame="off"])[data-bs-theme="light"] .vault-card-shell.glass::after {
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.50),
+        inset 1px 1px 0 0 rgba(255,255,255,0.60),
+        inset -1px -1px 0 0 rgba(255,255,255,0.20);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -105,6 +361,7 @@ html[data-glass-effects="off"] {
     --surface-hover:  rgba(33,37,64,0.98);
     --glass-blur:     none;
     --glass-blur-sm:  none;
+    --glass-vivid-blur: none;
 }
 html[data-bs-theme="light"][data-glass-effects="off"] {
     --glass:          rgba(255,255,255,0.96);
@@ -114,7 +371,22 @@ html[data-bs-theme="light"][data-glass-effects="off"] {
 
 /* Cam yüzeylerden blur'u kaldır */
 html[data-glass-effects="off"] .glass,
-html[data-glass-effects="off"] .glass-sm {
+html[data-glass-effects="off"] .glass-sm,
+html[data-glass-effects="off"] .settings-action-card,
+html[data-glass-effects="off"] .settings-toggle-card,
+html[data-glass-effects="off"] .filter-btn,
+html[data-glass-effects="off"] .kasa-btn:not(.kasa-btn-primary),
+html[data-glass-effects="off"] .kasa-dropdown-trigger,
+html[data-glass-effects="off"] #search-input,
+html[data-glass-effects="off"] .bulk-select-all-control,
+html[data-glass-effects="off"] .background-choice-grid button,
+html[data-glass-effects="off"] .accent-preset-row button,
+html[data-glass-effects="off"] .settings-appearance-card,
+html[data-glass-effects="off"] .settings-bg-card,
+html[data-glass-effects="off"] .generator-output-card,
+html[data-glass-effects="off"] .generator-options-card,
+html[data-glass-effects="off"] .generator-history-card,
+html[data-glass-effects="off"] .generator-strength-card {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
@@ -147,7 +419,8 @@ html[data-bs-theme="light"][data-glass-effects="off"] .vault-card-shell.glass {
 }
 
 /* ── LIGHT TEMA: cam yüzeyler ─────────────────────────────────── */
-[data-bs-theme="light"] .glass,
+/* Kasa kartları hariç: kartlar kalıcı vivid cam görünümünü korur. */
+[data-bs-theme="light"] .glass:not(.vault-card-shell),
 [data-bs-theme="light"] .glass-sm {
     background: rgba(255,255,255,0.68) !important;
     border-color: var(--glass-border) !important;
@@ -238,6 +511,22 @@ html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] 
     grid-column: auto;
 }
 
+/* ── KART DETAY ANAHTARLARI (vault kartı cam dili) ────────────── */
+/* Sheen/frame/depth anahtar kartları: vault kartlarıyla aynı cam
+   malzemesi (.vault-card-shell.glass) — üst ışıltı + buzlu çerçeve
+   + katmanlı derinlik. İçerik flex düzeni HTML'den gelir. */
+.card-detail-toggle-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: stretch;
+    gap: 0.7rem;
+}
+
+.card-detail-toggle-row > .vault-card-shell {
+    flex: 1;
+    min-width: 0;
+}
+
 /* ── DAR EKRAN: cam kartlar alt alta ──────────────────────────── */
 @media (max-width: 620px) {
     .settings-panel > .glass-sm:not(.settings-appearance-card):not(.settings-bg-card),
@@ -250,7 +539,8 @@ html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] 
     }
 
     .chroma-toggle-row,
-    .glass-toggle-row {
+    .glass-toggle-row,
+    .card-detail-toggle-row {
         flex-direction: column;
     }
 }
@@ -358,7 +648,7 @@ html[data-glass-effects="off"] .glass-grain {
    yapılandırılmaz. Yeni katmanlar yalnızca ::before/::after
    pseudo-elementleriyle eklenir:
      data-glass-quality="low"    : minimal, YENİ KATMAN YOK
-     data-glass-quality="normal" : buzlu mat cam (grain + tek iç highlight)
+     data-glass-quality="normal" : tek iç highlight (üst kenar)
      data-glass-quality="high"   : parlak premium cam (edge highlight +
                                    specular parlama + satürasyon)
    data-glass-effects="off", data-kasa-low-power="on" ve quality="low"
@@ -391,10 +681,22 @@ html[data-glass-quality="normal"] .glass::before,
 html[data-glass-quality="normal"] .glass::after,
 html[data-glass-quality="normal"] .glass-sm::before,
 html[data-glass-quality="normal"] .glass-sm::after,
+html[data-glass-quality="normal"] .settings-action-card::before,
+html[data-glass-quality="normal"] .settings-action-card::after,
+html[data-glass-quality="normal"] .settings-toggle-card::before,
+html[data-glass-quality="normal"] .settings-toggle-card::after,
+html[data-glass-quality="normal"] .filter-btn::before,
+html[data-glass-quality="normal"] .filter-btn::after,
 html[data-glass-quality="high"] .glass::before,
 html[data-glass-quality="high"] .glass::after,
 html[data-glass-quality="high"] .glass-sm::before,
-html[data-glass-quality="high"] .glass-sm::after {
+html[data-glass-quality="high"] .glass-sm::after,
+html[data-glass-quality="high"] .settings-action-card::before,
+html[data-glass-quality="high"] .settings-action-card::after,
+html[data-glass-quality="high"] .settings-toggle-card::before,
+html[data-glass-quality="high"] .settings-toggle-card::after,
+html[data-glass-quality="high"] .filter-btn::before,
+html[data-glass-quality="high"] .filter-btn::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -405,27 +707,27 @@ html[data-glass-quality="high"] .glass-sm::after {
 
 /* ── NORMAL: tek iç highlight (üst kenar) ─────────────────────── */
 html[data-glass-quality="normal"] .glass::before,
-html[data-glass-quality="normal"] .glass-sm::before {
+html[data-glass-quality="normal"] .glass-sm::before,
+html[data-glass-quality="normal"] .settings-action-card::before,
+html[data-glass-quality="normal"] .settings-toggle-card::before,
+html[data-glass-quality="normal"] .filter-btn::before {
     box-shadow: inset 0 1px 0 var(--glass-border-hi);
     background: none;
 }
 
-/* ── NORMAL: buzlu mat doku (paylaşılan SVG feTurbulence grain) ──
-   base.html'deki #kasa-glass-noise filter'ı (fractalNoise + saturate 0
-   + slope 0.035 alpha) tüm .glass/.glass-sm ::after katmanlarınca
-   ORTAKLAŞA kullanılır; her element için ayrı SVG render edilmez.
-   Chromium/Electron'da SVG filter'ları backdrop-filter olarak
-   desteklenir (kube.io tekniği). Ağır kalırsa 64x64 base64 noise PNG
-   arkaplan görseline geçilebilir. */
-html[data-glass-quality="normal"] .glass::after,
-html[data-glass-quality="normal"] .glass-sm::after {
-    backdrop-filter: url(#kasa-glass-noise);
-    -webkit-backdrop-filter: url(#kasa-glass-noise);
-}
+/* ── NORMAL: buzlu doku küresel .glass-grain katmanından gelir ──
+   Element başına SVG backdrop-filter (#kasa-glass-noise) kullanılmaz:
+   Chromium pencere arka plandayken bu katmanları tutarsız düşürüyor
+   ve bazı yüzeyler "canlı", bazıları "düz" kalıyordu. Taneli doku artık
+   tam ekran .glass-grain overlay'inden (deterministik, sabit opacity)
+   gelir; böylece TÜM yüzeyler her durumda aynı görünür. ::after boştur. */
 
 /* ── HIGH: üstten ışık yansıması (1px ince edge gradient) ─────── */
 html[data-glass-quality="high"] .glass::before,
-html[data-glass-quality="high"] .glass-sm::before {
+html[data-glass-quality="high"] .glass-sm::before,
+html[data-glass-quality="high"] .settings-action-card::before,
+html[data-glass-quality="high"] .settings-toggle-card::before,
+html[data-glass-quality="high"] .filter-btn::before {
     padding: 1px;
     background: var(--glass-edge-highlight);
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -436,7 +738,10 @@ html[data-glass-quality="high"] .glass-sm::before {
 
 /* ── HIGH: specular parlama noktası (sol-üst) ─────────────────── */
 html[data-glass-quality="high"] .glass::after,
-html[data-glass-quality="high"] .glass-sm::after {
+html[data-glass-quality="high"] .glass-sm::after,
+html[data-glass-quality="high"] .settings-action-card::after,
+html[data-glass-quality="high"] .settings-toggle-card::after,
+html[data-glass-quality="high"] .filter-btn::after {
     background: var(--glass-specular);
 }
 
@@ -446,20 +751,41 @@ html[data-glass-quality="low"] .glass::before,
 html[data-glass-quality="low"] .glass::after,
 html[data-glass-quality="low"] .glass-sm::before,
 html[data-glass-quality="low"] .glass-sm::after,
+html[data-glass-quality="low"] .settings-action-card::before,
+html[data-glass-quality="low"] .settings-action-card::after,
+html[data-glass-quality="low"] .settings-toggle-card::before,
+html[data-glass-quality="low"] .settings-toggle-card::after,
+html[data-glass-quality="low"] .filter-btn::before,
+html[data-glass-quality="low"] .filter-btn::after,
 html[data-glass-effects="off"] .glass::before,
 html[data-glass-effects="off"] .glass::after,
 html[data-glass-effects="off"] .glass-sm::before,
 html[data-glass-effects="off"] .glass-sm::after,
+html[data-glass-effects="off"] .settings-action-card::before,
+html[data-glass-effects="off"] .settings-action-card::after,
+html[data-glass-effects="off"] .settings-toggle-card::before,
+html[data-glass-effects="off"] .settings-toggle-card::after,
+html[data-glass-effects="off"] .filter-btn::before,
+html[data-glass-effects="off"] .filter-btn::after,
 html[data-kasa-low-power="on"] .glass::before,
 html[data-kasa-low-power="on"] .glass::after,
 html[data-kasa-low-power="on"] .glass-sm::before,
-html[data-kasa-low-power="on"] .glass-sm::after {
+html[data-kasa-low-power="on"] .glass-sm::after,
+html[data-kasa-low-power="on"] .settings-action-card::before,
+html[data-kasa-low-power="on"] .settings-action-card::after,
+html[data-kasa-low-power="on"] .settings-toggle-card::before,
+html[data-kasa-low-power="on"] .settings-toggle-card::after,
+html[data-kasa-low-power="on"] .filter-btn::before,
+html[data-kasa-low-power="on"] .filter-btn::after {
     content: none !important;
 }
 
 /* ── LIGHT TEMA: iç highlight beyaz parıltı olur (mavi ton yerine) ─ */
 [data-bs-theme="light"][data-glass-quality="normal"] .glass::before,
-[data-bs-theme="light"][data-glass-quality="normal"] .glass-sm::before {
+[data-bs-theme="light"][data-glass-quality="normal"] .glass-sm::before,
+[data-bs-theme="light"][data-glass-quality="normal"] .settings-action-card::before,
+[data-bs-theme="light"][data-glass-quality="normal"] .settings-toggle-card::before,
+[data-bs-theme="light"][data-glass-quality="normal"] .filter-btn::before {
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
 }
 

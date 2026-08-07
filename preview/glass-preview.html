@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="tr" data-kasa-background="aurora" data-bs-theme="dark" data-glass-quality="normal" data-glass-effects="on">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ŞifreKasam — Cam Efekti Önizleme</title>
+
+    <!-- Gerçek uygulama CSS'leri (base.html sırasıyla). Değişiklik yapınca
+         önizleme de otomatik güncellenir — test ettiğin = build'deki. -->
+    <link href="../flask_app/static/tailwind-lite.css?v=1.2" rel="stylesheet">
+    <link href="../flask_app/static/all.min.css" rel="stylesheet">
+    <link href="../flask_app/static/tokens.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/base.css?v=67" rel="stylesheet">
+    <link href="../flask_app/static/vault-form.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/utilities.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/buttons.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/cards.css?v=67" rel="stylesheet">
+    <link href="../flask_app/static/modals.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/theme-states.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/responsive.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/background.css?v=67" rel="stylesheet">
+    <link href="../flask_app/static/custom-select.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/settings-modal.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/date-picker.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/theme-overrides.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/misc.css?v=66" rel="stylesheet">
+    <link href="../flask_app/static/glass.css?v=73" rel="stylesheet">
+
+    <style>
+        /* ── ÖNİZLEME KONTROL ÇUBUĞU (uygulamayı etkilemez) ── */
+        body { padding-top: 168px; }
+        #preview-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 9990;
+            background: rgba(12, 14, 28, 0.92);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+            padding: 10px 14px;
+            font-family: "Segoe UI", system-ui, sans-serif;
+            color: #e2e8f0;
+        }
+        #preview-bar .prow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+        #preview-bar .prow:last-child { margin-bottom: 0; }
+        #preview-bar .plabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8b93ab; margin-right: 4px; min-width: 84px; }
+        #preview-bar button.pbtn {
+            border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06);
+            color: #cbd5e1; padding: 4px 10px; border-radius: 8px; font-size: 12px; cursor: pointer;
+            transition: all 0.12s ease;
+        }
+        #preview-bar button.pbtn:hover { background: rgba(255,255,255,0.12); }
+        #preview-bar button.pbtn.on { background: linear-gradient(110deg, rgba(124,111,247,0.5), rgba(79,145,255,0.35)); border-color: rgba(124,111,247,0.6); color: #fff; }
+        #preview-bar input[type="range"] { width: 220px; accent-color: #7c6ff7; }
+        #preview-bar .preadout { font-family: Consolas, monospace; font-size: 11px; color: #9fd7ff; background: rgba(0,0,0,0.35); padding: 3px 8px; border-radius: 6px; }
+        #preview-bar input[type="file"] { font-size: 11px; max-width: 210px; color: #94a3b8; }
+        #preview-bar .phint { font-size: 11px; color: #64748b; }
+        #preview-bar .psep { width: 1px; height: 22px; background: rgba(255,255,255,0.12); margin: 0 4px; }
+
+        .preview-section { margin-bottom: 2rem; }
+        .preview-section h3 { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 0.6rem; }
+    </style>
+</head>
+<body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
+
+    <div class="blob-accent" aria-hidden="true"></div>
+    <div id="custom-bg-layer" aria-hidden="true"></div>
+    <div class="glass-grain" aria-hidden="true"></div>
+
+    <!-- ═══ KONTROL ÇUBUĞU ═══ -->
+    <div id="preview-bar">
+        <div class="prow">
+            <span class="plabel">Arkaplan</span>
+            <button class="pbtn on" data-bg="aurora">Aurora</button>
+            <button class="pbtn" data-bg="mesh">Mesh</button>
+            <button class="pbtn" data-bg="midnight">Midnight</button>
+            <button class="pbtn" data-bg="plain">Plain</button>
+            <button class="pbtn" data-bg="custom">Fotoğraf</button>
+            <span class="psep"></span>
+            <button class="pbtn" data-preset="sunset">Gün batımı</button>
+            <button class="pbtn" data-preset="ocean">Deniz</button>
+            <button class="pbtn" data-preset="night">Gece</button>
+            <input type="file" id="bg-file" accept="image/*" title="Kendi fotoğrafını seç">
+        </div>
+        <div class="prow">
+            <span class="plabel">Tema</span>
+            <button class="pbtn on" data-theme="dark">Koyu</button>
+            <button class="pbtn" data-theme="light">Açık</button>
+            <span class="psep"></span>
+            <span class="plabel">Kalite</span>
+            <button class="pbtn" data-quality="low">Low</button>
+            <button class="pbtn on" data-quality="normal">Normal</button>
+            <button class="pbtn" data-quality="high">High</button>
+            <span class="psep"></span>
+            <span class="plabel">Efekt</span>
+            <button class="pbtn on" data-effects="on">Açık</button>
+            <button class="pbtn" data-effects="off">Kapalı</button>
+        </div>
+        <div class="prow">
+            <span class="plabel">Kart detayı</span>
+            <button class="pbtn on" data-card-detail="sheen">Işıltı</button>
+            <button class="pbtn on" data-card-detail="frame">Çerçeve</button>
+            <button class="pbtn on" data-card-detail="depth">Derinlik</button>
+        </div>
+        <div class="prow">
+            <span class="plabel">Buğuluk</span>
+            <input type="range" id="fog-slider" min="0" max="10" step="1" value="0" title="Geçici canlı önizleme — gerçek CSS'e yazmaz">
+            <span class="preadout" id="fog-out">blur(10px) · veil 0.067</span>
+            <button class="pbtn" id="fog-reset">Gerçek CSS'e dön</button>
+            <span class="phint">Kaydırıcı yalnızca ÖNİZLEME içindir; karar verince glass.css'e yazarız.</span>
+        </div>
+    </div>
+
+    <!-- ═══ DEMO İÇERİK ═══ -->
+    <div id="kasa-page-shell" class="max-w-6xl mx-auto px-4 py-10">
+
+        <div class="preview-section">
+            <h3>Filtre + Arama (cam ailesi)</h3>
+            <div class="flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex flex-wrap gap-1.5" id="category-filter" role="group" aria-label="Kayıt filtreleri">
+                        <button type="button" data-filter="all" class="filter-btn filter-btn-active active" aria-pressed="true">Tümü</button>
+                        <button type="button" data-filter="favorites" class="filter-btn" aria-pressed="false"><i class="fa-solid fa-star"></i> Favori</button>
+                        <button type="button" data-filter="Website" class="filter-btn" aria-pressed="false"><i class="fa-solid fa-globe"></i> Web</button>
+                        <button type="button" data-filter="Application" class="filter-btn" aria-pressed="false"><i class="fa-solid fa-desktop"></i> Uygulama</button>
+                        <button type="button" data-filter="CreditCard" class="filter-btn" aria-pressed="false"><i class="fa-solid fa-credit-card"></i> Kart</button>
+                        <button type="button" data-filter="SecureNote" class="filter-btn" aria-pressed="false"><i class="fa-solid fa-note-sticky"></i> Not</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button type="button" class="kasa-btn kasa-btn-muted kasa-transition-fast"><i class="fa-solid fa-check-square"></i> Toplu Seç</button>
+                    <div class="record-search-wrap">
+                        <label for="search-input" class="sr-only">Kayıt ara</label>
+                        <input type="text" id="search-input" placeholder="Arama yap…" autocomplete="off" class="w-full px-3 py-2 kasa-field text-sm">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <h3>Vault Kartları (.vault-card-shell.glass)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="card-container">
+
+                <article class="card-wrapper vault-card card-animated">
+                    <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
+                        <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
+                            <div class="vault-card-header flex justify-between items-start mb-3">
+                                <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
+                                    <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm"><i class="fa-solid fa-globe"></i></span>
+                                    <h2 class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">Örnek Web Sitesi</h2>
+                                </div>
+                                <button type="button" class="card-star-btn" aria-label="Favorile"><i class="fa-regular fa-star card-star-icon card-star-unpinned"></i></button>
+                            </div>
+                            <div class="vault-detail-list flex-1 text-sm">
+                                <div class="vault-detail-row vault-detail-row-action password-row">
+                                    <p class="vault-detail-main m-0">
+                                        <span class="vault-detail-label">Kullanıcı Adı</span>
+                                        <span class="vault-detail-value">demo.kullanici</span>
+                                    </p>
+                                    <div class="vault-row-actions">
+                                        <button type="button" class="card-icon-btn copy-username" title="Kopyala"><i class="fa-solid fa-copy text-xs"></i></button>
+                                    </div>
+                                </div>
+                                <div class="vault-detail-row vault-detail-row-action password-row">
+                                    <p class="vault-detail-main m-0">
+                                        <span class="vault-detail-label">Şifre</span>
+                                        <span class="password-field vault-detail-value vault-secret font-mono tracking-wide" data-visible="false">••••••••</span>
+                                    </p>
+                                    <div class="vault-row-actions">
+                                        <button type="button" class="card-icon-btn toggle-password" title="Göster/Gizle"><i class="fa-solid fa-eye text-xs"></i></button>
+                                    </div>
+                                </div>
+                                <div class="vault-detail-row">
+                                    <span class="vault-detail-label">E-posta</span>
+                                    <span class="vault-detail-value">ornek@mail.com</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end items-center gap-4 px-4 py-3 border-t border-kasa-border">
+                            <button type="button" class="footer-action-btn history-btn"><i class="fa-solid fa-clock-rotate-left mr-1 text-xs"></i>Geçmişi</button>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card-wrapper vault-card card-animated">
+                    <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
+                        <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
+                            <div class="vault-card-header flex justify-between items-start mb-3">
+                                <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
+                                    <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm"><i class="fa-solid fa-credit-card"></i></span>
+                                    <h2 class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">Kredi Kartı Örneği</h2>
+                                </div>
+                                <button type="button" class="card-star-btn" aria-label="Favorile"><i class="fa-solid fa-star card-star-icon is-pinned"></i></button>
+                            </div>
+                            <div class="vault-detail-list flex-1 text-sm">
+                                <div class="vault-detail-row vault-detail-row-action password-row">
+                                    <p class="vault-detail-main m-0">
+                                        <span class="vault-detail-label">Kart Numarası</span>
+                                        <span class="vault-detail-value">•••• •••• •••• 4321</span>
+                                    </p>
+                                    <div class="vault-row-actions">
+                                        <button type="button" class="card-icon-btn copy-username" title="Kopyala"><i class="fa-solid fa-copy text-xs"></i></button>
+                                    </div>
+                                </div>
+                                <div class="vault-detail-row vault-detail-row-action password-row">
+                                    <p class="vault-detail-main m-0">
+                                        <span class="vault-detail-label">CVV / Şifre</span>
+                                        <span class="password-field vault-detail-value vault-secret font-mono tracking-wide" data-visible="false">•••</span>
+                                    </p>
+                                    <div class="vault-row-actions">
+                                        <button type="button" class="card-icon-btn toggle-password" title="Göster/Gizle"><i class="fa-solid fa-eye text-xs"></i></button>
+                                    </div>
+                                </div>
+                                <div class="vault-detail-row vault-note-row">
+                                    <span class="vault-detail-label">Not</span>
+                                    <span class="vault-detail-value vault-note-text">Aylık otomatik ödeme için kullanılıyor.</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end items-center gap-4 px-4 py-3 border-t border-kasa-border">
+                            <button type="button" class="footer-action-btn history-btn"><i class="fa-solid fa-clock-rotate-left mr-1 text-xs"></i>Geçmişi</button>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card-wrapper vault-card card-animated">
+                    <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
+                        <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
+                            <div class="vault-card-header flex justify-between items-start mb-3">
+                                <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
+                                    <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm"><i class="fa-solid fa-note-sticky"></i></span>
+                                    <h2 class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">Güvenli Not</h2>
+                                </div>
+                                <button type="button" class="card-star-btn" aria-label="Favorile"><i class="fa-regular fa-star card-star-icon card-star-unpinned"></i></button>
+                            </div>
+                            <div class="vault-detail-list flex-1 text-sm">
+                                <div class="vault-detail-row vault-note-row">
+                                    <span class="vault-detail-label">Not</span>
+                                    <span class="vault-detail-value vault-note-text">Wi-Fi şifresi: ev ağının arka tarafındaki etikette. Yedek anahtarlar çekmecede.</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end items-center gap-4 px-4 py-3 border-t border-kasa-border">
+                            <button type="button" class="footer-action-btn history-btn"><i class="fa-solid fa-clock-rotate-left mr-1 text-xs"></i>Geçmişi</button>
+                        </div>
+                    </div>
+                </article>
+
+            </div>
+        </div>
+
+        <div class="preview-section" style="max-width: 560px;">
+            <h3>Ayarlar — switch &amp; aksiyon kartları (cam ailesi)</h3>
+            <div style="display:grid; gap:0.7rem;">
+                <div class="settings-toggle-card">
+                    <div class="settings-toggle-main">
+                        <div class="settings-toggle-copy">
+                            <h4>Donanım Hızlandırma</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">Grafik performansı için GPU hızlandırmayı kullan.</p>
+                        </div>
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" checked>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-toggle-card">
+                    <div class="settings-toggle-main">
+                        <div class="settings-toggle-copy">
+                            <h4>Tepsiye Küçült</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">Kapatınca uygulamayı sistem tepsisinde tut.</p>
+                        </div>
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox">
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-toggle-card">
+                    <div class="settings-toggle-main">
+                        <div class="settings-toggle-copy">
+                            <h4>Cam Efektleri</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">Buzlu cam yüzeylerini aç/kapat.</p>
+                        </div>
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" checked>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-action-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:0.7rem;">
+                    <button type="button" class="settings-action-card">
+                        <span class="settings-action-icon"><i class="fa-solid fa-upload"></i></span>
+                        <span class="settings-action-copy">
+                            <strong>İçe Aktar</strong>
+                            <small>Yedek dosyasından kayıt ekle.</small>
+                        </span>
+                        <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                    </button>
+                    <button type="button" class="settings-action-card">
+                        <span class="settings-action-icon settings-action-icon-success"><i class="fa-solid fa-download"></i></span>
+                        <span class="settings-action-copy">
+                            <strong>Dışa Aktar</strong>
+                            <small>Yedek formatını seçin.</small>
+                        </span>
+                        <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="preview-section" style="max-width: 560px;">
+            <h3>Şifre Üretici kartı (.generator-output-card)</h3>
+            <div class="generator-output-card" style="padding:1rem 1.1rem;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:0.6rem;">
+                    <strong style="font-size:0.82rem;">Örnek Parola</strong>
+                    <button type="button" class="card-icon-btn" title="Kopyala"><i class="fa-solid fa-copy text-xs"></i></button>
+                </div>
+                <div class="font-mono" style="font-size:1.05rem; letter-spacing:0.08em;">s7-Kv!3xP@9mZq</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        (function () {
+            var root = document.documentElement;
+
+            /* ── Kontrol çubuğu: aktif buton takibi ── */
+            function setActive(groupAttr, value) {
+                document.querySelectorAll('#preview-bar button[' + groupAttr + ']').forEach(function (b) {
+                    b.classList.toggle('on', b.getAttribute(groupAttr) === value);
+                });
+            }
+
+            /* ── Arkaplan ── */
+            document.querySelectorAll('#preview-bar [data-bg]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var v = btn.getAttribute('data-bg');
+                    root.setAttribute('data-kasa-background', v);
+                    setActive('data-bg', v);
+                    var layer = document.getElementById('custom-bg-layer');
+                    if (v === 'custom') {
+                        layer.classList.add('is-active');
+                    } else {
+                        layer.classList.remove('is-active');
+                        layer.style.backgroundImage = '';
+                    }
+                });
+            });
+
+            /* ── Fotoğraf örnekleri (SVG) ── */
+            var presets = {
+                sunset: '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1055"/><stop offset=".45" stop-color="#7597de"/><stop offset=".78" stop-color="#ff9a8b"/><stop offset="1" stop-color="#ffd3a5"/></linearGradient><radialGradient id="s"><stop offset="0" stop-color="#fff3c4"/><stop offset="1" stop-color="#ff9a8b"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><circle cx="1150" cy="760" r="240" fill="url(#s)" opacity=".92"/></svg>',
+                ocean: '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f3a5f"/><stop offset=".55" stop-color="#1d7a8c"/><stop offset="1" stop-color="#0c1e33"/></linearGradient><radialGradient id="h"><stop offset="0" stop-color="#cfefff" stop-opacity=".9"/><stop offset="1" stop-color="#cfefff" stop-opacity="0"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><rect y="300" width="1600" height="130" fill="url(#h)"/></svg>',
+                night: '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a0a18"/><stop offset=".6" stop-color="#1a1440"/><stop offset="1" stop-color="#0d0b1f"/></linearGradient><radialGradient id="c1"><stop offset="0" stop-color="#f472b6" stop-opacity=".55"/><stop offset="1" stop-color="#f472b6" stop-opacity="0"/></radialGradient><radialGradient id="c2"><stop offset="0" stop-color="#60a5fa" stop-opacity=".5"/><stop offset="1" stop-color="#60a5fa" stop-opacity="0"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><circle cx="420" cy="300" r="280" fill="url(#c1)"/><circle cx="1180" cy="620" r="300" fill="url(#c2)"/></svg>'
+            };
+
+            function applyCustomBg(url) {
+                root.setAttribute('data-kasa-background', 'custom');
+                setActive('data-bg', 'custom');
+                var layer = document.getElementById('custom-bg-layer');
+                layer.classList.add('is-active');
+                layer.style.backgroundImage = 'url("' + url + '")';
+            }
+
+            document.querySelectorAll('#preview-bar [data-preset]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    applyCustomBg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(presets[btn.getAttribute('data-preset')]));
+                });
+            });
+
+            document.getElementById('bg-file').addEventListener('change', function () {
+                var file = this.files && this.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = function () { applyCustomBg(reader.result); };
+                reader.readAsDataURL(file);
+            });
+
+            /* ── Tema / Kalite / Efekt ── */
+            document.querySelectorAll('#preview-bar [data-theme]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var v = btn.getAttribute('data-theme');
+                    root.setAttribute('data-bs-theme', v);
+                    setActive('data-theme', v);
+                });
+            });
+            document.querySelectorAll('#preview-bar [data-quality]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var v = btn.getAttribute('data-quality');
+                    root.setAttribute('data-glass-quality', v);
+                    setActive('data-quality', v);
+                });
+            });
+            document.querySelectorAll('#preview-bar [data-effects]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var v = btn.getAttribute('data-effects');
+                    root.setAttribute('data-glass-effects', v);
+                    setActive('data-effects', v);
+                });
+            });
+            document.querySelectorAll('#preview-bar [data-card-detail]').forEach(function (btn) {
+                var detail = btn.getAttribute('data-card-detail');
+                var sync = function () {
+                    btn.classList.toggle('on', root.getAttribute('data-kasa-card-' + detail) !== 'off');
+                };
+                sync();
+                btn.addEventListener('click', function () {
+                    var next = root.getAttribute('data-kasa-card-' + detail) === 'off' ? 'on' : 'off';
+                    root.setAttribute('data-kasa-card-' + detail, next);
+                    sync();
+                });
+            });
+
+            /* ── Buğuluk kaydırıcısı (yalnızca önizleme) ──
+               --glass-vivid-blur / --glass-vivid-veil token'larını
+               inline geçersiz kılar; karar verince glass.css'e yazılır. */
+            var slider = document.getElementById('fog-slider');
+            var out = document.getElementById('fog-out');
+
+            function isLight() { return root.getAttribute('data-bs-theme') === 'light'; }
+
+            function applyFog() {
+                var fog = parseInt(slider.value, 10) || 0;
+                if (fog <= 0) { clearFog(); return; }
+                var blur = 10 + fog * 1.4;                 /* 10 → 24px */
+                var saturate = root.getAttribute('data-glass-quality') === 'high' ? 1.8 : 1.55;
+                var veil = isLight() ? 0.66 + fog * 0.02   /* 0.66 → 0.86 */
+                                     : 0.067 + fog * 0.004; /* 0.067 → 0.107 */
+                root.style.setProperty('--glass-vivid-blur', 'blur(' + blur.toFixed(0) + 'px) saturate(' + saturate + ')');
+                root.style.setProperty('--glass-vivid-veil', 'rgba(255,255,255,' + veil.toFixed(3) + ')');
+                out.textContent = 'blur(' + blur.toFixed(0) + 'px) · veil ' + veil.toFixed(3) + ' [ÖNİZLEME]';
+            }
+
+            function clearFog() {
+                root.style.removeProperty('--glass-vivid-blur');
+                root.style.removeProperty('--glass-vivid-veil');
+                slider.value = 0;
+                var isHigh = root.getAttribute('data-glass-quality') === 'high';
+                var baseBlur = isHigh ? '14px' : '10px';
+                var baseVeil = isLight() ? (isHigh ? '0.50' : '0.66') : (isHigh ? '0.055' : '0.067');
+                out.textContent = 'blur(' + baseBlur + ') · veil ' + baseVeil + ' (gerçek CSS)';
+            }
+
+            slider.addEventListener('input', applyFog);
+            document.getElementById('fog-reset').addEventListener('click', clearFog);
+            clearFog();
+        })();
+    </script>
+</body>
+</html>

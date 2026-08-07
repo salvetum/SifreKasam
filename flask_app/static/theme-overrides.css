@@ -78,7 +78,11 @@ html[data-glass-effects="off"] .settings-action-card,
 html[data-glass-effects="off"] .settings-appearance-card,
 html[data-glass-effects="off"] .settings-bg-card,
 html[data-glass-effects="off"] .background-choice-grid button,
-html[data-glass-effects="off"] .accent-preset-row button {
+html[data-glass-effects="off"] .accent-preset-row button,
+html[data-glass-effects="off"] .kasa-btn:not(.kasa-btn-primary),
+html[data-glass-effects="off"] .kasa-dropdown-trigger,
+html[data-glass-effects="off"] #search-input,
+html[data-glass-effects="off"] .bulk-select-all-control {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     border-color: rgba(var(--accent-rgb),0.20) !important;
@@ -113,7 +117,11 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-action-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-appearance-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-bg-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .background-choice-grid button,
-html[data-bs-theme="light"][data-glass-effects="off"] .accent-preset-row button {
+html[data-bs-theme="light"][data-glass-effects="off"] .accent-preset-row button,
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-btn:not(.kasa-btn-primary),
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-dropdown-trigger,
+html[data-bs-theme="light"][data-glass-effects="off"] #search-input,
+html[data-bs-theme="light"][data-glass-effects="off"] .bulk-select-all-control {
     border-color: rgba(var(--accent-rgb),0.18) !important;
     background:
         radial-gradient(circle at top left, rgba(var(--accent-rgb),0.07), transparent 42%),

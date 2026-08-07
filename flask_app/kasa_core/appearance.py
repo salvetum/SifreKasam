@@ -9,6 +9,9 @@ from typing import Any
 
 from kasa_core.constants import (
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
+    DEFAULT_CARD_DEPTH_ENABLED,
+    DEFAULT_CARD_FRAME_ENABLED,
+    DEFAULT_CARD_SHEEN_ENABLED,
     DEFAULT_CHROMA_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GRADIENTS_ENABLED,
@@ -283,6 +286,60 @@ class AppearanceSettings:
         enabled = normalize_theme_option(value, DEFAULT_GRADIENTS_ENABLED)
         self.set_setting("gradients_enabled", str(enabled).lower())
         self.save_file(gradients_enabled=enabled)
+        return enabled
+
+    def get_card_sheen_enabled(self) -> bool:
+        try:
+            value = self.get_setting("card_sheen_enabled")
+            if value is not None:
+                return normalize_theme_option(value, DEFAULT_CARD_SHEEN_ENABLED)
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("card_sheen_enabled"),
+            DEFAULT_CARD_SHEEN_ENABLED,
+        )
+
+    def save_card_sheen(self, value: object) -> bool:
+        enabled = normalize_theme_option(value, DEFAULT_CARD_SHEEN_ENABLED)
+        self.set_setting("card_sheen_enabled", str(enabled).lower())
+        self.save_file(card_sheen_enabled=enabled)
+        return enabled
+
+    def get_card_frame_enabled(self) -> bool:
+        try:
+            value = self.get_setting("card_frame_enabled")
+            if value is not None:
+                return normalize_theme_option(value, DEFAULT_CARD_FRAME_ENABLED)
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("card_frame_enabled"),
+            DEFAULT_CARD_FRAME_ENABLED,
+        )
+
+    def save_card_frame(self, value: object) -> bool:
+        enabled = normalize_theme_option(value, DEFAULT_CARD_FRAME_ENABLED)
+        self.set_setting("card_frame_enabled", str(enabled).lower())
+        self.save_file(card_frame_enabled=enabled)
+        return enabled
+
+    def get_card_depth_enabled(self) -> bool:
+        try:
+            value = self.get_setting("card_depth_enabled")
+            if value is not None:
+                return normalize_theme_option(value, DEFAULT_CARD_DEPTH_ENABLED)
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("card_depth_enabled"),
+            DEFAULT_CARD_DEPTH_ENABLED,
+        )
+
+    def save_card_depth(self, value: object) -> bool:
+        enabled = normalize_theme_option(value, DEFAULT_CARD_DEPTH_ENABLED)
+        self.set_setting("card_depth_enabled", str(enabled).lower())
+        self.save_file(card_depth_enabled=enabled)
         return enabled
 
     def get_hardware_acceleration_enabled(self) -> bool:

@@ -217,8 +217,15 @@ body::after {
 }
 
 /* ── ANİMASYONLAR ────────────────────────────────────────────── */
+/* DİKKAT: animation-fill-mode ("both") KULLANILMAZ. Vault kartlarının
+   wrapper'ında (.card-wrapper) kalıcı transform: translateY(0) bırakır;
+   Chromium wrapper'ı composited layer olarak tutup, içindeki backdrop-
+   filter'lı shell'in arkaplan örneklemesini boşaltır → camın buğusu
+   yalnızca kartlarda kaybolur (settings kartlarında wrapper olmadığı için
+   sorun yok). Son kare zaten doğal durumla aynı (opacity:1, translateY:0),
+   bu yüzden fill-mode'suz görsel fark yoktur. */
 .card-animated {
-    animation: fadeUp 0.24s cubic-bezier(0.2,0.8,0.2,1) both;
+    animation: fadeUp 0.24s cubic-bezier(0.2,0.8,0.2,1);
 }
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
@@ -229,12 +236,10 @@ body::after {
     from {
         opacity: 0;
         transform: translateY(12px) scale(0.985);
-        filter: blur(6px);
     }
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
-        filter: blur(0);
     }
 }
 

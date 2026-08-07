@@ -92,6 +92,7 @@
 
 /* ── Filtre butonları */
 .filter-btn {
+    position: relative;
     isolation: isolate;
     display: inline-flex;
     align-items: center;
@@ -128,7 +129,9 @@
 .filter-btn:focus-visible { box-shadow: var(--focus-ring); }
 
 .filter-btn.filter-activating {
-    animation: filterPillActivate 0.3s cubic-bezier(0.16,1,0.3,1) both;
+    /* fill-mode'suz: glass butonun composited kalmasını (→ kendi buğusunu
+       kaybetmesini) önlemek için `both` KULLANILMAZ (bkz. base.css kart notu). */
+    animation: filterPillActivate 0.3s cubic-bezier(0.16,1,0.3,1);
 }
 
 @keyframes filterPillActivate {

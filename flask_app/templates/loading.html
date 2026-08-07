@@ -114,7 +114,6 @@
                 ? backgroundValue
                 : 'aurora';
 
-            document.documentElement.classList.toggle('dark', theme !== 'light');
             document.documentElement.setAttribute('data-bs-theme', theme);
             document.documentElement.setAttribute('data-glass-effects', glass);
             document.documentElement.setAttribute('data-glass-quality', glassQuality);
@@ -183,7 +182,6 @@
                 }
             });
         } catch (_) {
-            document.documentElement.classList.add('dark');
         }
     </script>
     <style nonce="{{ csp_nonce }}">

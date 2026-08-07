@@ -35,6 +35,9 @@ from kasa_core.constants import (
     DEFAULT_BACKGROUND_STYLE,
     DEFAULT_CHROMA_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_SPEED,
+    DEFAULT_CARD_DEPTH_ENABLED,
+    DEFAULT_CARD_FRAME_ENABLED,
+    DEFAULT_CARD_SHEEN_ENABLED,
     DEFAULT_CATEGORY,
     DEFAULT_CONTENT_PROTECTION_ENABLED,
     DEFAULT_GLASS_QUALITY,
@@ -44,7 +47,6 @@ from kasa_core.constants import (
     LEGACY_PBKDF2_ITERATIONS,
     LEGACY_PBKDF2_SALT,
     MAX_BULK_IDS,
-    PBKDF2_ITERATIONS,
     PBKDF2_SALT_SETTING,
     RECORD_METADATA_FIELDS,
     RECORD_METADATA_PREFIX,
@@ -78,7 +80,6 @@ from kasa_core.import_export import (
     parse_import_record as _parse_import_record_data,
     parse_old_txt,
     serialize_records as _serialize_records,
-    serialize_records_txt as _serialize_records_txt,
 )
 from kasa_core.models import PasswordHistory, Record, Setting, User
 from kasa_core.paths import (
@@ -100,14 +101,8 @@ from kasa_core.reports import (
     build_vault_report_payloads as _calculate_vault_report_payloads,
 )
 from kasa_core.validation import (
-    normalize_background_style,
-    normalize_glass_effects,
-    normalize_glass_quality,
-    normalize_hex_color,
     normalize_record_type,
     normalize_text,
-    normalize_theme,
-    normalize_theme_option,
     normalize_url,
     safe_int,
 )
@@ -115,7 +110,6 @@ from kasa_core.versioning import (
     fetch_latest_release,
     is_newer_version as _is_newer_version,
     normalize_version as _normalize_version,
-    version_parts as _version_parts,
 )
 
 # ─── UYGULAMA KURULUMU ────────────────────────────────────────────────────────
@@ -176,7 +170,6 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 _appearance_settings = AppearanceSettings(THEME_FILE)
-_load_appearance_file = _appearance_settings.load_file
 _save_appearance_file = _appearance_settings.save_file
 _get_setting = _appearance_settings.get_setting
 _set_setting = _appearance_settings.set_setting
@@ -190,6 +183,9 @@ get_glass_quality = _appearance_settings.get_glass_quality
 get_animated_backgrounds_enabled = _appearance_settings.get_animated_backgrounds_enabled
 get_interface_animations_enabled = _appearance_settings.get_interface_animations_enabled
 get_gradients_enabled = _appearance_settings.get_gradients_enabled
+get_card_sheen_enabled = _appearance_settings.get_card_sheen_enabled
+get_card_frame_enabled = _appearance_settings.get_card_frame_enabled
+get_card_depth_enabled = _appearance_settings.get_card_depth_enabled
 get_hardware_acceleration_enabled = _appearance_settings.get_hardware_acceleration_enabled
 save_glass_effects = _appearance_settings.save_glass_effects
 save_theme = _appearance_settings.save_theme
@@ -203,6 +199,9 @@ save_glass_quality = _appearance_settings.save_glass_quality
 save_animated_backgrounds = _appearance_settings.save_animated_backgrounds
 save_interface_animations = _appearance_settings.save_interface_animations
 save_gradients = _appearance_settings.save_gradients
+save_card_sheen = _appearance_settings.save_card_sheen
+save_card_frame = _appearance_settings.save_card_frame
+save_card_depth = _appearance_settings.save_card_depth
 save_hardware_acceleration = _appearance_settings.save_hardware_acceleration
 
 _translation_service = TranslationService(
@@ -512,6 +511,9 @@ def inject_globals():
     animated_backgrounds = DEFAULT_ANIMATED_BACKGROUNDS_ENABLED
     interface_animations = DEFAULT_INTERFACE_ANIMATIONS_ENABLED
     gradients_enabled  = DEFAULT_GRADIENTS_ENABLED
+    card_sheen_enabled = DEFAULT_CARD_SHEEN_ENABLED
+    card_frame_enabled = DEFAULT_CARD_FRAME_ENABLED
+    card_depth_enabled = DEFAULT_CARD_DEPTH_ENABLED
     hardware_acceleration = DEFAULT_HARDWARE_ACCELERATION_ENABLED
     lan_enabled        = False
     try:
@@ -532,6 +534,9 @@ def inject_globals():
         animated_backgrounds = get_animated_backgrounds_enabled()
         interface_animations = get_interface_animations_enabled()
         gradients_enabled = get_gradients_enabled()
+        card_sheen_enabled = get_card_sheen_enabled()
+        card_frame_enabled = get_card_frame_enabled()
+        card_depth_enabled = get_card_depth_enabled()
         hardware_acceleration = get_hardware_acceleration_enabled()
         le           = _get_setting('lan_enabled')
         if le is not None:
@@ -557,6 +562,9 @@ def inject_globals():
         'ANIMATED_BACKGROUNDS_ENABLED': animated_backgrounds,
         'INTERFACE_ANIMATIONS_ENABLED': interface_animations,
         'GRADIENTS_ENABLED':     gradients_enabled,
+        'CARD_SHEEN_ENABLED':    card_sheen_enabled,
+        'CARD_FRAME_ENABLED':    card_frame_enabled,
+        'CARD_DEPTH_ENABLED':    card_depth_enabled,
         'HARDWARE_ACCELERATION_ENABLED': hardware_acceleration,
         'LAN_ENABLED':           lan_enabled,
         'CURRENT_LANG':          current_lang,
@@ -1211,6 +1219,12 @@ def save_settings():
         'true' if request.form.get('interface_animations_enabled') else 'false')
     save_gradients(
         'true' if request.form.get('gradients_enabled') else 'false')
+    save_card_sheen(
+        'true' if request.form.get('card_sheen_enabled') else 'false')
+    save_card_frame(
+        'true' if request.form.get('card_frame_enabled') else 'false')
+    save_card_depth(
+        'true' if request.form.get('card_depth_enabled') else 'false')
     save_hardware_acceleration(
         'true' if request.form.get('hardware_acceleration_enabled') else 'false')
     _set_setting('lan_enabled',
@@ -1228,6 +1242,9 @@ def save_settings():
             "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
             "interface_animations_enabled": get_interface_animations_enabled(),
             "gradients_enabled": get_gradients_enabled(),
+            "card_sheen_enabled": get_card_sheen_enabled(),
+            "card_frame_enabled": get_card_frame_enabled(),
+            "card_depth_enabled": get_card_depth_enabled(),
             "hardware_acceleration_enabled": get_hardware_acceleration_enabled(),
             "lan_enabled": _lan_access_enabled(),
         })
@@ -1424,15 +1441,6 @@ def lan_info():
         'ssl': os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE),
     })
 
-@app.route('/settings/theme', methods=['GET', 'POST'])
-@login_required
-def settings_theme():
-    if request.method == 'POST':
-        theme = save_theme(request_json().get('theme'))
-        db.session.commit()
-        return jsonify({"status": "ok", "theme": theme})
-    return jsonify({"theme": get_saved_theme()})
-
 @app.route('/settings/theme-mode', methods=['GET', 'POST'])
 @login_required
 def settings_theme_mode():
@@ -1498,6 +1506,21 @@ def settings_appearance():
             if 'gradients_enabled' in data
             else get_gradients_enabled()
         )
+        card_sheen = (
+            save_card_sheen(data.get('card_sheen_enabled'))
+            if 'card_sheen_enabled' in data
+            else get_card_sheen_enabled()
+        )
+        card_frame = (
+            save_card_frame(data.get('card_frame_enabled'))
+            if 'card_frame_enabled' in data
+            else get_card_frame_enabled()
+        )
+        card_depth = (
+            save_card_depth(data.get('card_depth_enabled'))
+            if 'card_depth_enabled' in data
+            else get_card_depth_enabled()
+        )
         db.session.commit()
         return jsonify({
             "status": "ok",
@@ -1509,6 +1532,9 @@ def settings_appearance():
             "animated_backgrounds_enabled": animated_backgrounds,
             "interface_animations_enabled": interface_animations,
             "gradients_enabled": gradients,
+            "card_sheen_enabled": card_sheen,
+            "card_frame_enabled": card_frame,
+            "card_depth_enabled": card_depth,
         })
     return jsonify({
         "accent_color": get_saved_accent_color(),
@@ -1520,6 +1546,9 @@ def settings_appearance():
         "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
         "interface_animations_enabled": get_interface_animations_enabled(),
         "gradients_enabled": get_gradients_enabled(),
+        "card_sheen_enabled": get_card_sheen_enabled(),
+        "card_frame_enabled": get_card_frame_enabled(),
+        "card_depth_enabled": get_card_depth_enabled(),
     })
 
 # ─── ÖZEL ARKA PLAN YÜKLEME ─────────────────────────────────────────────────

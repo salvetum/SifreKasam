@@ -19,7 +19,7 @@ let lastToast = null;
   };
 
   export const TOAST_BASE = {
-    duration: 2000, close: false,
+    duration: 3500, close: false,
     gravity: 'bottom', position: 'right', stopOnFocus: true,
   };
 

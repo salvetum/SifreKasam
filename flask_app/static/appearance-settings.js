@@ -43,7 +43,6 @@ export function initAppearanceSettings({
   const applyEffectiveTheme = (mode) => {
     const effective = resolveEffectiveTheme(mode);
     document.documentElement.setAttribute('data-bs-theme', effective);
-    document.documentElement.classList.toggle('dark', effective === 'dark');
     localStorage.setItem('kasa-theme', effective);
     return effective;
   };
@@ -122,6 +121,9 @@ export function initAppearanceSettings({
   const motionToggle = document.getElementById('animated-backgrounds-toggle');
   const interfaceAnimationsToggle = document.getElementById('interface-animations-toggle');
   const gradientsToggle = document.getElementById('gradients-toggle');
+  const cardSheenToggle = document.getElementById('card-sheen-toggle');
+  const cardFrameToggle = document.getElementById('card-frame-toggle');
+  const cardDepthToggle = document.getElementById('card-depth-toggle');
   const hardwareAccelerationToggle = document.getElementById('hardware-acceleration-toggle');
 
   const setupThemeFeatureToggle = (toggle, attribute, storageKey, apiKey) => {
@@ -150,6 +152,24 @@ export function initAppearanceSettings({
     'data-kasa-gradient',
     'kasa-gradients',
     'gradients_enabled'
+  );
+  setupThemeFeatureToggle(
+    cardSheenToggle,
+    'data-kasa-card-sheen',
+    'kasa-card-sheen',
+    'card_sheen_enabled'
+  );
+  setupThemeFeatureToggle(
+    cardFrameToggle,
+    'data-kasa-card-frame',
+    'kasa-card-frame',
+    'card_frame_enabled'
+  );
+  setupThemeFeatureToggle(
+    cardDepthToggle,
+    'data-kasa-card-depth',
+    'kasa-card-depth',
+    'card_depth_enabled'
   );
 
   if (hardwareAccelerationToggle) {
@@ -332,6 +352,9 @@ export function initAppearanceSettings({
         animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
         interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
         gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
+        card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
+        card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
+        card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
       }).finally(() => { appearanceSavePromise = null; });
     }, 250);
   };
@@ -349,8 +372,15 @@ export function initAppearanceSettings({
       animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
       interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
       gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
+      card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
+      card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
+      card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
     }).finally(() => { appearanceSavePromise = null; });
     return appearanceSavePromise;
+  };
+
+  const cancelPendingAppearanceSave = () => {
+    clearTimeout(appearanceSaveTimer);
   };
 
   const syncChromaSpeedVisibility = (enabled, animate = true) => {
@@ -590,11 +620,15 @@ export function initAppearanceSettings({
           ? window._('Aktif')
           : window._('Bu arkaplanı aktifleştir'));
 
+        const photo = document.createElement('div');
+        photo.className = 'custom-bg-thumb-photo';
+        wrap.appendChild(photo);
+
         const img = document.createElement('img');
         img.src = item.url;
         img.alt = '';
         img.loading = 'lazy';
-        wrap.appendChild(img);
+        photo.appendChild(img);
 
         const fileTypeLabel = (mime) => {
           const map = {
@@ -606,6 +640,9 @@ export function initAppearanceSettings({
           return map[mime] || (mime ? String(mime).split('/').pop().toUpperCase() : '');
         };
 
+        const label = document.createElement('div');
+        label.className = 'custom-bg-thumb-label';
+
         const tooltipText = [
           fileTypeLabel(item.mime),
           formatBytes(item.size),
@@ -615,15 +652,16 @@ export function initAppearanceSettings({
           const tooltip = document.createElement('span');
           tooltip.className = 'custom-bg-thumb-tooltip';
           tooltip.textContent = tooltipText;
-          wrap.appendChild(tooltip);
+          label.appendChild(tooltip);
         }
 
         if (item.is_active) {
           const badge = document.createElement('span');
           badge.className = 'custom-bg-thumb-badge';
           badge.textContent = window._('Aktif');
-          wrap.appendChild(badge);
+          label.appendChild(badge);
         }
+        wrap.appendChild(label);
 
         const del = document.createElement('button');
         del.type = 'button';
@@ -632,7 +670,7 @@ export function initAppearanceSettings({
         const icon = document.createElement('i');
         icon.className = 'fa-solid fa-xmark';
         del.appendChild(icon);
-        wrap.appendChild(del);
+        photo.appendChild(del);
 
         const activate = async () => {
           if (!item.is_active) {
@@ -767,8 +805,12 @@ export function initAppearanceSettings({
     motionToggle,
     interfaceAnimationsToggle,
     gradientsToggle,
+    cardSheenToggle,
+    cardFrameToggle,
+    cardDepthToggle,
     hardwareAccelerationToggle,
     updateAppearance,
+    cancelPendingAppearanceSave,
   };
 
 }

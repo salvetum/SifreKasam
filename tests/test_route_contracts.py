@@ -134,6 +134,21 @@ class RouteContractTests(unittest.TestCase):
         self.assertIn("missing_requirements", payload)
         self.assertNotIn("password", payload)
 
+    def test_settings_save_must_not_reference_module_local_timer(self) -> None:
+        """The settings form save previously crashed with a ReferenceError.
+
+        ``appearanceSaveTimer`` lives inside ``appearance-settings.js`` (an ES
+        module) but ``app.js`` referenced it directly after the module split,
+        which raised *after* the loading overlay was shown and left it stuck on
+        every settings save. The save must use the exported canceller instead.
+        """
+        app_js = (ROOT / "flask_app" / "static" / "app.js").read_text(encoding="utf-8")
+        appearance_js = (ROOT / "flask_app" / "static" / "appearance-settings.js").read_text(encoding="utf-8")
+
+        self.assertNotIn("clearTimeout(appearanceSaveTimer)", app_js)
+        self.assertIn("cancelPendingAppearanceSave", app_js)
+        self.assertIn("cancelPendingAppearanceSave,", appearance_js)
+
 
 if __name__ == "__main__":
     unittest.main()
