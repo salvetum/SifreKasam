@@ -250,6 +250,20 @@
     el.style.removeProperty('-webkit-backdrop-filter');
   }
 
+  /* Gizli (display:none) yüzeylerin inline url(#...) ile referans verdiği
+     filter tanımını prune listesinde TUT: yüzey tekrar görünür olduğunda
+     buğu 120-200ms'lik debounce beklenmeden anında gelir. Aksi halde
+     referans ölü filter'a düşer ve kart buğusuz flash yapar. */
+  function keepReferencedFilter(el, keepIds) {
+    if (!el || !keepIds) return;
+    var inline = el.style && el.style.backdropFilter;
+    if (!inline) return;
+    var m = /url\(#([^)]+)\)/.exec(inline);
+    if (m && svgRoot && svgRoot.querySelector('#' + m[1])) {
+      keepIds[m[1]] = true;
+    }
+  }
+
   function applyTo(el, spec, enabled, keepIds) {
     if (!enabled) {
       clearFrom(el);
@@ -257,7 +271,9 @@
     }
     var rect = visibleRect(el);
     if (!rect) {
-      clearFrom(el);
+      /* Görünmeyen yüzey: inline stili ve filter tanımını koru
+         (display:none iken GPU maliyeti yok). */
+      keepReferencedFilter(el, keepIds);
       return;
     }
     var w = Math.max(2, Math.round(rect.width));
@@ -323,6 +339,11 @@
       });
     }
 
+    /* Görünürlük değişimlerinde (filtre/sayfa geçişi, modal aç/kapa)
+       anında buğu uygulanması için senkron bir kanal. Gönderen taraf
+       (ör. vault-index) kartlar görünür olduğunda bu event'i fırlatır. */
+    window.addEventListener('kasa:glass-refresh', refreshAll);
+
     /* Element boyutu değişince displacement map'i yeniden hesapla.
        ResizeObserver, pencere resize + modal açılış animasyonu + font
        değişimi gibi tüm boyut değişimlerini yakalar. Sık sık hesaplama
@@ -347,7 +368,9 @@
     }
     rescanObservedSurfaces();
 
-    /* Dinamik eklenen/çıkan cam yüzeyler için (debounced). */
+    /* Dinamik eklenen/çıkan cam yüzeyler + hidden/class görünürlük
+       değişimleri için (debounced). hidden değişimi childList değil
+       attribute olduğundan ayrıca izlenir. */
     var domTimer = null;
     new MutationObserver(function () {
       if (domTimer) return;
@@ -356,7 +379,12 @@
         refreshAll();
         rescanObservedSurfaces();
       }, 120);
-    }).observe(document.body, { childList: true, subtree: true });
+    }).observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'class']
+    });
   }
 
   if (document.readyState === 'loading') {

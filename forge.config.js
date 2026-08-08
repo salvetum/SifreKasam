@@ -18,6 +18,13 @@ module.exports = {
   packagerConfig: {
     asar: true,
     executableName: "SifreKasam",
+    ignore: [
+      /^\/preview($|\/)/,
+      /^\/tests($|\/)/,
+      /^\/.*\.md$/,
+      /^\/flask_app\/.*\.(db|sqlite|sqlite3|pem|key|crt|cer|log)$/,
+      /^\/flask_app\/(build|dist|__pycache__)($|\/)/
+    ],
     extraResource: [
       "./backend",
       "./favicon.ico",

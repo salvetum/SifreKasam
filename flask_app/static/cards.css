@@ -6,13 +6,11 @@
     border-radius: 16px;
     transition:
         transform 0.22s cubic-bezier(0.16,1,0.3,1),
-        box-shadow 0.22s ease,
-        filter 0.22s ease;
+        box-shadow 0.22s ease;
 }
 .vault-card:hover {
     transform: translateY(-5px) scale(1.006);
     box-shadow: 0 14px 34px var(--accent-glow);
-    filter: saturate(1.04);
 }
 .vault-card:active {
     transform: translateY(-1px) scale(0.998);
@@ -133,6 +131,8 @@
         radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.09), transparent 42%),
         rgba(255,255,255,0.045);
     box-shadow: 0 14px 34px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .card-pagination[hidden] {
@@ -184,6 +184,8 @@
     text-align: center;
     appearance: textfield;
     transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .card-page-jump-input::-webkit-inner-spin-button,
@@ -237,6 +239,8 @@
         border-color 160ms ease,
         background 160ms ease,
         color 160ms ease;
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .card-page-btn:hover,

@@ -108,7 +108,14 @@ html[data-kasa-low-power="on"] .settings-bg-card,
 html[data-kasa-low-power="on"] .generator-output-card,
 html[data-kasa-low-power="on"] .generator-options-card,
 html[data-kasa-low-power="on"] .generator-history-card,
-html[data-kasa-low-power="on"] .generator-strength-card {
+html[data-kasa-low-power="on"] .generator-strength-card,
+html[data-kasa-low-power="on"] .kasa-field,
+html[data-kasa-low-power="on"] .card-pagination,
+html[data-kasa-low-power="on"] .card-page-btn,
+html[data-kasa-low-power="on"] .card-page-jump-input,
+html[data-kasa-low-power="on"] .filter-empty-state,
+html[data-kasa-low-power="on"] .vault-strength-card,
+html[data-kasa-low-power="on"] .vault-generator-panel {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }

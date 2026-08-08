@@ -171,9 +171,19 @@ export function initVaultIndex({
         matchedCards.slice(startIndex, endIndex).map(item => item.wrapper)
       );
 
-      cardCache.forEach(({ wrapper }) =>
-        setCardVisible(wrapper, visibleWrappers.has(wrapper), animate)
-      );
+      let anyCardBecameVisible = false;
+      cardCache.forEach(({ wrapper }) => {
+        const willShow = visibleWrappers.has(wrapper);
+        if (willShow && wrapper.hidden) anyCardBecameVisible = true;
+        setCardVisible(wrapper, willShow, animate);
+      });
+
+      /* Tekrar görünen kartların buğusu (liquid-glass SVG filter'ı)
+         debounce beklemeden anında uygulansın; aksi halde ilk karede
+         buğusuz görünüp ~120-200ms sonra buğulanır ("2 kez yükleme"). */
+      if (anyCardBecameVisible) {
+        window.dispatchEvent(new CustomEvent('kasa:glass-refresh'));
+      }
 
       if (filterEmptyState) {
         const shouldShowEmptyState = cardCache.length > 0 && matchedCards.length === 0;
