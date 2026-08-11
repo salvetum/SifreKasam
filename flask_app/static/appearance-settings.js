@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.3 - Görünüm Ayarları modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.1 - Görünüm Ayarları modülü (ES Module)
  *
  * 3. bölüm: tema/efekt toggle'ları, glass kalitesi, vurgu rengi seçici,
  * chroma akcent, özel arka plan yükleme/galeri.
@@ -77,6 +77,7 @@ export function initAppearanceSettings({
   const glassToggle = document.getElementById('glass-effects-toggle');
   const glassQualityCard = document.getElementById('glass-quality-card');
   const glassQualitySelect = document.getElementById('glass-quality-select');
+  const glassScalesCard = document.getElementById('glass-scales-card');
   let glassQualitySyncFrame = 0;
 
   const syncGlassQualityVisibility = (enabled, animate = true) => {
@@ -87,6 +88,11 @@ export function initAppearanceSettings({
     const shouldShow = Boolean(enabled);
     cancelAnimationFrame(glassQualitySyncFrame);
     glassQualityCard.setAttribute('aria-hidden', String(!shouldShow));
+    if (glassScalesCard) {
+      glassScalesCard.setAttribute('aria-hidden', String(!shouldShow));
+      glassScalesCard.classList.toggle('is-no-transition', !animate);
+      glassScalesCard.classList.toggle('is-collapsed', !shouldShow);
+    }
     if (glassQualitySelect) {
       glassQualitySelect.disabled = !shouldShow;
       glassQualitySelect.tabIndex = glassQualitySelect.dataset.customSelectReady === 'true'
@@ -100,6 +106,7 @@ export function initAppearanceSettings({
     if (!animate) {
       glassQualitySyncFrame = requestAnimationFrame(() => {
         glassQualityCard.classList.remove('is-no-transition');
+        glassScalesCard?.classList.remove('is-no-transition');
       });
     }
   };
@@ -243,6 +250,85 @@ export function initAppearanceSettings({
     });
   }
 
+  const glassBlurRange = document.getElementById('glass-blur-range');
+  const glassVeilRange = document.getElementById('glass-veil-range');
+  const glassBlurOutput = document.getElementById('glass-blur-output');
+  const glassVeilOutput = document.getElementById('glass-veil-output');
+  let glassScaleSaveTimer = 0;
+  let glassScaleSyncFrame = 0;
+
+  const clampGlassScale = (pct, max) => Math.min(max, Math.max(0, pct));
+
+  const syncGlassScaleProgress = (range) => {
+    if (!range) return;
+    const min = Number(range.min) || 0;
+    const max = Number(range.max) || 100;
+    const value = clampGlassScale(Number(range.value) || 0, max);
+    const progress = max > min ? ((value - min) / (max - min)) * 100 : 0;
+    range.style.setProperty('--kasa-range-progress', progress.toFixed(1) + '%');
+  };
+
+  const updateGlassScaleBoost = (blurPct, veilPct) => {
+    glassBlurOutput?.classList.toggle('is-over-boost', blurPct > 100);
+    glassVeilOutput?.classList.toggle('is-over-boost', veilPct > 100);
+  };
+
+  const syncGlassScales = () => {
+    const blur = clampGlassScale(Number(glassBlurRange?.value ?? 100), 150) / 100;
+    const veil = clampGlassScale(Number(glassVeilRange?.value ?? 100), 200) / 100;
+    document.documentElement.setAttribute('data-glass-blur', String(blur));
+    document.documentElement.setAttribute('data-glass-veil', String(veil));
+    document.documentElement.style.setProperty('--glass-blur-scale', String(blur));
+    document.documentElement.style.setProperty('--glass-veil-scale', String(veil));
+    localStorage.setItem('kasa-glass-blur', String(blur));
+    localStorage.setItem('kasa-glass-veil', String(veil));
+    document.dispatchEvent(new CustomEvent('kasa:glass-refresh'));
+  };
+
+  const flushGlassScaleSave = () => {
+    if (glassBlurRange && glassVeilRange) {
+      const blur = clampGlassScale(Number(glassBlurRange.value ?? 100), 150) / 100;
+      const veil = clampGlassScale(Number(glassVeilRange.value ?? 100), 200) / 100;
+      clearTimeout(glassScaleSaveTimer);
+      return apiPost('/settings/appearance', { glass_blur: blur, glass_veil: veil });
+    }
+    return undefined;
+  };
+
+  if (glassBlurRange || glassVeilRange) {
+    const readGlassScalePct = (attribute, max) => {
+      const raw = document.documentElement.getAttribute(attribute);
+      const number = (raw === null || raw === '') ? 1 : Number(raw);
+      const normalized = Number.isFinite(number) ? number : 1;
+      return clampGlassScale(Math.round(normalized * 100), max);
+    };
+    const initialBlurPct = readGlassScalePct('data-glass-blur', 150);
+    const initialVeilPct = readGlassScalePct('data-glass-veil', 200);
+    if (glassBlurRange) glassBlurRange.value = String(initialBlurPct);
+    if (glassVeilRange) glassVeilRange.value = String(initialVeilPct);
+    if (glassBlurOutput) glassBlurOutput.textContent = initialBlurPct + '%';
+    if (glassVeilOutput) glassVeilOutput.textContent = initialVeilPct + '%';
+    syncGlassScaleProgress(glassBlurRange);
+    syncGlassScaleProgress(glassVeilRange);
+    updateGlassScaleBoost(initialBlurPct, initialVeilPct);
+
+    const onGlassScaleInput = () => {
+      const blurPct = clampGlassScale(Number(glassBlurRange?.value ?? 100), 150);
+      const veilPct = clampGlassScale(Number(glassVeilRange?.value ?? 100), 200);
+      if (glassBlurOutput) glassBlurOutput.textContent = Math.round(blurPct) + '%';
+      if (glassVeilOutput) glassVeilOutput.textContent = Math.round(veilPct) + '%';
+      updateGlassScaleBoost(blurPct, veilPct);
+      syncGlassScaleProgress(glassBlurRange);
+      syncGlassScaleProgress(glassVeilRange);
+      syncGlassScales();
+      clearTimeout(glassScaleSaveTimer);
+      glassScaleSaveTimer = setTimeout(flushGlassScaleSave, 400);
+    };
+    glassBlurRange?.addEventListener('input', onGlassScaleInput);
+    glassVeilRange?.addEventListener('input', onGlassScaleInput);
+    syncGlassScales();
+  }
+
   const queueAccentContrastWarning = (accent) => {
     const normalizedAccent = normalizeHexColor(accent);
     clearTimeout(accentContrastWarningTimer);
@@ -381,6 +467,7 @@ export function initAppearanceSettings({
 
   const cancelPendingAppearanceSave = () => {
     clearTimeout(appearanceSaveTimer);
+    clearTimeout(glassScaleSaveTimer);
   };
 
   const syncChromaSpeedVisibility = (enabled, animate = true) => {
@@ -460,7 +547,7 @@ export function initAppearanceSettings({
 
     appearanceCard?.addEventListener('click', (event) => {
       if (!appearanceCard.classList.contains('is-chroma-locked')) return;
-      if (event.target.closest('.settings-appearance-head')) return;
+      if (event.target.closest('.settings-card-head')) return;
       event.preventDefault();
       showWarningToast(window._('Önce Chroma RGB efektini kapatın'));
     });
@@ -782,6 +869,7 @@ export function initAppearanceSettings({
 
     settingsModal?.addEventListener('kasa:modal-closing', () => {
       flushAppearanceSave();
+      flushGlassScaleSave();
       setColorPickerOpen(false);
     });
     document.addEventListener('keydown', event => {

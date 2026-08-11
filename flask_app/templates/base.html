@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="{{ CURRENT_LANG|default('tr') }}" class="dark" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
@@ -57,6 +57,26 @@
         const storedGlassQuality = normalizeGlassQuality(localStorage.getItem('kasa-glass-quality') || "{{ GLASS_QUALITY|default('normal') }}");
         document.documentElement.setAttribute('data-glass-quality', storedGlassQuality);
         localStorage.setItem('kasa-glass-quality', storedGlassQuality);
+
+        const normalizeGlassScale = function (value, minimum, maximum, fallback) {
+            if (value === null || value === '') return fallback;
+            const number = Number(value);
+            return Number.isFinite(number)
+                ? Math.min(maximum, Math.max(minimum, number))
+                : fallback;
+        };
+        const storedGlassBlur = normalizeGlassScale(
+            localStorage.getItem('kasa-glass-blur'), 0, 1.5, {{ GLASS_BLUR|default(1.0) }}
+        );
+        const storedGlassVeil = normalizeGlassScale(
+            localStorage.getItem('kasa-glass-veil'), 0, 2, {{ GLASS_VEIL|default(1.0) }}
+        );
+        document.documentElement.setAttribute('data-glass-blur', String(storedGlassBlur));
+        document.documentElement.setAttribute('data-glass-veil', String(storedGlassVeil));
+        document.documentElement.style.setProperty('--glass-blur-scale', String(storedGlassBlur));
+        document.documentElement.style.setProperty('--glass-veil-scale', String(storedGlassVeil));
+        localStorage.setItem('kasa-glass-blur', String(storedGlassBlur));
+        localStorage.setItem('kasa-glass-veil', String(storedGlassVeil));
 
         const storedMotion = localStorage.getItem('kasa-animated-backgrounds') || "{{ 'on' if ANIMATED_BACKGROUNDS_ENABLED else 'off' }}";
         const normalizedMotion = storedMotion === 'off' ? 'off' : 'on';
@@ -186,7 +206,7 @@
     <title>{{ title or _('ŞifreKasam | Güvenli Şifre Yöneticisi') }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.6.3-beta.3 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.7.0-beta.1 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -206,7 +226,7 @@
 
     <!-- Our Custom CSS -->
     <link href="{{ url_for('static', filename='tokens.css') }}?v=68" rel="stylesheet">
-    <link href="{{ url_for('static', filename='base.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='base.css') }}?v=69" rel="stylesheet">
     <link href="{{ url_for('static', filename='vault-form.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='utilities.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='buttons.css') }}?v=68" rel="stylesheet">
@@ -214,20 +234,21 @@
     <link href="{{ url_for('static', filename='modals.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='theme-states.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='responsive.css') }}?v=68" rel="stylesheet">
-    <link href="{{ url_for('static', filename='background.css') }}?v=69" rel="stylesheet">
+    <link href="{{ url_for('static', filename='background.css') }}?v=70" rel="stylesheet">
     <link href="{{ url_for('static', filename='custom-select.css') }}?v=68" rel="stylesheet">
-    <link href="{{ url_for('static', filename='settings-modal.css') }}?v=68" rel="stylesheet">
-    <link href="{{ url_for('static', filename='vault-form-2.css') }}?v=68" rel="stylesheet">
+    <link href="{{ url_for('static', filename='settings-modal.css') }}?v=69" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vault-form-2.css') }}?v=69" rel="stylesheet">
     <link href="{{ url_for('static', filename='date-picker.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='theme-overrides.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='misc.css') }}?v=68" rel="stylesheet">
-    <link href="{{ url_for('static', filename='glass.css') }}?v=72" rel="stylesheet">
+    <link href="{{ url_for('static', filename='glass.css') }}?v=73" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
     <!-- 3. Animasyonlu Blob (opsiyonel) -->
     <div class="blob-accent" aria-hidden="true"></div>
     <div id="custom-bg-layer" aria-hidden="true"{% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL %} data-bg-url="{{ CUSTOM_BACKGROUND_URL }}"{% endif %}></div>
+    <div id="default-bg-texture" aria-hidden="true"></div>
     <!-- BÖLÜM 5: Frosted Glass grain (Material You) -->
     <div class="glass-grain" aria-hidden="true"></div>
 
@@ -262,12 +283,12 @@
     <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.11" defer></script>
-    <!-- Liquid Glass refraction (kube.io tekniği, Chromium-only) —
-         tüm .glass / .glass-sm yüzeylerde, data-glass-quality="high"
+    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.14" defer></script>
+    <!-- Liquid Glass — saf CSS backdrop blur (GPU-uyumlu), tüm
+         .glass / .glass-sm yüzeylerde, data-glass-quality="high"
          iken; özel yüzeyler (.settings-modal-content, .entry-login-card)
          sabit parametre alır, diğerleri boyuta göre kademeli. -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=2" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=5" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script nonce="{{ csp_nonce }}">

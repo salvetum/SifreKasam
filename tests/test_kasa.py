@@ -1,29 +1,422 @@
-"""Security regression tests for vault storage and login throttling."""
+"""ŞifreKasam birleşik test paketi.
+
+İçerik:
+- Kasa çekirdek servisleri (import/export, sürüm, zaman, görünüm)
+- Şifre gücü analizi
+- Çeviri kapsamı
+- Rota sözleşmeleri
+- Güvenlik regresyon testleri
+"""
 
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 import stat
 import sys
 import tempfile
 import unittest
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 from flask import Flask
 
-
-ROOT = Path(__file__).resolve().parents[1]
-RUNTIME_DIR = Path(tempfile.mkdtemp(prefix="sifrekasam-security-tests-"))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FLASK_APP_DIR = PROJECT_ROOT / "flask_app"
+RUNTIME_DIR = Path(tempfile.mkdtemp(prefix="sifrekasam-tests-"))
 os.environ["APPDATA"] = str(RUNTIME_DIR)
 os.environ["XDG_CONFIG_HOME"] = str(RUNTIME_DIR)
-sys.path.insert(0, str(ROOT / "flask_app"))
+if str(FLASK_APP_DIR) not in sys.path:
+    sys.path.insert(0, str(FLASK_APP_DIR))
 
 import app as app_module  # noqa: E402
+from kasa_core.import_export import (  # noqa: E402
+    build_export_payload,
+    parse_expiry,
+    parse_import_payload,
+)
+from kasa_core.password_strength import (  # noqa: E402
+    ACCEPTABLE_PASSWORD_SCORE,
+    analyze_password,
+    normalize_user_inputs,
+    password_is_weak,
+)
 from kasa_core.reports import build_vault_report_payloads  # noqa: E402
+from kasa_core.time_utils import (  # noqa: E402
+    utc_iso_timestamp,
+    utc_now,
+    utc_now_naive,
+)
+from kasa_core.validation import (
+    normalize_chroma_accent_speed,
+    normalize_glass_blur,
+    normalize_glass_veil,
+)  # noqa: E402
+from kasa_core.versioning import is_newer_version  # noqa: E402
+
+TRANSLATION_CALL = re.compile(
+    r"""(?<![\w$])_\(\s*(['"])(.*?)\1\s*\)""",
+    re.DOTALL,
+)
+UNICODE_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+EXPECTED_ROUTES = {
+    "login": ("/login", {"GET", "POST"}),
+    "index": ("/", {"GET"}),
+    "ekle_sayfasi": ("/ekle", {"GET", "POST"}),
+    "duzenle_sayfasi": ("/duzenle/<kayit_id>", {"GET", "POST"}),
+    "sil_kayit": ("/sil/<kayit_id>", {"POST"}),
+    "pin_kayit": ("/pin/<kayit_id>", {"POST"}),
+    "get_gecmis": ("/gecmis/<kayit_id>", {"GET"}),
+    "get_record_password": ("/api/record/<kayit_id>/password", {"GET"}),
+    "password_strength": ("/api/password-strength", {"POST"}),
+    "api_stats": ("/api/stats", {"GET"}),
+    "saglik_raporu": ("/saglik", {"GET"}),
+    "save_settings": ("/save_settings", {"POST"}),
+    "settings_theme_mode": ("/settings/theme-mode", {"GET", "POST"}),
+    "settings_hardware_acceleration": ("/settings/hardware-acceleration", {"GET", "POST"}),
+    "settings_runtime": ("/settings/runtime", {"GET"}),
+    "export_data": ("/export", {"GET"}),
+    "import_data": ("/import", {"POST"}),
+    "bulk_delete": ("/api/bulk/delete", {"POST"}),
+    "bulk_category": ("/api/bulk/category", {"POST"}),
+    "bulk_export": ("/api/bulk/export", {"POST"}),
+    "change_password": ("/change-password", {"POST"}),
+    "change_password_progress": ("/change-password/progress/<task_id>", {"GET"}),
+}
+
+
+def _decode_javascript_unicode_escapes(value: str) -> str:
+    return UNICODE_ESCAPE.sub(
+        lambda match: chr(int(match.group(1), 16)),
+        value,
+    )
+
+
+class ImportExportServiceTests(unittest.TestCase):
+    def test_json_and_kasa_payloads_keep_record_data(self) -> None:
+        records = [{"title": "Örnek", "password": "gizli"}]
+
+        for export_format in ("json", "kasa"):
+            payload, mimetype = build_export_payload(records, export_format)
+            parsed = parse_import_payload(
+                f"yedek.{export_format}",
+                payload.decode("utf-8"),
+            )
+
+            self.assertEqual(parsed, records)
+            self.assertIn("json", mimetype)
+
+    def test_txt_payload_round_trip_preserves_supported_fields(self) -> None:
+        records = [{
+            "type": "Website",
+            "category": "Genel",
+            "title": "ŞifreKasam",
+            "website_url": "https://example.com",
+            "login": "kullanıcı",
+            "password": "gizli",
+            "comment": "not",
+            "expiry_date": "2030-01-02",
+        }]
+
+        payload, mimetype = build_export_payload(records, "txt")
+        parsed = parse_import_payload("yedek.txt", payload.decode("utf-8"))
+
+        self.assertEqual(parsed, records)
+        self.assertEqual(mimetype, "text/plain; charset=utf-8")
+
+    def test_invalid_import_shape_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "invalid-import-payload"):
+            parse_import_payload("yedek.json", json.dumps({"title": "tek"}))
+
+    def test_expiry_parser_fails_closed(self) -> None:
+        self.assertEqual(parse_expiry("2030-01-02").strftime("%Y-%m-%d"), "2030-01-02")
+        self.assertIsNone(parse_expiry("02.01.2030"))
+        self.assertIsNone(parse_expiry(None))
+
+
+class VersioningServiceTests(unittest.TestCase):
+    def test_beta_version_compares_by_numeric_release(self) -> None:
+        self.assertTrue(is_newer_version("v2.6.0", "2.5.12"))
+        self.assertFalse(is_newer_version("v2.5.12", "2.5.12"))
+
+
+class TimeServiceTests(unittest.TestCase):
+    def test_utc_helpers_preserve_storage_compatibility(self) -> None:
+        self.assertIs(utc_now().tzinfo, UTC)
+        self.assertIsNone(utc_now_naive().tzinfo)
+        self.assertRegex(
+            utc_iso_timestamp(),
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
+        )
+
+
+class AppearanceValidationTests(unittest.TestCase):
+    def test_chroma_speed_only_accepts_supported_values(self) -> None:
+        self.assertEqual(normalize_chroma_accent_speed(30), 30)
+        self.assertEqual(normalize_chroma_accent_speed("8"), 8)
+        self.assertEqual(normalize_chroma_accent_speed(12), 15)
+        self.assertEqual(normalize_chroma_accent_speed("invalid"), 15)
+
+    def test_glass_blur_is_clamped_between_0_and_1_5(self) -> None:
+        self.assertEqual(normalize_glass_blur(1.0), 1.0)
+        self.assertEqual(normalize_glass_blur("0.75"), 0.75)
+        self.assertEqual(normalize_glass_blur(0), 0.0)
+        self.assertEqual(normalize_glass_blur(1.5), 1.5)
+        self.assertEqual(normalize_glass_blur(9), 1.5)
+        self.assertEqual(normalize_glass_blur(-2), 0.0)
+
+    def test_glass_blur_invalid_inputs_fall_back_to_default(self) -> None:
+        self.assertEqual(normalize_glass_blur(None), 1.0)
+        self.assertEqual(normalize_glass_blur("abc"), 1.0)
+        self.assertEqual(normalize_glass_blur(float("nan")), 1.0)
+
+    def test_glass_veil_is_clamped_between_0_and_2(self) -> None:
+        self.assertEqual(normalize_glass_veil(1.0), 1.0)
+        self.assertEqual(normalize_glass_veil("1.25"), 1.25)
+        self.assertEqual(normalize_glass_veil(0), 0.0)
+        self.assertEqual(normalize_glass_veil(2), 2.0)
+        self.assertEqual(normalize_glass_veil(5), 2.0)
+        self.assertEqual(normalize_glass_veil(-1), 0.0)
+
+    def test_glass_veil_invalid_inputs_fall_back_to_default(self) -> None:
+        self.assertEqual(normalize_glass_veil(None), 1.0)
+        self.assertEqual(normalize_glass_veil("abc"), 1.0)
+        self.assertEqual(normalize_glass_veil(float("nan")), 1.0)
+
+
+class PasswordStrengthTests(unittest.TestCase):
+    def test_common_passwords_remain_weak(self) -> None:
+        self.assertLess(analyze_password("password")["score"], ACCEPTABLE_PASSWORD_SCORE)
+        self.assertLess(analyze_password("P@ssword1")["score"], ACCEPTABLE_PASSWORD_SCORE)
+
+    def test_long_unpredictable_passwords_are_strong(self) -> None:
+        self.assertGreaterEqual(
+            analyze_password("J7!vQ2#nL9@xR4$k")["score"],
+            ACCEPTABLE_PASSWORD_SCORE,
+        )
+        self.assertFalse(password_is_weak("correct horse battery staple"))
+
+    def test_short_passwords_cannot_score_as_strong(self) -> None:
+        analysis = analyze_password("Aa1!short")
+
+        self.assertLess(analysis["score"], ACCEPTABLE_PASSWORD_SCORE)
+        self.assertFalse(analysis["requirements"]["min_length"])
+        self.assertIn("min_length", analysis["missing_requirements"])
+
+    def test_character_variety_is_required_for_non_passphrases(self) -> None:
+        checks = {
+            "OnlyLettersLong": ("number", "symbol"),
+            "lowercase123!": ("uppercase",),
+            "UPPERCASE123!": ("lowercase",),
+            "MixedCaseOnlyLong": ("number", "symbol"),
+        }
+
+        for password, missing_requirements in checks.items():
+            with self.subTest(password=password):
+                analysis = analyze_password(password)
+                self.assertLess(analysis["score"], ACCEPTABLE_PASSWORD_SCORE)
+                for requirement in missing_requirements:
+                    self.assertIn(
+                        requirement,
+                        analysis["missing_requirements"],
+                    )
+
+    def test_all_character_requirements_are_reported(self) -> None:
+        analysis = analyze_password("J7!vQ2#nL9@xR4$k")
+
+        self.assertTrue(all(analysis["requirements"].values()))
+        self.assertEqual(analysis["missing_requirements"], [])
+
+    def test_record_context_penalizes_related_passwords(self) -> None:
+        password = "AcmePortal1!"
+        without_context = analyze_password(password)["score"]
+        with_context = analyze_password(
+            password,
+            ["AcmePortal", "https://acme.example", "admin@acme.example"],
+        )["score"]
+
+        self.assertGreaterEqual(without_context, ACCEPTABLE_PASSWORD_SCORE)
+        self.assertLess(with_context, ACCEPTABLE_PASSWORD_SCORE)
+
+    def test_context_normalization_extracts_domain_and_login_tokens(self) -> None:
+        values = normalize_user_inputs([
+            "https://vault.example.com/login",
+            "kaan@example.com",
+        ])
+        folded_values = {value.casefold() for value in values}
+
+        self.assertIn("vault.example.com", folded_values)
+        self.assertIn("vault", folded_values)
+        self.assertIn("kaan", folded_values)
+        self.assertIn("example.com", folded_values)
+
+    def test_non_matching_context_never_changes_the_score(self) -> None:
+        password = "J7!vQ2#nL9@xR4$k"
+        baseline = analyze_password(password)["score"]
+
+        for values in (
+            ["AcmePortal", "https://acme.example", "admin@acme.example"],
+            ["tamamen alakasız", "x", "1234567890"],
+            ["OrnekFirma", "kullanici@ornek.com"],
+        ):
+            with self.subTest(values=values):
+                self.assertEqual(
+                    analyze_password(password, values)["score"],
+                    baseline,
+                )
+
+
+class TranslationCoverageTests(unittest.TestCase):
+    def test_english_catalog_covers_user_facing_literal_keys(self) -> None:
+        files = [
+            *sorted((PROJECT_ROOT / "flask_app" / "templates").glob("*.html")),
+            PROJECT_ROOT / "flask_app" / "static" / "app.js",
+            PROJECT_ROOT / "flask_app" / "static" / "password-generator.js",
+            PROJECT_ROOT / "flask_app" / "static" / "toast.js",
+            PROJECT_ROOT / "flask_app" / "static" / "reveal-copy.js",
+            PROJECT_ROOT / "flask_app" / "static" / "password-strength.js",
+            PROJECT_ROOT / "flask_app" / "static" / "custom-controls.js",
+            PROJECT_ROOT / "flask_app" / "static" / "lan-settings.js",
+            PROJECT_ROOT / "flask_app" / "static" / "modal-system.js",
+            PROJECT_ROOT / "flask_app" / "static" / "heartbeat.js",
+            PROJECT_ROOT / "flask_app" / "static" / "appearance-settings.js",
+            PROJECT_ROOT / "flask_app" / "static" / "vault-index.js",
+            PROJECT_ROOT / "flask_app" / "static" / "vault-form.js",
+        ]
+        used_keys: set[str] = set()
+        for path in files:
+            source = path.read_text(encoding="utf-8")
+            used_keys.update(
+                _decode_javascript_unicode_escapes(key)
+                for _, key in TRANSLATION_CALL.findall(source)
+            )
+
+        english = json.loads(
+            (PROJECT_ROOT / "flask_app" / "translations" / "en.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        missing = sorted(used_keys - english.keys())
+
+        self.assertEqual(missing, [], f"Missing English translations: {missing}")
+
+    def test_settings_language_change_does_not_restart_login_flow(self) -> None:
+        index_template = (
+            PROJECT_ROOT / "flask_app" / "templates" / "index.html"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("window.location.href = '/loading?lang='", index_template)
+        self.assertIn("window.location.reload();", index_template)
+
+
+class RouteContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+
+    def test_route_paths_and_methods_remain_stable(self) -> None:
+        rules = {rule.endpoint: rule for rule in app_module.app.url_map.iter_rules()}
+
+        for endpoint, (path, methods) in EXPECTED_ROUTES.items():
+            with self.subTest(endpoint=endpoint):
+                self.assertIn(endpoint, rules)
+                self.assertEqual(rules[endpoint].rule, path)
+                self.assertEqual(rules[endpoint].methods - {"HEAD", "OPTIONS"}, methods)
+
+    def test_public_shell_routes_still_render(self) -> None:
+        for path in ("/login", "/loading", "/manifest.json", "/sw.js"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_settings_runtime_reports_desired_and_actual_lan_state(self) -> None:
+        with patch.dict(os.environ, {"FLASK_HOST": "0.0.0.0"}):
+            response = self.client.get(
+                "/settings/runtime",
+                headers={"X-App-Token": app_module.APP_TOKEN},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload["lan_enabled"], bool)
+        self.assertIsInstance(payload["runtime_lan_enabled"], bool)
+        self.assertTrue(payload["runtime_lan_enabled"])
+
+    def test_vault_pages_require_authentication(self) -> None:
+        for path in ("/", "/api/stats", "/saglik"):
+            with self.subTest(path=path):
+                response = self.client.get(
+                    path,
+                    headers={"X-App-Token": app_module.APP_TOKEN},
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("/login", response.headers["Location"])
+
+    def test_delete_json_request_does_not_render_index_redirect(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+        with patch.object(app_module, "backup_database"), \
+                patch.object(
+                    app_module,
+                    "_delete_records_and_history",
+                    return_value=1,
+                ), \
+                patch.object(app_module.db.session, "commit"), \
+                patch.object(app_module, "invalidate_vault_report_cache"):
+            response = self.client.post(
+                "/sil/test-record",
+                base_url="https://localhost",
+                headers={
+                    "X-App-Token": app_module.APP_TOKEN,
+                    "Accept": "application/json",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"status": "ok", "deleted": 1})
+        self.assertIsNone(response.location)
+
+    def test_password_strength_endpoint_uses_authenticated_backend_engine(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+        response = self.client.post(
+            "/api/password-strength",
+            base_url="https://localhost",
+            headers={"X-App-Token": app_module.APP_TOKEN},
+            json={
+                "password": "AcmePortal1!",
+                "user_inputs": ["AcmePortal"],
+            },
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(payload["score"], 3)
+        self.assertIn("requirements", payload)
+        self.assertIn("missing_requirements", payload)
+        self.assertNotIn("password", payload)
+
+    def test_settings_save_must_not_reference_module_local_timer(self) -> None:
+        """The settings form save previously crashed with a ReferenceError.
+
+        ``appearanceSaveTimer`` lives inside ``appearance-settings.js`` (an ES
+        module) but ``app.js`` referenced it directly after the module split,
+        which raised *after* the loading overlay was shown and left it stuck on
+        every settings save. The save must use the exported canceller instead.
+        """
+        app_js = (PROJECT_ROOT / "flask_app" / "static" / "app.js").read_text(encoding="utf-8")
+        appearance_js = (PROJECT_ROOT / "flask_app" / "static" / "appearance-settings.js").read_text(encoding="utf-8")
+
+        self.assertNotIn("clearTimeout(appearanceSaveTimer)", app_js)
+        self.assertIn("cancelPendingAppearanceSave", app_js)
+        self.assertIn("cancelPendingAppearanceSave,", appearance_js)
 
 
 class ContentSecurityPolicyTests(unittest.TestCase):
@@ -69,11 +462,11 @@ class ContentSecurityPolicyTests(unittest.TestCase):
 
 class StylesheetDependencyTests(unittest.TestCase):
     def test_bootstrap_stylesheet_is_not_bundled_or_referenced(self) -> None:
-        self.assertFalse((ROOT / "flask_app" / "static" / "bootstrap.min.css").exists())
+        self.assertFalse((PROJECT_ROOT / "flask_app" / "static" / "bootstrap.min.css").exists())
 
         template_text = "\n".join(
             path.read_text(encoding="utf-8")
-            for path in (ROOT / "flask_app" / "templates").glob("*")
+            for path in (PROJECT_ROOT / "flask_app" / "templates").glob("*")
             if path.is_file()
         )
         self.assertNotIn("bootstrap.min.css", template_text)
@@ -779,6 +1172,68 @@ class HardwareAccelerationSettingsTests(unittest.TestCase):
             headers={'X-App-Token': app_module.APP_TOKEN},
         ).get_json()
         self.assertFalse(data['hardware_acceleration_enabled'])
+
+    def test_appearance_endpoint_persists_glass_scales(self) -> None:
+        response = self.client.post(
+            '/settings/appearance',
+            json={'glass_blur': 0.5, 'glass_veil': 1.25},
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(app_module.get_glass_blur(), 0.5)
+        self.assertEqual(app_module.get_glass_veil(), 1.25)
+
+        data = self.client.get(
+            '/settings/appearance',
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        self.assertEqual(data['glass_blur'], 0.5)
+        self.assertEqual(data['glass_veil'], 1.25)
+
+    def test_save_settings_persists_glass_scales(self) -> None:
+        response = self.client.post('/save_settings', data={
+            'glass_blur': '40',
+            'glass_veil': '90',
+        }, headers={
+            'X-App-Token': app_module.APP_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['glass_blur'], 0.4)
+        self.assertEqual(data['glass_veil'], 0.9)
+        self.assertEqual(app_module.get_glass_blur(), 0.4)
+        self.assertEqual(app_module.get_glass_veil(), 0.9)
+
+    def test_save_settings_glass_scale_zero_is_preserved(self) -> None:
+        response = self.client.post('/save_settings', data={
+            'glass_blur': '0',
+            'glass_veil': '0',
+        }, headers={
+            'X-App-Token': app_module.APP_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['glass_blur'], 0.0)
+        self.assertEqual(data['glass_veil'], 0.0)
+        self.assertEqual(app_module.get_glass_blur(), 0.0)
+        self.assertEqual(app_module.get_glass_veil(), 0.0)
+
+    def test_save_settings_glass_scale_clamps_to_max(self) -> None:
+        response = self.client.post('/save_settings', data={
+            'glass_blur': '150',
+            'glass_veil': '200',
+        }, headers={
+            'X-App-Token': app_module.APP_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['glass_blur'], 1.5)
+        self.assertEqual(data['glass_veil'], 2.0)
+        self.assertEqual(app_module.get_glass_blur(), 1.5)
+        self.assertEqual(app_module.get_glass_veil(), 2.0)
 
     def test_save_settings_persists_hardware_acceleration(self) -> None:
         response = self.client.post('/save_settings', data={

@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.3 - Main JavaScript
+ * ŞifreKasam v2.7.0-beta.1 - Main JavaScript
  */
 
 import { initPasswordGenerator } from './password-generator.js';
@@ -251,7 +251,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const CHROMA_SPEED_OPTIONS = new Set([8, 15, 30, 60]);
-  const CHROMA_UPDATE_INTERVAL_MS = 100;
+  /* rAF ile kare başına 1 kez, en fazla ~50ms'de bir güncelleme:
+     setTimeout yerine compositing ile eşzamanlı çalışır, sekme
+     görünmezken rAF zaten tetiklenmez → boşta CPU tasarrufu. */
+  const CHROMA_UPDATE_INTERVAL_MS = 50;
   const normalizeChromaSpeed = (value) => {
     const speed = Number(value);
     return CHROMA_SPEED_OPTIONS.has(speed) ? speed : 15;
@@ -264,7 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
   );
   let chromaElapsedMs = 0;
   let chromaStartedAt = 0;
-  let chromaTimer = 0;
+  let chromaRafId = 0;
+  let chromaLastTickAt = 0;
 
   const chromaCanAnimate = () => (
     chromaAccentEnabled
@@ -294,8 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const stopChromaCycle = () => {
-    if (chromaTimer) clearTimeout(chromaTimer);
-    chromaTimer = 0;
+    if (chromaRafId) cancelAnimationFrame(chromaRafId);
+    chromaRafId = 0;
     if (chromaStartedAt) {
       chromaElapsedMs = Math.max(0, performance.now() - chromaStartedAt);
       chromaStartedAt = 0;
@@ -316,16 +320,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     chromaStartedAt = performance.now() - chromaElapsedMs;
-    const tick = () => {
+    const tick = (now) => {
       if (!chromaCanAnimate()) {
         stopChromaCycle();
         return;
       }
-      chromaElapsedMs = performance.now() - chromaStartedAt;
-      renderChromaAccent();
-      chromaTimer = window.setTimeout(tick, CHROMA_UPDATE_INTERVAL_MS);
+      if (now - chromaLastTickAt >= CHROMA_UPDATE_INTERVAL_MS) {
+        chromaLastTickAt = now;
+        chromaElapsedMs = now - chromaStartedAt;
+        renderChromaAccent();
+      }
+      chromaRafId = requestAnimationFrame(tick);
     };
-    tick();
+    chromaRafId = requestAnimationFrame(tick);
   };
 
   const setChromaAccent = (enabled, speed = chromaAccentSpeed) => {
@@ -483,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ─── 3b. LAN ERİŞİMİ (lan-settings.js) ─────────────────────────────────
-  const { lanToggle, lanInfoBox, fetchLanInfo } = initLanSettings({ apiJson });
+  const { lanToggle, lanInfoBox, showPending, showActive, hide } = initLanSettings({ apiJson });
 
   // ─── 4. TOAST & PANO ──────────────────────────────────────────────────────
 
@@ -701,6 +708,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let settingsFormSnapshot = getSettingsSnapshot();
 
+    // LAN uyarısı: toggle açılırken gösterilir (kayıt anında değil).
+    // "Bir daha gösterme" seçimi localStorage'da tutulur.
+    const LAN_WARNING_DISMISS_KEY = 'kasa-lan-warning-dismissed';
+    if (lanToggle && lanInfoBox) {
+      const lanWasEnabled = () => {
+        try {
+          return JSON.parse(settingsFormSnapshot)
+            .some(([name, value]) => name === 'lan_enabled' && value === '1');
+        } catch (_) { return false; }
+      };
+
+      lanToggle.addEventListener('change', async function () {
+        if (!lanToggle.checked) {
+          hide();
+          return;
+        }
+        // LAN zaten kayıtlı + aktifse adresi doğrudan göster, uyarı gösterme.
+        if (lanWasEnabled()) {
+          showActive();
+          return;
+        }
+        if (localStorage.getItem(LAN_WARNING_DISMISS_KEY)) {
+          showPending();
+          return;
+        }
+
+        let dontShowAgain = false;
+        const confirmation = await Swal.fire({
+          title: window._('LAN Erişimi'),
+          icon: 'warning',
+          html: `<p class="kasa-swal-msg">${window._('LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.')}</p>
+                 <label class="kasa-swal-remember">
+                   <input type="checkbox" class="kasa-checkbox" id="lan-warning-remember">
+                   <span>${window._('Bu uyarıyı bir daha gösterme')}</span>
+                 </label>`,
+          showCancelButton: true,
+          heightAuto: false,
+          scrollbarPadding: false,
+          confirmButtonText: window._('Evet, Aç'),
+          cancelButtonText: window._('Vazgeç'),
+          color: 'var(--text)',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'kasa-swal-popup', title: 'kasa-swal-title',
+            htmlContainer: 'kasa-swal-text', actions: 'kasa-swal-actions',
+            confirmButton: 'kasa-btn kasa-btn-primary',
+            cancelButton: 'kasa-btn kasa-btn-muted',
+          },
+          willOpen: (popup, container) => {
+            popup.classList.add('kasa-swal-enter');
+            container.classList.add('kasa-swal-container');
+          },
+          didOpen: (popup, container) => {
+            void container.offsetHeight;
+            popup.classList.add('is-open');
+            container.classList.add('is-open');
+          },
+          willClose: (popup, container, done) => {
+            popup.classList.add('is-closing');
+            container.classList.add('is-closing');
+            setTimeout(done, 150);
+          },
+          preConfirm: () => {
+            const remember = document.getElementById('lan-warning-remember');
+            dontShowAgain = remember ? remember.checked : false;
+            return true;
+          },
+        });
+        if (!confirmation.isConfirmed) {
+          lanToggle.checked = false;
+          hide();
+          return;
+        }
+        if (dontShowAgain) localStorage.setItem(LAN_WARNING_DISMISS_KEY, '1');
+        showPending();
+      });
+    }
+
     settingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const nextSnapshot = getSettingsSnapshot();
@@ -710,40 +795,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const submitButton = settingsForm.querySelector('button[type="submit"]');
-
-      if (lanToggle) {
-        const lanWasEnabled = (() => {
-          try {
-            return JSON.parse(settingsFormSnapshot)
-              .some(([name, value]) => name === 'lan_enabled' && value === '1');
-          } catch (_) { return false; }
-        })();
-        if (lanToggle.checked && !lanWasEnabled) {
-          const confirmation = await Swal.fire({
-            title: window._('LAN Erişimi'),
-            text: window._('LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.'),
-            icon: 'warning',
-            showCancelButton: true,
-            heightAuto: false,
-            scrollbarPadding: false,
-            confirmButtonText: window._('Evet, Aç'),
-            cancelButtonText: window._('Vazgeç'),
-            color: 'var(--text)',
-            buttonsStyling: false,
-            customClass: {
-              popup: 'kasa-swal-popup', title: 'kasa-swal-title',
-              htmlContainer: 'kasa-swal-text', actions: 'kasa-swal-actions',
-              confirmButton: 'kasa-btn kasa-btn-primary',
-              cancelButton: 'kasa-btn kasa-btn-muted'
-            }
-          });
-          if (!confirmation.isConfirmed) {
-            lanToggle.checked = false;
-            lanInfoBox?.classList.add('hidden');
-            return;
-          }
-        }
-      }
 
       setPageLoading(true);
       submitButton?.setAttribute('aria-disabled', 'true');
@@ -782,6 +833,33 @@ document.addEventListener('DOMContentLoaded', () => {
           glassQualitySelect.value = applyGlassQuality(data.glass_quality);
           glassQualitySelect.kasaSyncCustomSelect?.();
         }
+        if (typeof data.glass_blur === 'number' || typeof data.glass_veil === 'number') {
+          const blur = typeof data.glass_blur === 'number'
+            ? Math.min(1.5, Math.max(0, data.glass_blur)) : null;
+          const veil = typeof data.glass_veil === 'number'
+            ? Math.min(2, Math.max(0, data.glass_veil)) : null;
+          const glassBlurRange = document.getElementById('glass-blur-range');
+          const glassVeilRange = document.getElementById('glass-veil-range');
+          const glassBlurOutput = document.getElementById('glass-blur-output');
+          const glassVeilOutput = document.getElementById('glass-veil-output');
+          if (blur !== null && glassBlurRange) {
+            glassBlurRange.value = String(Math.round(blur * 100));
+            if (glassBlurOutput) glassBlurOutput.textContent = Math.round(blur * 100) + '%';
+            glassBlurOutput?.classList.toggle('is-over-boost', blur > 1);
+          }
+          if (veil !== null && glassVeilRange) {
+            glassVeilRange.value = String(Math.round(veil * 100));
+            if (glassVeilOutput) glassVeilOutput.textContent = Math.round(veil * 100) + '%';
+            glassVeilOutput?.classList.toggle('is-over-boost', veil > 1);
+          }
+          document.documentElement.setAttribute('data-glass-blur', String(blur ?? 1));
+          document.documentElement.setAttribute('data-glass-veil', String(veil ?? 1));
+          document.documentElement.style.setProperty('--glass-blur-scale', String(blur ?? 1));
+          document.documentElement.style.setProperty('--glass-veil-scale', String(veil ?? 1));
+          localStorage.setItem('kasa-glass-blur', String(blur ?? 1));
+          localStorage.setItem('kasa-glass-veil', String(veil ?? 1));
+          document.dispatchEvent(new CustomEvent('kasa:glass-refresh'));
+        }
         if (typeof data.animated_backgrounds_enabled === 'boolean' && motionToggle) {
           motionToggle.checked = data.animated_backgrounds_enabled;
           applyThemeFeature('data-kasa-motion', 'kasa-animated-backgrounds', data.animated_backgrounds_enabled);
@@ -811,8 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (typeof data.lan_enabled === 'boolean' && lanToggle && lanInfoBox) {
           lanToggle.checked = data.lan_enabled;
-          lanInfoBox.classList.toggle('hidden', !data.lan_enabled);
-          if (data.lan_enabled) setTimeout(fetchLanInfo, 1200);
+          if (data.lan_enabled) showActive(); else hide();
         }
         settingsFormSnapshot = getSettingsSnapshot();
         showSuccessToast(window._('Ayarlar kaydedildi.'));

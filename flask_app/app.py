@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
+from cryptography import x509
 from cryptography.fernet import Fernet
 import ipaddress
 from urllib.parse import urlparse
@@ -27,7 +28,10 @@ from kasa_core.appearance import AppearanceSettings
 from kasa_core.certificates import ensure_self_signed_cert
 from kasa_core.constants import (
     APP_VERSION_DEFAULT,
+    CARD_PAGE_SIZE,
     CUSTOM_BACKGROUND_HISTORY_LIMIT,
+    CUSTOM_BACKGROUND_CACHE_SECONDS,
+    CUSTOM_BACKGROUND_MAX_DIM,
     CUSTOM_BACKGROUND_MAX_GIF_BYTES,
     CUSTOM_BACKGROUND_MAX_IMAGE_BYTES,
     DEFAULT_ACCENT_COLOR,
@@ -40,7 +44,9 @@ from kasa_core.constants import (
     DEFAULT_CARD_SHEEN_ENABLED,
     DEFAULT_CATEGORY,
     DEFAULT_CONTENT_PROTECTION_ENABLED,
+    DEFAULT_GLASS_BLUR,
     DEFAULT_GLASS_QUALITY,
+    DEFAULT_GLASS_VEIL,
     DEFAULT_GRADIENTS_ENABLED,
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
@@ -104,6 +110,7 @@ from kasa_core.validation import (
     normalize_record_type,
     normalize_text,
     normalize_url,
+    safe_float,
     safe_int,
 )
 from kasa_core.versioning import (
@@ -180,6 +187,8 @@ get_saved_background_style = _appearance_settings.get_saved_background_style
 get_chroma_accent_enabled = _appearance_settings.get_chroma_accent_enabled
 get_chroma_accent_speed = _appearance_settings.get_chroma_accent_speed
 get_glass_quality = _appearance_settings.get_glass_quality
+get_glass_blur = _appearance_settings.get_glass_blur
+get_glass_veil = _appearance_settings.get_glass_veil
 get_animated_backgrounds_enabled = _appearance_settings.get_animated_backgrounds_enabled
 get_interface_animations_enabled = _appearance_settings.get_interface_animations_enabled
 get_gradients_enabled = _appearance_settings.get_gradients_enabled
@@ -196,6 +205,8 @@ save_background_style = _appearance_settings.save_background_style
 save_chroma_accent_enabled = _appearance_settings.save_chroma_accent_enabled
 save_chroma_accent_speed = _appearance_settings.save_chroma_accent_speed
 save_glass_quality = _appearance_settings.save_glass_quality
+save_glass_blur = _appearance_settings.save_glass_blur
+save_glass_veil = _appearance_settings.save_glass_veil
 save_animated_backgrounds = _appearance_settings.save_animated_backgrounds
 save_interface_animations = _appearance_settings.save_interface_animations
 save_gradients = _appearance_settings.save_gradients
@@ -502,12 +513,15 @@ def inject_globals():
     auto_lock_enabled  = True
     auto_lock_timeout  = 5
     theme              = 'dark'
+    theme_mode         = 'dark'
     glass_effects      = True
     accent_color       = DEFAULT_ACCENT_COLOR
     background_style   = DEFAULT_BACKGROUND_STYLE
     chroma_accent_enabled = DEFAULT_CHROMA_ACCENT_ENABLED
     chroma_accent_speed = DEFAULT_CHROMA_ACCENT_SPEED
     glass_quality      = DEFAULT_GLASS_QUALITY
+    glass_blur         = DEFAULT_GLASS_BLUR
+    glass_veil         = DEFAULT_GLASS_VEIL
     animated_backgrounds = DEFAULT_ANIMATED_BACKGROUNDS_ENABLED
     interface_animations = DEFAULT_INTERFACE_ANIMATIONS_ENABLED
     gradients_enabled  = DEFAULT_GRADIENTS_ENABLED
@@ -522,7 +536,7 @@ def inject_globals():
             auto_lock_enabled = v.lower() == 'true'
         t = _get_setting('auto_lock_timeout')
         if t is not None:
-            auto_lock_timeout = int(t)
+            auto_lock_timeout = safe_int(t, 5, 1, 240)
         theme         = get_saved_theme()
         theme_mode    = get_theme_mode()
         glass_effects = get_glass_effects_enabled()
@@ -531,6 +545,8 @@ def inject_globals():
         chroma_accent_enabled = get_chroma_accent_enabled()
         chroma_accent_speed = get_chroma_accent_speed()
         glass_quality = get_glass_quality()
+        glass_blur = get_glass_blur()
+        glass_veil = get_glass_veil()
         animated_backgrounds = get_animated_backgrounds_enabled()
         interface_animations = get_interface_animations_enabled()
         gradients_enabled = get_gradients_enabled()
@@ -559,6 +575,8 @@ def inject_globals():
         'CHROMA_ACCENT_ENABLED': chroma_accent_enabled,
         'CHROMA_ACCENT_SPEED':   chroma_accent_speed,
         'GLASS_QUALITY':         glass_quality,
+        'GLASS_BLUR':            glass_blur,
+        'GLASS_VEIL':            glass_veil,
         'ANIMATED_BACKGROUNDS_ENABLED': animated_backgrounds,
         'INTERFACE_ANIMATIONS_ENABLED': interface_animations,
         'GRADIENTS_ENABLED':     gradients_enabled,
@@ -1036,7 +1054,7 @@ def index():
             },
         })
 
-    return render_template('index.html', kayit_listesi=kasa_verileri)
+    return render_template('index.html', kayit_listesi=kasa_verileri, card_page_size=CARD_PAGE_SIZE)
 
 def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str, Any]:
     """Form verilerini okuyup (id, Record alanları) döner."""
@@ -1213,6 +1231,10 @@ def save_settings():
         save_chroma_accent_speed(request.form.get('chroma_accent_speed'))
     if 'glass_quality' in request.form:
         save_glass_quality(request.form.get('glass_quality'))
+    if 'glass_blur' in request.form:
+        save_glass_blur(safe_float(request.form.get('glass_blur'), 100.0) / 100.0)
+    if 'glass_veil' in request.form:
+        save_glass_veil(safe_float(request.form.get('glass_veil'), 100.0) / 100.0)
     save_animated_backgrounds(
         'true' if request.form.get('animated_backgrounds_enabled') else 'false')
     save_interface_animations(
@@ -1239,6 +1261,8 @@ def save_settings():
             "chroma_accent_enabled": get_chroma_accent_enabled(),
             "chroma_accent_speed": get_chroma_accent_speed(),
             "glass_quality": get_glass_quality(),
+            "glass_blur": get_glass_blur(),
+            "glass_veil": get_glass_veil(),
             "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
             "interface_animations_enabled": get_interface_animations_enabled(),
             "gradients_enabled": get_gradients_enabled(),
@@ -1491,6 +1515,8 @@ def settings_appearance():
             else get_chroma_accent_speed()
         )
         glass_quality = save_glass_quality(data.get('glass_quality')) if 'glass_quality' in data else get_glass_quality()
+        glass_blur = save_glass_blur(data.get('glass_blur')) if 'glass_blur' in data else get_glass_blur()
+        glass_veil = save_glass_veil(data.get('glass_veil')) if 'glass_veil' in data else get_glass_veil()
         animated_backgrounds = (
             save_animated_backgrounds(data.get('animated_backgrounds_enabled'))
             if 'animated_backgrounds_enabled' in data
@@ -1529,6 +1555,8 @@ def settings_appearance():
             "chroma_accent_enabled": chroma_accent_enabled,
             "chroma_accent_speed": chroma_accent_speed,
             "glass_quality": glass_quality,
+            "glass_blur": glass_blur,
+            "glass_veil": glass_veil,
             "animated_backgrounds_enabled": animated_backgrounds,
             "interface_animations_enabled": interface_animations,
             "gradients_enabled": gradients,
@@ -1543,6 +1571,8 @@ def settings_appearance():
         "chroma_accent_enabled": get_chroma_accent_enabled(),
         "chroma_accent_speed": get_chroma_accent_speed(),
         "glass_quality": get_glass_quality(),
+        "glass_blur": get_glass_blur(),
+        "glass_veil": get_glass_veil(),
         "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
         "interface_animations_enabled": get_interface_animations_enabled(),
         "gradients_enabled": get_gradients_enabled(),
@@ -1592,6 +1622,42 @@ def _validate_custom_background(file_storage):
         return None, f'Dosya boyutu {limit_mb}MB sınırını aşıyor.'
 
     return _ALLOWED_IMAGE_MIMES[mime], None
+
+
+def _optimize_custom_background(file_storage, filepath, ext):
+    """Statik görüntüleri yeniden boyutlandırıp sıkıştırarak kaydeder.
+
+    GIF'ler animasyonu bozmamak için olduğu gibi kopyalanır. Arkaplan
+    ``cover`` olarak gösterildiği için görünüm değişmez; yalnızca
+    yükleme/servis hızı artar. Optimizasyon başarısız olursa orijinal
+    dosya kaydedilir (işlev bozulmaz).
+    """
+    if ext == '.gif':
+        file_storage.seek(0)
+        file_storage.save(filepath)
+        return
+
+    from PIL import Image, ImageOps
+
+    file_storage.seek(0)
+    try:
+        with Image.open(file_storage.stream) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode not in ('RGB', 'RGBA'):
+                has_alpha = 'A' in img.getbands() or (
+                    img.mode == 'P' and 'transparency' in img.info)
+                img = img.convert('RGBA' if has_alpha else 'RGB')
+            if max(img.size) > CUSTOM_BACKGROUND_MAX_DIM:
+                img.thumbnail((CUSTOM_BACKGROUND_MAX_DIM, CUSTOM_BACKGROUND_MAX_DIM), Image.LANCZOS)
+            if ext == '.png':
+                img.save(filepath, format='PNG', optimize=True)
+            elif ext == '.webp':
+                img.save(filepath, format='WEBP', quality=85, method=6)
+            else:
+                img.convert('RGB').save(filepath, format='JPEG', quality=85, optimize=True, progressive=True)
+    except Exception:
+        file_storage.seek(0)
+        file_storage.save(filepath)
 
 
 def _remove_old_custom_backgrounds():
@@ -1818,7 +1884,7 @@ def upload_custom_background():
         _move_current_to_history()
         filename = f"{uuid.uuid4().hex}{ext}"
         filepath = os.path.join(BACKGROUND_DIR, filename)
-        uploaded.save(filepath)
+        _optimize_custom_background(uploaded, filepath, ext)
 
     meta = _load_custom_background_metadata()
     _ensure_background_metadata(meta, filename, filepath)
@@ -1841,7 +1907,7 @@ def serve_custom_background():
     bg_path = _find_custom_background()
     if not bg_path:
         abort(404)
-    return send_file(bg_path, max_age=0)
+    return send_file(bg_path, max_age=CUSTOM_BACKGROUND_CACHE_SECONDS)
 
 
 @app.route('/api/background', methods=['DELETE'])
@@ -1939,7 +2005,7 @@ def serve_history_background(filename):
     filepath = os.path.join(_custom_background_history_dir(), name)
     if not os.path.isfile(filepath):
         abort(404)
-    return send_file(filepath, max_age=0)
+    return send_file(filepath, max_age=CUSTOM_BACKGROUND_CACHE_SECONDS)
 
 
 @app.route('/api/background/history/<id>/activate', methods=['POST'])
@@ -2162,9 +2228,58 @@ def _migrate_legacy_ssl_files():
             os.replace(old, new)
             log.info("SSL dosyasi %s -> %s tasindi", old, new)
 
+def _detect_lan_ips() -> list[str]:
+    """Ağ üzerinden erişilebilir IPv4 adreslerini döndürür (loopback hariç)."""
+    ips: list[str] = []
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(1)
+            sock.connect(('8.8.8.8', 53))
+            ips.append(sock.getsockname()[0])
+    except Exception:
+        pass
+    if not ips:
+        hostname = socket.gethostname()
+        try:
+            for info in socket.getaddrinfo(hostname, None, family=socket.AF_INET):
+                addr = info[4][0]
+                if not addr.startswith('127.'):
+                    ips.append(addr)
+        except Exception:
+            pass
+    return sorted(set(ips))
+
+def _cert_missing_lan_ips(extra_ips: list[str]) -> bool:
+    try:
+        with open(CERT_FILE, 'rb') as f:
+            cert = x509.load_pem_x509_certificate(f.read())
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        present = {str(ip) for ip in san.value.get_values_for_type(x509.IPAddress)}
+        return bool(extra_ips) and not set(extra_ips).issubset(present)
+    except Exception:
+        return True
+
 def _ensure_self_signed_cert():
     _migrate_legacy_ssl_files()
-    ensure_self_signed_cert(CERT_FILE, KEY_FILE, log)
+    lan_ips: list[str] = []
+    lan_on = False
+    try:
+        with app.app_context():
+            lan_on = _lan_access_enabled()
+    except Exception:
+        pass
+    if lan_on:
+        lan_ips = _detect_lan_ips()
+    missing = not (os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE))
+    force = lan_on and bool(lan_ips) and not missing and _cert_missing_lan_ips(lan_ips)
+    try:
+        ensure_self_signed_cert(
+            CERT_FILE, KEY_FILE, log,
+            extra_ips=lan_ips,
+            force=force,
+        )
+    except Exception as e:
+        log.warning("Sertifika hazirlanamadi: %s", e)
 
 _ensure_self_signed_cert()
 
@@ -2206,6 +2321,6 @@ if __name__ == '__main__':
     flask_host = _get_server_host()
     flask_port = safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535)
     ssl_ctx = (CERT_FILE, KEY_FILE) if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE) else None
-    app.run(host=flask_host, port=flask_port, ssl_context=ssl_ctx)
+    app.run(host=flask_host, port=flask_port, ssl_context=ssl_ctx, threaded=True)
 
 

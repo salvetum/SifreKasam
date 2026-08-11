@@ -57,7 +57,7 @@ html[data-glass-effects="off"] .page-loading-overlay { background: rgba(8,9,18,0
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-modal::before,
 html[data-bs-theme="light"][data-glass-effects="off"] .page-loading-overlay { background: rgba(238,242,255,0.82) !important; }
 
-html[data-glass-effects="off"] .settings-appearance-card,
+html[data-glass-effects="off"] .settings-card,
 html[data-glass-effects="off"] .generator-output-card,
 html[data-glass-effects="off"] .generator-options-card,
 html[data-glass-effects="off"] .generator-history-card,
@@ -69,7 +69,7 @@ html[data-glass-effects="off"] .generator-panel {
     border-color: rgba(var(--accent-rgb), 0.20) !important;
 }
 
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-appearance-card,
+html[data-bs-theme="light"][data-glass-effects="off"] .settings-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .generator-output-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .generator-options-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .generator-history-card,

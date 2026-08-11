@@ -1,16 +1,27 @@
 /**
- * ŞifreKasam v2.6.3-beta.3 - LAN Erişimi modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.1 - LAN Erişimi modülü (ES Module)
  *
- * 3b. bölüm: LAN toggle / bilgi kutusu ve fetchLanInfo.
- * initLanSettings, app.js içindeki DOMContentLoaded sırasında çağrılır;
- * ayarlar formu lanToggle / lanInfoBox / fetchLanInfo kullandığı için döndürülür.
+ * 3b. bölüm: LAN bilgi kutusu durumları (bekliyor / aktif) ve fetchLanInfo.
+ * initLanSettings, app.js içindeki DOMContentLoaded sırasında çağrılır.
+ * Toggle değişim olayı ve LAN uyarı modalı app.js tarafından yönetilir.
+ *
+ * Durumlar:
+ * - Aktif: LAN kayıtlı ve sunucu 0.0.0.0'a bağlıyken sayfa yüklendiyse adres
+ *   doğrudan gösterilir.
+ * - Bekliyor: Kullanıcı toggle'ı açtı ama henüz kaydetmedi. Gerçek adres
+ *   kayıt + sunucu yeniden başlatmasından sonra gösterilir; ondan önce
+ *   "kaydetmeniz gerekiyor" notu gösterilir.
  */
 
 export function initLanSettings({ apiJson }) {
 
   const lanToggle = document.getElementById('lan-enabled-toggle');
   const lanInfoBox = document.getElementById('lan-info-box');
+  const lanAddressWrap = document.getElementById('lan-address-wrap');
   const lanAddress = document.getElementById('lan-address');
+  const lanPendingNote = document.getElementById('lan-pending-note');
+
+  const lanActiveOnLoad = Boolean(lanToggle && lanToggle.checked);
 
   async function fetchLanInfo() {
     if (!lanAddress) return;
@@ -27,21 +38,34 @@ export function initLanSettings({ apiJson }) {
     }
   }
 
-  if (lanToggle && lanInfoBox) {
-    lanToggle.addEventListener('change', function () {
-      if (lanToggle.checked) {
-        lanInfoBox.classList.remove('hidden');
-        fetchLanInfo();
-      } else {
-        lanInfoBox.classList.add('hidden');
-      }
-    });
-
-    if (lanToggle.checked) {
-      fetchLanInfo();
+  function showPending() {
+    if (!lanInfoBox) return;
+    lanInfoBox.classList.remove('hidden');
+    if (lanAddressWrap) lanAddressWrap.classList.add('hidden');
+    if (lanPendingNote) {
+      lanPendingNote.classList.remove('hidden');
+    } else if (lanAddress) {
+      lanAddress.textContent = window._('Ağ bağlantısı bulunamadı');
     }
   }
 
-  return { lanToggle, lanInfoBox, fetchLanInfo };
+  function showActive() {
+    if (!lanInfoBox) return;
+    lanInfoBox.classList.remove('hidden');
+    if (lanAddressWrap) lanAddressWrap.classList.remove('hidden');
+    if (lanPendingNote) lanPendingNote.classList.add('hidden');
+    fetchLanInfo();
+  }
+
+  function hide() {
+    lanInfoBox?.classList.add('hidden');
+  }
+
+  // LAN zaten kayıtlı ve çalışıyorken sayfa yüklendiyse adresi doğrudan göster.
+  if (lanActiveOnLoad) {
+    showActive();
+  }
+
+  return { lanToggle, lanInfoBox, lanAddress, fetchLanInfo, showPending, showActive, hide };
 
 }

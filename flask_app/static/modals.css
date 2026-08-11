@@ -550,6 +550,19 @@
 .kasa-swal-title   { color: var(--text) !important;        font-family: var(--font-main) !important; font-size: 1.15rem !important; }
 .kasa-swal-text    { color: var(--text-muted) !important;  font-size: 0.92rem !important; }
 .kasa-swal-actions { gap: 0.65rem; }
+.kasa-swal-msg     { margin: 0 0 0.4rem; line-height: 1.55; }
+.kasa-swal-remember {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    user-select: none;
+}
+.kasa-swal-remember .kasa-checkbox { width: 16px; height: 16px; }
 .swal2-icon.swal2-warning { border-color: rgba(245,158,11,0.38) !important; color: #f59e0b !important; }
 
 /* SweetAlert2 scroll fix */

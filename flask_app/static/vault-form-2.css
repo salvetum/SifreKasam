@@ -32,8 +32,8 @@
     padding-right: calc(var(--control-height) + 1rem) !important;
 }
 
-.vault-password-line .generator-copy-btn {
-    position: absolute;
+.vault-form-access .vault-password-line .generator-copy-btn {
+    position: absolute !important;
     right: 0.35rem;
     top: 50%;
     width: 36px;
@@ -44,11 +44,11 @@
     border-radius: 12px !important;
 }
 
-.vault-password-line .generator-copy-btn:hover {
+.vault-form-access .vault-password-line .generator-copy-btn:hover {
     transform: translateY(calc(-50% - 1px));
 }
 
-.vault-password-line .generator-copy-btn:active {
+.vault-form-access .vault-password-line .generator-copy-btn:active {
     transform: translateY(-50%) scale(0.97);
 }
 

@@ -42,8 +42,7 @@
 [data-bs-theme="light"] .settings-toggle-card,
 [data-bs-theme="light"] .settings-select-card,
 [data-bs-theme="light"] .settings-action-card,
-[data-bs-theme="light"] .settings-appearance-card,
-[data-bs-theme="light"] .settings-bg-card {
+[data-bs-theme="light"] .settings-card {
     color: var(--text);
     border-color: rgba(45,58,82,0.14) !important;
     background:
@@ -75,8 +74,7 @@ html[data-glass-effects="off"] .settings-nav,
 html[data-glass-effects="off"] .settings-toggle-card,
 html[data-glass-effects="off"] .settings-select-card,
 html[data-glass-effects="off"] .settings-action-card,
-html[data-glass-effects="off"] .settings-appearance-card,
-html[data-glass-effects="off"] .settings-bg-card,
+html[data-glass-effects="off"] .settings-card,
 html[data-glass-effects="off"] .background-choice-grid button,
 html[data-glass-effects="off"] .accent-preset-row button,
 html[data-glass-effects="off"] .kasa-btn:not(.kasa-btn-primary),
@@ -114,8 +112,7 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-nav,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-toggle-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-select-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-action-card,
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-appearance-card,
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-bg-card,
+html[data-bs-theme="light"][data-glass-effects="off"] .settings-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .background-choice-grid button,
 html[data-bs-theme="light"][data-glass-effects="off"] .accent-preset-row button,
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-btn:not(.kasa-btn-primary),
@@ -225,10 +222,6 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-switch-input:che
 }
 
 @media (max-width: 620px) {
-    .settings-appearance-head {
-        grid-template-columns: minmax(0, 1fr) 58px;
-    }
-
     .settings-timeout-row {
         align-items: stretch;
         flex-direction: column;
@@ -277,7 +270,7 @@ html[data-bs-theme="light"][data-glass-effects="off"] .page-loading-card {
         inset 0 1px 0 rgba(255,255,255,0.72);
 }
 
-html[data-glass-effects="off"] .settings-appearance-card {
+html[data-glass-effects="off"] .settings-card {
     border: 1px solid rgba(var(--accent-rgb), 0.30) !important;
     background:
         radial-gradient(circle at 10% 0%, rgba(var(--accent-rgb), 0.16), transparent 34%),
@@ -287,7 +280,7 @@ html[data-glass-effects="off"] .settings-appearance-card {
         inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-appearance-card {
+html[data-bs-theme="light"][data-glass-effects="off"] .settings-card {
     border-color: rgba(var(--accent-rgb), 0.24) !important;
     background:
         radial-gradient(circle at 10% 0%, rgba(var(--accent-rgb), 0.10), transparent 34%),

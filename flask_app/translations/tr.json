@@ -129,6 +129,9 @@
   "Mobil cihazdan bağlanmak için ağ üzerinden erişime izin ver.": "Mobil cihazdan bağlanmak için ağ üzerinden erişime izin ver.",
   "Ağ Adresi": "Ağ Adresi",
   "Bu adresi mobil cihazınızın tarayıcısına yazın.": "Bu adresi mobil cihazınızın tarayıcısına yazın.",
+  "LAN erişiminin aktif olması için ayarları kaydetmeniz gerekiyor.": "LAN erişiminin aktif olması için ayarları kaydetmeniz gerekiyor.",
+  "Bu uyarıyı bir daha gösterme": "Bu uyarıyı bir daha gösterme",
+  "Evet, Aç": "Evet, Aç",
   "Ekran Yakalamayı Engelle": "Ekran Yakalamayı Engelle",
   "Ekran kaydı ve ekran görüntüsü araçlarında pencereyi gizler. Yalnızca Windows ve macOS'ta çalışır.": "Ekran kaydı ve ekran görüntüsü araçlarında pencereyi gizler. Yalnızca Windows ve macOS'ta çalışır.",
   "Linux'ta desteklenmiyor.": "Linux'ta desteklenmiyor.",
@@ -276,6 +279,7 @@
   "Ana şifre güncelleniyor": "Ana şifre güncelleniyor",
   "Yedek formatını seçin ve indirin.": "Yedek formatını seçin ve indirin.",
   "LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.": "LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.",
+  "Bu programın yeniden başlatılması gerekebilir.": "Bu programın yeniden başlatılması gerekebilir.",
   "İçe aktarılıyor…": "İçe aktarılıyor…",
   "Sayfaya git": "Sayfaya git",
   "Git": "Git",
@@ -342,5 +346,7 @@
   "Sonraki yıl": "Sonraki yıl",
   "Tarih seçici": "Tarih seçici",
   "Bugün": "Bugün",
-  "Temizle": "Temizle"
+  "Temizle": "Temizle",
+  "Renk ve Arkaplan": "Renk ve Arkaplan",
+  "Ana görünümün arkaplan stilini seçin.": "Ana görünümün arkaplan stilini seçin."
 }

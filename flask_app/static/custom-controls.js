@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.6.3-beta.3 - Özel Form Kontrolleri modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.1 - Özel Form Kontrolleri modülü (ES Module)
  *
  * 2b. bölüm: data-custom-select sarmalayıcıları, data-number-stepper ve
  * ilgili açık dropdown / scroll / resize davranışları.
@@ -14,16 +14,26 @@ export function initCustomControls({ createIcon }) {
   const syncCustomSelectDirection = (state) => {
     if (!state?.openRequested) return;
     const triggerRect = state.trigger.getBoundingClientRect();
-    const boundaryRect = state.wrapper.closest('.modal-content')?.getBoundingClientRect();
+    /* Scroll konteyneri (örn. settings-panel) sınır olarak kullanılır:
+       menü bu alanın içinde kalır, scroll konteynerinin overflow'u
+       değiştirilmez (overflow değişimi Chromium'da scroll'u sıfırlar). */
+    const scrollHost = state.wrapper.closest('.settings-panel, .vault-form-panel, .modal-body');
+    const boundaryRect = (scrollHost || state.wrapper.closest('.modal-content'))?.getBoundingClientRect();
     const boundaryTop = boundaryRect?.top ?? 0;
     const boundaryBottom = boundaryRect?.bottom ?? window.innerHeight;
-    const menuHeight = Math.min(state.menu.scrollHeight, window.innerHeight * 0.38);
+    const naturalHeight = state.menu.scrollHeight;
+    const menuHeight = Math.min(naturalHeight, window.innerHeight * 0.38);
     const spaceAbove = triggerRect.top - boundaryTop;
     const spaceBelow = boundaryBottom - triggerRect.bottom;
     state.wrapper.classList.toggle(
       'opens-upward',
       spaceBelow < menuHeight + 10 && spaceAbove > spaceBelow,
     );
+    const availableSpace = (state.wrapper.classList.contains('opens-upward') ? spaceAbove : spaceBelow) - 10;
+    const cappedHeight = Math.max(72, Math.min(menuHeight, availableSpace));
+    if (state.menu.style.maxHeight !== cappedHeight + 'px') {
+      state.menu.style.maxHeight = cappedHeight + 'px';
+    }
   };
 
   const closeCustomSelect = (state, restoreFocus = false) => {
@@ -35,6 +45,7 @@ export function initCustomControls({ createIcon }) {
     state.closeTimer = setTimeout(() => {
       if (!state.wrapper.classList.contains('is-open')) {
         state.menu.hidden = true;
+        state.menu.style.maxHeight = '';
         state.wrapper.classList.remove('opens-upward');
         state.host?.classList.remove('has-open-select');
         state.layerHosts.forEach((layerHost) => {
@@ -128,7 +139,7 @@ export function initCustomControls({ createIcon }) {
       optionButtons,
       closeTimer: 0,
       openRequested: false,
-      host: wrapper.closest('.glass-sm, .settings-appearance-card, .vault-field'),
+      host: wrapper.closest('.glass-sm, .settings-card, .vault-field'),
       layerHosts: [
         wrapper.closest('.vault-form-panel'),
         wrapper.closest('.settings-panel'),

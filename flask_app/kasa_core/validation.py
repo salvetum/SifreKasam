@@ -6,8 +6,14 @@ from kasa_core.constants import (
     DEFAULT_ACCENT_COLOR,
     DEFAULT_BACKGROUND_STYLE,
     DEFAULT_CHROMA_ACCENT_SPEED,
+    DEFAULT_GLASS_BLUR,
     DEFAULT_GLASS_QUALITY,
+    DEFAULT_GLASS_VEIL,
     DEFAULT_THEME_MODE,
+    GLASS_BLUR_MAX,
+    GLASS_BLUR_MIN,
+    GLASS_VEIL_MAX,
+    GLASS_VEIL_MIN,
     VALID_BACKGROUND_STYLES,
     VALID_CHROMA_ACCENT_SPEEDS,
     VALID_GLASS_QUALITIES,
@@ -90,6 +96,35 @@ def normalize_glass_quality(value: object) -> str:
     return text if text in VALID_GLASS_QUALITIES else DEFAULT_GLASS_QUALITY
 
 
+def _normalize_clamped_scale(
+    value: object,
+    default: float,
+    minimum: float,
+    maximum: float,
+) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not number == number:  # NaN guard
+        return default
+    return min(maximum, max(minimum, number))
+
+
+def normalize_glass_blur(value: object) -> float:
+    """Glass blur strength multiplier (0.0 = sıfır buğu, 1.0 = varsayılan)."""
+    return _normalize_clamped_scale(
+        value, DEFAULT_GLASS_BLUR, GLASS_BLUR_MIN, GLASS_BLUR_MAX
+    )
+
+
+def normalize_glass_veil(value: object) -> float:
+    """Glass veil/perde yoğunluğu çarpanı (1.0 = varsayılan)."""
+    return _normalize_clamped_scale(
+        value, DEFAULT_GLASS_VEIL, GLASS_VEIL_MIN, GLASS_VEIL_MAX
+    )
+
+
 def safe_int(
     value: object | None,
     default: int,
@@ -105,3 +140,11 @@ def safe_int(
     if maximum is not None:
         number = min(maximum, number)
     return number
+
+
+def safe_float(value: object | None, default: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return default if number != number else number

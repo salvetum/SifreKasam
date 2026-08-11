@@ -14,6 +14,8 @@ from kasa_core.constants import (
     DEFAULT_CARD_SHEEN_ENABLED,
     DEFAULT_CHROMA_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_SPEED,
+    DEFAULT_GLASS_BLUR,
+    DEFAULT_GLASS_VEIL,
     DEFAULT_GRADIENTS_ENABLED,
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
@@ -23,8 +25,10 @@ from kasa_core.models import Setting
 from kasa_core.validation import (
     normalize_background_style,
     normalize_chroma_accent_speed,
+    normalize_glass_blur,
     normalize_glass_effects,
     normalize_glass_quality,
+    normalize_glass_veil,
     normalize_hex_color,
     normalize_theme,
     normalize_theme_mode,
@@ -162,6 +166,24 @@ class AppearanceSettings:
             pass
         return normalize_glass_quality(self.load_file().get("glass_quality"))
 
+    def get_glass_blur(self) -> float:
+        try:
+            value = self.get_setting("glass_blur")
+            if value is not None:
+                return normalize_glass_blur(value)
+        except Exception:
+            pass
+        return normalize_glass_blur(self.load_file().get("glass_blur"))
+
+    def get_glass_veil(self) -> float:
+        try:
+            value = self.get_setting("glass_veil")
+            if value is not None:
+                return normalize_glass_veil(value)
+        except Exception:
+            pass
+        return normalize_glass_veil(self.load_file().get("glass_veil"))
+
     def get_animated_backgrounds_enabled(self) -> bool:
         try:
             value = self.get_setting("animated_backgrounds_enabled")
@@ -263,6 +285,18 @@ class AppearanceSettings:
         self.set_setting("glass_quality", quality)
         self.save_file(glass_quality=quality)
         return quality
+
+    def save_glass_blur(self, value: object) -> float:
+        blur = normalize_glass_blur(value)
+        self.set_setting("glass_blur", str(blur))
+        self.save_file(glass_blur=blur)
+        return blur
+
+    def save_glass_veil(self, value: object) -> float:
+        veil = normalize_glass_veil(value)
+        self.set_setting("glass_veil", str(veil))
+        self.save_file(glass_veil=veil)
+        return veil
 
     def save_animated_backgrounds(self, value: object) -> bool:
         enabled = normalize_theme_option(

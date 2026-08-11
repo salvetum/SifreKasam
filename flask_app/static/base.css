@@ -10,7 +10,7 @@ body::before, body::after, .blob-accent {
     content: '';
     position: fixed;
     border-radius: 50%;
-    filter: blur(24px);
+    filter: blur(16px);
     pointer-events: none;
     z-index: -1;
     animation: drift 20s infinite alternate ease-in-out;
@@ -18,10 +18,11 @@ body::before, body::after, .blob-accent {
     will-change: auto;
 }
 
-html[data-kasa-motion="on"][data-glass-quality="high"] body::before,
-html[data-kasa-motion="on"][data-glass-quality="high"] body::after,
-html[data-kasa-motion="on"][data-glass-quality="high"] .blob-accent {
+html[data-kasa-motion="on"] body::before,
+html[data-kasa-motion="on"] body::after,
+html[data-kasa-motion="on"] .blob-accent {
     will-change: transform;
+    transform: translateZ(0);
 }
 
 html[data-kasa-motion="off"] body::before,

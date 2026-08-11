@@ -192,12 +192,6 @@
 .settings-panel.has-open-select-layer {
     position: relative;
     z-index: 100;
-    overflow: visible;
-}
-
-.settings-body.has-open-select-layer,
-.settings-modal-content.has-open-select-layer {
-    overflow: visible;
 }
 
 .vault-section-head {

@@ -825,8 +825,8 @@
             </section>
         </main>
     </div>
-    <!-- Liquid Glass refraction (kube.io tekniği) — tüm .glass/.glass-sm
-         yüzeylerde, data-glass-quality="high" iken. -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=2" defer></script>
+    <!-- Liquid Glass — saf CSS backdrop blur (GPU-uyumlu) — tüm
+         .glass/.glass-sm yüzeylerde, data-glass-quality="high" iken. -->
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=5" defer></script>
 </body>
 </html>

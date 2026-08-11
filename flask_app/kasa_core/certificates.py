@@ -17,8 +17,10 @@ def ensure_self_signed_cert(
     cert_file: str,
     key_file: str,
     logger: logging.Logger,
+    extra_ips: list[str] | None = None,
+    force: bool = False,
 ) -> None:
-    if os.path.exists(cert_file) and os.path.exists(key_file):
+    if os.path.exists(cert_file) and os.path.exists(key_file) and not force:
         return
     os.makedirs(os.path.dirname(cert_file), exist_ok=True)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -26,6 +28,16 @@ def ensure_self_signed_cert(
         [x509.NameAttribute(NameOID.COMMON_NAME, "ŞifreKasam")]
     )
     valid_from = utc_now()
+    san_entries: list[x509.GeneralName] = [
+        x509.DNSName("localhost"),
+        x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
+        x509.IPAddress(ipaddress.IPv6Address("::1")),
+    ]
+    for raw_ip in extra_ips or []:
+        try:
+            san_entries.append(x509.IPAddress(ipaddress.ip_address(raw_ip)))
+        except ValueError:
+            logger.debug("Sertifika SAN'ina eklenemeyen IP: %s", raw_ip)
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject)
@@ -35,13 +47,7 @@ def ensure_self_signed_cert(
         .not_valid_before(valid_from)
         .not_valid_after(valid_from + timedelta(days=365 * 10))
         .add_extension(
-            x509.SubjectAlternativeName(
-                [
-                    x509.DNSName("localhost"),
-                    x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
-                    x509.IPAddress(ipaddress.IPv6Address("::1")),
-                ]
-            ),
+            x509.SubjectAlternativeName(san_entries),
             critical=False,
         )
         .sign(key, hashes.SHA256())
@@ -57,7 +63,14 @@ def ensure_self_signed_cert(
             )
         )
     _restrict_private_permissions(cert_file, key_file, logger)
-    logger.info("Self-signed SSL sertifikasi olusturuldu")
+    logger.info(
+        "Self-signed SSL sertifikasi %s (SAN: %s)",
+        "yenilendi" if force else "olusturuldu",
+        ", ".join(
+            entry.value if isinstance(entry, x509.DNSName) else str(entry.value)
+            for entry in san_entries
+        ),
+    )
 
 
 def _restrict_private_permissions(

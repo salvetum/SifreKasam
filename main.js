@@ -112,6 +112,8 @@ const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.3-beta.2',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.3-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.3-beta.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.2-beta.2',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.2-beta.2',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.2-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.2-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.2',
@@ -124,6 +126,8 @@ const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.12',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.11',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.11',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.10',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.10',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.10-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.5.10-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.5.9-beta.3',
@@ -396,6 +400,8 @@ const SSL_NOISE_PATTERNS = [
   'certificate',
   'SSL',
 ];
+const LAN_RECONCILE_INTERVAL_MS = 3000;
+const LAN_RESTART_MIN_INTERVAL_MS = 15_000;
 
 // ─── UYGULAMA DURUMU ──────────────────────────────────────────────────────────
 
@@ -407,6 +413,8 @@ let isQuiting    = false;
 let lanRuntimeEnabled = false;
 let resetSavedLanOnNextStart = true;
 let isRestartingFlask = false;
+let lanReconciliationTimer = null;
+let lastLanRestartAttempt = 0;
 let hasReportedLocalCertificateNoise = false;
 let rendererLowPowerRequested = false;
 let backendPageRecoveryAttempts = 0;
@@ -574,16 +582,22 @@ if (!gotTheLock) {
 
 let pinnedCertificatePem = null;
 let pinnedCertificateDer = null;
+let pinnedCertificateMtime = 0;
 let warnedPinnedCertificateUnavailable = false;
 
 function loadPinnedCertificate() {
-  if (pinnedCertificatePem !== null) return true;
   try {
     const dataDir = getDataDir();
     const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
     if (certPath && fs.existsSync(certPath)) {
-      pinnedCertificatePem = fs.readFileSync(certPath);
-      pinnedCertificateDer = Buffer.from(new crypto.X509Certificate(pinnedCertificatePem).raw);
+      // Sertifika LAN açılışında LAN IP içerecek şekilde yeniden üretilebiliyor;
+      // dosya değiştiğinde eski pin'in takılı kalmasın diye mtime'ı izle.
+      const mtime = fs.statSync(certPath).mtimeMs;
+      if (pinnedCertificatePem === null || mtime !== pinnedCertificateMtime) {
+        pinnedCertificatePem = fs.readFileSync(certPath);
+        pinnedCertificateDer = Buffer.from(new crypto.X509Certificate(pinnedCertificatePem).raw);
+        pinnedCertificateMtime = mtime;
+      }
       return true;
     }
   } catch (error) {
@@ -604,6 +618,12 @@ function getPinnedHttpsOptions() {
     return { rejectUnauthorized: true, ca: pinnedCertificatePem };
   }
   return { rejectUnauthorized: false };
+}
+
+function resetPinnedCertificateCache() {
+  pinnedCertificatePem = null;
+  pinnedCertificateDer = null;
+  pinnedCertificateMtime = 0;
 }
 
 // ─── UYGULAMA HAZIR ───────────────────────────────────────────────────────────
@@ -730,6 +750,7 @@ async function onAppReady() {
       mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
       applyContentProtection();
       await loadBackendPage('/login?entry=loading');
+      startLanReconciliation();
     }
   } catch (err) {
     const isSquirrel = process.argv.some(arg => arg.startsWith('--squirrel-'));
@@ -1150,11 +1171,90 @@ async function syncLanRuntimeState() {
     const desiredLanEnabled = state.lan_enabled === true;
     const actualLanEnabled = state.runtime_lan_enabled === true;
     if (desiredLanEnabled !== actualLanEnabled) {
+      const now = Date.now();
+      // Restart basarisiz olursa poller her 3 sn'de yeniden denerdi;
+      // restart firtinasi olusmamasi icin iki deneme arasina minimum sure koy.
+      if (now - lastLanRestartAttempt < LAN_RESTART_MIN_INTERVAL_MS) return;
+      lastLanRestartAttempt = now;
       await restartFlaskServer(desiredLanEnabled);
     }
   } catch (err) {
     console.warn(`LAN runtime senkronizasyonu atlandi: ${err.message}`);
   }
+}
+
+// webRequest.onCompleted cekicisi bazi ortamlarda (paketli uygulama) saglikli
+// tetiklenmeyebiliyor; LAN ayari kaydedildikten sonra sunucunun gercekten
+// 0.0.0.0'a baglanmasi icin periyodik bir mutabakat poller'i calistirir.
+function startLanReconciliation() {
+  if (lanReconciliationTimer) clearInterval(lanReconciliationTimer);
+  lanReconciliationTimer = setInterval(() => {
+    syncLanRuntimeState().catch(() => {});
+  }, LAN_RECONCILE_INTERVAL_MS);
+  if (lanReconciliationTimer.unref) lanReconciliationTimer.unref();
+}
+
+// ─── LAN FIREWALL (paketli uygulama) ─────────────────────────────────────────
+
+function lanFirewallRuleName() {
+  return 'SifreKasam LAN Erisimi';
+}
+
+function backendProcessPath() {
+  const exe = process.platform === 'win32' ? 'SifreKasam.exe' : 'SifreKasam';
+  return app.isPackaged ? resolvePath('backend', exe) : process.execPath;
+}
+
+function lanFirewallRuleExists(ruleName) {
+  try {
+    const result = spawnSync(
+      'netsh',
+      ['advfirewall', 'firewall', 'show', 'rule', `name=${ruleName}`],
+      { encoding: 'utf8', timeout: 6000 }
+    );
+    if (result.status !== 0) return false;
+    return /Ok\./.test(result.stdout) && !/No rules match/.test(result.stdout);
+  } catch (_) {
+    return false;
+  }
+}
+
+function addLanFirewallRule(ruleName, program) {
+  try {
+    const result = spawnSync(
+      'netsh',
+      ['advfirewall', 'firewall', 'add', 'rule',
+       `name=${ruleName}`,
+       'dir=in',
+       'action=allow',
+       `program="${program}"`,
+       'profile=private,public',
+       'enable=yes'],
+      { encoding: 'utf8', timeout: 10000 }
+    );
+    return result.status === 0 && /Ok\./.test(result.stdout);
+  } catch (_) {
+    return false;
+  }
+}
+
+async function ensureLanFirewallRuleAndWarn() {
+  if (process.platform !== 'win32') return;
+  const ruleName = lanFirewallRuleName();
+  if (lanFirewallRuleExists(ruleName)) return;
+  const program = backendProcessPath();
+  if (!program) return;
+  if (addLanFirewallRule(ruleName, program)) return;
+  try {
+    await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: 'ŞifreKasam',
+      message: 'LAN erişimi açıldı.',
+      detail: 'Windows Güvenlik Duvarı bu uygulamanın ağdan erişimini engelleyebilir.\n\nTelefon hâlâ bağlanamıyorsa, yönetici olarak şu komutu çalıştırın:\n\nnetsh advfirewall firewall add rule name="SifreKasam LAN Erisimi" dir=in action=allow program="' + program + '" profile=private,public enable=yes',
+      buttons: ['Tamam'],
+      noLink: true,
+    });
+  } catch (_) {}
 }
 
 async function restartFlaskServer(nextLanEnabled) {
@@ -1167,7 +1267,13 @@ async function restartFlaskServer(nextLanEnabled) {
     }
     await stopFlaskServer();
     lanRuntimeEnabled = nextLanEnabled;
+    // LAN açılışında sertifika LAN IP içerecek şekilde yeniden üretilmiş
+    // olabilir; eskimiş pin önbelleğini temizle.
+    resetPinnedCertificateCache();
     await startFlaskServer(60000); // LAN restart için uzun timeout
+    if (nextLanEnabled) {
+      await ensureLanFirewallRuleAndWarn();
+    }
     // Flask başarıyla restart olduktan sonra, sayfayı yeniden yükle
     if (mainWindow && !mainWindow.isDestroyed()) {
       await loadBackendPage('/login?entry=loading');

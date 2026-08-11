@@ -240,7 +240,6 @@
 }
 
 .settings-theme-card {
-    grid-column: auto;
     min-width: 0;
 }
 
