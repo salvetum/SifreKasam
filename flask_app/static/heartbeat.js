@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Heartbeat / Tasarruf Modu modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Heartbeat / Tasarruf Modu modülü (ES Module)
  *
  * 1. bölüm: heartbeat gönderimi, düşük güç modu ve
  * renderer repaint yönetimi.
@@ -15,6 +15,7 @@ export function initHeartbeat({ apiFetch }) {
   let rendererLowPower = null;
   let systemLowPower = document.hidden;
   let idleLowPower = false;
+  let powerSaveEnabled = document.documentElement.getAttribute('data-kasa-power-save') !== 'off';
   let heartbeatTimer = null;
   let idleLowPowerTimer = null;
   let rendererResumeTimer = null;
@@ -50,13 +51,13 @@ export function initHeartbeat({ apiFetch }) {
     ].filter(Boolean);
 
     repaintTargets.forEach(target => target.classList.add('kasa-repaint-hidden'));
-    pageShell.classList.remove('kasa-renderer-repaint');
+    pageShell.classList.remove('kasa-resume-fade');
     void pageShell.offsetHeight;
     requestAnimationFrame(() => {
       repaintTargets.forEach(target => target.classList.remove('kasa-repaint-hidden'));
-      pageShell.classList.add('kasa-renderer-repaint');
+      pageShell.classList.add('kasa-resume-fade');
       window.dispatchEvent(new Event('resize'));
-      requestAnimationFrame(() => pageShell.classList.remove('kasa-renderer-repaint'));
+      window.setTimeout(() => pageShell.classList.remove('kasa-resume-fade'), 340);
     });
   };
 
@@ -67,10 +68,11 @@ export function initHeartbeat({ apiFetch }) {
   };
 
   const applyRendererLowPower = () => {
-    const nextState = systemLowPower || idleLowPower;
+    const nextState = powerSaveEnabled && (systemLowPower || idleLowPower);
     if (rendererLowPower === nextState) return;
     rendererLowPower = nextState;
     document.documentElement.setAttribute('data-kasa-low-power', nextState ? 'on' : 'off');
+    setPowerSaveOverlay(nextState, false);
     window.dispatchEvent(new CustomEvent('kasa:low-power-changed', {
       detail: { enabled: nextState },
     }));
@@ -78,7 +80,7 @@ export function initHeartbeat({ apiFetch }) {
 
   const scheduleIdleLowPower = () => {
     stopIdleLowPowerTimer();
-    if (systemLowPower || document.hidden) return;
+    if (!powerSaveEnabled || systemLowPower || document.hidden) return;
     idleLowPowerTimer = window.setTimeout(() => {
       idleLowPower = true;
       applyRendererLowPower();
@@ -86,7 +88,7 @@ export function initHeartbeat({ apiFetch }) {
   };
 
   const resetIdleLowPower = () => {
-    if (systemLowPower || document.hidden) return;
+    if (!powerSaveEnabled || systemLowPower || document.hidden) return;
     idleLowPower = false;
     applyRendererLowPower();
     scheduleIdleLowPower();
@@ -97,7 +99,6 @@ export function initHeartbeat({ apiFetch }) {
     if (systemLowPower) {
       stopIdleLowPowerTimer();
       clearTimeout(rendererResumeTimer);
-      setPowerSaveOverlay(true, false);
     } else {
       idleLowPower = false;
       scheduleIdleLowPower();
@@ -108,10 +109,14 @@ export function initHeartbeat({ apiFetch }) {
   const resumeRenderer = () => {
     if (document.hidden) return;
     clearTimeout(rendererResumeTimer);
-    setPowerSaveOverlay(true, true);
     systemLowPower = false;
     idleLowPower = false;
     applyRendererLowPower();
+    if (!powerSaveEnabled) {
+      setPowerSaveOverlay(false, false);
+      return;
+    }
+    setPowerSaveOverlay(true, true);
     scheduleIdleLowPower();
     requestAnimationFrame(() => requestAnimationFrame(forceRendererRepaint));
     rendererResumeTimer = window.setTimeout(() => {
@@ -141,6 +146,35 @@ export function initHeartbeat({ apiFetch }) {
   sendHeartbeat();
   scheduleHeartbeat();
 
+  const syncPowerSaveEnabled = () => {
+    const enabled = document.documentElement.getAttribute('data-kasa-power-save') !== 'off';
+    if (enabled === powerSaveEnabled) return;
+    powerSaveEnabled = enabled;
+    if (!powerSaveEnabled) {
+      idleLowPower = false;
+      stopIdleLowPowerTimer();
+      clearTimeout(rendererResumeTimer);
+      applyRendererLowPower();
+      setPowerSaveOverlay(false, false);
+    } else {
+      systemLowPower = document.hidden;
+      if (systemLowPower) {
+        stopIdleLowPowerTimer();
+        clearTimeout(rendererResumeTimer);
+      } else {
+        idleLowPower = false;
+        scheduleIdleLowPower();
+      }
+      applyRendererLowPower();
+    }
+  };
+
+  const powerSaveObserver = new MutationObserver(syncPowerSaveEnabled);
+  powerSaveObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-kasa-power-save'],
+  });
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) setRendererLowPower(true);
     else resumeRenderer();
@@ -153,6 +187,7 @@ export function initHeartbeat({ apiFetch }) {
     stopHeartbeat();
     stopIdleLowPowerTimer();
     clearTimeout(rendererResumeTimer);
+    powerSaveObserver.disconnect();
     IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
       window.removeEventListener(eventName, resetIdleLowPower);
     });

@@ -607,6 +607,11 @@
     border-color: rgba(var(--accent-rgb), 0.38) !important;
 }
 
+#page-password.generator-generated {
+    animation: generatorPasswordPulse 0.46s cubic-bezier(0.16,1,0.3,1) both;
+    border-color: rgba(var(--accent-rgb), 0.38) !important;
+}
+
 .generator-generated .generator-strength-card {
     animation: softPulse 0.44s ease both;
 }

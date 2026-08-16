@@ -369,3 +369,28 @@
 }
 .bulk-select-checkbox:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
+/* ── BUTON VIBRANCE (yalnızca butonlar) ────────────────────────── */
+/* Custom görseldeki canlı metin/renk hissini varsayılan modda da
+   versin. Açık tema renkleri theme-states.css'te ezildiği için bu
+   blok yalnız koyu temayı besler; açık tema ayarı theme-states'ta. */
+.kasa-btn:not(.kasa-btn-primary),
+.icon-btn,
+.kasa-close-btn { color: #eef1fb; }
+
+.kasa-btn-danger {
+    color: #ff7a7a;
+    border-color: rgba(239,68,68,0.48);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 10px 26px rgba(239,68,68,0.22);
+}
+.kasa-btn-danger:hover {
+    color: #ff9494;
+    border-color: rgba(239,68,68,0.60);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 14px 30px rgba(239,68,68,0.30);
+}
+
+.filter-btn { color: #d6dceb; }
+.filter-btn-active,
+.filter-btn.active { color: #d8ceff; }
+
+.card-icon-btn { color: #d5daea; }
+

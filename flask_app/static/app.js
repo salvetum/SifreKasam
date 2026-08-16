@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Main JavaScript
+ * ŞifreKasam v2.7.0-beta.2 - Main JavaScript
  */
 
 import { initPasswordGenerator } from './password-generator.js';
@@ -236,10 +236,43 @@ document.addEventListener('DOMContentLoaded', () => {
     if (customLayer) {
       const bgUrl = customLayer.getAttribute('data-bg-url');
       const isActive = normalizedBackground === 'custom' && bgUrl;
+      const isVideo = customLayer.getAttribute('data-bg-type') === 'video';
+      const markLoaded = () => customLayer.classList.add('is-loaded');
       customLayer.classList.toggle('is-active', isActive);
+      if (!isActive) {
+        customLayer.classList.remove('is-loaded');
+      }
       window.KASA_SET_RUNTIME_STYLE?.('custom-background',
-        isActive ? `#custom-bg-layer.is-active { background-image: url(${bgUrl}); }` : ''
+        isActive && !isVideo ? `#custom-bg-layer.is-active { background-image: url(${bgUrl}); }` : ''
       );
+      if (isActive && !isVideo) {
+        const probe = new Image();
+        probe.onload = markLoaded;
+        probe.onerror = markLoaded;
+        probe.src = bgUrl;
+      }
+      const bgVideo = document.getElementById('custom-bg-video');
+      if (bgVideo) {
+        if (isActive && isVideo) {
+          if (bgVideo.getAttribute('src') !== bgUrl) {
+            bgVideo.setAttribute('src', bgUrl);
+            bgVideo.play?.().catch(() => {});
+          }
+          bgVideo.classList.add('is-active');
+          if (bgVideo.readyState >= 2) {
+            markLoaded();
+          } else {
+            bgVideo.addEventListener('loadeddata', markLoaded, { once: true });
+            bgVideo.addEventListener('error', markLoaded, { once: true });
+          }
+        } else {
+          bgVideo.classList.remove('is-active');
+          if (bgVideo.getAttribute('src')) {
+            bgVideo.removeAttribute('src');
+            bgVideo.load();
+          }
+        }
+      }
     }
     localStorage.setItem('kasa-accent', normalizedAccent);
     localStorage.setItem('kasa-background', normalizedBackground);
@@ -251,10 +284,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const CHROMA_SPEED_OPTIONS = new Set([8, 15, 30, 60]);
-  /* rAF ile kare başına 1 kez, en fazla ~50ms'de bir güncelleme:
-     setTimeout yerine compositing ile eşzamanlı çalışır, sekme
-     görünmezken rAF zaten tetiklenmez → boşta CPU tasarrufu. */
-  const CHROMA_UPDATE_INTERVAL_MS = 50;
+  /* rAF ile kare başına 1 kez, en fazla ~200ms'de bir güncelleme:
+     `--accent` değişimi tüm DOM'da style recalc tetiklediği için daha sık
+     güncellemek CPU israfıdır; 15sn'lik döngüde hue 200ms'de 4.8° kayar,
+     görsel olarak ayırt edilemez. Sekme görünmezken rAF zaten tetiklenmez
+     → boşta CPU tasarrufu. */
+  const CHROMA_UPDATE_INTERVAL_MS = 200;
   const normalizeChromaSpeed = (value) => {
     const speed = Number(value);
     return CHROMA_SPEED_OPTIONS.has(speed) ? speed : 15;
@@ -268,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let chromaElapsedMs = 0;
   let chromaStartedAt = 0;
   let chromaRafId = 0;
-  let chromaLastTickAt = 0;
 
   const chromaCanAnimate = () => (
     chromaAccentEnabled
@@ -298,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const stopChromaCycle = () => {
-    if (chromaRafId) cancelAnimationFrame(chromaRafId);
+    if (chromaRafId) clearTimeout(chromaRafId);
     chromaRafId = 0;
     if (chromaStartedAt) {
       chromaElapsedMs = Math.max(0, performance.now() - chromaStartedAt);
@@ -320,19 +354,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     chromaStartedAt = performance.now() - chromaElapsedMs;
-    const tick = (now) => {
+    const tick = () => {
       if (!chromaCanAnimate()) {
         stopChromaCycle();
         return;
       }
-      if (now - chromaLastTickAt >= CHROMA_UPDATE_INTERVAL_MS) {
-        chromaLastTickAt = now;
-        chromaElapsedMs = now - chromaStartedAt;
-        renderChromaAccent();
-      }
-      chromaRafId = requestAnimationFrame(tick);
+      chromaElapsedMs = performance.now() - chromaStartedAt;
+      renderChromaAccent();
+      chromaRafId = setTimeout(tick, CHROMA_UPDATE_INTERVAL_MS);
     };
-    chromaRafId = requestAnimationFrame(tick);
+    chromaRafId = setTimeout(tick, CHROMA_UPDATE_INTERVAL_MS);
   };
 
   const setChromaAccent = (enabled, speed = chromaAccentSpeed) => {
@@ -465,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cardFrameToggle,
     cardDepthToggle,
     hardwareAccelerationToggle,
+    powerSaveToggle,
     updateAppearance,
     cancelPendingAppearanceSave,
   } = initAppearanceSettings({
@@ -886,6 +918,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (typeof data.hardware_acceleration_enabled === 'boolean' && hardwareAccelerationToggle) {
           hardwareAccelerationToggle.checked = data.hardware_acceleration_enabled;
+        }
+        if (typeof data.power_save_enabled === 'boolean' && powerSaveToggle) {
+          powerSaveToggle.checked = data.power_save_enabled;
+          applyThemeFeature('data-kasa-power-save', 'kasa-power-save', data.power_save_enabled);
         }
         if (typeof data.lan_enabled === 'boolean' && lanToggle && lanInfoBox) {
           lanToggle.checked = data.lan_enabled;

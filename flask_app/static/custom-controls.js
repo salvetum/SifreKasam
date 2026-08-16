@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Özel Form Kontrolleri modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Özel Form Kontrolleri modülü (ES Module)
  *
  * 2b. bölüm: data-custom-select sarmalayıcıları, data-number-stepper ve
  * ilgili açık dropdown / scroll / resize davranışları.
@@ -14,11 +14,22 @@ export function initCustomControls({ createIcon }) {
   const syncCustomSelectDirection = (state) => {
     if (!state?.openRequested) return;
     const triggerRect = state.trigger.getBoundingClientRect();
-    /* Scroll konteyneri (örn. settings-panel) sınır olarak kullanılır:
-       menü bu alanın içinde kalır, scroll konteynerinin overflow'u
-       değiştirilmez (overflow değişimi Chromium'da scroll'u sıfırlar). */
-    const scrollHost = state.wrapper.closest('.settings-panel, .vault-form-panel, .modal-body');
-    const boundaryRect = (scrollHost || state.wrapper.closest('.modal-content'))?.getBoundingClientRect();
+    /* Gerçek clip/scroll konteyneri sınır olarak kullanılır: menü bu alanın
+       içinde kalır, konteynerin overflow'u değiştirilmez (overflow değişimi
+       Chromium'da scroll'u sıfırlar). overflow'u görünür olan sarmalayıcılar
+       (örn. vault-form-panel) sınır sayılmaz — menü panelin dışına taşabilir,
+       sınır viewport olur. */
+    const getBoundaryHost = (el) => {
+      let node = el.parentElement;
+      while (node && node !== document.body && node !== document.documentElement) {
+        const style = window.getComputedStyle(node);
+        if (/(auto|scroll|hidden)/.test(style.overflowX + ' ' + style.overflowY)) return node;
+        node = node.parentElement;
+      }
+      return null;
+    };
+    const scrollHost = getBoundaryHost(state.wrapper);
+    const boundaryRect = scrollHost?.getBoundingClientRect();
     const boundaryTop = boundaryRect?.top ?? 0;
     const boundaryBottom = boundaryRect?.bottom ?? window.innerHeight;
     const naturalHeight = state.menu.scrollHeight;
@@ -30,9 +41,11 @@ export function initCustomControls({ createIcon }) {
       spaceBelow < menuHeight + 10 && spaceAbove > spaceBelow,
     );
     const availableSpace = (state.wrapper.classList.contains('opens-upward') ? spaceAbove : spaceBelow) - 10;
-    const cappedHeight = Math.max(72, Math.min(menuHeight, availableSpace));
-    if (state.menu.style.maxHeight !== cappedHeight + 'px') {
-      state.menu.style.maxHeight = cappedHeight + 'px';
+    const neededCap = Math.max(72, Math.min(menuHeight, availableSpace));
+    if (neededCap >= naturalHeight) {
+      if (state.menu.style.maxHeight) state.menu.style.maxHeight = '';
+    } else if (state.menu.style.maxHeight !== neededCap + 'px') {
+      state.menu.style.maxHeight = neededCap + 'px';
     }
   };
 

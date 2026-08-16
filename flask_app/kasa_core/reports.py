@@ -20,6 +20,7 @@ def build_vault_report_payloads(
         Record.title,
         Record.website_url,
         Record.login,
+        Record.email,
         Record.encrypted_password,
         Record.updated_at,
         Record.is_pinned,
@@ -47,6 +48,7 @@ def build_vault_report_payloads(
             title,
             decrypt_metadata(fernet, record.website_url),
             decrypt_metadata(fernet, record.login),
+            decrypt_metadata(fernet, record.email),
         ]
         if score_password(password, user_inputs) < ACCEPTABLE_PASSWORD_SCORE:
             weak += 1

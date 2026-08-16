@@ -138,7 +138,7 @@ html[data-glass-effects="off"] .history-entry {
 [data-bs-theme="light"] .filter-btn,
 [data-bs-theme="light"] .icon-btn,
 [data-bs-theme="light"] .card-icon-btn {
-    background: rgba(255,255,255,0.72) !important;
+    background: rgba(255,255,255,0.62) !important;
     border-color: var(--glass-border) !important;
     color: var(--text) !important;
 }
@@ -172,6 +172,15 @@ html[data-glass-effects="off"] .history-entry {
 
 [data-bs-theme="light"] .filter-btn-active,
 [data-bs-theme="light"] .filter-btn.active { color: #5748d9 !important; background: linear-gradient(110deg, rgba(124,111,247,0.18), rgba(79,145,255,0.14)) !important; }
+
+/* Açık temada buton vibrance (yalnızca butonlar) */
+[data-bs-theme="light"] .kasa-btn:not(.kasa-btn-primary),
+[data-bs-theme="light"] .icon-btn,
+[data-bs-theme="light"] .kasa-close-btn { color: #2b3a63 !important; }
+[data-bs-theme="light"] .kasa-dropdown-trigger { color: #3d4d7a !important; }
+[data-bs-theme="light"] .filter-btn { color: #3d4d7a !important; }
+[data-bs-theme="light"] .card-icon-btn { color: #3d4d7a !important; }
+[data-bs-theme="light"] .kasa-btn-danger         { background: rgba(239,68,68,0.16) !important; border-color: rgba(180,35,24,0.36) !important; }
 
 [data-bs-theme="light"] .footer-action-btn,
 [data-bs-theme="light"] .footer-action-btn:hover,

@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Göster/Kopyala modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Göster/Kopyala modülü (ES Module)
  *
  * Kopyalama sistemi (copyToClipboard, flashCopyIcon) ve 5. bölüm
  * (copy-password / copy-username / toggle-password butonları).

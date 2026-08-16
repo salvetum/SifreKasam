@@ -258,6 +258,19 @@
         color: var(--text-muted);
     }
 
+    #password-match-feedback {
+        margin: -0.25rem 0 0;
+        color: var(--text-muted);
+    }
+
+    #password-match-feedback.is-matching {
+        color: var(--text-success, #10b981);
+    }
+
+    #password-match-feedback.is-mismatch {
+        color: #f87171;
+    }
+
     .entry-first-setup-warning {
         display: flex;
         align-items: flex-start;
@@ -587,11 +600,11 @@
                         <i class="fa-solid fa-shield-halved"></i>{{ _('İlk Kurulum') }}
                     </strong>
                     <ul>
-                        <li>{{ _('En az 12 karakter kullanmalısınız.') }}</li>
+                        <li>{{ _('En az 12 karakter kullanmanız tavsiye edilir.') }}</li>
                         <li>{{ _('Büyük ve küçük harf, sayı ve özel karakterleri birlikte kullanın.') }}</li>
                     </ul>
                     <p class="entry-first-setup-optional">
-                        {{ _('Bu gereksinimler zorunludur; zayıf şifreler kabul edilmez.') }}
+                        {{ _('Bu öneriler zorunlu değildir; ancak uzun ve benzersiz bir şifre kasanızı daha iyi korur.') }}
                     </p>
                     <p class="entry-first-setup-warning">
                         <i class="fa-solid fa-triangle-exclamation"></i>
@@ -608,6 +621,16 @@
                         placeholder="••••••••••••" required autofocus
                         autocomplete="{{ 'new-password' if first_setup_active else 'current-password' }}"
                         {% if first_setup_active %}aria-describedby="first-setup-guidance"{% endif %}>
+
+                    {% if first_setup_active %}
+                    <label class="sr-only" for="master-password-confirm">{{ _('Ana Şifre (Tekrar)') }}</label>
+                    <input type="password" name="master_password_confirm" id="master-password-confirm"
+                        class="w-full px-4 py-3 text-center text-lg tracking-widest kasa-field"
+                        placeholder="••••••••••••" required
+                        autocomplete="new-password">
+
+                    <p id="password-match-feedback" class="text-sm text-left hidden" role="status" aria-live="polite"></p>
+                    {% endif %}
 
                     <button type="submit" class="w-full kasa-btn kasa-btn-primary">
                         <i class="fa-solid {{ 'fa-key' if first_setup_active else 'fa-unlock' }} mr-2"></i>
@@ -670,6 +693,29 @@ if (loginErrorAlert && loginErrorText) {
             1000
         );
     }
+}
+
+const masterPasswordInput = document.getElementById('master-password');
+const masterPasswordConfirm = document.getElementById('master-password-confirm');
+const passwordMatchFeedback = document.getElementById('password-match-feedback');
+
+if (masterPasswordConfirm && passwordMatchFeedback) {
+    const updateMatchFeedback = () => {
+        const first = masterPasswordInput.value || '';
+        const second = masterPasswordConfirm.value || '';
+        if (!second) {
+            passwordMatchFeedback.classList.add('hidden');
+            passwordMatchFeedback.classList.remove('is-matching', 'is-mismatch');
+            return;
+        }
+        passwordMatchFeedback.textContent = first === second
+            ? window._('Ana şifreler eşleşiyor.')
+            : window._('Ana şifreler eşleşmiyor. Lütfen tekrar deneyin.');
+        passwordMatchFeedback.classList.remove('hidden', 'is-matching', 'is-mismatch');
+        passwordMatchFeedback.classList.add(first === second ? 'is-matching' : 'is-mismatch');
+    };
+    masterPasswordInput.addEventListener('input', updateMatchFeedback);
+    masterPasswordConfirm.addEventListener('input', updateMatchFeedback);
 }
 
 </script>

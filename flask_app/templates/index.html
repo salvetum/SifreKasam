@@ -229,7 +229,7 @@
                             </a>
                         </div>
 
-                        {% elif anahtar == 'Kullanıcı Adı' or anahtar == 'Kart Numarası' %}
+                        {% elif anahtar == 'Kullanıcı Adı' or anahtar == 'E-posta' or anahtar == 'Kart Numarası' %}
                         <div class="vault-detail-row vault-detail-row-action password-row">
                             <p class="vault-detail-main m-0">
                                 <span class="vault-detail-label">{{ anahtar }}</span>
@@ -717,10 +717,11 @@
                             </button>
                             <button type="button" id="custom-bg-btn" data-background-option="custom" aria-pressed="false">
                                 <strong>{{ _('Özel') }}</strong>
-                                <small>{{ _("Kendi resminizi veya GIF'inizi yükleyin") }}</small>
+                                <small>{{ _('Resim, GIF veya video yükleyin') }}</small>
                             </button>
-                            <input type="file" id="custom-bg-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+                            <input type="file" id="custom-bg-input" accept="image/png,image/jpeg,image/webp,image/gif,video/webm,video/mp4" hidden>
                         </div>
+                        <p class="custom-bg-limit-hint"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> {{ _('8 taneye kadar arkaplan ekleyebilirsiniz.') }}</p>
                         <div id="custom-bg-gallery" class="custom-bg-gallery hidden" aria-live="polite">
                             <div class="custom-bg-gallery-head">
                                 <span class="text-xs text-kasa-text-muted">{{ _('Arkaplan geçmişi') }}</span>
@@ -850,6 +851,20 @@
                     </div>
                     <div class="settings-card settings-card-toggle">
                         <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-power-save-title">{{ _('Tasarruf Modu') }}</h4>
+                                <p>{{ _('Arka planda veya hareketsizken kaynak kullanımını azaltır.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="power_save_enabled" id="power-save-toggle" {% if POWER_SAVE_ENABLED %}checked{% endif %} aria-labelledby="setting-power-save-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
                             <span class="settings-card-icon"><i class="fa-solid fa-fan" aria-hidden="true"></i></span>
                             <div class="settings-card-copy">
                                 <h4 id="setting-motion-title">{{ _('Hareketli Arkaplan') }}</h4>
@@ -919,7 +934,6 @@
                             </div>
                             <input type="range" id="glass-blur-range" name="glass_blur" min="0" max="150" step="5"
                                 value="{{ (GLASS_BLUR * 100)|round|int }}" class="settings-range-input"
-                                style="--kasa-range-progress: {{ ((GLASS_BLUR * 100 / 150) * 100)|round }}%"
                                 data-scale-key="glass-blur" aria-labelledby="setting-glass-blur-title">
                         </div>
                         <div class="settings-scale-block">
@@ -932,7 +946,6 @@
                             </div>
                             <input type="range" id="glass-veil-range" name="glass_veil" min="0" max="200" step="5"
                                 value="{{ (GLASS_VEIL * 100)|round|int }}" class="settings-range-input"
-                                style="--kasa-range-progress: {{ ((GLASS_VEIL * 100 / 200) * 100)|round }}%"
                                 data-scale-key="glass-veil" aria-labelledby="setting-glass-veil-title">
                         </div>
                     </div>

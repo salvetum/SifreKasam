@@ -1,4 +1,4 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v79';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v94';
 const ASSETS = [
   '{{ url_for("static", filename="tokens.css") }}',
   '{{ url_for("static", filename="base.css") }}',
@@ -68,6 +68,28 @@ self.addEventListener('fetch', function (e) {
 
   // Sadece kendi origin'imizdeki istekleri ele al
   if (url.origin !== location.origin) return;
+
+  // Özel arkaplan dosyaları: sayfa geçişlerinde anında gösterim için cache-first.
+  // URL'ler dosyanın mtime'ı ile sürümlenir (?v=...), bu yüzden yeni arkaplan
+  // yüklenince yeni URL ile otomatik tazelenir. Video (Range) isteklerinde
+  // Chromium SW cache'i atlar; o noktada tarayıcı HTTP cache'i devreye girer.
+  if (req.method === 'GET'
+      && (url.pathname === '/api/background/current'
+          || url.pathname.startsWith('/api/background/history/'))) {
+    e.respondWith(
+      caches.match(req).then(function (cached) {
+        if (cached) return cached;
+        return fetch(req).then(function (res) {
+          if (!res || !res.ok) return res;
+          caches.open(CACHE).then(function (cache) { cache.put(req, res.clone()); });
+          return res;
+        });
+      }).catch(function () {
+        return fetch(req);
+      })
+    );
+    return;
+  }
 
   // API isteklerini cache'leme
   if (req.mode === 'navigate' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/settings/')) {

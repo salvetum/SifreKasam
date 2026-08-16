@@ -32,8 +32,13 @@ from kasa_core.constants import (
     CUSTOM_BACKGROUND_HISTORY_LIMIT,
     CUSTOM_BACKGROUND_CACHE_SECONDS,
     CUSTOM_BACKGROUND_MAX_DIM,
+    CUSTOM_BACKGROUND_MAX_DIMENSION,
     CUSTOM_BACKGROUND_MAX_GIF_BYTES,
     CUSTOM_BACKGROUND_MAX_IMAGE_BYTES,
+    CUSTOM_BACKGROUND_MAX_PIXELS,
+    CUSTOM_BACKGROUND_MAX_VIDEO_BYTES,
+    CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW,
+    CUSTOM_BACKGROUND_UPLOAD_WINDOW_SECONDS,
     DEFAULT_ACCENT_COLOR,
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
     DEFAULT_BACKGROUND_STYLE,
@@ -50,6 +55,7 @@ from kasa_core.constants import (
     DEFAULT_GRADIENTS_ENABLED,
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
+    DEFAULT_POWER_SAVE_ENABLED,
     LEGACY_PBKDF2_ITERATIONS,
     LEGACY_PBKDF2_SALT,
     MAX_BULK_IDS,
@@ -140,7 +146,7 @@ def _fetch_latest_release() -> dict[str, Any]:
 app.secret_key = FLASK_SECRET_KEY
 app.permanent_session_lifetime = timedelta(minutes=60)
 app.config.update(
-    MAX_CONTENT_LENGTH=20 * 1024 * 1024,
+    MAX_CONTENT_LENGTH=64 * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Strict',
     SESSION_COOKIE_SECURE=True,
@@ -214,6 +220,8 @@ save_card_sheen = _appearance_settings.save_card_sheen
 save_card_frame = _appearance_settings.save_card_frame
 save_card_depth = _appearance_settings.save_card_depth
 save_hardware_acceleration = _appearance_settings.save_hardware_acceleration
+get_power_save_enabled = _appearance_settings.get_power_save_enabled
+save_power_save = _appearance_settings.save_power_save
 
 _translation_service = TranslationService(
     os.path.join(os.path.dirname(__file__), 'translations'),
@@ -239,6 +247,11 @@ with app.app_context():
     db.create_all()
     try:
         db.session.execute(db.text("ALTER TABLE records ADD COLUMN expiry_date DATETIME"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        db.session.execute(db.text("ALTER TABLE records ADD COLUMN email TEXT"))
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -529,6 +542,7 @@ def inject_globals():
     card_frame_enabled = DEFAULT_CARD_FRAME_ENABLED
     card_depth_enabled = DEFAULT_CARD_DEPTH_ENABLED
     hardware_acceleration = DEFAULT_HARDWARE_ACCELERATION_ENABLED
+    power_save_enabled = DEFAULT_POWER_SAVE_ENABLED
     lan_enabled        = False
     try:
         v = _get_setting('auto_lock_enabled')
@@ -554,6 +568,7 @@ def inject_globals():
         card_frame_enabled = get_card_frame_enabled()
         card_depth_enabled = get_card_depth_enabled()
         hardware_acceleration = get_hardware_acceleration_enabled()
+        power_save_enabled = get_power_save_enabled()
         le           = _get_setting('lan_enabled')
         if le is not None:
             lan_enabled = le.lower() == 'true'
@@ -562,6 +577,14 @@ def inject_globals():
     current_lang = get_saved_language()
     available_langs = get_available_languages()
     lang_translations = load_translations(current_lang)
+    custom_bg_path = _find_custom_background() if background_style == 'custom' else None
+    custom_bg_url = None
+    if custom_bg_path:
+        try:
+            bg_mtime = int(os.path.getmtime(custom_bg_path))
+        except OSError:
+            bg_mtime = 0
+        custom_bg_url = url_for('serve_custom_background') + f'?v={bg_mtime}'
     return {
         'APP_VERSION':           APP_VERSION,
         'AUTO_LOCK_ENABLED':     auto_lock_enabled,
@@ -571,7 +594,8 @@ def inject_globals():
         'GLASS_EFFECTS_ENABLED': glass_effects,
         'ACCENT_COLOR':          accent_color,
         'BACKGROUND_STYLE':      background_style,
-        'CUSTOM_BACKGROUND_URL': url_for('serve_custom_background') if background_style == 'custom' and _find_custom_background() else None,
+        'CUSTOM_BACKGROUND_URL': custom_bg_url,
+        'CUSTOM_BACKGROUND_IS_VIDEO': bool(custom_bg_path and custom_bg_path.lower().endswith(_VIDEO_EXTS)),
         'CHROMA_ACCENT_ENABLED': chroma_accent_enabled,
         'CHROMA_ACCENT_SPEED':   chroma_accent_speed,
         'GLASS_QUALITY':         glass_quality,
@@ -584,6 +608,7 @@ def inject_globals():
         'CARD_FRAME_ENABLED':    card_frame_enabled,
         'CARD_DEPTH_ENABLED':    card_depth_enabled,
         'HARDWARE_ACCELERATION_ENABLED': hardware_acceleration,
+        'POWER_SAVE_ENABLED': power_save_enabled,
         'LAN_ENABLED':           lan_enabled,
         'CURRENT_LANG':          current_lang,
         'AVAILABLE_LANGS':       available_langs,
@@ -837,7 +862,7 @@ def add_security_headers(response):
         'Permissions-Policy',
         'camera=(), microphone=(), geolocation=()',
     )
-    if request.endpoint != 'static':
+    if request.endpoint not in {'static', 'serve_custom_background', 'serve_history_background'}:
         response.headers['Cache-Control'] = 'no-store, max-age=0'
         response.headers['Pragma'] = 'no-cache'
     return response
@@ -980,10 +1005,11 @@ def login():
                 first_setup=False,
             ), 403
         log.info("İlk kurulum: Ana şifre belirleniyor...")
-        if _password_is_weak(mp):
+        mp_confirm = request.form.get('master_password_confirm', '').strip()
+        if mp_confirm != mp:
             return render_template(
                 'login.html',
-                error=_('Belirlediğiniz ana şifre çok zayıf. En az 12 karakter ve karışık karakter türleri kullanın.'),
+                error=_('Ana şifreler eşleşmiyor. Lütfen tekrar deneyin.'),
                 first_setup=True,
             ), 400
         Setting.query.filter_by(key='master_hash').delete()
@@ -1026,6 +1052,7 @@ def index():
         title = decrypt_metadata(fernet, r.title)
         website_url = decrypt_metadata(fernet, r.website_url)
         login_value = decrypt_metadata(fernet, r.login)
+        email_value = decrypt_metadata(fernet, r.email)
         dec_comm = safe_decrypt(fernet, r.encrypted_comment)
 
         if r.type == 'CreditCard':
@@ -1038,6 +1065,7 @@ def index():
             detaylar = {k: v for k, v in [
                 ('Kategori',       r.category),
                 ('Kullanıcı Adı',  login_value),
+                ('E-posta',        email_value),
                 ('Şifre',          SECRET_PLACEHOLDER if r.encrypted_password else ''),
                 ('İnternet Adresi', website_url),
                 ('Not',            dec_comm),
@@ -1049,7 +1077,7 @@ def index():
             'full_data': {
                 'id': r.id, 'type': r.type, 'category': r.category,
                 'title': title, 'website_url': website_url,
-                'login': login_value, 'is_pinned': r.is_pinned,
+                'login': login_value, 'email': email_value, 'is_pinned': r.is_pinned,
                 'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
             },
         })
@@ -1069,6 +1097,8 @@ def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str,
             fernet, normalize_url(request.form.get('website_url'))),
         login              = encrypt_metadata(
             fernet, normalize_text(request.form.get('login'), max_length=300)),
+        email              = encrypt_metadata(
+            fernet, normalize_text(request.form.get('email'), max_length=300)),
         encrypted_password = safe_encrypt(fernet, request.form.get('password', '')),
         encrypted_comment  = safe_encrypt(fernet, request.form.get('comment', '')),
         expiry_date        = _parse_expiry(request.form.get('expiry_date', '')),
@@ -1120,6 +1150,7 @@ def duzenle_sayfasi(kayit_id):
         'SecureNote':    title if r.type == 'SecureNote'  else '',
         'Website URL': decrypt_metadata(fernet, r.website_url),
         'Login': decrypt_metadata(fernet, r.login),
+        'Email': decrypt_metadata(fernet, r.email),
         'Password': dec_pass, 'Comment': dec_comm,
         'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
     }
@@ -1249,6 +1280,8 @@ def save_settings():
         'true' if request.form.get('card_depth_enabled') else 'false')
     save_hardware_acceleration(
         'true' if request.form.get('hardware_acceleration_enabled') else 'false')
+    save_power_save(
+        'true' if request.form.get('power_save_enabled') else 'false')
     _set_setting('lan_enabled',
                  'true' if request.form.get('lan_enabled') else 'false')
     db.session.commit()
@@ -1270,6 +1303,7 @@ def save_settings():
             "card_frame_enabled": get_card_frame_enabled(),
             "card_depth_enabled": get_card_depth_enabled(),
             "hardware_acceleration_enabled": get_hardware_acceleration_enabled(),
+            "power_save_enabled": get_power_save_enabled(),
             "lan_enabled": _lan_access_enabled(),
         })
     return redirect(url_for('index'))
@@ -1547,6 +1581,11 @@ def settings_appearance():
             if 'card_depth_enabled' in data
             else get_card_depth_enabled()
         )
+        power_save = (
+            save_power_save(data.get('power_save_enabled'))
+            if 'power_save_enabled' in data
+            else get_power_save_enabled()
+        )
         db.session.commit()
         return jsonify({
             "status": "ok",
@@ -1563,6 +1602,7 @@ def settings_appearance():
             "card_sheen_enabled": card_sheen,
             "card_frame_enabled": card_frame,
             "card_depth_enabled": card_depth,
+            "power_save_enabled": power_save,
         })
     return jsonify({
         "accent_color": get_saved_accent_color(),
@@ -1579,65 +1619,101 @@ def settings_appearance():
         "card_sheen_enabled": get_card_sheen_enabled(),
         "card_frame_enabled": get_card_frame_enabled(),
         "card_depth_enabled": get_card_depth_enabled(),
+        "power_save_enabled": get_power_save_enabled(),
     })
 
 # ─── ÖZEL ARKA PLAN YÜKLEME ─────────────────────────────────────────────────
 
-_ALLOWED_IMAGE_MIMES = {
+_ALLOWED_BACKGROUND_MIMES = {
     'image/png': '.png',
     'image/jpeg': '.jpg',
     'image/webp': '.webp',
     'image/gif': '.gif',
+    'video/webm': '.webm',
+    'video/mp4': '.mp4',
 }
 
-def _validate_custom_background(file_storage):
-    """Validate uploaded file via Pillow header sniffing and size limits.
+_IMAGE_FORMAT_MIMES = {
+    'PNG': 'image/png',
+    'JPEG': 'image/jpeg',
+    'WEBP': 'image/webp',
+    'GIF': 'image/gif',
+}
 
-    Image.open() is lazy: only the file header (and first frame for GIFs) is
-    read, so format validation does not decode the whole payload.
+_VIDEO_EXTS = ('.webm', '.mp4')
+
+def _validate_custom_background(file_storage):
+    """Validate uploaded file via header sniffing and size limits.
+
+    Görüntüler Pillow ile doğrulanır (header-only, tam çözümleme yapılmaz);
+    WebM/MP4 videoları magic-byte imzasıyla tanınır (``1A45DFA3`` = EBML,
+    ``ftyp`` = MP4 kutusu). Boyut sınırı formata göre seçilir.
     """
     from PIL import Image
+    Image.MAX_IMAGE_PIXELS = CUSTOM_BACKGROUND_MAX_PIXELS
 
     try:
         file_storage.seek(0, 2)
         size = file_storage.tell()
         file_storage.seek(0)
-        img = Image.open(file_storage.stream)
-        fmt = (img.format or '').upper()
+        head = file_storage.stream.read(12) if hasattr(file_storage.stream, 'read') else b''
+        file_storage.seek(0)
     except Exception:
         file_storage.seek(0)
         return None, 'Geçersiz dosya formatı.'
-    finally:
-        file_storage.seek(0)
 
-    mime_map = {'PNG': 'image/png', 'JPEG': 'image/jpeg', 'WEBP': 'image/webp', 'GIF': 'image/gif'}
-    mime = mime_map.get(fmt)
-    if not mime:
-        return None, 'Desteklenmeyen dosya formatı. PNG, JPEG, WebP veya GIF yükleyin.'
+    ext = None
+    if head[:4] == b'\x1a\x45\xdf\xa3':
+        ext = '.webm'
+    elif b'ftyp' in head[:12]:
+        ext = '.mp4'
 
-    is_gif = mime == 'image/gif'
-    max_bytes = CUSTOM_BACKGROUND_MAX_GIF_BYTES if is_gif else CUSTOM_BACKGROUND_MAX_IMAGE_BYTES
+    if ext is None:
+        try:
+            img = Image.open(file_storage.stream)
+            fmt = (img.format or '').upper()
+            width, height = img.size
+        except Exception:
+            file_storage.seek(0)
+            return None, 'Geçersiz dosya formatı.'
+        finally:
+            file_storage.seek(0)
+        mime = _IMAGE_FORMAT_MIMES.get(fmt)
+        if not mime:
+            return None, 'Desteklenmeyen dosya formatı. PNG, JPEG, WebP, GIF, WebM veya MP4 yükleyin.'
+        if width * height > CUSTOM_BACKGROUND_MAX_PIXELS or max(width, height) > CUSTOM_BACKGROUND_MAX_DIMENSION:
+            return None, 'Görsel çözünürlüğü çok yüksek. Maksimum 24MP ve maksimum kenar 8192px olabilir.'
+        ext = _ALLOWED_BACKGROUND_MIMES[mime]
+
+    mime = _EXT_TO_MIME.get(ext, '')
+    if mime == 'image/gif':
+        max_bytes = CUSTOM_BACKGROUND_MAX_GIF_BYTES
+    elif mime.startswith('video/'):
+        max_bytes = CUSTOM_BACKGROUND_MAX_VIDEO_BYTES
+    else:
+        max_bytes = CUSTOM_BACKGROUND_MAX_IMAGE_BYTES
     if size > max_bytes:
         limit_mb = max_bytes // (1024 * 1024)
         return None, f'Dosya boyutu {limit_mb}MB sınırını aşıyor.'
 
-    return _ALLOWED_IMAGE_MIMES[mime], None
+    return ext, None
 
 
 def _optimize_custom_background(file_storage, filepath, ext):
     """Statik görüntüleri yeniden boyutlandırıp sıkıştırarak kaydeder.
 
-    GIF'ler animasyonu bozmamak için olduğu gibi kopyalanır. Arkaplan
-    ``cover`` olarak gösterildiği için görünüm değişmez; yalnızca
-    yükleme/servis hızı artar. Optimizasyon başarısız olursa orijinal
-    dosya kaydedilir (işlev bozulmaz).
+    GIF ve videolar (WebM/MP4) animasyonu/akışı bozmamak için kaynak
+    formatında olduğu gibi kopyalanır. Arkaplan ``cover`` olarak gösterildiği
+    için görünüm değişmez; yalnızca yükleme/servis hızı artar. Optimizasyon
+    başarısız olursa orijinal dosya kaydedilir (işlev bozulmaz).
     """
-    if ext == '.gif':
+    if ext in ('.gif', '.webm', '.mp4'):
         file_storage.seek(0)
         file_storage.save(filepath)
         return
 
     from PIL import Image, ImageOps
+    Image.MAX_IMAGE_PIXELS = CUSTOM_BACKGROUND_MAX_PIXELS
 
     file_storage.seek(0)
     try:
@@ -1684,7 +1760,7 @@ def _find_custom_background():
     return None
 
 
-_CUSTOM_BACKGROUND_NAME_RE = re.compile(r'^[0-9a-f]{32}\.(png|jpg|webp|gif)$')
+_CUSTOM_BACKGROUND_NAME_RE = re.compile(r'^[0-9a-f]{32}\.(png|jpg|webp|gif|webm|mp4)$')
 
 
 def _custom_background_history_dir():
@@ -1707,7 +1783,26 @@ def _safe_background_filename(name):
 
 _BACKGROUND_METADATA_NAME = 'metadata.json'
 _background_state_lock = threading.Lock()
-_EXT_TO_MIME = {ext: mime for mime, ext in _ALLOWED_IMAGE_MIMES.items()}
+_EXT_TO_MIME = {ext: mime for mime, ext in _ALLOWED_BACKGROUND_MIMES.items()}
+
+_background_upload_log: dict[str, list[float]] = {}
+_background_upload_lock = threading.Lock()
+
+
+def _background_upload_allowed(client_key: str) -> bool:
+    """Sliding-window rate limit for custom background uploads per client.
+
+    LAN üzerinden kimliği doğrulanmış bir istemcinin tekrar tekrar 50MB'ye
+    kadar dosya yazarak disk/hafıza DoS'u yapmasını sınırlar.
+    """
+    now = time.monotonic()
+    with _background_upload_lock:
+        stamps = _background_upload_log.setdefault(client_key, [])
+        stamps[:] = [t for t in stamps if now - t < CUSTOM_BACKGROUND_UPLOAD_WINDOW_SECONDS]
+        if len(stamps) >= CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW:
+            return False
+        stamps.append(now)
+        return True
 
 
 def _custom_background_metadata_path():
@@ -1760,8 +1855,7 @@ def _compute_background_metadata(filepath, ext):
         with Image.open(filepath) as img:
             info['width'] = img.width
             info['height'] = img.height
-            mime_map = {'PNG': 'image/png', 'JPEG': 'image/jpeg', 'WEBP': 'image/webp', 'GIF': 'image/gif'}
-            info['mime'] = mime_map.get((img.format or '').upper(), info['mime'])
+            info['mime'] = _IMAGE_FORMAT_MIMES.get((img.format or '').upper(), info['mime'])
     except Exception:
         pass
     return info
@@ -1869,6 +1963,9 @@ def _clear_custom_background_history():
 @app.route('/api/background/upload', methods=['POST'])
 @login_required
 def upload_custom_background():
+    if not _background_upload_allowed(request.remote_addr or 'unknown'):
+        return jsonify({'error': 'Çok fazla istek. Lütfen bir süre sonra tekrar deneyin.'}), 429
+
     if 'file' not in request.files:
         return jsonify({'error': 'Dosya seçilmedi.'}), 400
 
@@ -1898,6 +1995,7 @@ def upload_custom_background():
         'status': 'ok',
         'url': url_for('serve_custom_background') + '?v=' + str(int(time.time())),
         'is_gif': is_gif,
+        'is_video': ext in _VIDEO_EXTS,
     })
 
 
@@ -1907,7 +2005,9 @@ def serve_custom_background():
     bg_path = _find_custom_background()
     if not bg_path:
         abort(404)
-    return send_file(bg_path, max_age=CUSTOM_BACKGROUND_CACHE_SECONDS)
+    response = send_file(bg_path, max_age=CUSTOM_BACKGROUND_CACHE_SECONDS, conditional=True)
+    response.headers['Cache-Control'] = f'private, max-age={CUSTOM_BACKGROUND_CACHE_SECONDS}'
+    return response
 
 
 @app.route('/api/background', methods=['DELETE'])
@@ -1964,6 +2064,7 @@ def _active_custom_background_entry():
         'id': filename,
         'url': url_for('serve_custom_background') + '?v=' + str(int(mtime)),
         'is_gif': filename.endswith('.gif'),
+        'is_video': filename.endswith(_VIDEO_EXTS),
         'created_at': datetime.fromtimestamp(mtime).isoformat(),
         'is_active': True,
         'size': info.get('size'),
@@ -1983,6 +2084,7 @@ def list_custom_background_history():
             'id': filename,
             'url': url_for('serve_history_background', filename=filename) + '?v=' + str(int(item['mtime'])),
             'is_gif': filename.endswith('.gif'),
+            'is_video': filename.endswith(_VIDEO_EXTS),
             'created_at': datetime.fromtimestamp(item['mtime']).isoformat(),
             'is_active': False,
             'size': item.get('size'),
@@ -2005,7 +2107,9 @@ def serve_history_background(filename):
     filepath = os.path.join(_custom_background_history_dir(), name)
     if not os.path.isfile(filepath):
         abort(404)
-    return send_file(filepath, max_age=CUSTOM_BACKGROUND_CACHE_SECONDS)
+    response = send_file(filepath, max_age=CUSTOM_BACKGROUND_CACHE_SECONDS, conditional=True)
+    response.headers['Cache-Control'] = f'private, max-age={CUSTOM_BACKGROUND_CACHE_SECONDS}'
+    return response
 
 
 @app.route('/api/background/history/<id>/activate', methods=['POST'])
@@ -2032,6 +2136,7 @@ def activate_history_background(id):
         'status': 'ok',
         'url': url_for('serve_custom_background') + '?v=' + str(int(time.time())),
         'is_gif': is_gif,
+        'is_video': name.endswith(_VIDEO_EXTS),
     })
 
 
@@ -2320,7 +2425,15 @@ def _get_server_host() -> str:
 if __name__ == '__main__':
     flask_host = _get_server_host()
     flask_port = safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535)
-    ssl_ctx = (CERT_FILE, KEY_FILE) if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE) else None
-    app.run(host=flask_host, port=flask_port, ssl_context=ssl_ctx, threaded=True)
+    try:
+        from cheroot.wsgi import Server as _CherootServer
+        from cheroot.ssl.builtin import BuiltinSSLAdapter as _CherootSSLAdapter
+        _server = _CherootServer((flask_host, flask_port), app, numthreads=8)
+        if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
+            _server.ssl_adapter = _CherootSSLAdapter(CERT_FILE, KEY_FILE)
+        _server.safe_start()
+    except ImportError:
+        # cheroot yuklu degilse Werkzeug gelistirme sunucusuna geri don
+        app.run(host=flask_host, port=flask_port, ssl_context=ssl_ctx, threaded=True)
 
 

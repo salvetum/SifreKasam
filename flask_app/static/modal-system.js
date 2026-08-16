@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Modal Sistemi modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Modal Sistemi modülü (ES Module)
  *
  * 6. bölüm: window.kasaModalAc / window.kasaModalKapat, kasa-modal
  * tıklama / kapatma davranışları ve Escape yönetimi.

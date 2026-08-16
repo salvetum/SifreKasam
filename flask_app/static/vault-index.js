@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Index / Kart Listesi modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Index / Kart Listesi modülü (ES Module)
  *
  * 9. bölüm: kart arama/filtreleme, sayfalama, geçmiş modalı,
  * silme onayı, pin toggle ve tepsi ayarı.

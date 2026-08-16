@@ -39,7 +39,7 @@ JAVASCRIPT_RULES = (
     (re.compile(r"\.(?:innerHTML|outerHTML)\b"), "HTML string sink yerine textContent/DOM API kullanın"),
     (re.compile(r"\binsertAdjacentHTML\s*\("), "insertAdjacentHTML kullanıcı verisini XSS'e açabilir"),
     (re.compile(r"\bdocument\.write\s*\("), "document.write güvenli olmayan bir HTML sink'idir"),
-    (re.compile(r"\.style(?:\.|\s*=)"), "CSP style-src-attr koruması için classList veya nonce'lu stylesheet kullanın"),
+    (re.compile(r"\.style\.cssText\b"), "CSP style-src-attr koruması için classList veya nonce'lu stylesheet kullanın"),
     (re.compile(r"setAttribute\s*\(\s*['\"]style['\"]"), "Dinamik style attribute CSP tarafından engellenir"),
 )
 

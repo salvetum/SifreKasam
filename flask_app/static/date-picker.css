@@ -27,6 +27,7 @@
     opacity: 0;
     transform: translateY(-4px) scale(0.98);
     transform-origin: top left;
+    pointer-events: none;
     transition: opacity 150ms ease, transform 180ms var(--ease-out);
 }
 
@@ -34,9 +35,10 @@
     display: none;
 }
 
-.kasa-calendar-popup:not([hidden]) {
+.kasa-calendar-popup.is-open {
     opacity: 1;
     transform: translateY(0) scale(1);
+    pointer-events: auto;
 }
 
 .kasa-calendar-header {
@@ -56,6 +58,15 @@
     white-space: nowrap;
 }
 
+.kasa-calendar-title-anim {
+    animation: calendarTitleIn 0.18s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes calendarTitleIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 .kasa-calendar-nav {
     display: grid;
     place-items: center;
@@ -67,13 +78,17 @@
     color: var(--text-muted);
     font-size: 0.7rem;
     cursor: pointer;
-    transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    transition: color 120ms ease, background 120ms ease, border-color 120ms ease, transform 140ms var(--ease-out);
 }
 
 .kasa-calendar-nav:hover {
     color: var(--text);
     border-color: rgba(var(--accent-rgb), 0.20);
     background: rgba(var(--accent-rgb), 0.08);
+}
+
+.kasa-calendar-nav:active {
+    transform: scale(0.90);
 }
 
 .kasa-calendar-weekdays {
@@ -118,6 +133,15 @@
     background: rgba(var(--accent-rgb), 0.06);
 }
 
+.kasa-calendar-day:not(.kasa-calendar-day-empty) {
+    animation: calendarDayIn 0.22s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes calendarDayIn {
+    from { opacity: 0; transform: translateY(4px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .kasa-calendar-day:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -1px;
@@ -132,6 +156,13 @@
     color: #fff;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     border-color: transparent;
+    animation: calendarSelectedPop 0.3s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes calendarSelectedPop {
+    0%   { opacity: 0; transform: translateY(4px) scale(0.90); }
+    60%  { opacity: 1; transform: scale(1.04); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .kasa-calendar-day-empty {
@@ -182,6 +213,7 @@
     background:
         radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.11), transparent 42%),
         rgba(255,255,255,0.055);
+    transform: translateY(-1px);
 }
 
 .kasa-checkbox:hover {

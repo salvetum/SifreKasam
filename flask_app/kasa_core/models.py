@@ -23,6 +23,7 @@ class Record(db.Model):
     title = db.Column(db.String, nullable=False)
     website_url = db.Column(db.String, default="")
     login = db.Column(db.String, default="")
+    email = db.Column(db.String, default="")
     encrypted_password = db.Column(db.String, default="")
     encrypted_comment = db.Column(db.String, default="")
     is_pinned = db.Column(db.Integer, default=0)

@@ -19,6 +19,7 @@ from kasa_core.constants import (
     DEFAULT_GRADIENTS_ENABLED,
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
+    DEFAULT_POWER_SAVE_ENABLED,
 )
 from kasa_core.extensions import db
 from kasa_core.models import Setting
@@ -398,4 +399,28 @@ class AppearanceSettings:
         )
         self.set_setting("hardware_acceleration_enabled", str(enabled).lower())
         self.save_file(hardware_acceleration_enabled=enabled)
+        return enabled
+
+    def get_power_save_enabled(self) -> bool:
+        try:
+            value = self.get_setting("power_save_enabled")
+            if value is not None:
+                return normalize_theme_option(
+                    value,
+                    DEFAULT_POWER_SAVE_ENABLED,
+                )
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("power_save_enabled"),
+            DEFAULT_POWER_SAVE_ENABLED,
+        )
+
+    def save_power_save(self, value: object) -> bool:
+        enabled = normalize_theme_option(
+            value,
+            DEFAULT_POWER_SAVE_ENABLED,
+        )
+        self.set_setting("power_save_enabled", str(enabled).lower())
+        self.save_file(power_save_enabled=enabled)
         return enabled

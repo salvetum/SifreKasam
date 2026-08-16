@@ -1,5 +1,21 @@
 # ŞifreKasam Changelog
 
+## [2.7.0-beta.2] - 2026-08-13
+
+### ⚡ Performans / CPU
+- **LAN tarayıcı sıklığı azaltıldı**: LAN etkinken 5 s, boştayken 20 s (durum değişince yeniden planlanıyor). Her turda tam TLS el sıkışması + SQLite sorgusu çalışıyordu.
+- **Kromatik vurgu döngüsü**: 60 fps `requestAnimationFrame` yerine 200 ms `setTimeout`; pencere gizliyken tamamen duruyor.
+- **Keep-alive bağlantı havuzu**: ana süreç backend istekleri artık en fazla 4 soketlik kalıcı `https.Agent` kullanıyor; sertifika sıfırlandığında havuz yenileniyor.
+- **WSGI sunucusu**: Werkzeug geliştirme sunucusu yerine TLS destekli üretim sunucusu **Cheroot** kullanılıyor (Waitress TLS desteklemediği için tercih edilemedi); kurulu değilse Werkzeug fallback'i korunuyor.
+
+### 🎨 Görünüm / Glass
+- `kasa-glass-warning` kartı buzlu cam efektine geçirildi.
+- Filtre/arama sonrası kartların belirmesinde yanıp sönme (flash) düzeltildi: `filterFadeIn` artık sadece opacity animasyonu.
+
+### ⚙️ Diğer
+- Sürüm **2.7.0-beta.2**'ye yükseltildi.
+- Uninstall kayıt defteri temizliğine **2.7.0-beta.1** anahtarları eklendi.
+
 ## [2.7.0-beta.1] - 2026-08-11
 
 Bu sürüm; `main` dalındaki v2.6.3-beta.1 (8acc2b2) commitinden itibaren ve `experimental` dalının oluşturulduğu tarihten itibaren biriken tüm değişiklikleri içerir.

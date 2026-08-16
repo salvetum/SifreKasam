@@ -328,6 +328,72 @@
     align-self: center;
 }
 
+.settings-card.settings-theme-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+}
+
+.settings-card.settings-theme-card .settings-card-head {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.settings-card.settings-theme-card .settings-card-control {
+    flex: 0 0 auto;
+    align-self: center;
+}
+
+/* Cam Kalitesi ve Renk Döngüsü Hızı kartları: tema kartıyla aynı
+   düzen — başlık solda, seçici sağda; açılan dropdown menüsü de
+   sağ tarafa hizalanır. (glass-scales-card hariç: o kart yalnızca
+   kaydırıcılar içerir ve alt alta dizilim korunur.) */
+.settings-card.settings-glass-quality-card:not(.settings-glass-scales-card),
+.settings-card.settings-chroma-speed-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+}
+
+.settings-card.settings-glass-quality-card:not(.settings-glass-scales-card) .settings-card-head,
+.settings-card.settings-chroma-speed-card .settings-card-head {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.settings-card.settings-glass-quality-card:not(.settings-glass-scales-card) .settings-card-control,
+.settings-card.settings-chroma-speed-card .settings-card-control {
+    flex: 0 0 auto;
+    align-self: center;
+}
+
+.settings-glass-quality-card:not(.settings-glass-scales-card) .kasa-custom-select,
+.settings-chroma-speed-card .kasa-custom-select {
+    width: min(215px, 38vw);
+    flex: 0 0 auto;
+}
+
+/* Dar ekranda başlık ve seçici alt alta dizilir */
+@media (max-width: 620px) {
+    .settings-card.settings-glass-quality-card:not(.settings-glass-scales-card),
+    .settings-card.settings-chroma-speed-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .settings-card.settings-glass-quality-card:not(.settings-glass-scales-card) .settings-card-control,
+    .settings-card.settings-chroma-speed-card .settings-card-control {
+        align-self: stretch;
+    }
+
+    .settings-glass-quality-card:not(.settings-glass-scales-card) .kasa-custom-select,
+    .settings-chroma-speed-card .kasa-custom-select {
+        width: 100%;
+    }
+}
+
 .settings-card-body {
     display: grid;
     gap: 0.6rem;
@@ -1189,9 +1255,13 @@ html[data-kasa-motion="on"] .appearance-preview {
     gap: 0.75rem;
     width: 100%;
     padding: 0.75rem 0.85rem;
+    position: relative;
+    isolation: isolate;
     border: 1px solid rgba(245,158,11,0.25);
     border-radius: 15px;
     color: #fbbf24;
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
     background:
         radial-gradient(circle at top left, rgba(245,158,11,0.13), transparent 42%),
         rgba(245,158,11,0.065);

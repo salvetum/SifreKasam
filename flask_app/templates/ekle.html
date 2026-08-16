@@ -68,30 +68,37 @@
                 <span><i class="fa-solid fa-key"></i></span>
                 <div>
                     <h2 id="vault-section-access">{{ _('Giriş Bilgileri') }}</h2>
-                    <p>{{ _('Kullanıcı adı ve şifre alanları.') }}</p>
+                    <p>{{ _('Kullanıcı adı, e-posta ve şifre alanları.') }}</p>
                 </div>
             </div>
 
             <div class="vault-form-row vault-form-row-two">
                 <div class="vault-field" id="login_group">
                     <label for="login" id="login_label">{{ _('Kullanıcı Adı') }}</label>
-                    <input type="text" name="login" id="login" placeholder="kullanici@mail.com"
+                    <input type="text" name="login" id="login" placeholder="kullanici_adi"
                         value="{{ kayit.full_data.Login if kayit }}"
                         class="kasa-field">
                 </div>
 
-                <div class="vault-field" id="password_group">
-                    <label for="page-password" id="password_label">{{ _('Şifre') }}</label>
-                    <div class="vault-password-line">
-                        <input type="text" name="password" id="page-password" placeholder="••••••••"
-                            value="{{ kayit.full_data.Password if kayit }}"
-                            class="kasa-field vault-password-input">
-                        <button type="button" id="page-generate-btn" title="{{ _('Şifre Üretici') }}"
-                            aria-label="{{ _('Şifre Üretici') }}" aria-controls="pageGenerator" aria-expanded="false"
-                            class="kasa-btn kasa-btn-icon generator-copy-btn">
-                            <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
-                        </button>
-                    </div>
+                <div class="vault-field" id="email_group">
+                    <label for="email" id="email_label">{{ _('E-posta') }}</label>
+                    <input type="text" name="email" id="email" placeholder="kullanici@mail.com"
+                        value="{{ kayit.full_data.Email if kayit }}"
+                        class="kasa-field">
+                </div>
+            </div>
+
+            <div class="vault-field" id="password_group">
+                <label for="page-password" id="password_label">{{ _('Şifre') }}</label>
+                <div class="vault-password-line">
+                    <input type="text" name="password" id="page-password" placeholder="••••••••"
+                        value="{{ kayit.full_data.Password if kayit }}"
+                        class="kasa-field vault-password-input">
+                    <button type="button" id="page-generate-btn" title="{{ _('Şifre Üretici') }}"
+                        aria-label="{{ _('Şifre Üretici') }}" aria-controls="pageGenerator" aria-expanded="false"
+                        class="kasa-btn kasa-btn-icon generator-copy-btn">
+                        <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                    </button>
                 </div>
             </div>
 
@@ -224,6 +231,7 @@
         const weekdaysEl = document.getElementById('expiry-calendar-weekdays');
         const gridEl = document.getElementById('expiry-calendar-grid');
         let viewYear, viewMonth;
+        let popupCloseTimer = 0;
 
         function parseDate(val) {
             if (!val) return null;
@@ -247,6 +255,9 @@
 
         function render() {
             titleEl.textContent = MONTHS_TR[viewMonth] + ' ' + viewYear;
+            titleEl.classList.remove('kasa-calendar-title-anim');
+            void titleEl.offsetWidth;
+            titleEl.classList.add('kasa-calendar-title-anim');
             while (gridEl.firstChild) gridEl.removeChild(gridEl.firstChild);
             const first = new Date(viewYear, viewMonth, 1);
             let startDay = first.getDay();
@@ -284,6 +295,7 @@
         }
 
         function openPopup() {
+            clearTimeout(popupCloseTimer);
             const dt = parseDate(hiddenInput.value) || new Date();
             viewYear = dt.getFullYear();
             viewMonth = dt.getMonth();
@@ -292,6 +304,7 @@
             const panel = wrapper.closest('.vault-form-panel');
             if (panel) panel.classList.add('has-open-select-layer');
             render();
+            requestAnimationFrame(() => popup.classList.add('is-open'));
             const selected = gridEl.querySelector('.is-selected') || gridEl.querySelector('.kasa-calendar-day:not(.kasa-calendar-day-empty)');
             if (selected) {
                 selected.setAttribute('tabindex', '0');
@@ -300,10 +313,11 @@
         }
 
         function closePopup() {
-            popup.hidden = true;
+            popup.classList.remove('is-open');
             displayInput.setAttribute('aria-expanded', 'false');
             const panel = wrapper.closest('.vault-form-panel');
             if (panel) panel.classList.remove('has-open-select-layer');
+            popupCloseTimer = setTimeout(function () { popup.hidden = true; }, 180);
             displayInput.focus();
         }
 

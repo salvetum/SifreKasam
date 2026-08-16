@@ -61,38 +61,137 @@ html[data-kasa-background="plain"] .blob-accent {
     display: none !important;
 }
 
-/* ── VARSAYILAN ARKA PLAN DOKUSU ─────────────────────────────── */
-/* Özel arkaplan (kullanıcı görseli) arkaya detay koyduğu için cam
-   yüzeylerin blur'u belirgin, buzlu görünür. Varsayılan arkaplanlar
-   düz gradyan olduğundan camın blur'u neredeyse hiçbir şeyi
-   bulanıklaştırmaz ve cam "düz" görünür. Bu katman, varsayılan
-   arkaplanların arkasına düşük opaklıklı fraktal doku ekler —
-   backdrop-filter'ın bulanıklaştıracağı detayı sağlar ve custom
-   arkaplanla aynı buzlu cam hissini üretir. Custom modda görsel
-   zaten detaylı olduğundan bu katman gereksizdir ve gizlenir. */
+/* ── VARSAYILAN ARKA PLAN DOKUSU + PERDESİ ────────────────────── */
+/* Özel arkaplan (kullanıcı görseli) cam yüzeylerin altına gerçek
+   detay koyduğu için cam blur'u belirgin, buzlu görünür; toplu seç
+   açılır menülerindeki toast ve modallardaki "buğu" efekti ancak o
+   zaman fark edilir. Varsayılan arkaplanlar düz gradyan olduğundan
+   camın blur'u neredeyse hiçbir şeyi bulanıklaştırmaz ve cam "düz"
+   görünür. Bu iki katman (doku + perde), varsayılan arkaplanların
+   arkasına custom görselin verdiği görsel malzemeyi simüle eder:
+     · tam ekran yumuşak accent/accent-2 ışık sızması → cam yüzeylerin
+       altına renkli ışık sızması.
+     · ekran ortasındaki iki leke → modallar, diyaloglar ve toplu
+       seçteki açılır menüler/tostlar ekranın ortasında açıldığı için
+       camın blur'una beslenen görsel malzeme; varsayılan modda da
+       "buğu"/toast efekti görünür.
+     · viewport'a dağılmış orta ve ince boy renkli bokeh lekeleri →
+       kartlar, butonlar, arama kutusu, filtre hapları ve dropdown
+       menüleri gibi her cam yüzeyin blur'u custom görseldeki gibi
+       "buzlu ve renkli" görünür (tek başına büyük lekeler blur'un
+       bulanıklaştırabileceği detayı vermiyordu; ince lekeler blur
+       yarıçapına yakın uzamsal frekans sağlar).
+     · #default-bg-veil → custom moddaki #custom-bg-layer::after
+       perdesinin aynısı: koyu temada %50 siyah (merkez radyal ile),
+       açık temada %42 beyaz. Perde arkaplanı koyulaştırarak cam
+       yüzeylerin beyaz kenarlarını ve blur'unu custom'daki gibi
+       belirginleştirir.
+   Fraktal grain katmanı bilinçli olarak kaldırıldı: kullanıcı
+   "her yerde hafif grain" şikâyetinde bulundu; yumuşak degradeler
+   backdrop-filter blur'unu beslemeye yeter. Custom modda görsel
+   zaten detaylı olduğundan bu katmanlar gizlenir. */
 #default-bg-texture {
     position: fixed;
     inset: 0;
     z-index: -2;
     pointer-events: none;
     display: block;
-    opacity: 0.06;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='168' height='168'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='168' height='168' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 168px 168px;
-    background-repeat: repeat;
+    opacity: 0.32;
+    background-image:
+        radial-gradient(circle at 50% 40%, rgba(var(--accent-rgb), 0.62), transparent 30%),
+        radial-gradient(circle at 47% 60%, rgba(var(--accent-2-rgb), 0.55), transparent 28%),
+        radial-gradient(circle at 12% 16%, rgba(var(--accent-rgb), 0.75), transparent 26%),
+        radial-gradient(circle at 86% 10%, rgba(var(--accent-2-rgb), 0.68), transparent 24%),
+        radial-gradient(circle at 30% 90%, rgba(var(--accent-rgb), 0.52), transparent 22%),
+        radial-gradient(circle at 70% 82%, rgba(52, 211, 153, 0.50), transparent 24%),
+        radial-gradient(circle at 94% 62%, rgba(251, 113, 133, 0.48), transparent 20%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.65), rgba(var(--accent-rgb), 0.20) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-2-rgb), 0.60), rgba(var(--accent-2-rgb), 0.18) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.58), rgba(52, 211, 153, 0.17) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(251, 113, 133, 0.55), rgba(251, 113, 133, 0.17) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.60), rgba(var(--accent-rgb), 0.18) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-2-rgb), 0.58), rgba(var(--accent-2-rgb), 0.17) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.62), rgba(52, 211, 153, 0.19) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(251, 113, 133, 0.52), rgba(251, 113, 133, 0.16) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.60), rgba(var(--accent-rgb), 0.18) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-2-rgb), 0.55), rgba(var(--accent-2-rgb), 0.17) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(251, 113, 133, 0.56), rgba(251, 113, 133, 0.17) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.58), rgba(52, 211, 153, 0.17) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.60), rgba(var(--accent-rgb), 0.18) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-2-rgb), 0.68), rgba(var(--accent-2-rgb), 0.20) 42%, transparent 62%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.70), rgba(var(--accent-rgb), 0.21) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-2-rgb), 0.65), rgba(var(--accent-2-rgb), 0.20) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.62), rgba(52, 211, 153, 0.19) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(251, 113, 133, 0.60), rgba(251, 113, 133, 0.18) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.68), rgba(var(--accent-rgb), 0.20) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-2-rgb), 0.65), rgba(var(--accent-2-rgb), 0.20) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.64), rgba(52, 211, 153, 0.19) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(251, 113, 133, 0.62), rgba(251, 113, 133, 0.19) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.70), rgba(var(--accent-rgb), 0.21) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-2-rgb), 0.66), rgba(var(--accent-2-rgb), 0.20) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.64), rgba(52, 211, 153, 0.19) 40%, transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.68), rgba(var(--accent-rgb), 0.20) 40%, transparent 58%);
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+        no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+        no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+        no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
+        no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0,
+        12% 24%, 30% 10%, 52% 6%, 78% 18%, 88% 36%, 68% 52%, 44% 38%,
+        22% 46%, 8% 60%, 38% 76%, 60% 88%, 86% 80%, 16% 92%, 58% 28%,
+        6% 38%, 24% 30%, 44% 16%, 64% 26%, 80% 48%, 92% 22%, 34% 56%,
+        12% 74%, 52% 70%, 72% 92%, 90% 60%, 26% 88%;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+        10% 10%, 12% 12%, 9% 9%, 11% 11%, 10% 10%, 13% 13%, 9% 9%,
+        11% 11%, 10% 10%, 12% 12%, 10% 10%, 11% 11%, 9% 9%, 8% 8%,
+        4% 4%, 3% 3%, 4% 4%, 3% 3%, 4% 4%, 3% 3%, 4% 4%,
+        3% 3%, 4% 4%, 3% 3%, 4% 4%, 3% 3%;
 }
 
 html[data-glass-quality="high"] #default-bg-texture {
-    opacity: 0.09;
+    opacity: 0.38;
 }
 
 html[data-bs-theme="light"] #default-bg-texture {
-    opacity: 0.04;
+    opacity: 0.18;
+}
+
+/* "Plain" arkaplan: temiz düz görünüm — doku katmanı tamamen gizlenir. */
+html[data-kasa-background="plain"] #default-bg-texture {
+    display: none !important;
 }
 
 html[data-kasa-background="custom"] #default-bg-texture,
 html[data-glass-effects="off"] #default-bg-texture,
 html[data-kasa-low-power="on"] #default-bg-texture {
+    display: none !important;
+}
+
+/* ── VARSAYILAN ARKA PLAN PERDESİ (custom perdenin birebir kopyası) ── */
+/* Custom modda #custom-bg-layer::after arkaplanı %50 koyulaştırıp camın
+   belirgin olmasını sağlar; varsayılan modda aynı perde #default-bg-veil
+   ile verilir (z-index -2, doku katmanının üstünde, blobların altında). */
+#default-bg-veil {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    display: block;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(8, 9, 18, 0.16) 0%, rgba(8, 9, 18, 0.30) 140%),
+        linear-gradient(rgba(8, 9, 18, 0.50), rgba(8, 9, 18, 0.50));
+}
+
+html[data-bs-theme="light"] #default-bg-veil {
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.20) 140%),
+        linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42));
+}
+
+html[data-kasa-background="custom"] #default-bg-veil,
+html[data-kasa-background="plain"] #default-bg-veil,
+html[data-glass-effects="off"] #default-bg-veil,
+html[data-kasa-low-power="on"] #default-bg-veil {
     display: none !important;
 }
 
@@ -114,6 +213,31 @@ html[data-kasa-low-power="on"] #default-bg-texture {
 }
 
 #custom-bg-layer.is-active {
+    display: block;
+    opacity: 0;
+}
+
+#custom-bg-layer.is-active.is-loaded {
+    opacity: 1;
+    transition: opacity 320ms ease;
+}
+
+html[data-kasa-motion="off"] #custom-bg-layer.is-active,
+html[data-kasa-animations="off"] #custom-bg-layer.is-active {
+    opacity: 1;
+}
+
+#custom-bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+    pointer-events: none;
+}
+
+#custom-bg-video.is-active {
     display: block;
 }
 
@@ -147,46 +271,47 @@ html[data-kasa-motion="off"] #custom-bg-layer[data-animated="true"] {
     display: none !important;
 }
 
-/* ── ÖZEL ARKA PLAN OKUNABİLİRLİK ────────────────────────────── */
-/* Arkaplan doğrudan zemin üzerindeki başlık metinlerine yumuşak gölge ver. */
-html[data-kasa-background="custom"] .kasa-page-title,
-html[data-kasa-background="custom"] h1,
-html[data-kasa-background="custom"] h2,
-html[data-kasa-background="custom"] h3,
-html[data-kasa-background="custom"] h4 {
+/* ── OKUNABİLİRLİK (custom perde/arkaplanla aynı metin gölgeleri) ── */
+/* Perde varsayılan arkaplanda da olduğu için başlıklara yumuşak gölge
+   verilir (eskiden yalnızca custom modda fotoğraf üzerinde vardı). */
+.kasa-page-title,
+h1,
+h2,
+h3,
+h4 {
     text-shadow: 0 1px 2px rgba(8, 9, 18, 0.55);
 }
 
 /* Canlı (vivid) cam kartlarda arkaplan rengi sızdığında bile kart
    içindeki metnin net okunması için hafif metin gölgesi. */
-html[data-kasa-background="custom"] .vault-card .vault-card-title,
-html[data-kasa-background="custom"] .vault-card .vault-detail-label,
-html[data-kasa-background="custom"] .vault-card .vault-detail-value,
-html[data-kasa-background="custom"] .vault-card .vault-note-text {
+.vault-card .vault-card-title,
+.vault-card .vault-detail-label,
+.vault-card .vault-detail-value,
+.vault-card .vault-note-text {
     text-shadow: 0 1px 2px rgba(8, 9, 18, 0.55);
 }
 
-html[data-bs-theme="light"][data-kasa-background="custom"] .kasa-page-title,
-html[data-bs-theme="light"][data-kasa-background="custom"] h1,
-html[data-bs-theme="light"][data-kasa-background="custom"] h2,
-html[data-bs-theme="light"][data-kasa-background="custom"] h3,
-html[data-bs-theme="light"][data-kasa-background="custom"] h4 {
+[data-bs-theme="light"] .kasa-page-title,
+[data-bs-theme="light"] h1,
+[data-bs-theme="light"] h2,
+[data-bs-theme="light"] h3,
+[data-bs-theme="light"] h4 {
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.65);
 }
 
-html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-card-title,
-html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-detail-label,
-html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-detail-value,
-html[data-bs-theme="light"][data-kasa-background="custom"] .vault-card .vault-note-text {
+[data-bs-theme="light"] .vault-card .vault-card-title,
+[data-bs-theme="light"] .vault-card .vault-detail-label,
+[data-bs-theme="light"] .vault-card .vault-detail-value,
+[data-bs-theme="light"] .vault-card .vault-note-text {
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
 }
 
-/* Ayarlar penceresinde özel arkaplan okunabilirlik gölgesini kapat. */
-html[data-kasa-background="custom"] #settingsModal .kasa-page-title,
-html[data-kasa-background="custom"] #settingsModal h1,
-html[data-kasa-background="custom"] #settingsModal h2,
-html[data-kasa-background="custom"] #settingsModal h3,
-html[data-kasa-background="custom"] #settingsModal h4 {
+/* Ayarlar penceresinde okunabilirlik gölgesini kapat. */
+#settingsModal .kasa-page-title,
+#settingsModal h1,
+#settingsModal h2,
+#settingsModal h3,
+#settingsModal h4 {
     text-shadow: none;
 }
 
@@ -211,7 +336,25 @@ html[data-kasa-background="custom"] #settingsModal h4 {
     gap: 0.5rem;
 }
 
+.custom-bg-limit-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.65rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.custom-bg-limit-hint i {
+    flex: 0 0 auto;
+    color: var(--accent-2);
+    font-size: 0.72rem;
+}
+
 .custom-bg-thumb {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -236,17 +379,30 @@ html[data-kasa-background="custom"] #settingsModal h4 {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
 }
 
+/* Hoverlanan küçük resim ve üstündeki tooltip, yanındaki küçük
+   resimlerin üstünde kalır (tooltip "altta kalma" sorunu). */
+.custom-bg-thumb:hover,
+.custom-bg-thumb:focus-visible,
+.custom-bg-thumb:focus-within {
+    z-index: 70;
+}
+
 .custom-bg-thumb.is-active .custom-bg-thumb-photo {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.35);
 }
 
-.custom-bg-thumb img {
+.custom-bg-thumb img,
+.custom-bg-thumb video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
     pointer-events: none;
+}
+
+.custom-bg-thumb video {
+    background: rgba(0, 0, 0, 0.55);
 }
 
 .custom-bg-thumb-label {
@@ -259,23 +415,63 @@ html[data-kasa-background="custom"] #settingsModal h4 {
 }
 
 .custom-bg-thumb-tooltip {
-    min-width: 0;
-    font-size: 0.58rem;
-    font-weight: 500;
-    color: var(--text-muted);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 2px);
+    z-index: 80;
+    width: max-content;
+    max-width: min(240px, calc(100vw - 1.5rem));
+    padding: 0.3rem 0.6rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.26);
+    border-radius: 8px;
+    color: var(--text);
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.16), transparent 45%),
+        rgba(10, 12, 24, 0.97);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.38);
+    font-size: 0.64rem;
+    font-weight: 600;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    text-align: center;
+    opacity: 0;
+    transform: translateX(-50%) translateY(5px);
+    pointer-events: none;
+    transition: opacity 150ms ease, transform 180ms var(--ease-out);
+}
+
+[data-bs-theme="light"] .custom-bg-thumb-tooltip {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.12), transparent 45%),
+        rgba(255, 255, 255, 0.99);
+    box-shadow: 0 10px 26px rgba(31, 41, 55, 0.16);
+}
+
+.custom-bg-thumb:hover .custom-bg-thumb-tooltip,
+.custom-bg-thumb:focus-visible .custom-bg-thumb-tooltip,
+.custom-bg-thumb:focus-within .custom-bg-thumb-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.settings-bg-card:has(.custom-bg-thumb:hover) {
+    z-index: 130;
 }
 
 .custom-bg-thumb-badge {
-    flex: 0 0 auto;
-    padding: 1px 6px;
-    border-radius: 999px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 3px 6px 4px;
+    text-align: center;
     font-size: 0.58rem;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
     color: #fff;
-    background: rgba(var(--accent-rgb), 0.85);
+    background: linear-gradient(0deg, rgba(var(--accent-rgb), 0.95), rgba(var(--accent-rgb), 0.72));
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
 }
 
 .custom-bg-thumb-del {
@@ -286,17 +482,25 @@ html[data-kasa-background="custom"] #settingsModal h4 {
     height: 20px;
     display: grid;
     place-items: center;
+    padding: 0;
     border: 0;
     border-radius: 999px;
     color: #fff;
     background: rgba(8, 9, 18, 0.62);
-    font-size: 0.7rem;
+    font-size: 0.62rem;
+    line-height: 1;
     cursor: pointer;
-    transition: background var(--speed) ease;
+    transition: background var(--speed) ease, transform var(--speed) ease;
+}
+
+.custom-bg-thumb-del > i {
+    display: block;
+    line-height: 1;
 }
 
 .custom-bg-thumb-del:hover {
-    background: rgba(239, 68, 68, 0.85);
+    background: rgba(239, 68, 68, 0.88);
+    transform: scale(1.08);
 }
 
 html[data-kasa-gradient="off"] body {

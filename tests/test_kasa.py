@@ -118,6 +118,7 @@ class ImportExportServiceTests(unittest.TestCase):
             "title": "ŞifreKasam",
             "website_url": "https://example.com",
             "login": "kullanıcı",
+            "email": "kullanici@mail.com",
             "password": "gizli",
             "comment": "not",
             "expiry_date": "2030-01-02",
@@ -458,6 +459,8 @@ class ContentSecurityPolicyTests(unittest.TestCase):
 
         self.assertIn('id="first-setup-guidance"', first_setup_html)
         self.assertNotIn('id="first-setup-guidance"', existing_vault_html)
+        self.assertIn('id="master-password-confirm"', first_setup_html)
+        self.assertNotIn('id="master-password-confirm"', existing_vault_html)
 
 
 class StylesheetDependencyTests(unittest.TestCase):
@@ -720,6 +723,7 @@ class CustomBackgroundUploadTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = app_module.app.test_client()
         self._token = {'X-App-Token': app_module.APP_TOKEN}
+        app_module._background_upload_log.clear()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -768,9 +772,110 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         self.assertIn('error', data)
 
     def test_rejects_oversized_image(self) -> None:
-        oversized = self._make_png(size_bytes=11 * 1024 * 1024)
+        oversized = self._make_png(size_bytes=app_module.CUSTOM_BACKGROUND_MAX_IMAGE_BYTES + 1)
         response = self.client.post('/api/background/upload', data={
             'file': (io.BytesIO(oversized), 'big.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertIn('error', data)
+
+    def _make_png_with_size(self, width: int, height: int) -> bytes:
+        import struct as _struct
+        import zlib as _zlib
+
+        def _chunk(typ: bytes, data: bytes) -> bytes:
+            return (_struct.pack('>I', len(data)) + typ + data
+                    + _struct.pack('>I', _zlib.crc32(typ + data) & 0xffffffff))
+
+        ihdr = _struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)
+        idat = _zlib.compress(b'\x00' * 9)
+        return (b'\x89PNG\r\n\x1a\n'
+                + _chunk(b'IHDR', ihdr)
+                + _chunk(b'IDAT', idat)
+                + _chunk(b'IEND', b''))
+
+    def test_rejects_oversized_dimension_image(self) -> None:
+        huge = self._make_png_with_size(10000, 10000)
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(huge), 'huge.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertIn('error', data)
+
+    def test_limits_upload_rate(self) -> None:
+        for _ in range(app_module.CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW):
+            response = self.client.post('/api/background/upload', data={
+                'file': (io.BytesIO(self._make_png()), 'ok.png'),
+            }, content_type='multipart/form-data', headers=self._token)
+            self.assertEqual(response.status_code, 200)
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'ok.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 429)
+        data = response.get_json()
+        self.assertIn('error', data)
+
+    def test_current_url_is_mtime_versioned(self) -> None:
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'ok.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        with patch.object(app_module, "get_fernet", return_value=Fernet(Fernet.generate_key())):
+            page = self.client.get('/', headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b'/api/background/current?v=', page.data)
+
+    def test_background_served_with_private_cache(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'ok.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        response = self.client.get('/api/background/current', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        cache_control = response.headers.get('Cache-Control', '')
+        self.assertIn('private', cache_control)
+        self.assertIn('max-age=', cache_control)
+        self.assertTrue(response.headers.get('ETag'))
+
+    def test_background_served_with_etag_revalidation(self) -> None:
+        self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(self._make_png()), 'ok.png'),
+        }, content_type='multipart/form-data', headers=self._token)
+        first = self.client.get('/api/background/current', headers=self._token)
+        etag = first.headers.get('ETag')
+        self.assertTrue(etag)
+        second = self.client.get(
+            '/api/background/current', headers={**self._token, 'If-None-Match': etag})
+        self.assertEqual(second.status_code, 304)
+
+    def test_accepts_valid_webm(self) -> None:
+        webm_data = b'\x1a\x45\xdf\xa3' + b'webm-sample-magic-bytes'
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(webm_data), 'anim.webm'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertTrue(data.get('is_video'))
+        self.assertFalse(data.get('is_gif'))
+        entries = self.client.get('/api/background/history', headers=self._token).get_json()['entries']
+        self.assertTrue(entries[0]['is_video'])
+        self.assertEqual(entries[0]['mime'], 'video/webm')
+
+    def test_accepts_valid_mp4(self) -> None:
+        mp4_data = b'\x00\x00\x00\x18ftypisom' + b'\x00\x00\x00\x08free'
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(mp4_data), 'video.mp4'),
+        }, content_type='multipart/form-data', headers=self._token)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertTrue(data.get('is_video'))
+
+    def test_rejects_fake_video_extension(self) -> None:
+        response = self.client.post('/api/background/upload', data={
+            'file': (io.BytesIO(b'definitely not an mp4 video'), 'fake.mp4'),
         }, content_type='multipart/form-data', headers=self._token)
         self.assertEqual(response.status_code, 400)
         data = response.get_json()
@@ -1119,7 +1224,42 @@ class CsrfAndPasswordStrengthTests(unittest.TestCase):
         response = self.client.post('/login', data={'master_password': 'ignored'})
         self.assertEqual(response.status_code, 400)
 
-    def test_first_setup_rejects_weak_master_password(self) -> None:
+    def test_first_setup_accepts_weak_master_password(self) -> None:
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False):
+            token = self._extract_csrf_token(
+                self.client.get('/login').get_data(as_text=True)
+            )
+            response = self.client.post('/login', data={
+                'master_password': '1234567890123456',
+                'master_password_confirm': '1234567890123456',
+                'csrf_token': token,
+            })
+        self.assertEqual(response.status_code, 302)
+        with app_module.app.app_context():
+            app_module.Setting.query.filter_by(key='master_hash').delete()
+            app_module.Setting.query.filter_by(key='pbkdf2_salt_b64').delete()
+            app_module.Setting.query.filter_by(key='record_metadata_encryption_v1').delete()
+            app_module.Setting.query.filter_by(key='vault_initialized').delete()
+            app_module.db.session.commit()
+        if os.path.exists(app_module.VAULT_INIT_FILE):
+            os.remove(app_module.VAULT_INIT_FILE)
+
+    def test_first_setup_requires_matching_confirm(self) -> None:
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False):
+            token = self._extract_csrf_token(
+                self.client.get('/login').get_data(as_text=True)
+            )
+            response = self.client.post('/login', data={
+                'master_password': '1234567890123456',
+                'master_password_confirm': '1234567890123457',
+                'csrf_token': token,
+            })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('eşleşmiyor', response.get_data(as_text=True))
+
+    def test_first_setup_requires_confirm(self) -> None:
         with patch.object(app_module, "_vault_initialized", return_value=False), \
                 patch.object(app_module, "_has_existing_vault_data", return_value=False):
             token = self._extract_csrf_token(
@@ -1130,7 +1270,7 @@ class CsrfAndPasswordStrengthTests(unittest.TestCase):
                 'csrf_token': token,
             })
         self.assertEqual(response.status_code, 400)
-        self.assertIn('çok zayıf', response.get_data(as_text=True))
+        self.assertIn('eşleşmiyor', response.get_data(as_text=True))
 
     def test_change_password_rejects_weak_new_password(self) -> None:
         with self.client.session_transaction() as session:
@@ -1158,6 +1298,14 @@ class HardwareAccelerationSettingsTests(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('id="hardware-acceleration-toggle"', html)
         self.assertIn('name="hardware_acceleration_enabled"', html)
+
+    def test_index_renders_power_save_toggle(self) -> None:
+        with patch.object(app_module, "get_fernet", return_value=Fernet(Fernet.generate_key())):
+            response = self.client.get('/', headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="power-save-toggle"', html)
+        self.assertIn('name="power_save_enabled"', html)
 
     def test_settings_endpoint_round_trip(self) -> None:
         response = self.client.post(
@@ -1264,6 +1412,140 @@ class HardwareAccelerationSettingsTests(unittest.TestCase):
         ).get_json()
         self.assertIn('hardware_acceleration_enabled', data)
         self.assertIsInstance(data['hardware_acceleration_enabled'], bool)
+
+    def test_save_settings_persists_power_save(self) -> None:
+        response = self.client.post('/save_settings', data={
+            'auto_lock_timeout': '5',
+        }, headers={
+            'X-App-Token': app_module.APP_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn('power_save_enabled', data)
+        self.assertFalse(data['power_save_enabled'])
+        self.assertFalse(app_module.get_power_save_enabled())
+
+        response = self.client.post('/save_settings', data={
+            'power_save_enabled': 'on',
+            'auto_lock_timeout': '5',
+        }, headers={
+            'X-App-Token': app_module.APP_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data['power_save_enabled'])
+        self.assertTrue(app_module.get_power_save_enabled())
+
+    def test_appearance_endpoint_persists_power_save(self) -> None:
+        response = self.client.post(
+            '/settings/appearance',
+            json={'power_save_enabled': False},
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(app_module.get_power_save_enabled())
+        data = self.client.get(
+            '/settings/appearance',
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        self.assertFalse(data['power_save_enabled'])
+
+        response = self.client.post(
+            '/settings/appearance',
+            json={'power_save_enabled': True},
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn('power_save_enabled', data)
+        self.assertTrue(data['power_save_enabled'])
+        self.assertTrue(app_module.get_power_save_enabled())
+
+
+class RecordFormTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+    def test_add_form_renders_username_email_and_password_fields(self) -> None:
+        response = self.client.get(
+            '/ekle',
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('name="login"', html)
+        self.assertIn('id="login_group"', html)
+        self.assertIn('name="email"', html)
+        self.assertIn('id="email_group"', html)
+        self.assertIn('name="password"', html)
+        self.assertIn('id="password_group"', html)
+
+    def test_add_record_persists_username_email_and_password(self) -> None:
+        fernet = Fernet(Fernet.generate_key())
+        with patch.object(app_module, "backup_database"), \
+                patch.object(app_module, "invalidate_vault_report_cache"), \
+                patch.object(app_module, "get_fernet", return_value=fernet):
+            response = self.client.post(
+                '/ekle',
+                data={
+                    'kayit_tipi': 'Website',
+                    'kategori': 'Genel',
+                    'isim': 'Example Site',
+                    'website_url': 'https://example.com',
+                    'login': 'kullanici',
+                    'email': 'kullanici@mail.com',
+                    'password': 's3cret',
+                    'comment': '',
+                    'expiry_date': '',
+                },
+                headers={'X-App-Token': app_module.APP_TOKEN},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'].endswith('/'), True)
+        with app_module.app.app_context():
+            record = next(
+                (r for r in app_module.Record.query.filter_by(type='Website')
+                 if app_module.decrypt_metadata(fernet, r.login) == "kullanici"),
+                None,
+            )
+            self.assertIsNotNone(record)
+            self.assertEqual(
+                app_module.decrypt_metadata(fernet, record.email),
+                "kullanici@mail.com",
+            )
+
+    def test_index_card_shows_email_detail(self) -> None:
+        fernet = Fernet(Fernet.generate_key())
+        record = app_module.Record(
+            id="email-card-record",
+            type="Website",
+            category="Genel",
+            title=app_module.encrypt_metadata(fernet, "Example Site"),
+            website_url=app_module.encrypt_metadata(fernet, "https://example.com"),
+            login=app_module.encrypt_metadata(fernet, "kullanici"),
+            email=app_module.encrypt_metadata(fernet, "kullanici@mail.com"),
+            encrypted_password=app_module.safe_encrypt(fernet, "s3cret"),
+        )
+        with app_module.app.app_context():
+            app_module.db.session.add(record)
+            app_module.db.session.commit()
+
+        with patch.object(app_module, "get_fernet", return_value=fernet):
+            response = self.client.get(
+                '/',
+                headers={'X-App-Token': app_module.APP_TOKEN},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('E-posta', html)
+        self.assertIn('kullanici@mail.com', html)
 
 
 if __name__ == "__main__":

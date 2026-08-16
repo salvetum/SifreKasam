@@ -106,6 +106,8 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.7.0-beta.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.7.0-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.3-beta.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.6.3-beta.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.3-beta.2',
@@ -400,7 +402,8 @@ const SSL_NOISE_PATTERNS = [
   'certificate',
   'SSL',
 ];
-const LAN_RECONCILE_INTERVAL_MS = 3000;
+const LAN_RECONCILE_IDLE_INTERVAL_MS = 20_000;
+const LAN_RECONCILE_ACTIVE_INTERVAL_MS = 5_000;
 const LAN_RESTART_MIN_INTERVAL_MS = 15_000;
 
 // ─── UYGULAMA DURUMU ──────────────────────────────────────────────────────────
@@ -620,10 +623,33 @@ function getPinnedHttpsOptions() {
   return { rejectUnauthorized: false };
 }
 
+// Backend'e giden tekrarlanan istekler için yeniden kullanılabilir bağlantı
+// havuzu. Her istekte yeni TLS handshake yapmak (özellikle LAN poller ve
+// heartbeat) gereksiz CPU + gecikme üretir; keep-alive aynı socket'i
+// yeniden kullanır. Sertifika yenilenince (LAN restart) havuz sıfırlanır.
+let backendKeepAliveAgent = null;
+function getBackendKeepAliveAgent() {
+  if (!backendKeepAliveAgent) {
+    backendKeepAliveAgent = new https.Agent({
+      keepAlive: true,
+      maxSockets: 4,
+      keepAliveMsecs: 1500,
+    });
+  }
+  return backendKeepAliveAgent;
+}
+function resetBackendKeepAliveAgent() {
+  if (backendKeepAliveAgent) {
+    backendKeepAliveAgent.destroy();
+    backendKeepAliveAgent = null;
+  }
+}
+
 function resetPinnedCertificateCache() {
   pinnedCertificatePem = null;
   pinnedCertificateDer = null;
   pinnedCertificateMtime = 0;
+  resetBackendKeepAliveAgent();
 }
 
 // ─── UYGULAMA HAZIR ───────────────────────────────────────────────────────────
@@ -1132,6 +1158,7 @@ function requestBackendJson(pathname, { method = 'GET', body = null, timeout = 1
         path: pathname,
         method,
         timeout,
+        agent: getBackendKeepAliveAgent(),
         ...getPinnedHttpsOptions(),
         headers: {
           'X-App-Token': APP_TOKEN,
@@ -1170,9 +1197,13 @@ async function syncLanRuntimeState() {
     // kaydinda gereksiz restart tetiklenip yukleme ekrani kalici olabilir.
     const desiredLanEnabled = state.lan_enabled === true;
     const actualLanEnabled = state.runtime_lan_enabled === true;
+    if (lanRuntimeEnabled !== desiredLanEnabled) {
+      lanRuntimeEnabled = desiredLanEnabled;
+      startLanReconciliation();
+    }
     if (desiredLanEnabled !== actualLanEnabled) {
       const now = Date.now();
-      // Restart basarisiz olursa poller her 3 sn'de yeniden denerdi;
+      // Restart basarisiz olursa poller belirli araliklarla yeniden dener;
       // restart firtinasi olusmamasi icin iki deneme arasina minimum sure koy.
       if (now - lastLanRestartAttempt < LAN_RESTART_MIN_INTERVAL_MS) return;
       lastLanRestartAttempt = now;
@@ -1186,11 +1217,16 @@ async function syncLanRuntimeState() {
 // webRequest.onCompleted cekicisi bazi ortamlarda (paketli uygulama) saglikli
 // tetiklenmeyebiliyor; LAN ayari kaydedildikten sonra sunucunun gercekten
 // 0.0.0.0'a baglanmasi icin periyodik bir mutabakat poller'i calistirir.
+// LAN kapaliyken her 3 sn'de TLS handshake + DB sorgusu yapmak gereksiz CPU
+// harcar; bos durumda 20 sn, LAN acikken 5 sn'de bir kontrol yeterlidir.
 function startLanReconciliation() {
   if (lanReconciliationTimer) clearInterval(lanReconciliationTimer);
+  const interval = lanRuntimeEnabled
+    ? LAN_RECONCILE_ACTIVE_INTERVAL_MS
+    : LAN_RECONCILE_IDLE_INTERVAL_MS;
   lanReconciliationTimer = setInterval(() => {
     syncLanRuntimeState().catch(() => {});
-  }, LAN_RECONCILE_INTERVAL_MS);
+  }, interval);
   if (lanReconciliationTimer.unref) lanReconciliationTimer.unref();
 }
 
@@ -1267,6 +1303,7 @@ async function restartFlaskServer(nextLanEnabled) {
     }
     await stopFlaskServer();
     lanRuntimeEnabled = nextLanEnabled;
+    startLanReconciliation();
     // LAN açılışında sertifika LAN IP içerecek şekilde yeniden üretilmiş
     // olabilir; eskimiş pin önbelleğini temizle.
     resetPinnedCertificateCache();

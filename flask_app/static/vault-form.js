@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Ekle / Düzenle Formu modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Ekle / Düzenle Formu modülü (ES Module)
  *
  * 10. bölüm: kayıt tipine göre alan gösterimi ve şifre üretici
  * açma/kapama davranışı.
@@ -15,35 +15,41 @@ export function initVaultForm() {
       CreditCard: {
         isim: _t('Kart Başlığı'), login: _t('Kart Numarası'), password: _t('CVV / Şifre'),
         comment: _t('Not / Son Kullanma Tarihi'),
-        showLogin: true, showPassword: true, showKategori: true,
+        showLogin: true, showEmail: false, showPassword: true, showKategori: true,
+        showAccess: true,
         commentRows: 3, commentPlaceholder: _t('Notlar…'), commentRequired: false,
       },
       SecureNote: {
         isim: _t('Not Başlığı'), comment: _t('Not İçeriği'),
-        showLogin: false, showPassword: false, showKategori: true,
+        showLogin: false, showEmail: false, showPassword: false, showKategori: true,
+        showAccess: false,
         commentRows: 7, commentPlaceholder: _t('Notunuzu buraya yazın…'), commentRequired: true,
       },
       default: {
-        isim: _t('İsim / Başlık'), login: _t('Kullanıcı Adı'), password: _t('Şifre'),
+        isim: _t('İsim / Başlık'), login: _t('Kullanıcı Adı'), email: _t('E-posta'), password: _t('Şifre'),
         comment: _t('Not (İsteğe Bağlı)'),
-        showLogin: true, showPassword: true, showKategori: true,
+        showLogin: true, showEmail: true, showPassword: true, showKategori: true,
+        showAccess: true,
         commentRows: 3, commentPlaceholder: _t('Notlar…'), commentRequired: false,
       },
     };
 
     const el = (id) => document.getElementById(id);
-    const urlGroup      = el('website_url_group');
-    const loginGroup    = el('login_group');
-    const passwordGroup = el('password_group');
-    const kategoriGroup = el('kategori_group');
-    const pageGenerator = el('pageGenerator');
-    const generateBtn   = el('page-generate-btn');
-    const strengthCard  = el('vault-strength-card');
-    const commentInput  = el('comment');
-    const isimLabel     = el('isim_label');
-    const loginLabel    = el('login_label');
-    const passwordLabel = el('password_label');
-    const commentLabel  = el('comment_label');
+    const urlGroup        = el('website_url_group');
+    const loginGroup      = el('login_group');
+    const emailGroup      = el('email_group');
+    const passwordGroup   = el('password_group');
+    const kategoriGroup   = el('kategori_group');
+    const accessSection   = el('login_password_row');
+    const pageGenerator   = el('pageGenerator');
+    const generateBtn     = el('page-generate-btn');
+    const strengthCard    = el('vault-strength-card');
+    const commentInput    = el('comment');
+    const isimLabel       = el('isim_label');
+    const loginLabel      = el('login_label');
+    const emailLabel      = el('email_label');
+    const passwordLabel   = el('password_label');
+    const commentLabel    = el('comment_label');
 
     generateBtn?.addEventListener('click', () => {
       const isVisible = pageGenerator && !pageGenerator.classList.contains('is-collapsed');
@@ -62,7 +68,9 @@ export function initVaultForm() {
       const config = FIELD_CONFIGS[kayitTipiSelect.value] || FIELD_CONFIGS.default;
 
       if (urlGroup)      urlGroup.hidden      = kayitTipiSelect.value !== 'Website';
+      if (accessSection) accessSection.hidden = !config.showAccess;
       if (loginGroup)    loginGroup.hidden    = !config.showLogin;
+      if (emailGroup)    emailGroup.hidden    = !config.showEmail;
       if (passwordGroup) passwordGroup.hidden = !config.showPassword;
       if (kategoriGroup) kategoriGroup.hidden = !config.showKategori;
       if (strengthCard)  strengthCard.hidden  = !config.showPassword;
@@ -77,6 +85,7 @@ export function initVaultForm() {
 
       if (isimLabel)     isimLabel.textContent    = config.isim;
       if (loginLabel    && config.login)    loginLabel.textContent    = config.login;
+      if (emailLabel    && config.email)    emailLabel.textContent    = config.email;
       if (passwordLabel && config.password) passwordLabel.textContent = config.password;
       if (commentLabel)  commentLabel.textContent  = config.comment;
 
@@ -88,6 +97,7 @@ export function initVaultForm() {
 
       el('website_url') && (el('website_url').disabled = kayitTipiSelect.value !== 'Website');
       el('login')       && (el('login').disabled       = !config.showLogin);
+      el('email')       && (el('email').disabled       = !config.showEmail);
       el('page-password') && (el('page-password').disabled = !config.showPassword);
     };
 

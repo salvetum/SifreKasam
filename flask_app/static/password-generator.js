@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Şifre Üretici modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Şifre Üretici modülü (ES Module)
  *
  * 8. ve 8b. bölümler: şifre üretici ve üretici geçmişi.
  * app.js (main modül) içindeki DOMContentLoaded sırasında
@@ -101,8 +101,6 @@ export function initPasswordGenerator({
       if (targetInput) {
         targetInput.value = password;
         targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-        targetInput.classList.add('shake');
-        setTimeout(() => targetInput.classList.remove('shake'), 400);
       }
 
       const modalBar   = $('strength-bar');
@@ -111,13 +109,15 @@ export function initPasswordGenerator({
         window.updateStrengthMeter(password, modalBar, modalLabel);
 
       if (typeof addToGeneratorHistory === 'function') addToGeneratorHistory(password);
-      if (containerId !== 'pageGenerator') {
+
+      const pulseTarget = containerId === 'pageGenerator' ? targetInput : container;
+      if (pulseTarget) {
         clearTimeout(generatedAnimationTimer);
-        container.classList.remove('generator-generated');
-        void container.offsetWidth;
-        container.classList.add('generator-generated');
+        pulseTarget.classList.remove('generator-generated');
+        void pulseTarget.offsetWidth;
+        pulseTarget.classList.add('generator-generated');
         generatedAnimationTimer = setTimeout(() => {
-          container.classList.remove('generator-generated');
+          pulseTarget.classList.remove('generator-generated');
         }, 520);
       }
     };

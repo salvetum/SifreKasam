@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.1 - Görünüm Ayarları modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.2 - Görünüm Ayarları modülü (ES Module)
  *
  * 3. bölüm: tema/efekt toggle'ları, glass kalitesi, vurgu rengi seçici,
  * chroma akcent, özel arka plan yükleme/galeri.
@@ -132,6 +132,7 @@ export function initAppearanceSettings({
   const cardFrameToggle = document.getElementById('card-frame-toggle');
   const cardDepthToggle = document.getElementById('card-depth-toggle');
   const hardwareAccelerationToggle = document.getElementById('hardware-acceleration-toggle');
+  const powerSaveToggle = document.getElementById('power-save-toggle');
 
   const setupThemeFeatureToggle = (toggle, attribute, storageKey, apiKey) => {
     if (!toggle) return;
@@ -177,6 +178,12 @@ export function initAppearanceSettings({
     'data-kasa-card-depth',
     'kasa-card-depth',
     'card_depth_enabled'
+  );
+  setupThemeFeatureToggle(
+    powerSaveToggle,
+    'data-kasa-power-save',
+    'kasa-power-save',
+    'power_save_enabled'
   );
 
   if (hardwareAccelerationToggle) {
@@ -441,6 +448,7 @@ export function initAppearanceSettings({
         card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
         card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
         card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
+        power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
       }).finally(() => { appearanceSavePromise = null; });
     }, 250);
   };
@@ -461,6 +469,7 @@ export function initAppearanceSettings({
       card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
       card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
       card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
+      power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
     }).finally(() => { appearanceSavePromise = null; });
     return appearanceSavePromise;
   };
@@ -533,9 +542,9 @@ export function initAppearanceSettings({
     if (persist) queueAppearanceSave(next.accent, next.background);
   };
 
+  applyAppearance(currentAppearance.accent, currentAppearance.background, false);
   if (accentInput || accentTextInput || backgroundHidden || backgroundButtons.length) {
     syncAppearanceControls(currentAppearance.accent, currentAppearance.background);
-    applyAppearance(currentAppearance.accent, currentAppearance.background, false);
     setChromaAccentPreference(chromaAccentEnabled, chromaAccentSpeed, false, false);
 
     chromaToggle?.addEventListener('change', () => {
@@ -644,7 +653,8 @@ export function initAppearanceSettings({
           const applyUploaded = () => {
             if (customLayer && data.url) {
               customLayer.setAttribute('data-bg-url', data.url);
-              if (data.is_gif) customLayer.setAttribute('data-animated', 'true');
+              customLayer.setAttribute('data-bg-type', data.is_video ? 'video' : 'image');
+              if (data.is_gif || data.is_video) customLayer.setAttribute('data-animated', 'true');
               else customLayer.removeAttribute('data-animated');
               customLayer.classList.add('is-active');
             }
@@ -711,11 +721,21 @@ export function initAppearanceSettings({
         photo.className = 'custom-bg-thumb-photo';
         wrap.appendChild(photo);
 
-        const img = document.createElement('img');
-        img.src = item.url;
-        img.alt = '';
-        img.loading = 'lazy';
-        photo.appendChild(img);
+        if (item.is_video || /^video\//.test(item.mime || '')) {
+          const videoEl = document.createElement('video');
+          videoEl.src = item.url;
+          videoEl.muted = true;
+          videoEl.playsInline = true;
+          videoEl.preload = 'metadata';
+          videoEl.setAttribute('aria-hidden', 'true');
+          photo.appendChild(videoEl);
+        } else {
+          const img = document.createElement('img');
+          img.src = item.url;
+          img.alt = '';
+          img.loading = 'lazy';
+          photo.appendChild(img);
+        }
 
         const fileTypeLabel = (mime) => {
           const map = {
@@ -723,6 +743,8 @@ export function initAppearanceSettings({
             'image/png': 'PNG',
             'image/webp': 'WebP',
             'image/gif': 'GIF',
+            'video/webm': 'WebM',
+            'video/mp4': 'MP4',
           };
           return map[mime] || (mime ? String(mime).split('/').pop().toUpperCase() : '');
         };
@@ -746,7 +768,7 @@ export function initAppearanceSettings({
           const badge = document.createElement('span');
           badge.className = 'custom-bg-thumb-badge';
           badge.textContent = window._('Aktif');
-          label.appendChild(badge);
+          photo.appendChild(badge);
         }
         wrap.appendChild(label);
 
@@ -774,7 +796,8 @@ export function initAppearanceSettings({
             if (layer && actData.url) {
               const applyActivated = () => {
                 layer.setAttribute('data-bg-url', actData.url);
-                if (actData.is_gif) layer.setAttribute('data-animated', 'true');
+                layer.setAttribute('data-bg-type', actData.is_video ? 'video' : 'image');
+                if (actData.is_gif || actData.is_video) layer.setAttribute('data-animated', 'true');
                 else layer.removeAttribute('data-animated');
                 layer.classList.add('is-active');
                 updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
@@ -803,6 +826,7 @@ export function initAppearanceSettings({
           if (item.is_active) {
             if (layer) {
               layer.removeAttribute('data-bg-url');
+              layer.removeAttribute('data-bg-type');
               layer.removeAttribute('data-animated');
               layer.classList.remove('is-active');
             }
@@ -837,6 +861,7 @@ export function initAppearanceSettings({
           id: entry.id,
           url: entry.url,
           is_gif: entry.is_gif,
+          is_video: entry.is_video,
           is_active: entry.is_active,
           width: entry.width,
           height: entry.height,
@@ -856,6 +881,7 @@ export function initAppearanceSettings({
         const layer = document.getElementById('custom-bg-layer');
         if (layer) {
           layer.removeAttribute('data-bg-url');
+          layer.removeAttribute('data-bg-type');
           layer.removeAttribute('data-animated');
           layer.classList.remove('is-active');
         }
@@ -897,6 +923,7 @@ export function initAppearanceSettings({
     cardFrameToggle,
     cardDepthToggle,
     hardwareAccelerationToggle,
+    powerSaveToggle,
     updateAppearance,
     cancelPendingAppearanceSave,
   };
