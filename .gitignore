@@ -52,3 +52,7 @@ desktop.ini
 .idea/
 .opencode/
 opencode.json
+
+# Miscellaneous
+CHANGELOG.md
+NOTES.md
