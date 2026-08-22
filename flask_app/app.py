@@ -47,6 +47,7 @@ from kasa_core.constants import (
     DEFAULT_CARD_DEPTH_ENABLED,
     DEFAULT_CARD_FRAME_ENABLED,
     DEFAULT_CARD_SHEEN_ENABLED,
+    DEFAULT_VAULT_ACCENT_ENABLED,
     DEFAULT_CATEGORY,
     DEFAULT_CONTENT_PROTECTION_ENABLED,
     DEFAULT_GLASS_BLUR,
@@ -150,6 +151,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Strict',
     SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_NAME='__Host-session',
 )
 
 # ─── VERİ YOLU AYARLARI ───────────────────────────────────────────────────────
@@ -201,6 +203,7 @@ get_gradients_enabled = _appearance_settings.get_gradients_enabled
 get_card_sheen_enabled = _appearance_settings.get_card_sheen_enabled
 get_card_frame_enabled = _appearance_settings.get_card_frame_enabled
 get_card_depth_enabled = _appearance_settings.get_card_depth_enabled
+get_vault_accent_enabled = _appearance_settings.get_vault_accent_enabled
 get_hardware_acceleration_enabled = _appearance_settings.get_hardware_acceleration_enabled
 save_glass_effects = _appearance_settings.save_glass_effects
 save_theme = _appearance_settings.save_theme
@@ -219,6 +222,7 @@ save_gradients = _appearance_settings.save_gradients
 save_card_sheen = _appearance_settings.save_card_sheen
 save_card_frame = _appearance_settings.save_card_frame
 save_card_depth = _appearance_settings.save_card_depth
+save_vault_accent = _appearance_settings.save_vault_accent
 save_hardware_acceleration = _appearance_settings.save_hardware_acceleration
 get_power_save_enabled = _appearance_settings.get_power_save_enabled
 save_power_save = _appearance_settings.save_power_save
@@ -255,6 +259,11 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    try:
+        db.session.execute(db.text("ALTER TABLE records ADD COLUMN card_holder TEXT"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     if os.environ.get('KASA_RESET_LAN_ON_START') == '1':
         try:
             lan_setting = Setting.query.filter_by(key='lan_enabled').first()
@@ -270,7 +279,7 @@ with app.app_context():
 
 # ─── HEARTBEAT ────────────────────────────────────────────────────────────────
 
-HEARTBEAT_TIMEOUT_SECONDS = 120
+HEARTBEAT_TIMEOUT_SECONDS = 600
 _last_heartbeat = time.time()
 
 def _check_heartbeat():
@@ -291,19 +300,24 @@ threading.Thread(target=_check_heartbeat, daemon=True).start()
 
 _vault_keys: dict[str, bytes] = {}
 _vault_keys_lock = threading.Lock()
+_VAULT_KEY_TTL = 60 * 60  # session.permanent_session_lifetime ile eşleşir
 
-def _set_vault_key(master_password: str):
+def _set_vault_key_bytes(vault_key: bytes):
+    """Oturuma kasa şifreleme anahtarını bağlar (master'dan türetilmiş ya da LAN sarmalından)."""
     old_sid = session.pop('vault_session_id', None)
     session.pop('master_password', None)
     new_sid = uuid.uuid4().hex
-    key = derive_key(master_password)
+    now = time.time()
     with _vault_keys_lock:
         if old_sid:
             _vault_keys.pop(old_sid, None)
-        _vault_keys[new_sid] = key
+        _vault_keys[new_sid] = (vault_key, now)
     if old_sid:
         _remove_vault_report_cache(old_sid)
     session['vault_session_id'] = new_sid
+
+def _set_vault_key(master_password: str):
+    _set_vault_key_bytes(derive_key(master_password))
 
 def _clear_vault_password():
     sid = session.pop('vault_session_id', None)
@@ -317,8 +331,26 @@ def _get_vault_key() -> bytes | None:
     sid = session.get('vault_session_id')
     if sid:
         with _vault_keys_lock:
-            return _vault_keys.get(sid)
+            entry = _vault_keys.get(sid)
+            if entry is not None:
+                if time.time() - entry[1] > _VAULT_KEY_TTL:
+                    _vault_keys.pop(sid, None)
+                    return None
+                return entry[0]
     return None
+
+def _cleanup_vault_keys() -> None:
+    """Süresi dolmuş kasa anahtarlarını temizler; arka plan daemon thread'i çağırır."""
+    while True:
+        time.sleep(300)
+        now = time.time()
+        with _vault_keys_lock:
+            expired = [k for k, v in _vault_keys.items() if now - v[1] > _VAULT_KEY_TTL]
+            for k in expired:
+                _vault_keys.pop(k, None)
+        _vault_keys_lock  # noqa: ensure lock released
+
+threading.Thread(target=_cleanup_vault_keys, daemon=True).start()
 
 # ─── KRİPTOGRAFİ ──────────────────────────────────────────────────────────────
 
@@ -541,6 +573,7 @@ def inject_globals():
     card_sheen_enabled = DEFAULT_CARD_SHEEN_ENABLED
     card_frame_enabled = DEFAULT_CARD_FRAME_ENABLED
     card_depth_enabled = DEFAULT_CARD_DEPTH_ENABLED
+    vault_accent_enabled = DEFAULT_VAULT_ACCENT_ENABLED
     hardware_acceleration = DEFAULT_HARDWARE_ACCELERATION_ENABLED
     power_save_enabled = DEFAULT_POWER_SAVE_ENABLED
     lan_enabled        = False
@@ -567,6 +600,7 @@ def inject_globals():
         card_sheen_enabled = get_card_sheen_enabled()
         card_frame_enabled = get_card_frame_enabled()
         card_depth_enabled = get_card_depth_enabled()
+        vault_accent_enabled = get_vault_accent_enabled()
         hardware_acceleration = get_hardware_acceleration_enabled()
         power_save_enabled = get_power_save_enabled()
         le           = _get_setting('lan_enabled')
@@ -607,6 +641,7 @@ def inject_globals():
         'CARD_SHEEN_ENABLED':    card_sheen_enabled,
         'CARD_FRAME_ENABLED':    card_frame_enabled,
         'CARD_DEPTH_ENABLED':    card_depth_enabled,
+        'VAULT_ACCENT_ENABLED':  vault_accent_enabled,
         'HARDWARE_ACCELERATION_ENABLED': hardware_acceleration,
         'POWER_SAVE_ENABLED': power_save_enabled,
         'LAN_ENABLED':           lan_enabled,
@@ -622,9 +657,7 @@ def inject_globals():
 
 _PUBLIC_ENDPOINTS = {'login', 'static', 'loading_page', 'manifest_json', 'sw',
                      'settings_language'}
-_TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'settings_tray', 'lan_info',
-                    'settings_runtime', 'settings_content_protection',
-                    'settings_hardware_acceleration'}
+_TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'lan_info', 'settings_runtime', 'settings_tray'}
 
 def _is_local_request() -> bool:
     remote = request.remote_addr or '127.0.0.1'
@@ -639,17 +672,147 @@ def _lan_access_enabled() -> bool:
     except Exception:
         return False
 
+# ─── LAN ERİŞİM ŞİFRESİ ───────────────────────────────────────────────────────
+# LAN üzerinden girişte ana şifre ağa gönderilmez; uygulamanın ürettiği ayrı,
+# rastgele bir "LAN erişim şifresi" kullanılır. Kasa anahtarı bu şifreyle
+# sarılmış (wrap) halde veritabanında saklanır; böylece LAN istemcileri ana
+# şifreyi bilmeden kasayı açabilir. LAN şifresinin düz metni hiçbir zaman diskte
+# saklanmaz: kullanıcıya gösterim için yalnızca kasa anahtarıyla şifrelenmiş
+# kopyası (lan_access_secret) tutulur ve yerel oturumdayken çözülür.
+LAN_ACCESS_HASH_SETTING   = 'lan_access_hash'
+LAN_ACCESS_SECRET_SETTING = 'lan_access_secret'
+LAN_VAULT_WRAP_SETTING    = 'lan_vault_wrap'
+LAN_PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'  # 0/o/1/i/l karışıklığı önlenir
+LAN_PASSWORD_LENGTH  = 10
+
+def _generate_lan_access_password() -> str:
+    """Telefonda kolay yazılabilir, ~50 bit entropili rastgele LAN şifresi."""
+    return ''.join(secrets.choice(LAN_PASSWORD_ALPHABET)
+                   for _ in range(LAN_PASSWORD_LENGTH))
+
+def _lan_wrap_key(lan_password: str, salt: bytes) -> bytes:
+    """LAN şifresinden türetilen kasa-anahtari sarma anahtarı."""
+    return _derive_key_with_salt(lan_password, salt)
+
+def _build_lan_vault_wrap(lan_password: str, vault_key: bytes) -> str:
+    """Kasa anahtarını LAN şifresiyle sarar; 'salt_b64:token' biçiminde döner."""
+    salt_b64 = _new_salt_b64()
+    wrap_key = _lan_wrap_key(lan_password, base64.b64decode(salt_b64))
+    token = Fernet(wrap_key).encrypt(vault_key).decode()
+    return f'{salt_b64}:{token}'
+
+def _unwrap_lan_vault_key(lan_password: str) -> bytes | None:
+    """LAN şifresiyle sarılmış kasa anahtarını açar."""
+    wrap = _get_setting(LAN_VAULT_WRAP_SETTING)
+    if not wrap:
+        return None
+    try:
+        salt_b64, _, token = wrap.partition(':')
+        wrap_key = _lan_wrap_key(lan_password, base64.b64decode(salt_b64))
+        return Fernet(wrap_key).decrypt(token.encode())
+    except Exception:
+        log.warning('LAN kasa anahtari cozulemedi.', exc_info=True)
+        return None
+
+def _set_lan_access_secret(vault_key: bytes, lan_password: str) -> None:
+    """LAN şifresinin düz metnini kasa anahtarıyla şifreleyip saklar."""
+    _set_setting(LAN_ACCESS_SECRET_SETTING,
+                 Fernet(vault_key).encrypt(lan_password.encode()).decode())
+
+def _get_lan_access_password(vault_key: bytes | None) -> str | None:
+    """Yerel oturum (kasa anahtarı bellekteyken) LAN şifresini çözer."""
+    secret = _get_setting(LAN_ACCESS_SECRET_SETTING)
+    if not secret or not vault_key:
+        return None
+    try:
+        return Fernet(vault_key).decrypt(secret.encode()).decode()
+    except Exception:
+        log.warning('LAN erisim sifresi cozulemedi.', exc_info=True)
+        return None
+
+def _ensure_lan_access_setup() -> tuple[str | None, bool]:
+    """LAN şifresi + kasa anahtarı sarmalını eksikse oluşturur.
+
+    Dönüş: (düz metin LAN şifresi, yeni üretildi mi). Kasa anahtarı bellekte
+    değilse (yerel oturum yoksa) hiçbir şey yapmaz ve (None, False) döner.
+    """
+    vault_key = _get_vault_key()
+    if not vault_key:
+        return None, False
+    if _get_setting(LAN_ACCESS_HASH_SETTING):
+        if not _get_setting(LAN_VAULT_WRAP_SETTING):
+            lan_password = _get_lan_access_password(vault_key)
+            if lan_password:
+                _set_setting(LAN_VAULT_WRAP_SETTING,
+                             _build_lan_vault_wrap(lan_password, vault_key))
+        return _get_lan_access_password(vault_key), False
+    lan_password = _generate_lan_access_password()
+    _set_setting(LAN_ACCESS_HASH_SETTING, hash_master_password(lan_password))
+    _set_lan_access_secret(vault_key, lan_password)
+    _set_setting(LAN_VAULT_WRAP_SETTING,
+                 _build_lan_vault_wrap(lan_password, vault_key))
+    return lan_password, True
+
+def _clear_lan_access_settings() -> None:
+    """LAN kapandığında şifre/sarmal kayıtlarını siler (sonraki açılışta yeni şifre)."""
+    for key in (LAN_ACCESS_HASH_SETTING, LAN_ACCESS_SECRET_SETTING,
+                LAN_VAULT_WRAP_SETTING):
+        Setting.query.filter_by(key=key).delete()
+
+def _refresh_lan_access_bindings(old_key: bytes, new_key: bytes) -> None:
+    """Ana şifre değişince LAN şifresiyle kasa anahtarı bağlarını yeniler."""
+    if not _get_setting(LAN_ACCESS_HASH_SETTING):
+        return
+    try:
+        lan_password = _get_lan_access_password(old_key)
+        if not lan_password:
+            log.warning('LAN erisim sifresi ana sifre degisimi sirasinda cozulemedi.')
+            return
+        _set_lan_access_secret(new_key, lan_password)
+        _set_setting(LAN_VAULT_WRAP_SETTING,
+                     _build_lan_vault_wrap(lan_password, new_key))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        log.exception('LAN erisim sarmallari yenilenemedi.')
+
 _login_attempts: dict[str, dict[str, float | int]] = {}
 _login_attempts_lock = threading.Lock()
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_BASE_SECONDS = 30
 LOGIN_LOCK_MAX_SECONDS = 30 * 60
+LOGIN_LOCKOUT_FILE = os.path.join(DATA_DIR, 'login_lockout.json')
 
 def _login_attempt_key() -> str:
     # LAN açıkken aynı ağdaki istemciler için IP bazlı brute-force limiti uygular.
     if _lan_access_enabled():
         return request.remote_addr or 'unknown'
     return 'local'
+
+def _save_login_lockout() -> None:
+    now = time.time()
+    expired = [k for k, v in _login_attempts.items()
+               if now - float(v.get('locked_until', 0)) > LOGIN_LOCK_MAX_SECONDS and int(v.get('failures', 0)) >= LOGIN_LOCK_THRESHOLD]
+    for k in expired:
+        _login_attempts.pop(k, None)
+    try:
+        with open(LOGIN_LOCKOUT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(_login_attempts, f)
+    except OSError:
+        pass
+
+def _load_login_lockout() -> None:
+    if not os.path.isfile(LOGIN_LOCKOUT_FILE):
+        return
+    try:
+        with open(LOGIN_LOCKOUT_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            _login_attempts.update(data)
+    except (OSError, json.JSONDecodeError):
+        pass
+
+_load_login_lockout()
 
 def _login_retry_after(key: str) -> int:
     with _login_attempts_lock:
@@ -674,11 +837,13 @@ def _record_login_failure(key: str) -> int:
         wait_seconds = _login_backoff_seconds(failures)
         if wait_seconds:
             state['locked_until'] = max(float(state.get('locked_until', 0)), time.time() + wait_seconds)
+        _save_login_lockout()
         return int(max(0, float(state.get('locked_until', 0)) - time.time()))
 
 def _reset_login_failures(key: str) -> None:
     with _login_attempts_lock:
         _login_attempts.pop(key, None)
+        _save_login_lockout()
 
 _LOGIN_LOCKED_TEMPLATE = "Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin."
 
@@ -795,18 +960,14 @@ def check_token_and_auth():
         abort(403)
 
     # Oturum çereziyle kimlik doğrulanan durum değiştiren isteklerde CSRF belirteci zorunludur.
-    # Yerel ana süreç istekleri X-App-Token imzasıyla geldiği için belirteç zaten kabul edilir;
-    # burada CSRF yalnızca herkese açık uçlar ve LAN üzerinden gelen oturum istekleri için kritiktir.
+    # X-App-Token yalnızca stateless API uçları için enjekte edilir; state-changing
+    # istekler X-CSRF-Token ile korunur. Token taşıyan istekler CSRF'den muaftır.
     if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
-        will_proceed = (
-            token == APP_TOKEN
-            or endpoint in _PUBLIC_ENDPOINTS
-            or (not _is_local_request() and current_user.is_authenticated)
-        )
-        if will_proceed and not _csrf_authorized():
-            return jsonify({
-                'error': _('Güvenlik doğrulaması başarısız. Lütfen sayfayı yenileyip tekrar deneyin.'),
-            }), 400
+        if token == APP_TOKEN or current_user.is_authenticated:
+            if not _csrf_authorized():
+                return jsonify({
+                    'error': _('Güvenlik doğrulaması başarısız. Lütfen sayfayı yenileyip tekrar deneyin.'),
+                }), 400
     g.csrf_token = _get_csrf_token()
 
     # Re-encrypt sürerken eski anahtarla yeni veri yazılmasını engeller.
@@ -836,6 +997,10 @@ def check_token_and_auth():
     if not is_local and lan_enabled:
         if not current_user.is_authenticated:
             return redirect(url_for('login'))
+        return
+
+    # Yerel oturum açmış istemciler token olmadan da erişebilir (CSRF koruması yukarıda zaten uygulandı).
+    if is_local and current_user.is_authenticated:
         return
 
     abort(403)
@@ -910,7 +1075,8 @@ def loading_page():
 @app.route('/heartbeat', methods=['POST'])
 def heartbeat():
     if request.headers.get('X-App-Token') != APP_TOKEN:
-        abort(403)
+        if not current_user.is_authenticated or not _is_local_request():
+            abort(403)
     global _last_heartbeat
     _last_heartbeat = time.time()
     return jsonify({"status": "ok"})
@@ -939,8 +1105,10 @@ def logout():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     first_setup = _is_first_setup()
+    is_lan_client = not _is_local_request()
     if request.method != 'POST':
-        return render_template('login.html', first_setup=first_setup)
+        return render_template('login.html', first_setup=first_setup,
+                               is_lan_client=is_lan_client)
 
     attempt_key = _login_attempt_key()
     retry_after = _login_retry_after(attempt_key)
@@ -952,7 +1120,53 @@ def login():
 
     mp = request.form.get('master_password', '').strip()
     if not mp:
-        return render_template('login.html', error="Ana şifre boş olamaz.", first_setup=first_setup)
+        return render_template('login.html', error="Ana şifre boş olamaz.",
+                               first_setup=first_setup, is_lan_client=is_lan_client)
+
+    # LAN istemcileri ana şifreyle değil, ayrı üretilen LAN erişim şifresiyle girer.
+    if is_lan_client:
+        if _is_first_setup():
+            return render_template(
+                'login.html',
+                error="Kasa ilk olarak bu bilgisayardan kurulmalıdır.",
+                first_setup=True, is_lan_client=True,
+            ), 403
+
+        lan_hash = _get_setting(LAN_ACCESS_HASH_SETTING)
+        if not lan_hash or not verify_master_password(lan_hash, mp):
+            _clear_vault_password()
+            session.clear()
+            logout_user()
+            retry_after = _record_login_failure(attempt_key)
+            log.warning("Hatalı LAN erişim şifresi denemesi.")
+            if retry_after > 0:
+                return render_template(
+                    'login.html', error=_too_many_attempts_message(retry_after),
+                    retry_after=retry_after, first_setup=first_setup,
+                    is_lan_client=True,
+                ), 429
+            return render_template(
+                'login.html', error="Hatalı LAN erişim şifresi!",
+                first_setup=first_setup, is_lan_client=True,
+            ), 401
+
+        vault_key = _unwrap_lan_vault_key(mp)
+        if not vault_key:
+            _clear_vault_password()
+            session.clear()
+            logout_user()
+            log.error("LAN kasa anahtarı çözülemedi; LAN kurulumu yenilenmeli.")
+            return render_template(
+                'login.html',
+                error="LAN kasa anahtarı çözülemedi. Bilgisayarda LAN ayarını kapatıp tekrar açın.",
+                first_setup=first_setup, is_lan_client=True,
+            ), 500
+
+        _reset_login_failures(attempt_key)
+        session.permanent = True
+        _set_vault_key_bytes(vault_key)
+        login_user(User("admin"), remember=False)
+        return redirect(url_for('index'))
 
     setting = Setting.query.filter_by(key='master_hash').first()
 
@@ -1054,10 +1268,13 @@ def index():
         login_value = decrypt_metadata(fernet, r.login)
         email_value = decrypt_metadata(fernet, r.email)
         dec_comm = safe_decrypt(fernet, r.encrypted_comment)
+        card_holder_value = decrypt_metadata(fernet, r.card_holder)
 
         if r.type == 'CreditCard':
             detaylar = {k: v for k, v in [
-                ('Kart Numarası', login_value), ('CVV / Şifre', SECRET_PLACEHOLDER if r.encrypted_password else '')
+                ('Kart Üzerindeki İsim', card_holder_value),
+                ('Kart Numarası', login_value),
+                ('CVV / Şifre', SECRET_PLACEHOLDER if r.encrypted_password else '')
             ] if v}
         elif r.type == 'SecureNote':
             detaylar = {'Not': dec_comm} if dec_comm else {}
@@ -1079,6 +1296,7 @@ def index():
                 'title': title, 'website_url': website_url,
                 'login': login_value, 'email': email_value, 'is_pinned': r.is_pinned,
                 'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
+                'card_holder': card_holder_value,
             },
         })
 
@@ -1099,8 +1317,10 @@ def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str,
             fernet, normalize_text(request.form.get('login'), max_length=300)),
         email              = encrypt_metadata(
             fernet, normalize_text(request.form.get('email'), max_length=300)),
-        encrypted_password = safe_encrypt(fernet, request.form.get('password', '')),
-        encrypted_comment  = safe_encrypt(fernet, request.form.get('comment', '')),
+        encrypted_password = safe_encrypt(fernet, normalize_text(request.form.get('password', ''), max_length=10000)),
+        encrypted_comment  = safe_encrypt(fernet, normalize_text(request.form.get('comment', ''), max_length=10000)),
+        card_holder        = encrypt_metadata(
+            fernet, normalize_text(request.form.get('card_holder'), max_length=120)),
         expiry_date        = _parse_expiry(request.form.get('expiry_date', '')),
     )
 
@@ -1153,6 +1373,7 @@ def duzenle_sayfasi(kayit_id):
         'Email': decrypt_metadata(fernet, r.email),
         'Password': dec_pass, 'Comment': dec_comm,
         'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
+        'Card holder': decrypt_metadata(fernet, r.card_holder),
     }
     return render_template('ekle.html', title="Kaydı Düzenle",
                            kayit={'id': kayit_id, 'full_data': mapped_data})
@@ -1278,12 +1499,26 @@ def save_settings():
         'true' if request.form.get('card_frame_enabled') else 'false')
     save_card_depth(
         'true' if request.form.get('card_depth_enabled') else 'false')
+    save_vault_accent(
+        'true' if request.form.get('vault_accent_enabled') else 'false')
     save_hardware_acceleration(
         'true' if request.form.get('hardware_acceleration_enabled') else 'false')
     save_power_save(
         'true' if request.form.get('power_save_enabled') else 'false')
-    _set_setting('lan_enabled',
-                 'true' if request.form.get('lan_enabled') else 'false')
+    lan_now_enabled = bool(request.form.get('lan_enabled'))
+    lan_was_enabled = _lan_access_enabled()
+    if lan_now_enabled and not lan_was_enabled:
+        # LAN yeni açılıyor: eski şifreyi sıfırlayıp yeni LAN erişim şifresi üret.
+        _clear_lan_access_settings()
+        lan_password, generated = _ensure_lan_access_setup()
+        if not lan_password and not generated:
+            log.warning("LAN erişim şifresi oluşturulamadı; oturum anahtarı bulunamadı.")
+    elif lan_now_enabled:
+        # Zaten açık: eksik parça (örn. anahtar sarmalı) varsa tamamla.
+        _ensure_lan_access_setup()
+    elif lan_was_enabled:
+        _clear_lan_access_settings()
+    _set_setting('lan_enabled', 'true' if lan_now_enabled else 'false')
     db.session.commit()
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
@@ -1302,9 +1537,11 @@ def save_settings():
             "card_sheen_enabled": get_card_sheen_enabled(),
             "card_frame_enabled": get_card_frame_enabled(),
             "card_depth_enabled": get_card_depth_enabled(),
+            "vault_accent_enabled": get_vault_accent_enabled(),
             "hardware_acceleration_enabled": get_hardware_acceleration_enabled(),
             "power_save_enabled": get_power_save_enabled(),
             "lan_enabled": _lan_access_enabled(),
+            "restart_required": lan_now_enabled != lan_was_enabled,
         })
     return redirect(url_for('index'))
 
@@ -1492,12 +1729,20 @@ def lan_info():
                     ips.append(addr)
         except Exception:
             pass
-    return jsonify({
+    payload = {
         'hostname': socket.gethostname(),
         'ips': sorted(set(ips)),
         'port': safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535),
         'ssl': os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE),
-    })
+    }
+    if _lan_access_enabled():
+        payload['lan_access_configured'] = bool(_get_setting(LAN_ACCESS_HASH_SETTING))
+        # Düz metin LAN şifresi yalnızca kasa anahtarı bellekteyken (yerel oturum)
+        # çözülür; ana şifre bu yanıtta asla yer almaz.
+        lan_password = _get_lan_access_password(_get_vault_key())
+        if lan_password:
+            payload['lan_password'] = lan_password
+    return jsonify(payload)
 
 @app.route('/settings/theme-mode', methods=['GET', 'POST'])
 @login_required
@@ -1581,6 +1826,11 @@ def settings_appearance():
             if 'card_depth_enabled' in data
             else get_card_depth_enabled()
         )
+        vault_accent = (
+            save_vault_accent(data.get('vault_accent_enabled'))
+            if 'vault_accent_enabled' in data
+            else get_vault_accent_enabled()
+        )
         power_save = (
             save_power_save(data.get('power_save_enabled'))
             if 'power_save_enabled' in data
@@ -1602,6 +1852,7 @@ def settings_appearance():
             "card_sheen_enabled": card_sheen,
             "card_frame_enabled": card_frame,
             "card_depth_enabled": card_depth,
+            "vault_accent_enabled": vault_accent,
             "power_save_enabled": power_save,
         })
     return jsonify({
@@ -1619,6 +1870,7 @@ def settings_appearance():
         "card_sheen_enabled": get_card_sheen_enabled(),
         "card_frame_enabled": get_card_frame_enabled(),
         "card_depth_enabled": get_card_depth_enabled(),
+        "vault_accent_enabled": get_vault_accent_enabled(),
         "power_save_enabled": get_power_save_enabled(),
     })
 
@@ -2224,7 +2476,9 @@ def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str,
             if vault_sid:
                 with _vault_keys_lock:
                     if vault_sid in _vault_keys:
-                        _vault_keys[vault_sid] = new_key
+                        _vault_keys[vault_sid] = (new_key, time.time())
+            # Ana şifre değişince LAN şifresiyle kasa anahtarı sarmalını da yenile.
+            _refresh_lan_access_bindings(old_key, new_key)
             log.info("Ana ?ifre ba?ar?yla de?i?tirildi.")
             with _reencrypt_lock:
                 _reencrypt_state[task_id] = {'progress': 100, 'total': total, 'done': True}
@@ -2434,6 +2688,7 @@ if __name__ == '__main__':
         _server.safe_start()
     except ImportError:
         # cheroot yuklu degilse Werkzeug gelistirme sunucusuna geri don
+        ssl_ctx = (CERT_FILE, KEY_FILE) if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE) else None
         app.run(host=flask_host, port=flask_port, ssl_context=ssl_ctx, threaded=True)
 
 

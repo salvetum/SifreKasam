@@ -131,6 +131,7 @@ export function initAppearanceSettings({
   const cardSheenToggle = document.getElementById('card-sheen-toggle');
   const cardFrameToggle = document.getElementById('card-frame-toggle');
   const cardDepthToggle = document.getElementById('card-depth-toggle');
+  const vaultAccentToggle = document.getElementById('vault-accent-toggle');
   const hardwareAccelerationToggle = document.getElementById('hardware-acceleration-toggle');
   const powerSaveToggle = document.getElementById('power-save-toggle');
 
@@ -180,6 +181,12 @@ export function initAppearanceSettings({
     'card_depth_enabled'
   );
   setupThemeFeatureToggle(
+    vaultAccentToggle,
+    'data-kasa-vault-accent',
+    'kasa-vault-accent',
+    'vault_accent_enabled'
+  );
+  setupThemeFeatureToggle(
     powerSaveToggle,
     'data-kasa-power-save',
     'kasa-power-save',
@@ -208,6 +215,7 @@ export function initAppearanceSettings({
   const accentColorScrim = document.getElementById('accent-color-scrim');
   const accentColorClose = document.getElementById('accent-color-close');
   const accentColorReset = document.getElementById('accent-color-reset');
+  const accentColorRandom = document.getElementById('accent-color-random');
   const accentColorTriggerValue = document.getElementById('accent-color-trigger-value');
   const accentColorPickerValue = document.getElementById('accent-color-picker-value');
   const accentColorRgb = document.getElementById('accent-color-rgb');
@@ -430,6 +438,12 @@ export function initAppearanceSettings({
       btn.classList.toggle('is-active', isActive);
       btn.setAttribute('aria-pressed', String(isActive));
     });
+    if (motionToggle) {
+      const lockMotion = background === 'custom';
+      motionToggle.disabled = lockMotion;
+      const motionCard = motionToggle.closest('.settings-card-toggle');
+      if (motionCard) motionCard.classList.toggle('is-bg-locked', lockMotion);
+    }
   };
 
   let appearanceSavePromise = null;
@@ -448,6 +462,7 @@ export function initAppearanceSettings({
         card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
         card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
         card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
+        vault_accent_enabled: vaultAccentToggle?.checked ?? themeFeatureEnabled('data-kasa-vault-accent'),
         power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
       }).finally(() => { appearanceSavePromise = null; });
     }, 250);
@@ -469,6 +484,7 @@ export function initAppearanceSettings({
       card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
       card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
       card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
+      vault_accent_enabled: vaultAccentToggle?.checked ?? themeFeatureEnabled('data-kasa-vault-accent'),
       power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
     }).finally(() => { appearanceSavePromise = null; });
     return appearanceSavePromise;
@@ -572,6 +588,15 @@ export function initAppearanceSettings({
         getCurrentBackground()
       );
     });
+    accentColorRandom?.addEventListener('click', () => {
+      const hue = Math.floor(Math.random() * 360);
+      const saturation = 65 + Math.floor(Math.random() * 25);
+      const brightness = 55 + Math.floor(Math.random() * 30);
+      updateAppearance(
+        hsvToHex(hue, saturation, brightness),
+        getCurrentBackground()
+      );
+    });
     [accentHueInput, accentSaturationInput, accentBrightnessInput].forEach(input => {
       input?.addEventListener('input', () => {
         colorPickerState = {
@@ -613,14 +638,15 @@ export function initAppearanceSettings({
     });
     backgroundButtons.forEach(btn => {
       if (btn.id === 'custom-bg-btn') return;
-      btn.addEventListener('click', () =>
+      btn.addEventListener('click', () => {
         updateAppearance(
           accentInput?.value || currentAppearance.accent,
           btn.dataset.backgroundOption,
           true,
           true
-        )
-      );
+        );
+        refreshCustomBgGallery();
+      });
     });
 
     // ── Özel Arka Plan Yükleme ──
@@ -634,13 +660,12 @@ export function initAppearanceSettings({
         const formData = new FormData();
         formData.append('file', file);
         customBgBtn.disabled = true;
-        showToast({
-          ...TOAST_BASE,
-          text: '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> ' + window._('Yükleniyor...'),
-          escapeHTML: false,
-          duration: 30000,
-          className: 'kasa-toast kasa-toast-info',
-        });
+  showToast({
+    ...TOAST_BASE,
+    text: window._('Yükleniyor...'),
+    duration: 30000,
+    className: 'kasa-toast kasa-toast-info',
+  });
         try {
           const resp = await apiFetch('/api/background/upload', { method: 'POST', body: formData });
           if (!resp || !resp.ok) {
@@ -688,17 +713,17 @@ export function initAppearanceSettings({
       if (!customBgGallery || !customBgGalleryGrid) return;
       const resp = await apiFetch('/api/background/history');
       if (!resp?.ok) {
-        customBgGallery.classList.add('hidden');
+        customBgGallery.classList.remove('is-visible');
         return;
       }
       const data = await resp.json();
       const entries = Array.isArray(data.entries) ? data.entries : [];
 
       if (entries.length === 0) {
-        customBgGallery.classList.add('hidden');
+        customBgGallery.classList.remove('is-visible');
         return;
       }
-      customBgGallery.classList.remove('hidden');
+      customBgGallery.classList.add('is-visible');
       customBgGalleryGrid.replaceChildren();
 
       const formatBytes = (bytes) => {
@@ -765,9 +790,10 @@ export function initAppearanceSettings({
         }
 
         if (item.is_active) {
+          const isCustomMode = document.documentElement.getAttribute('data-kasa-background') === 'custom';
           const badge = document.createElement('span');
-          badge.className = 'custom-bg-thumb-badge';
-          badge.textContent = window._('Aktif');
+          badge.className = 'custom-bg-thumb-badge' + (isCustomMode ? '' : ' custom-bg-thumb-badge-saved');
+          badge.textContent = isCustomMode ? window._('Aktif') : window._('Kayıtlı');
           photo.appendChild(badge);
         }
         wrap.appendChild(label);
@@ -922,6 +948,7 @@ export function initAppearanceSettings({
     cardSheenToggle,
     cardFrameToggle,
     cardDepthToggle,
+    vaultAccentToggle,
     hardwareAccelerationToggle,
     powerSaveToggle,
     updateAppearance,

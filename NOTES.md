@@ -34,6 +34,40 @@ Analiz salt-inceleme olarak yapıldı, hiçbir kod değişikliği uygulanmadı. 
 - `CUSTOM_BACKGROUND_MAX_DIM` (2560, optimize küçültme) vs `CUSTOM_BACKGROUND_MAX_DIMENSION` (8192, kabul sınırı): ikisi de kullanılıyor, çakışma değil.
 - `security_lint.py` JS dosya listesi `static/*.js` ile eksiksiz eşleşiyor; `liquid-glass.js` ve vendor dosyaları (toastify/sweetalert) kasıtlı olarak listede yok.
 
+## Çift Render (Glass Flash) Kök Analizi — 19 Ağu 2026
+
+Vault kartlarında cam buğu (backdrop-filter) "çift render" sorunu analiz edildi. Vault kartları, glass sistemindeki **tek** iki katmanlı (wrapper + shell) elemandır.
+
+### Kök Nedenler
+
+**A) Wrapper/Shell Opacity Desenkronizasyonu:**
+- Wrapper (`.card-wrapper`) `card-animated` CSS animasyonuyla T=0'da fadeUp'a başlar (240ms).
+- Shell (`.vault-card-shell.glass`) `html:not(.glass-ready) { opacity: 0 !important }` ile T=30-60ms'e kadar görünmez.
+- Sonuç: wrapper dolmuşken shell hâlâ geçişte → son %16'da "pop" (T=240→310ms).
+
+**B) Gölge-Önce-Glass Safhası:**
+- İlk 30-60ms'de wrapper box-shadow'u görünür ama shell görünmez → "yüzen gölge" artefaktı.
+
+### Diğer Glass Elemanlarından Farkı
+
+| Özellik | Vault Kartları | Diğer Glass Elemanlar |
+|---------|---------------|----------------------|
+| Wrapper + Shell iki katman | Evet | Hayır (tek element) |
+| `card-animated` CSS animasyonu | Evet | Hayır |
+| `html:not(.glass-ready)` opacity gate | Evet | Hayır |
+| JS tier blur (CSS'ten farklı) | Evet | CSS blur yeterli |
+
+### Çözüm Yönleri Karşılaştırması
+
+| | Görünüm | Performans | Uygulama | Risk |
+|--|---------|-----------|----------|------|
+| 1. Wrapper gecikme (glass-ready'den sonra fadeUp) | ★★★★★ | ★★★★★ | Kolay (3 satır JS) | Sıfır |
+| 2. Shell kaldır (glass'ı wrapper'a taşı) | ★★★★ | ★★☆ | Orta | Yüksek (compositing artifact) |
+| 3. Gate kaldır (CSS blur = JS blur) | ★★★ | ★★★★ | Zor (tier eşleşme) | Orta |
+| 4. Wrapper+shell senkronize başlat | ★★★★ | ★★★ | Orta | Düşük |
+
+**Seçim: Seçenek 1** — Wrapper `card-animated` animasyonu `glass-ready` event'inden sonra başlatılacak. En iyi görünüm + en iyi performans + sıfır risk.
+
 ## main.js Modülerleştirme Analizi — 16 Ağu 2026
 
 Kök dizindeki `main.js` (1637 satır, ~62 KB) Electron ana süreci; `package.json` "main" girişi. Analiz salt-inceleme, uygulanmadı.
@@ -53,3 +87,23 @@ Kök dizindeki `main.js` (1637 satır, ~62 KB) Electron ana süreci; `package.js
 
 ### Not
 - Uygulama kararı kullanıcıya bırakıldı; onay verilirse `package.json` "main" ve yukarıdaki risklerle birlikte ele alınacak.
+
+## Güvenlik Denetimi — 17 Ağu 2026
+
+Kapsamlı tarama (backend + Electron + şablonlar + statik JS, `security_lint` GEÇTİ, `sifreler.db`/`build/` git dışı doğrulandı). Default (LAN kapalı) yapılandırmada uzaktan istismar edilebilir kritik açık bulunamadı. Bulgular üç seviyede:
+
+### 🔴 Ciddi
+1. **LAN modunda ana şifre self-signed TLS üzerinden ağda taşınıyor (TOFU/MITM).** Sertifika parmak izi pin'i yok; ilk bağlantıyı kesen aynı LAN'daki saldırgan kendi sertifikasını sunup master şifreyi yakalayabilir → tüm kasa offline ele geçirilebilir. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): ayrı rastgele "LAN erişim şifresi"; master şifre ağa gönderilmiyor; kasa anahtarı `lan_vault_wrap` ile sarmalı; LAN kapatılınca temizlenir, açılınca döner; ana şifre değişince sarmal yenilenir; LAN'dan ilk kurulum engelli. Testler: `LanAccessPasswordTests` (7 test) + 110 test + security_lint geçti.
+2. **`certificate-error` auto-accept + heuristic → yerel süreç kimliğe bürünebilir.** Electron, CN=ŞifreKasam + self-signed + SAN localhost görünümlü her sertifikayı port kontrolü olmadan otomatik kabul ediyor. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): pin eşleşmesi DER-normalizasyonu ile düzeltildi (PEM/DER karşılaştırma hatası giderildi); heuristic yalnızca pin eşleşmediğinde fallback olarak kullanılıyor (sertifika yeniden üretilmişse otomatik kabul + pin güncelleme); bilinmeyen sertifikalarda diyalog gösteriliyor.
+
+### 🟡 Orta
+3. **X-App-Token'e tam güven (CSRF bay-pass) + tüm renderer isteklerine otomatik enjeksiyon.** Herhangi bir XSS tüm backend'i bay-pass eder. Vendored JS (swal2/toastify) CSP `'self'` kapsamında → tek başarı noktası. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): token enjeksiyonu yalnızca stateless API uçlarına (`_TOKEN_INJECT_PATHS`) daraltıldı; state-changing istekler `X-CSRF-Token` ile korunuyor; middleware tüm kimlik doğrulanmış isteklerde CSRF kontrolü yapıyor; local oturum açmış istemciler token olmadan erişebilir (CSRF yukarıda uygulandı).
+4. **`getPinnedHttpsOptions` → pin yokken `rejectUnauthorized:false`.** **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): pin yokken `checkServerIdentity` ile yalnızca localhost hostname'e izin veriliyor.
+5. **LAN oturumlarında CSRF bypass (`_TOKEN_ENDPOINTS`).** `/settings/tray`, `/settings/content-protection`, `/settings/hardware-acceleration` token'sız geçer. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): state-changing uçlar `_TOKEN_ENDPOINTS`'ten çıkarıldı; `_TOKEN_INJECT_PATHS` güncellendi; `apiFetch` zaten `X-CSRF-Token` gönderiyor.
+6. **Login kilit: per-IP + in-memory** (IP rotasyonu/NAT DoS; restart'ta sıfırlanır). **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): lockout durumu `login_lockout.json`'a perziste ediliyor; restart'ta korunuyor. Per-IP sınırlaması masaüstü uygulama için yeterli (CİDDİ-1 LAN şifresi ayrı; NAT/rotasyon yalnızca LAN erişiminde anlamlı).
+
+### 🟢 Önemsiz
+7. Session cookie `__Host-` prefix yok; HSTS yok. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): `SESSION_COOKIE_NAME='__Host-session'` eklendi. HSTS gerekli değil (masaüstü uygulama, self-signed localhost). 8. `execSync('net session')` PATH üzerinden çözülüyor. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): tam yol `System32\net.exe` kullanılıyor. 9. Windows'ta `chmod 0o700` no-op (ACL önerisi). **Durum: kabul** (veri dizini APPDATA altında, OS düzeyinde korumalı; ACL eklemek karmaşıklık getirir). 10. `_vault_keys` session expire'da temizlenmiyor. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): TTL tabanlı (60dk) periyodik daemon thread + `_get_vault_key`'de lazy temizlik. 11. Explicit `sandbox:true` yok (default true). **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): `sandbox: true` eklendi. 12. `_record_from_form` şifre alanı max_length'sız; `_login_attempts` LAN'da büyüyebilir. **Durum: ÇÖZÜLDÜ** (17 Ağu 2026): password/comment `max_length=10000` eklendi; `_save_login_lockout` süresi dolmuş girişleri temizliyor.
+
+### Güçlü yönler (doğrulandı)
+CSP nonce'lı + `unsafe-inline` yok + `frame-ancestors 'none'`; session HTTPOnly+Secure+SameSite=Strict+60dk+per-run secret; Fernet + 600k PBKDF2; upload magic-byte+uuid+rate limit+SVG yasak; import 5000+64MB; SQL parametrize; şablon autoescape+tojson; DOM createElement/textContent; normalize_url http/https whitelist; nodeIntegration:false + contextIsolation:true; `/shutdown`/`/heartbeat` token+local zorunlu; `save_settings` CSRF token'lı (muaf değil).

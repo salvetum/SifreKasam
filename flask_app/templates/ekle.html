@@ -72,6 +72,45 @@
                 </div>
             </div>
 
+            <div class="vault-field" id="card_holder_group" hidden>
+                <label for="card_holder">{{ _('Kart Üzerindeki İsim') }}</label>
+                <input type="text" name="card_holder" id="card_holder" placeholder="ADI SOYADI"
+                    value="{{ kayit.full_data['Card holder'] if kayit and kayit.full_data.get('Card holder') }}"
+                    class="kasa-field" maxlength="120" autocomplete="off">
+            </div>
+
+            <div class="vault-field" id="card-expiry-group" hidden>
+                <label>{{ _('Son Kullanma (Ay / Yıl)') }}</label>
+                <div class="vault-form-row vault-form-row-two">
+                    <div class="vault-field">
+                        <label for="expiry_ay">{{ _('Ay') }}</label>
+                        <div class="settings-number-stepper" data-number-stepper>
+                            <input type="number" id="expiry_ay" min="1" max="12" inputmode="numeric"
+                                placeholder="AA" class="kasa-field settings-timeout-input" autocomplete="off">
+                            <button type="button" data-step-direction="up" aria-label="{{ _('Artır') }}">
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                            <button type="button" data-step-direction="down" aria-label="{{ _('Azalt') }}">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="vault-field">
+                        <label for="expiry_yil">{{ _('Yıl') }}</label>
+                        <div class="settings-number-stepper" data-number-stepper>
+                            <input type="number" id="expiry_yil" min="2000" max="2100" inputmode="numeric"
+                                placeholder="YYYY" class="kasa-field settings-timeout-input" autocomplete="off">
+                            <button type="button" data-step-direction="up" aria-label="{{ _('Artır') }}">
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                            <button type="button" data-step-direction="down" aria-label="{{ _('Azalt') }}">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="vault-form-row vault-form-row-two">
                 <div class="vault-field" id="login_group">
                     <label for="login" id="login_label">{{ _('Kullanıcı Adı') }}</label>
@@ -230,6 +269,8 @@
         const titleEl = document.getElementById('expiry-calendar-title');
         const weekdaysEl = document.getElementById('expiry-calendar-weekdays');
         const gridEl = document.getElementById('expiry-calendar-grid');
+        const expiryAy = document.getElementById('expiry_ay');
+        const expiryYil = document.getElementById('expiry_yil');
         let viewYear, viewMonth;
         let popupCloseTimer = 0;
 
@@ -252,6 +293,29 @@
             const dt = parseDate(hiddenInput.value);
             displayInput.value = dt ? toDisplay(dt.getFullYear(), dt.getMonth(), dt.getDate()) : '';
         }
+
+        function syncCardExpiryFromHidden() {
+            const dt = parseDate(hiddenInput.value);
+            if (expiryAy) expiryAy.value = dt ? String(dt.getMonth() + 1).padStart(2, '0') : '';
+            if (expiryYil) expiryYil.value = dt ? String(dt.getFullYear()) : '';
+        }
+
+        function syncHiddenFromCardExpiry() {
+            const ay = parseInt(expiryAy.value, 10);
+            const yil = parseInt(expiryYil.value, 10);
+            if (ay >= 1 && ay <= 12 && yil >= 2000 && yil <= 2100) {
+                const lastDay = new Date(yil, ay, 0).getDate();
+                hiddenInput.value = yil + '-' + String(ay).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
+            } else {
+                hiddenInput.value = '';
+            }
+            syncDisplay();
+        }
+
+        window.KASA_SYNC_CARD_EXPIRY = syncCardExpiryFromHidden;
+        window.KASA_CLOSE_EXPIRY_POPUP = closePopup;
+        if (expiryAy) expiryAy.addEventListener('input', syncHiddenFromCardExpiry);
+        if (expiryYil) expiryYil.addEventListener('input', syncHiddenFromCardExpiry);
 
         function render() {
             titleEl.textContent = MONTHS_TR[viewMonth] + ' ' + viewYear;
@@ -288,6 +352,7 @@
                 btn.addEventListener('click', function () {
                     hiddenInput.value = toISO(viewYear, viewMonth, d);
                     syncDisplay();
+                    syncCardExpiryFromHidden();
                     closePopup();
                 });
                 gridEl.appendChild(btn);
@@ -346,11 +411,13 @@
             viewMonth = now.getMonth();
             hiddenInput.value = toISO(viewYear, viewMonth, now.getDate());
             syncDisplay();
+            syncCardExpiryFromHidden();
             render();
         });
         wrapper.querySelector('.kasa-calendar-clear-btn').addEventListener('click', function () {
             hiddenInput.value = '';
             syncDisplay();
+            syncCardExpiryFromHidden();
             closePopup();
         });
 
@@ -399,6 +466,7 @@
                 if (active && active.dataset.day) {
                     hiddenInput.value = toISO(viewYear, viewMonth, +active.dataset.day);
                     syncDisplay();
+                    syncCardExpiryFromHidden();
                     closePopup();
                 }
                 return;

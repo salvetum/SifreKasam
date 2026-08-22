@@ -83,19 +83,28 @@ export function initVaultIndex({
         pageJumpInput.classList.remove('kasa-field-invalid');
         pageJumpInput.removeAttribute('aria-invalid');
       }
-      filterCards({ preservePage: true, animate: true, scrollToGrid: true });
+      cardContainer.classList.add('vault-card-curtain');
+      filterCards({ preservePage: true, animate: false, scrollToGrid: true });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          cardContainer.classList.remove('vault-card-curtain');
+        });
+      });
     };
 
     const setCardVisible = (wrapper, visible, animate = false) => {
-      const wasHidden = wrapper.hidden;
-      wrapper.hidden = !visible;
-
-      if (visible && animate && wasHidden) {
+      if (!visible) {
         wrapper.classList.remove('filter-reveal');
-        void wrapper.offsetWidth;
+        wrapper.hidden = true;
+        return;
+      }
+      if (!wrapper.hidden) return;
+      if (animate) {
+        wrapper.classList.remove('filter-reveal');
         wrapper.classList.add('filter-reveal');
-      } else if (!visible) {
-        wrapper.classList.remove('filter-reveal');
+        requestAnimationFrame(() => { wrapper.hidden = false; });
+      } else {
+        wrapper.hidden = false;
       }
     };
 
@@ -121,7 +130,13 @@ export function initVaultIndex({
       if (!paginationNav || !paginationSummary || !pageNumbers) return;
 
       const shouldShow = matchedCount > CARD_PAGE_SIZE;
-      paginationNav.hidden = !shouldShow;
+      if (shouldShow) {
+        paginationNav.hidden = false;
+        requestAnimationFrame(() => { paginationNav.classList.add('is-visible'); });
+      } else {
+        paginationNav.classList.remove('is-visible');
+        setTimeout(() => { if (matchedCount <= CARD_PAGE_SIZE) paginationNav.hidden = true; }, 240);
+      }
       currentCardPageCount = pageCount;
       if (pageJumpInput) pageJumpInput.max = String(pageCount);
       if (!shouldShow) return;
@@ -178,13 +193,6 @@ export function initVaultIndex({
         setCardVisible(wrapper, willShow, animate);
       });
 
-      /* Tekrar görünen kartların buğusu (liquid-glass SVG filter'ı)
-         debounce beklemeden anında uygulansın; aksi halde ilk karede
-         buğusuz görünüp ~120-200ms sonra buğulanır ("2 kez yükleme"). */
-      if (anyCardBecameVisible) {
-        window.dispatchEvent(new CustomEvent('kasa:glass-refresh'));
-      }
-
       if (filterEmptyState) {
         const shouldShowEmptyState = cardCache.length > 0 && matchedCards.length === 0;
         filterEmptyState.hidden = !shouldShowEmptyState;
@@ -227,6 +235,15 @@ export function initVaultIndex({
 
     rebuildCardCache();
     filterCards({ preservePage: false, animate: false });
+
+    const revealOverlay = document.getElementById('card-reveal-overlay');
+
+    requestAnimationFrame(() => {
+      cardContainer.classList.remove('vault-card-curtain');
+      if (revealOverlay) {
+        requestAnimationFrame(() => { revealOverlay.classList.add('fade'); });
+      }
+    });
 
     let searchTimeout;
     searchInput?.addEventListener('input', () => {

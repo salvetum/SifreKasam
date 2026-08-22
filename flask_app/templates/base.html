@@ -108,6 +108,11 @@
         document.documentElement.setAttribute('data-kasa-card-depth', normalizedCardDepth);
         localStorage.setItem('kasa-card-depth', normalizedCardDepth);
 
+        const storedVaultAccent = localStorage.getItem('kasa-vault-accent') || "{{ 'on' if VAULT_ACCENT_ENABLED else 'off' }}";
+        const normalizedVaultAccent = storedVaultAccent === 'off' ? 'off' : 'on';
+        document.documentElement.setAttribute('data-kasa-vault-accent', normalizedVaultAccent);
+        localStorage.setItem('kasa-vault-accent', normalizedVaultAccent);
+
         const storedPowerSave = localStorage.getItem('kasa-power-save') || "{{ 'on' if POWER_SAVE_ENABLED else 'off' }}";
         const normalizedPowerSave = storedPowerSave === 'off' ? 'off' : 'on';
         document.documentElement.setAttribute('data-kasa-power-save', normalizedPowerSave);
@@ -231,7 +236,7 @@
 
     <!-- Our Custom CSS -->
     <link href="{{ url_for('static', filename='tokens.css') }}?v=68" rel="stylesheet">
-    <link href="{{ url_for('static', filename='base.css') }}?v=72" rel="stylesheet">
+    <link href="{{ url_for('static', filename='base.css') }}?v=74" rel="stylesheet">
     <link href="{{ url_for('static', filename='vault-form.css') }}?v=69" rel="stylesheet">
     <link href="{{ url_for('static', filename='utilities.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='buttons.css') }}?v=70" rel="stylesheet">
@@ -239,14 +244,14 @@
     <link href="{{ url_for('static', filename='modals.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='theme-states.css') }}?v=70" rel="stylesheet">
     <link href="{{ url_for('static', filename='responsive.css') }}?v=68" rel="stylesheet">
-    <link href="{{ url_for('static', filename='background.css') }}?v=79" rel="stylesheet">
+    <link href="{{ url_for('static', filename='background.css') }}?v=83" rel="stylesheet">
     <link href="{{ url_for('static', filename='custom-select.css') }}?v=69" rel="stylesheet">
-    <link href="{{ url_for('static', filename='settings-modal.css') }}?v=71" rel="stylesheet">
+    <link href="{{ url_for('static', filename='settings-modal.css') }}?v=75" rel="stylesheet">
     <link href="{{ url_for('static', filename='vault-form-2.css') }}?v=69" rel="stylesheet">
     <link href="{{ url_for('static', filename='date-picker.css') }}?v=69" rel="stylesheet">
     <link href="{{ url_for('static', filename='theme-overrides.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='misc.css') }}?v=69" rel="stylesheet">
-    <link href="{{ url_for('static', filename='glass.css') }}?v=80" rel="stylesheet">
+    <link href="{{ url_for('static', filename='glass.css') }}?v=81" rel="stylesheet">
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
@@ -291,12 +296,12 @@
     <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.15" defer></script>
+    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.16" defer></script>
     <!-- Liquid Glass — saf CSS backdrop blur (GPU-uyumlu), tüm
          .glass / .glass-sm yüzeylerde, data-glass-quality="high"
          iken; özel yüzeyler (.settings-modal-content, .entry-login-card)
          sabit parametre alır, diğerleri boyuta göre kademeli. -->
-    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=5" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='liquid-glass.js') }}?v=7" defer></script>
 
     <!-- First-load fade-in tetikleyici -->
     <script nonce="{{ csp_nonce }}">
@@ -411,7 +416,7 @@
     <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
     <script nonce="{{ csp_nonce }}">
         if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-            var swUrl = '{{ url_for("sw") }}?v=assets-v94';
+            var swUrl = '{{ url_for("sw") }}?v=assets-v111';
             navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
         }
     </script>

@@ -132,7 +132,7 @@
 </header>
 
 <!-- ── TOPLU İŞLEM ARAÇ ÇUBUĞU ──────────────────────────────── -->
-<div id="bulk-toolbar" class="glass rounded-2xl px-4 py-3 shadow-2xl border border-kasa-border-hi flex items-center gap-3 transition-all duration-300" role="toolbar" aria-label="{{ _('Toplu işlem araçları') }}" aria-hidden="true" hidden>
+<div id="bulk-toolbar" class="glass rounded-2xl px-4 py-3 shadow-2xl border border-kasa-border-hi flex items-center gap-3" role="toolbar" aria-label="{{ _('Toplu işlem araçları') }}" aria-hidden="true">
     <span class="text-sm text-kasa-text-muted whitespace-nowrap" aria-live="polite"><span id="bulk-count">0</span> {{ _('seçili') }}</span>
     <div class="w-px h-6 bg-kasa-border"></div>
     <button type="button" id="bulk-category-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
@@ -151,16 +151,17 @@
 
 <!-- ── KART IZGARASI ─────────────────────────────────────────── -->
 <main aria-labelledby="dashboard-title">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="card-container">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 vault-card-curtain" id="card-container">
+        <div id="card-reveal-overlay"></div>
 
         {% for kayit in kayit_listesi %}
-        <article class="card-wrapper vault-card card-animated card-delay-{{ [loop.index0, 8]|min }}"
+        <article class="card-wrapper vault-card card-delay-{{ [loop.index0, 8]|min }}"
              {% if loop.index0 >= card_page_size %}hidden{% endif %}
              aria-labelledby="record-title-{{ kayit.id }}"
              data-type="{{ kayit.full_data.type }}"
              data-pinned="{{ 'true' if kayit.full_data.is_pinned else 'false' }}">
 
-            <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
+            <div class="vault-card-shell h-full flex flex-col rounded-2xl shadow-lg hover:border-kasa-border-hi overflow-hidden">
 
                 <!-- Card Body -->
                 <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
@@ -299,7 +300,7 @@
         <strong>{{ _('Hiçbir kayıt bulunamadı.') }}</strong>
         <span>{{ _('Arama veya filtreyi değiştirerek tekrar deneyin.') }}</span>
     </div>
-    <nav id="card-pagination" class="card-pagination" hidden aria-label="{{ _('Kayıt sayfaları') }}">
+    <nav id="card-pagination" class="card-pagination" aria-label="{{ _('Kayıt sayfaları') }}">
         <div class="card-pagination-summary" id="card-pagination-summary" aria-live="polite"></div>
         <div class="card-pagination-actions">
             <button type="button" id="card-page-prev" class="kasa-btn kasa-btn-muted">
@@ -672,6 +673,11 @@
                                                 <i class="fa-solid fa-arrow-rotate-left"></i>
                                                 {{ _('Varsayılana Dön') }}
                                             </button>
+                                            <button type="button" id="accent-color-random" class="kasa-btn kasa-btn-muted"
+                                                aria-label="{{ _('Rastgele renk üret') }}">
+                                                <i class="fa-solid fa-dice"></i>
+                                                {{ _('Rastgele') }}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -805,6 +811,20 @@
                         <div class="settings-card-control">
                             <div class="settings-switch-control">
                                 <input class="settings-switch-input" type="checkbox" name="card_depth_enabled" id="card-depth-toggle" {% if CARD_DEPTH_ENABLED %}checked{% endif %} aria-labelledby="setting-card-depth-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-droplet" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-vault-accent-title">{{ _('Kart Vurgu Rengi') }}</h4>
+                                <p>{{ _('Kartlarda accent renk gradyanını göster.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="vault_accent_enabled" id="vault-accent-toggle" {% if VAULT_ACCENT_ENABLED %}checked{% endif %} aria-labelledby="setting-vault-accent-title">
                             </div>
                         </div>
                     </div>
@@ -1067,25 +1087,49 @@
                             <input class="settings-switch-input" type="checkbox" name="lan_enabled" id="lan-enabled-toggle" {% if LAN_ENABLED %}checked{% endif %} aria-labelledby="setting-lan-title">
                         </div>
                     </div>
-                    <div class="lan-warning-card">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        <p>{{ _('LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.') }}</p>
-                    </div>
-                    <div class="lan-warning-card">
+                    <div id="lan-restart-note" class="lan-restart-note">
                         <i class="fa-solid fa-rotate"></i>
-                        <p>{{ _('Bu programın yeniden başlatılması gerekebilir.') }}</p>
+                        <span>{{ _('Ayarlar kaydedildiğinde program otomatik olarak yeniden başlatılır.') }}</span>
                     </div>
-                    <div id="lan-info-box" class="p-3 rounded-xl glass-sm text-xs text-kasa-text-muted kasa-transition-fast {% if not LAN_ENABLED %}hidden{% endif %}">
-                        <div class="flex items-center gap-2 mb-1">
-                            <i class="fa-solid fa-wifi text-[#22c55e]"></i>
-                            <span class="font-semibold text-kasa-text">{{ _('Ağ Adresi') }}</span>
+                    <div id="lan-warning-cards" class="lan-warning-cards-wrap">
+                        <div class="lan-warning-card">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <p>{{ _('LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.') }}</p>
                         </div>
-                        <div id="lan-address-wrap">
-                            <div id="lan-address" class="font-mono text-kasa-text text-sm break-all">{{ _('Yükleniyor...') }}</div>
-                            <p class="mt-1">{{ _('Bu adresi mobil cihazınızın tarayıcısına yazın.') }}</p>
+                    </div>
+                    <div id="lan-info-box" class="lan-info-grid {% if not LAN_ENABLED %}hidden{% endif %}">
+                        <div id="lan-address-card" class="lan-info-card">
+                            <div class="lan-info-card-header">
+                                <i class="fa-solid fa-wifi"></i>
+                                <span class="font-semibold text-kasa-text">{{ _('Ağ Adresi') }}</span>
+                            </div>
+                            <div id="lan-address-wrap">
+                                <div class="lan-info-card-row">
+                                    <div id="lan-address" class="lan-info-card-value">{{ _('Yükleniyor...') }}</div>
+                                    <button type="button" class="lan-copy-btn" data-copy-target="lan-address" aria-label="{{ _('Kopyala') }}">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                                <p class="lan-info-card-hint">{{ _('Bu adresi mobil cihazınızın tarayıcısına yazın.') }}</p>
+                            </div>
                         </div>
-                        <div id="lan-pending-note" class="mt-1 hidden">
-                            <i class="fa-solid fa-circle-info mr-1 text-amber-400"></i>
+                        <div id="lan-password-card" class="lan-info-card">
+                            <div class="lan-info-card-header">
+                                <i class="fa-solid fa-shield-halved"></i>
+                                <span class="font-semibold text-kasa-text">{{ _('LAN Şifresi') }}</span>
+                            </div>
+                            <div id="lan-password-wrap">
+                                <div class="lan-info-card-row">
+                                    <div id="lan-password" class="lan-info-card-value">-</div>
+                                    <button type="button" class="lan-copy-btn" data-copy-target="lan-password" aria-label="{{ _('Kopyala') }}">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                                <p class="lan-info-card-hint">{{ _('Mobil cihazınızda giriş yaparken bu şifreyi kullanın; ana şifreniz ağa gönderilmez.') }}</p>
+                            </div>
+                        </div>
+                        <div id="lan-pending-note" class="lan-pending-note hidden">
+                            <i class="fa-solid fa-circle-info"></i>
                             <span>{{ _('LAN erişiminin aktif olması için ayarları kaydetmeniz gerekiyor.') }}</span>
                         </div>
                     </div>
@@ -1278,7 +1322,6 @@ document.addEventListener('DOMContentLoaded', function () {
         var visibleCheckboxes = getVisibleCheckboxes();
         bulkCount.textContent = count;
         if (count > 0) {
-            bulkToolbar.hidden = false;
             bulkToolbar.removeAttribute('aria-hidden');
             requestAnimationFrame(function () {
                 bulkToolbar.classList.add('is-visible');
@@ -1286,7 +1329,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             bulkToolbar.classList.remove('is-visible');
             bulkToolbar.setAttribute('aria-hidden', 'true');
-            setTimeout(function () { if (selected.size === 0) bulkToolbar.hidden = true; }, 300);
         }
         selectAll.checked = visibleCheckboxes.length > 0 && visibleCheckboxes.every(function (cb) { return selected.has(cb.value); });
         selectAll.indeterminate = !selectAll.checked && visibleCheckboxes.some(function (cb) { return selected.has(cb.value); });

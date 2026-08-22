@@ -84,7 +84,7 @@ html[data-glass-quality="high"] {
     --panel-bg:       linear-gradient(145deg, rgba(255,255,255,calc(var(--glass-veil-scale) * 0.092)), rgba(255,255,255,calc(var(--glass-veil-scale) * 0.04)));
 
     /* Yüksek kalite: en canlı / en saydam versiyon */
-    --glass-vivid-blur: blur(calc(var(--glass-blur-scale) * 14px)) saturate(1.8);
+    --glass-vivid-blur: blur(calc(var(--glass-blur-scale) * 14px)) saturate(1.3);
     --glass-vivid-veil: rgba(255,255,255,calc(var(--glass-veil-scale) * 0.055));
     --glass-vivid-tint: radial-gradient(circle at 16% 0%, rgba(var(--accent-rgb),0.26), transparent 50%);
     --glass-vivid-scrim: linear-gradient(180deg, rgba(8,9,18,0.26), rgba(8,9,18,0.06) 42%, rgba(8,9,18,0.22));
@@ -105,7 +105,7 @@ html[data-bs-theme="light"][data-glass-quality="high"] {
     --glass:          rgba(255,255,255,calc(var(--glass-veil-scale) * 0.58));
     --glass-border:   rgba(31,41,55,0.14);
     --glass-border-hi:rgba(79,145,255,0.34);
-    --glass-vivid-blur: blur(calc(var(--glass-blur-scale) * 14px)) saturate(1.6);
+    --glass-vivid-blur: blur(calc(var(--glass-blur-scale) * 14px)) saturate(1.3);
     --glass-vivid-veil: rgba(255,255,255,calc(var(--glass-veil-scale) * 0.50));
 }
 
@@ -268,55 +268,11 @@ html[data-kasa-gradient="off"] .vault-card-shell.glass::after {
     box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.10);
 }
 
-/* ── KASA KARTLARI: buğulu cam yüzey ───────────────────────────── */
-/* Buğuluk (frost) doğrudan zemin gradyanına gömülüdür — backdrop-
-   filter'dan bağımsız olarak kartlar buğulu görünür. Üst ışıltı (sheen)
-   ve buzlu çerçeve (frame) ayrı pseudo katmanlardan gelir; depth
-   gölgesi .card-wrapper üzerinde. */
-.vault-card-shell.glass {
-    position: relative;
-    isolation: isolate;
-    background:
-        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
-        linear-gradient(160deg,
-            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.18)),
-            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.10)) 50%,
-            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.13)));
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.14);
-    backdrop-filter: var(--glass-vivid-blur);
-    -webkit-backdrop-filter: var(--glass-vivid-blur);
-    /* Tema geçişinde background/backdrop-filter animasyonu devre dışı:
-       transition-all, koyu camdan beyaza aralık kareler çizerek flash
-       oluşturuyordu. Sadece transform/border-color animasyonu kalır. */
-    transition-property: transform, border-color;
-}
-
-/* DİKKAT: Cam yüzeylere will-change:transform KESİNLİKLE uygulanmaz.
-   Chromium'da backdrop-filter ile aynı elementte will-change/transform,
-   elementi kendi compositing katmanına alır ve arkaplan örneklemesini
-   boşaltır — camın buğu (blur) efekti tamamen kaybolur. Firefox sorunsuz
-   işlediği için "Firefox'da var, Chrome'da yok" farkı da buydu. */
-
-/* ── KATMANLI DERİNLİK GÖLGESİ (data-kasa-card-depth="off" ile kapatılır) ── */
-/* Dış gölgeler .card-wrapper.vault-card (backdrop-filter'sız) üzerinde
-   tutulur. Gölge doğrudan backdrop-filter'lı shell'e konunca üst kenarda
-   hafif beyazlama (compositing/contrast artefaktı) oluşuyordu; wrapper
-   filtresiz olduğu için gölge temiz render edilir. Hover'da derinlik
-   korunur ve mevcut accent glow üstüne eklenir. */
-html:not([data-kasa-card-depth="off"]) .card-wrapper.vault-card {
-    box-shadow:
-        0 1px 2px rgba(0,0,0,0.14),
-        0 10px 24px rgba(0,0,0,0.18),
-        0 28px 64px rgba(0,0,0,0.32);
-}
-html:not([data-kasa-card-depth="off"]) .card-wrapper.vault-card:hover {
-    box-shadow:
-        0 1px 2px rgba(0,0,0,0.14),
-        0 10px 24px rgba(0,0,0,0.18),
-        0 28px 64px rgba(0,0,0,0.32),
-        0 14px 34px var(--accent-glow);
-}
+/* ── KASA KARTLARI ──────────────────────────────────────────────── */
+/* Vault kart cam yüzeyi glass.css'ten cards.css'e taşındı (v2
+   cam sistemi). Bu bölümde yalnızca kart-wrapper derinlik gölgeleri,
+   sheen/frame pseudo-katmanları ve settings modal mini-kartları
+   kalır. */
 
 /* Wrapper'sız mini kartlar (ayar modali içindeki sheen/frame/depth
    satırları, .card-detail-toggle-row) için aynı dil, daha hafif. */
@@ -356,28 +312,6 @@ html:not([data-kasa-card-frame="off"]) .vault-card-shell.glass::after {
         inset 1px 1px 0 0 rgba(255,255,255,0.10);
     pointer-events: none;
     z-index: 2;
-}
-
-[data-bs-theme="light"] .vault-card-shell.glass {
-    background:
-        radial-gradient(circle at top left, rgba(var(--accent-rgb),0.075), transparent 42%),
-        linear-gradient(145deg, rgba(241,245,251,0.90), rgba(224,231,244,0.78));
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.70);
-}
-
-html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-wrapper.vault-card {
-    box-shadow:
-        0 1px 2px rgba(31,41,55,0.06),
-        0 10px 24px rgba(65,80,108,0.12),
-        0 24px 56px rgba(65,80,108,0.14);
-}
-html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-wrapper.vault-card:hover {
-    box-shadow:
-        0 1px 2px rgba(31,41,55,0.06),
-        0 10px 24px rgba(65,80,108,0.12),
-        0 24px 56px rgba(65,80,108,0.14),
-        0 14px 34px var(--accent-glow);
 }
 
 html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-detail-toggle-row .vault-card-shell.glass {
@@ -450,22 +384,6 @@ html[data-bs-theme="light"][data-glass-effects="off"] .glass-sm {
     box-shadow: 0 12px 30px rgba(31,41,55,0.08) !important;
 }
 
-html[data-glass-effects="off"] .vault-card-shell.glass {
-    background:
-        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.14), transparent 42%),
-        linear-gradient(145deg, rgba(var(--accent-rgb), 0.085), rgba(var(--accent-2-rgb), 0.045)),
-        rgba(19,21,39,0.96) !important;
-    border-color: rgba(var(--accent-rgb), 0.20) !important;
-}
-
-html[data-bs-theme="light"][data-glass-effects="off"] .vault-card-shell.glass {
-    background:
-        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.10), transparent 42%),
-        linear-gradient(145deg, rgba(var(--accent-rgb), 0.055), rgba(var(--accent-2-rgb), 0.035)),
-        rgba(255,255,255,0.96) !important;
-    border-color: rgba(var(--accent-rgb), 0.16) !important;
-}
-
 /* ── LIGHT TEMA: cam yüzeyler ─────────────────────────────────── */
 /* Kasa kartları hariç: kartlar kalıcı vivid cam görünümünü korur. */
 [data-bs-theme="light"] .glass:not(.vault-card-shell),
@@ -479,16 +397,6 @@ html[data-bs-theme="light"][data-glass-effects="off"] .vault-card-shell.glass {
 html[data-kasa-gradient="off"] .glass,
 html[data-kasa-gradient="off"] .glass-sm {
     background: var(--glass) !important;
-}
-
-html[data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell.glass {
-    background: rgba(24,27,48,0.98) !important;
-    border-color: rgba(var(--accent-rgb), 0.20) !important;
-}
-
-html[data-bs-theme="light"][data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell.glass {
-    background: rgba(255,255,255,0.96) !important;
-    border-color: rgba(var(--accent-rgb), 0.16) !important;
 }
 
 /* ── ORTAK BORDER RENGİ (cam yüzeyler) ────────────────────────── */
@@ -635,23 +543,6 @@ html[data-bs-theme="light"][data-glass-effects="off"] .glass-toggle-row > .glass
     box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.72),
         0 9px 24px rgba(60,74,101,0.07);
-}
-
-/* ── GRADİYAN KAPALI: kasa kart cam yüzeyi ────────────────────── */
-html[data-kasa-gradient="off"] .vault-card-shell.glass {
-    border-color: rgba(var(--accent-rgb), 0.22) !important;
-    background: rgba(var(--accent-rgb), 0.065) !important;
-    box-shadow:
-        0 16px 34px rgba(var(--accent-rgb), 0.08),
-        0 12px 28px rgba(0,0,0,0.14) !important;
-}
-
-html[data-bs-theme="light"][data-kasa-gradient="off"] .vault-card-shell.glass {
-    border-color: rgba(var(--accent-rgb), 0.18) !important;
-    background: rgba(var(--accent-rgb), 0.045) !important;
-    box-shadow:
-        0 16px 34px rgba(var(--accent-rgb), 0.07),
-        0 12px 28px rgba(31,41,55,0.06) !important;
 }
 
 /* ══ BÖLÜM 5 — Frosted Glass grain (Google "Material You" yaklaşımı) ══

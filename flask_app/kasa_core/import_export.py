@@ -45,6 +45,7 @@ def serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
             "website_url": decrypt_metadata(fernet, record.website_url),
             "login": decrypt_metadata(fernet, record.login),
             "email": decrypt_metadata(fernet, record.email),
+            "card_holder": decrypt_metadata(fernet, record.card_holder),
             "password": safe_decrypt(fernet, record.encrypted_password),
             "comment": safe_decrypt(fernet, record.encrypted_comment),
             "expiry_date": (
@@ -65,6 +66,7 @@ def serialize_records_txt(data: list[dict[str, Any]]) -> bytes:
         "website_url",
         "login",
         "email",
+        "card_holder",
         "password",
         "comment",
         "expiry_date",
@@ -122,6 +124,10 @@ def parse_import_record(
         max_length=300,
     )
     password = normalize_text(item.get("password") or item.get("Password") or "")
+    card_holder = normalize_text(
+        item.get("card_holder") or item.get("Card holder") or "",
+        max_length=120,
+    )
     comment = normalize_text(
         item.get("comment")
         or item.get("Comment")
@@ -155,6 +161,7 @@ def parse_import_record(
         website_url=encrypt_metadata(fernet, url),
         login=encrypt_metadata(fernet, login_value),
         email=encrypt_metadata(fernet, email_value),
+        card_holder=encrypt_metadata(fernet, card_holder),
         encrypted_password=safe_encrypt(fernet, password),
         encrypted_comment=safe_encrypt(fernet, comment),
         expiry_date=parse_expiry(

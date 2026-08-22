@@ -1,4 +1,5 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v94';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v115';
+const BG_URL_PREFIX = '/api/background/';
 const ASSETS = [
   '{{ url_for("static", filename="tokens.css") }}',
   '{{ url_for("static", filename="base.css") }}',
@@ -57,6 +58,17 @@ self.addEventListener('activate', function (e) {
       return Promise.all(
         keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); })
       );
+    }).then(function () {
+      // Önceki sürümlerde SW cache'e alınmış arkaplan görsellerini temizle.
+      return caches.open(CACHE).then(function (cache) {
+        return cache.keys().then(function (reqs) {
+          return Promise.all(
+            reqs.filter(function (req) {
+              return new URL(req.url).pathname.startsWith(BG_URL_PREFIX);
+            }).map(function (req) { return cache.delete(req); })
+          );
+        });
+      });
     })
   );
   self.clients.claim();
@@ -69,25 +81,11 @@ self.addEventListener('fetch', function (e) {
   // Sadece kendi origin'imizdeki istekleri ele al
   if (url.origin !== location.origin) return;
 
-  // Özel arkaplan dosyaları: sayfa geçişlerinde anında gösterim için cache-first.
-  // URL'ler dosyanın mtime'ı ile sürümlenir (?v=...), bu yüzden yeni arkaplan
-  // yüklenince yeni URL ile otomatik tazelenir. Video (Range) isteklerinde
-  // Chromium SW cache'i atlar; o noktada tarayıcı HTTP cache'i devreye girer.
-  if (req.method === 'GET'
-      && (url.pathname === '/api/background/current'
-          || url.pathname.startsWith('/api/background/history/'))) {
-    e.respondWith(
-      caches.match(req).then(function (cached) {
-        if (cached) return cached;
-        return fetch(req).then(function (res) {
-          if (!res || !res.ok) return res;
-          caches.open(CACHE).then(function (cache) { cache.put(req, res.clone()); });
-          return res;
-        });
-      }).catch(function () {
-        return fetch(req);
-      })
-    );
+  // Arkaplan görselleri: SW cache'e almadan doğrudan sunuya yönlendir.
+  // Sunucu Cache-Control header'ı ile tarayıcı HTTP cache'ini yönetir.
+  // SW cache-first kullanılmaz → silinen/replaced edilen arkaplan görselleri
+  // cache'de kalmaz ve depolama birikmez.
+  if (req.method === 'GET' && url.pathname.startsWith(BG_URL_PREFIX)) {
     return;
   }
 

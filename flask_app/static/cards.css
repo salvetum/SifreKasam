@@ -1,6 +1,32 @@
 /* ════════════════════════════════════════════════════════════════
-   VAULT KARTLARI
+   VAULT KARTLARI — Cam (Glass) Yüzey Sistemi v2
+   Eski glass.css vault kurallarının birebir karşılığı, `.glass`
+   class'ı gerektirmez. liquid-glass.js vault kartlarını zaten
+   atlar; tüm efekt saf CSS token'larından beslenir.
    ════════════════════════════════════════════════════════════════ */
+
+.vault-card-curtain {
+    visibility: hidden;
+}
+
+/* Container overlay — curtain kaldırıldığında kartların üstünde durur,
+   fade-out ile kaybolur. Kart elementlerine dokunmaz, backdrop-filter
+   compositing'ini bozmaz. */
+#card-container {
+    position: relative;
+}
+#card-reveal-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    z-index: 1;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#card-reveal-overlay.fade {
+    opacity: 0;
+}
 
 .vault-card {
     border-radius: 16px;
@@ -15,7 +41,217 @@
 .vault-card:active {
     transform: translateY(-1px) scale(0.998);
 }
-.vault-card-shell  { position: relative; border-radius: 16px; }
+
+/* ── Cam yüzey (dark) ─────────────────────────────────────────── */
+.vault-card-shell {
+    position: relative;
+    isolation: isolate;
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.10), transparent 38%),
+        linear-gradient(160deg,
+            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.18)),
+            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.10)) 50%,
+            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.13)));
+    border: var(--border-glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+    transition-property: transform, border-color;
+}
+
+/* ── Cam yüzey (light) ────────────────────────────────────────── */
+[data-bs-theme="light"] .vault-card-shell {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb),0.075), transparent 42%),
+        linear-gradient(145deg, rgba(241,245,251,0.90), rgba(224,231,244,0.78));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
+}
+
+/* ── Düşük kalite / güç tasarrufu: blur yok ───────────────────── */
+html[data-glass-quality="low"] .vault-card-shell,
+html[data-kasa-low-power="on"] .vault-card-shell {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-glass-quality="low"][data-bs-theme="light"] .vault-card-shell,
+html[data-kasa-low-power="on"][data-bs-theme="light"] .vault-card-shell {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ── Efekt kapalı: solid arka plan ────────────────────────────── */
+html[data-glass-effects="off"] .vault-card-shell {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.14), transparent 42%),
+        linear-gradient(145deg, rgba(var(--accent-rgb), 0.085), rgba(var(--accent-2-rgb), 0.045)),
+        rgba(19,21,39,0.96) !important;
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+}
+html[data-glass-effects="off"][data-bs-theme="light"] .vault-card-shell {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.10), transparent 42%),
+        linear-gradient(145deg, rgba(var(--accent-rgb), 0.055), rgba(var(--accent-2-rgb), 0.035)),
+        rgba(255,255,255,0.96) !important;
+    border-color: rgba(var(--accent-rgb), 0.16) !important;
+}
+
+/* ── Gradyan kapalı ───────────────────────────────────────────── */
+html[data-kasa-gradient="off"] .vault-card-shell {
+    border-color: rgba(var(--accent-rgb), 0.22) !important;
+    background: rgba(var(--accent-rgb), 0.065) !important;
+    box-shadow:
+        0 16px 34px rgba(var(--accent-rgb), 0.08),
+        0 12px 28px rgba(0,0,0,0.14) !important;
+}
+html[data-kasa-gradient="off"][data-bs-theme="light"] .vault-card-shell {
+    border-color: rgba(var(--accent-rgb), 0.18) !important;
+    background: rgba(var(--accent-rgb), 0.045) !important;
+    box-shadow:
+        0 16px 34px rgba(var(--accent-rgb), 0.07),
+        0 12px 28px rgba(31,41,55,0.06) !important;
+}
+html[data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell {
+    background: rgba(24,27,48,0.98) !important;
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+}
+html[data-glass-effects="off"][data-kasa-gradient="off"][data-bs-theme="light"] .vault-card-shell {
+    background: rgba(255,255,255,0.96) !important;
+    border-color: rgba(var(--accent-rgb), 0.16) !important;
+}
+
+/* ── Accent renk kapalı: nötr cam yüzey ───────────────────────── */
+html[data-kasa-vault-accent="off"] .vault-card-shell {
+    background:
+        linear-gradient(160deg,
+            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.18)),
+            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.10)) 50%,
+            rgba(255,255,255,calc(var(--glass-veil-scale) * 0.13))) !important;
+    border-color: rgba(255,255,255,0.10) !important;
+}
+html[data-kasa-vault-accent="off"][data-bs-theme="light"] .vault-card-shell {
+    background:
+        linear-gradient(145deg, rgba(241,245,251,0.90), rgba(224,231,244,0.78)) !important;
+    border-color: rgba(0,0,0,0.06) !important;
+}
+html[data-kasa-vault-accent="off"][data-glass-effects="off"] .vault-card-shell {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
+        rgba(19,21,39,0.96) !important;
+    border-color: rgba(255,255,255,0.10) !important;
+}
+html[data-kasa-vault-accent="off"][data-glass-effects="off"][data-bs-theme="light"] .vault-card-shell {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.60), rgba(240,244,252,0.50)),
+        rgba(255,255,255,0.96) !important;
+    border-color: rgba(0,0,0,0.06) !important;
+}
+html[data-kasa-vault-accent="off"][data-kasa-gradient="off"] .vault-card-shell {
+    background: rgba(255,255,255,0.06) !important;
+    border-color: rgba(255,255,255,0.10) !important;
+    box-shadow:
+        0 16px 34px rgba(0,0,0,0.08),
+        0 12px 28px rgba(0,0,0,0.14) !important;
+}
+html[data-kasa-vault-accent="off"][data-kasa-gradient="off"][data-bs-theme="light"] .vault-card-shell {
+    background: rgba(255,255,255,0.60) !important;
+    border-color: rgba(0,0,0,0.06) !important;
+    box-shadow:
+        0 16px 34px rgba(0,0,0,0.04),
+        0 12px 28px rgba(31,41,55,0.06) !important;
+}
+html[data-kasa-vault-accent="off"][data-glass-effects="off"][data-kasa-gradient="off"] .vault-card-shell {
+    background: rgba(24,27,48,0.98) !important;
+    border-color: rgba(255,255,255,0.10) !important;
+}
+html[data-kasa-vault-accent="off"][data-glass-effects="off"][data-kasa-gradient="off"][data-bs-theme="light"] .vault-card-shell {
+    background: rgba(255,255,255,0.96) !important;
+    border-color: rgba(0,0,0,0.06) !important;
+}
+
+/* ── Üst kenar ışıltısı (sheen) ──────────────────────────────── */
+html:not([data-kasa-card-sheen="off"]) .vault-card-shell::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 80%),
+        radial-gradient(120% 200% at 50% 0%, rgba(var(--accent-rgb), 0.10), transparent 62%);
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 2;
+}
+html:not([data-kasa-card-sheen="off"])[data-bs-theme="light"] .vault-card-shell::before {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.50), transparent 80%),
+        radial-gradient(120% 200% at 50% 0%, rgba(var(--accent-rgb), 0.05), transparent 62%);
+    border-top: 1px solid rgba(255, 255, 255, 0.55);
+}
+html:not([data-kasa-card-sheen="off"])[data-kasa-vault-accent="off"] .vault-card-shell::before {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 80%);
+}
+html:not([data-kasa-card-sheen="off"])[data-kasa-vault-accent="off"][data-bs-theme="light"] .vault-card-shell::before {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.50), transparent 80%);
+}
+
+/* ── Buzlu çerçeve (frame) ────────────────────────────────────── */
+html:not([data-kasa-card-frame="off"]) .vault-card-shell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 1px 1px 0 0 rgba(255, 255, 255, 0.10);
+    pointer-events: none;
+    z-index: 2;
+}
+html:not([data-kasa-card-frame="off"])[data-bs-theme="light"] .vault-card-shell::after {
+    box-shadow: inset 1px 1px 0 0 rgba(255, 255, 255, 0.60);
+}
+
+/* ── Derinlik gölgeleri (wrapper üzerinde, backdrop-filter'sız) ── */
+html:not([data-kasa-card-depth="off"]) .card-wrapper.vault-card {
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.14),
+        0 10px 24px rgba(0, 0, 0, 0.18),
+        0 28px 64px rgba(0, 0, 0, 0.32);
+}
+html:not([data-kasa-card-depth="off"]) .card-wrapper.vault-card:hover {
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.14),
+        0 10px 24px rgba(0, 0, 0, 0.18),
+        0 28px 64px rgba(0, 0, 0, 0.32),
+        0 14px 34px var(--accent-glow);
+}
+html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-wrapper.vault-card {
+    box-shadow:
+        0 1px 2px rgba(31, 41, 55, 0.06),
+        0 10px 24px rgba(65, 80, 108, 0.12),
+        0 24px 56px rgba(65, 80, 108, 0.14);
+}
+html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-wrapper.vault-card:hover {
+    box-shadow:
+        0 1px 2px rgba(31, 41, 55, 0.06),
+        0 10px 24px rgba(65, 80, 108, 0.12),
+        0 24px 56px rgba(65, 80, 108, 0.14),
+        0 14px 34px var(--accent-glow);
+}
+
+/* ── Low power / efekt kapalı: pseudo katmanları gizle ─────────── */
+html[data-kasa-low-power="on"] .vault-card-shell::before,
+html[data-kasa-low-power="on"] .vault-card-shell::after,
+html[data-glass-effects="off"] .vault-card-shell::before,
+html[data-glass-effects="off"] .vault-card-shell::after,
+html[data-kasa-gradient="off"] .vault-card-shell::before,
+html[data-kasa-gradient="off"] .vault-card-shell::after {
+    display: none !important;
+}
+
 .vault-card-body   { min-height: 240px; }
 .vault-card-header { min-height: 34px; }
 .vault-title-line  { min-width: 0; }
@@ -125,6 +361,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.8rem;
+    position: relative;
+    z-index: 2;
     border: 1px solid rgba(var(--accent-rgb), 0.18);
     border-radius: 20px;
     background:
@@ -133,10 +371,14 @@
     box-shadow: 0 14px 34px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
-.card-pagination[hidden] {
-    display: none !important;
+.card-pagination.is-visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .card-pagination-summary {

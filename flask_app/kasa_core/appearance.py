@@ -12,6 +12,7 @@ from kasa_core.constants import (
     DEFAULT_CARD_DEPTH_ENABLED,
     DEFAULT_CARD_FRAME_ENABLED,
     DEFAULT_CARD_SHEEN_ENABLED,
+    DEFAULT_VAULT_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GLASS_BLUR,
@@ -375,6 +376,24 @@ class AppearanceSettings:
         enabled = normalize_theme_option(value, DEFAULT_CARD_DEPTH_ENABLED)
         self.set_setting("card_depth_enabled", str(enabled).lower())
         self.save_file(card_depth_enabled=enabled)
+        return enabled
+
+    def get_vault_accent_enabled(self) -> bool:
+        try:
+            value = self.get_setting("vault_accent_enabled")
+            if value is not None:
+                return normalize_theme_option(value, DEFAULT_VAULT_ACCENT_ENABLED)
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("vault_accent_enabled"),
+            DEFAULT_VAULT_ACCENT_ENABLED,
+        )
+
+    def save_vault_accent(self, value: object) -> bool:
+        enabled = normalize_theme_option(value, DEFAULT_VAULT_ACCENT_ENABLED)
+        self.set_setting("vault_accent_enabled", str(enabled).lower())
+        self.save_file(vault_accent_enabled=enabled)
         return enabled
 
     def get_hardware_acceleration_enabled(self) -> bool:

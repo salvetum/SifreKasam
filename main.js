@@ -40,7 +40,8 @@ function getLogFilePath() {
 function isRunningAsAdmin() {
   if (process.platform !== 'win32') return false;
   try {
-    execSync('net session', { stdio: 'ignore', timeout: 3000 });
+    const netPath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'net.exe');
+    execSync(`"${netPath}" session`, { stdio: 'ignore', timeout: 3000 });
     return true;
   } catch (_) {
     return false;
@@ -448,11 +449,24 @@ if (!gotTheLock) {
   // Self-signed SSL sertifikasını kabul et
   // Not: birden fazla kaynak için aynı sertifika hatası tekrar tekrar gelebilir. Bu yüzden
   // - aynı sertifikayı geçici olarak güvenmek için fingerprint önbelleği tutuyoruz,
-  // - uygulamanın kendi ürettiği self-signed sertifikayı tanıyınca otomatik kabul ediyoruz,
-  // - yalnızca beklenmeyen sertifikalar için kullanıcıya prompt gösteriyoruz.
+  // - yalnızca bilinmeyen sertifikalar için kullanıcıya prompt gösteriyoruz.
   const _temporaryTrustedFingerprints = new Set();
   function _fpHex(buf) {
     try { return crypto.createHash('sha256').update(buf).digest('hex'); } catch (_) { return null; }
+  }
+
+  function _normalizeCertToDer(certData) {
+    if (!certData) return null;
+    try {
+      const buf = Buffer.isBuffer(certData) ? certData : Buffer.from(String(certData));
+      const asUtf = buf.toString('utf8');
+      if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
+        return Buffer.from(new crypto.X509Certificate(asUtf).raw);
+      }
+      return Buffer.from(new crypto.X509Certificate(buf).raw);
+    } catch (_) {
+      return null;
+    }
   }
 
   function _isExpectedLocalCertificate(certBuffer) {
@@ -480,8 +494,9 @@ if (!gotTheLock) {
 
     event.preventDefault();
     try { loadPinnedCertificate(); } catch (_) {}
-    const presented = _certificate && _certificate.data ? Buffer.from(_certificate.data) : null;
-    const presentedFp = presented ? _fpHex(presented) : null;
+    const presentedRaw = _certificate && _certificate.data ? Buffer.from(_certificate.data) : null;
+    const presented = _normalizeCertToDer(presentedRaw);
+    const presentedFp = presentedRaw ? _fpHex(presentedRaw) : null;
 
     // Aynı sertifikayı daha önce geçici olarak kabul ettiysek direkt kabul et
     if (presentedFp && _temporaryTrustedFingerprints.has(presentedFp)) {
@@ -489,7 +504,7 @@ if (!gotTheLock) {
       return;
     }
 
-    // Pinned sertifika ile tam eşleşiyorsa kabul et
+    // Pinned sertifika ile DER normalization sonrası tam eşleşiyorsa kabul et
     if (pinnedCertificateDer && presented
         && presented.length === pinnedCertificateDer.length
         && presented.equals(pinnedCertificateDer)) {
@@ -501,22 +516,44 @@ if (!gotTheLock) {
       return;
     }
 
-    // Uygulamanın ürettiği expected local self-signed sertifika ise otomatik kabul et
-    if (_isExpectedLocalCertificate(presented)) {
+    // Pin mevcut ama eşleşmiyor (sertifika yeniden üretilmiş) VEYASE pin hiç yok
+    // (ilk açılış) — sertifika uygulamanın kendi ürettiği self-signed sertifikası
+    // ise otomatik kabul et. Eşzamanlı isteklerin hepsine tek tek diyalog
+    // göstermemek için kritik. Heuristic geçerse pin'i güncelle.
+    if (_isExpectedLocalCertificate(presentedRaw)) {
       if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
-      console.warn('Beklenen yerel self-signed sertifika otomatik olarak kabul edildi.');
+      if (presented && !pinnedCertificateDer) {
+        try {
+          const dataDir = getDataDir();
+          const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
+          if (certPath) {
+            let presentedPem = null;
+            const asUtf = presentedRaw.toString('utf8');
+            if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
+              presentedPem = asUtf;
+            }
+            if (presentedPem) {
+              try { fs.mkdirSync(path.dirname(certPath), { recursive: true }); } catch (_) {}
+              fs.writeFileSync(certPath, presentedPem, { encoding: 'utf8' });
+              pinnedCertificatePem = fs.readFileSync(certPath);
+              pinnedCertificateDer = presented;
+              pinnedCertificateMtime = fs.statSync(certPath).mtimeMs;
+            }
+          }
+        } catch (_) { /* Pin güncellenemezse geçici güven yeterli */ }
+      }
       callback(true);
       return;
     }
 
     // Sunulan sertifikayı PEM formatına dönüştür (kullanıcıya göstermek ve kaydetmek için)
     let presentedPem = null;
-    if (presented) {
-      const asUtf = presented.toString('utf8');
+    if (presentedRaw) {
+      const asUtf = presentedRaw.toString('utf8');
       if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
         presentedPem = asUtf;
       } else {
-        const certBase64 = presented.toString('base64');
+        const certBase64 = presentedRaw.toString('base64');
         const chunks = certBase64.match(/.{1,64}/g) || [certBase64];
         presentedPem = `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n`;
       }
@@ -620,7 +657,16 @@ function getPinnedHttpsOptions() {
   if (loadPinnedCertificate()) {
     return { rejectUnauthorized: true, ca: pinnedCertificatePem };
   }
-  return { rejectUnauthorized: false };
+  // Pin yokken yalnızca localhost'a bağlanmayı zorla (ilk kurulum penceresi).
+  return {
+    rejectUnauthorized: false,
+    checkServerIdentity: (hostname) => {
+      const allowed = ['127.0.0.1', 'localhost', '::1'];
+      if (!allowed.includes(hostname)) {
+        return new Error(`Beklenmeyen hostname: ${hostname}`);
+      }
+    },
+  };
 }
 
 // Backend'e giden tekrarlanan istekler için yeniden kullanılabilir bağlantı
@@ -797,6 +843,7 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       preload: path.join(__dirname, 'preload.js'),
       devTools: !app.isPackaged,
       spellcheck: false,
@@ -936,11 +983,21 @@ async function createWindow() {
     }
   });
 
-  // Her isteğe APP_TOKEN header'ı ekle
+  // Yalnızca stateless API isteklerine (heartbeat, lan-info vb.) token ekle.
+  // State-changing istekler (save_settings, add, edit vb.) X-CSRF-Token ile korunuyor;
+  // tüm isteklere token enjekte etmek XSS durumunda CSRF korumasını baypas eder.
+  const _TOKEN_INJECT_PATHS = new Set([
+    '/heartbeat', '/shutdown', '/api/lan-info', '/settings/runtime',
+  ]);
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
     { urls: [`${PROTOCOL}://${HOST}:${PORT}/*`] },
     (details, callback) => {
-      details.requestHeaders['X-App-Token'] = APP_TOKEN;
+      try {
+        const { pathname } = new URL(details.url);
+        if (_TOKEN_INJECT_PATHS.has(pathname)) {
+          details.requestHeaders['X-App-Token'] = APP_TOKEN;
+        }
+      } catch (_) {}
       callback({ requestHeaders: details.requestHeaders });
     }
   );
@@ -1056,7 +1113,7 @@ function checkMinimizeToTray() {
         res.on('data', (chunk) => { data += chunk; });
         res.on('end', () => {
           try   { resolve(JSON.parse(data).minimize_to_tray === true); }
-          catch { resolve(true); }
+          catch { resolve(false); }
         });
       }
     );

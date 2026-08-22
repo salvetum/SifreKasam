@@ -18,6 +18,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── SABİTLER & YARDIMCILAR ───────────────────────────────────────────────
 
+  window.kasaAnimateToggle = function (el, show) {
+    if (!el) return;
+    clearTimeout(el._aShow);
+    clearTimeout(el._aHide);
+    if (show) {
+      if (!el.hidden) return;
+      el.hidden = false;
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.22s ease';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { el.style.opacity = ''; el.style.transition = ''; });
+      });
+    } else {
+      if (el.hidden) return;
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.18s ease';
+      el._aHide = setTimeout(() => { el.hidden = true; el.style.opacity = ''; el.style.transition = ''; }, 220);
+    }
+  };
+
+  window.kasaAnimateClassToggle = function (el, show) {
+    if (!el) return;
+    clearTimeout(el._aShow);
+    clearTimeout(el._aHide);
+    if (show) {
+      el.classList.add('is-visible');
+      el._aShow = setTimeout(() => { el.style.opacity = ''; el.style.transform = ''; }, 280);
+    } else {
+      el.classList.remove('is-visible');
+    }
+  };
+
   const notifyVaultWriteLocked = async (response) => {
     if (!response || ![409, 423].includes(response.status)) return;
 
@@ -348,10 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const refreshChromaCycle = () => {
     stopChromaCycle();
-    if (!chromaCanAnimate()) {
-      clearChromaAccent();
-      return;
-    }
+    if (!chromaCanAnimate()) return;
 
     chromaStartedAt = performance.now() - chromaElapsedMs;
     const tick = () => {
@@ -495,6 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cardSheenToggle,
     cardFrameToggle,
     cardDepthToggle,
+    vaultAccentToggle,
     hardwareAccelerationToggle,
     powerSaveToggle,
     updateAppearance,
@@ -696,8 +726,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       settingsPanels.forEach(panel => {
         const isActive = panel === nextPanel;
-        panel.hidden = !isActive;
-        panel.classList.toggle('active', isActive);
+        if (!isActive && !panel.hidden && panel.classList.contains('active')) {
+          panel.classList.add('is-exiting');
+          panel.classList.remove('active');
+          const p = panel;
+          setTimeout(() => { p.hidden = true; p.classList.remove('is-exiting'); }, 180);
+        } else {
+          panel.hidden = !isActive;
+          panel.classList.toggle('active', isActive);
+        }
       });
       if (focusTab) nextTab.focus();
     };
@@ -767,6 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let dontShowAgain = false;
+        let rememberCheckbox = null;
         const confirmation = await Swal.fire({
           title: window._('LAN Erişimi'),
           icon: 'warning',
@@ -796,6 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
             void container.offsetHeight;
             popup.classList.add('is-open');
             container.classList.add('is-open');
+            rememberCheckbox = document.getElementById('lan-warning-remember');
           },
           willClose: (popup, container, done) => {
             popup.classList.add('is-closing');
@@ -803,8 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(done, 150);
           },
           preConfirm: () => {
-            const remember = document.getElementById('lan-warning-remember');
-            dontShowAgain = remember ? remember.checked : false;
+            dontShowAgain = rememberCheckbox ? rememberCheckbox.checked : false;
             return true;
           },
         });
@@ -916,6 +954,10 @@ document.addEventListener('DOMContentLoaded', () => {
           cardDepthToggle.checked = data.card_depth_enabled;
           applyThemeFeature('data-kasa-card-depth', 'kasa-card-depth', data.card_depth_enabled);
         }
+        if (typeof data.vault_accent_enabled === 'boolean' && vaultAccentToggle) {
+          vaultAccentToggle.checked = data.vault_accent_enabled;
+          applyThemeFeature('data-kasa-vault-accent', 'kasa-vault-accent', data.vault_accent_enabled);
+        }
         if (typeof data.hardware_acceleration_enabled === 'boolean' && hardwareAccelerationToggle) {
           hardwareAccelerationToggle.checked = data.hardware_acceleration_enabled;
         }
@@ -929,6 +971,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         settingsFormSnapshot = getSettingsSnapshot();
         showSuccessToast(window._('Ayarlar kaydedildi.'));
+        if (data.restart_required) {
+          showSuccessToast(window._('Yeniden başlatılıyor...'));
+        }
       } catch {
         showWarningToast(window._('Ayarlar kaydedilemedi.'));
       } finally {

@@ -497,7 +497,7 @@
 
 .color-picker-code-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(150px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 0.65rem;
 }
 

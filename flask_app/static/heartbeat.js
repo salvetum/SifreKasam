@@ -128,16 +128,17 @@ export function initHeartbeat({ apiFetch }) {
 
   const stopHeartbeat = () => {
     if (!heartbeatTimer) return;
-    clearInterval(heartbeatTimer);
+    clearTimeout(heartbeatTimer);
     heartbeatTimer = null;
   };
 
   const scheduleHeartbeat = () => {
     stopHeartbeat();
-    heartbeatTimer = window.setInterval(
-      sendHeartbeat,
-      rendererLowPower ? HEARTBEAT_LOW_POWER_INTERVAL_MS : HEARTBEAT_ACTIVE_INTERVAL_MS
-    );
+    const tick = () => {
+      sendHeartbeat();
+      heartbeatTimer = window.setTimeout(tick, HEARTBEAT_ACTIVE_INTERVAL_MS);
+    };
+    heartbeatTimer = window.setTimeout(tick, HEARTBEAT_ACTIVE_INTERVAL_MS);
   };
 
   window.KASA_SET_LOW_POWER = setRendererLowPower;
@@ -182,16 +183,14 @@ export function initHeartbeat({ apiFetch }) {
   IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
     window.addEventListener(eventName, resetIdleLowPower, { passive: true });
   });
-  window.addEventListener('kasa:low-power-changed', scheduleHeartbeat);
   window.addEventListener('pagehide', () => {
     stopHeartbeat();
     stopIdleLowPowerTimer();
     clearTimeout(rendererResumeTimer);
     powerSaveObserver.disconnect();
-    IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
-      window.removeEventListener(eventName, resetIdleLowPower);
-    });
-    window.removeEventListener('kasa:low-power-changed', scheduleHeartbeat);
-  }, { once: true });
+      IDLE_ACTIVITY_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, resetIdleLowPower);
+      });
+    }, { once: true });
 
 }

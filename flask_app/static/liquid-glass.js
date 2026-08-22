@@ -112,8 +112,11 @@
       }, enabled);
     }
 
-    /* Tüm diğer .glass / .glass-sm yüzeyler: boyut-tabanlı tier. */
-    var nodes = document.querySelectorAll('.glass, .glass-sm');
+    /* Tüm diğer .glass / .glass-sm yüzeyler: boyut-tabanlı tier.
+       Vault kartları (.vault-card-shell) hariç: kartlar kalıcı
+       CSS --glass-vivid-blur ile GPU tarafından boyanır; JS tier
+       override'i çift render (glass flash) yaratır. */
+    var nodes = document.querySelectorAll('.glass:not(.vault-card-shell), .glass-sm:not(.vault-card-shell)');
     for (i = 0; i < nodes.length; i++) {
       var node = nodes[i];
       if (seen.has(node)) continue;
@@ -162,7 +165,7 @@
       if (typeof ResizeObserver === 'undefined') return;
       if (!resizeObserver) resizeObserver = new ResizeObserver(scheduleResizeRefresh);
       resizeObserver.disconnect();
-      var els = document.querySelectorAll('.glass, .glass-sm');
+      var els = document.querySelectorAll('.glass:not(.vault-card-shell), .glass-sm:not(.vault-card-shell)');
       for (var i = 0; i < els.length; i++) resizeObserver.observe(els[i]);
     }
     rescanObservedSurfaces();
@@ -185,6 +188,11 @@
       attributeFilter: ['hidden', 'class']
     });
   }
+
+  /* Tek element glass uygulaması — vault-index.js tarafından
+     kart görünür olduğunda forced reflow'dan HEMEN ÖNCE çağrılır.
+     Vault kartları saf CSS --glass-vivid-blur ile boyanır; no-op. */
+  window.__kasaGlassApply = function () {};
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

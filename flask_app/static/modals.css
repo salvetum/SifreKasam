@@ -435,6 +435,15 @@
     padding: 1.2rem 0.5rem;
     font-size: 0.82rem;
     color: var(--text-muted);
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, max-height 0.24s ease, padding 0.2s ease;
+}
+
+.gen-history-empty.is-visible {
+    opacity: 1;
+    max-height: 100px;
 }
 
 .gen-history-item {
@@ -563,6 +572,7 @@
     user-select: none;
 }
 .kasa-swal-remember .kasa-checkbox { width: 16px; height: 16px; }
+.kasa-swal-remember .kasa-checkbox::after { top: 1px; left: 4px; width: 4px; height: 8px; }
 .swal2-icon.swal2-warning { border-color: rgba(245,158,11,0.38) !important; color: #f59e0b !important; }
 
 /* SweetAlert2 scroll fix */

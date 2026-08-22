@@ -119,6 +119,7 @@ class ImportExportServiceTests(unittest.TestCase):
             "website_url": "https://example.com",
             "login": "kullanıcı",
             "email": "kullanici@mail.com",
+            "card_holder": "",
             "password": "gizli",
             "comment": "not",
             "expiry_date": "2030-01-02",
@@ -959,16 +960,22 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         self.assertIn('error', data)
 
     def test_unauthorized_upload_without_token(self) -> None:
+        with self.client.session_transaction() as session:
+            session.clear()
         response = self.client.post('/api/background/upload', data={
             'file': (io.BytesIO(self._make_png()), 'test.png'),
         }, content_type='multipart/form-data')
         self.assertEqual(response.status_code, 403)
 
     def test_unauthorized_delete_without_token(self) -> None:
+        with self.client.session_transaction() as session:
+            session.clear()
         response = self.client.delete('/api/background')
         self.assertEqual(response.status_code, 403)
 
     def test_unauthorized_serve_without_token(self) -> None:
+        with self.client.session_transaction() as session:
+            session.clear()
         response = self.client.get('/api/background/current')
         self.assertEqual(response.status_code, 403)
 
@@ -1167,6 +1174,8 @@ class CustomBackgroundUploadTests(unittest.TestCase):
         self.assertEqual(app_module.get_saved_background_style(), 'aurora')
 
     def test_delete_all_backgrounds_requires_auth(self) -> None:
+        with self.client.session_transaction() as session:
+            session.clear()
         response = self.client.delete('/api/background/all')
         self.assertEqual(response.status_code, 403)
 
@@ -1282,6 +1291,197 @@ class CsrfAndPasswordStrengthTests(unittest.TestCase):
         }, headers={'X-App-Token': app_module.APP_TOKEN})
         self.assertEqual(response.status_code, 400)
         self.assertIn('çok zayıf', response.get_json()['error'])
+
+
+class LanAccessPasswordTests(unittest.TestCase):
+    """LAN erişim şifresi: master şifre ağa gönderilmez, sarma/çözme doğrulanır."""
+
+    MASTER = 'test-master-password'
+
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+        app_module._login_attempts.clear()
+        self._reset_vault_state()
+
+    def tearDown(self) -> None:
+        app_module._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized',
+                        'lan_enabled'):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module._clear_lan_access_settings()
+            app_module.db.session.commit()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key='master_hash',
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key='pbkdf2_salt_b64', value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key='vault_initialized', value='true'))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _extract_csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _local_login(self) -> None:
+        token = self._extract_csrf(self.client.get('/login').get_data(as_text=True))
+        response = self.client.post('/login', data={
+            'master_password': self.MASTER,
+            'csrf_token': token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _enable_lan(self) -> None:
+        response = self.client.post(
+            '/save_settings', data={'lan_enabled': '1'},
+            headers={
+                'X-App-Token': app_module.APP_TOKEN,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['lan_enabled'], True)
+
+    def _lan_password(self) -> str:
+        data = self.client.get(
+            '/api/lan-info', headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        self.assertIn('lan_password', data)
+        return data['lan_password']
+
+    def _lan_login(self, password: str, remote: str = '192.168.1.50'):
+        lan_client = app_module.app.test_client()
+        token = self._extract_csrf(lan_client.get(
+            '/login', environ_base={'REMOTE_ADDR': remote}).get_data(as_text=True))
+        response = lan_client.post(
+            '/login',
+            data={'master_password': password, 'csrf_token': token},
+            environ_base={'REMOTE_ADDR': remote},
+        )
+        return lan_client, response
+
+    def test_enabling_lan_creates_access_setup_and_returns_password(self) -> None:
+        self._seed_vault()
+        self._local_login()
+        self._enable_lan()
+
+        with app_module.app.app_context():
+            self.assertTrue(app_module._get_setting('lan_access_hash'))
+            self.assertTrue(app_module._get_setting('lan_vault_wrap'))
+            self.assertTrue(app_module._get_setting('lan_access_secret'))
+            self.assertEqual(app_module._get_setting('lan_enabled'), 'true')
+
+        lan_password = self._lan_password()
+        self.assertTrue(lan_password)
+        self.assertTrue(set(lan_password) <= set(app_module.LAN_PASSWORD_ALPHABET))
+
+    def test_lan_login_with_lan_access_password(self) -> None:
+        self._seed_vault()
+        self._local_login()
+        self._enable_lan()
+        lan_password = self._lan_password()
+
+        lan_client, response = self._lan_login(lan_password)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/', response.headers['Location'])
+        index_response = lan_client.get(
+            '/', environ_base={'REMOTE_ADDR': '192.168.1.50'},
+        )
+        self.assertEqual(index_response.status_code, 200)
+
+    def test_lan_login_rejects_master_password(self) -> None:
+        self._seed_vault()
+        self._local_login()
+        self._enable_lan()
+
+        _, response = self._lan_login(self.MASTER, remote='192.168.1.60')
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('LAN erişim şifresi', response.get_data(as_text=True))
+
+    def test_lan_info_omits_password_without_local_vault_key(self) -> None:
+        self._seed_vault()
+        self._local_login()
+        self._enable_lan()
+
+        fresh = app_module.app.test_client()
+        data = fresh.get(
+            '/api/lan-info', headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        self.assertTrue(data['lan_access_configured'])
+        self.assertNotIn('lan_password', data)
+
+    def test_disabling_lan_clears_access_and_reenabling_rotates(self) -> None:
+        self._seed_vault()
+        self._local_login()
+        self._enable_lan()
+        first = self._lan_password()
+
+        response = self.client.post(
+            '/save_settings', data={'lan_enabled': ''},
+            headers={
+                'X-App-Token': app_module.APP_TOKEN,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        with app_module.app.app_context():
+            self.assertFalse(app_module._get_setting('lan_access_hash'))
+            self.assertEqual(app_module._get_setting('lan_enabled'), 'false')
+
+        self._enable_lan()
+        second = self._lan_password()
+        self.assertNotEqual(first, second)
+
+    def test_lan_client_cannot_run_first_setup(self) -> None:
+        with patch.object(app_module, '_is_first_setup', return_value=True):
+            with app_module.app.app_context():
+                app_module._set_setting('lan_enabled', 'true')
+                app_module.db.session.commit()
+            lan_client = app_module.app.test_client()
+            token = self._extract_csrf(lan_client.get(
+                '/login', environ_base={'REMOTE_ADDR': '192.168.1.70'},
+            ).get_data(as_text=True))
+            response = lan_client.post(
+                '/login',
+                data={
+                    'master_password': 'some-new-master-password',
+                    'master_password_confirm': 'some-new-master-password',
+                    'csrf_token': token,
+                },
+                environ_base={'REMOTE_ADDR': '192.168.1.70'},
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn('bu bilgisayardan', response.get_data(as_text=True))
+
+    def test_master_password_change_refreshes_lan_bindings(self) -> None:
+        self._seed_vault()
+        self._local_login()
+        self._enable_lan()
+        lan_password = self._lan_password()
+
+        with app_module.app.app_context():
+            old_key = app_module.derive_key(self.MASTER)
+            new_key = app_module.derive_key('new-master-password-2')
+            app_module._refresh_lan_access_bindings(old_key, new_key)
+            self.assertEqual(app_module._unwrap_lan_vault_key(lan_password), new_key)
+            self.assertIsNone(app_module._get_lan_access_password(old_key))
+            self.assertEqual(
+                app_module._get_lan_access_password(new_key), lan_password,
+            )
 
 
 class HardwareAccelerationSettingsTests(unittest.TestCase):

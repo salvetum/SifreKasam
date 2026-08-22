@@ -13,7 +13,11 @@ body::before, body::after, .blob-accent {
     filter: blur(16px);
     pointer-events: none;
     z-index: -1;
-    animation: drift 20s infinite alternate ease-in-out;
+    /* steps(): background blob'ları pürüzsüz 60-120fps yerine kademeli
+       hareket ettirir. Ölçüm: smooth → GPU ~%83 (bir tam çekirdek);
+       steps(12) → ~%4.5. 20s'lik döngüde adım ~1.7s'de bir olduğundan
+       ambient görsel fark algılanmaz, CPU ~%95 düşer. */
+    animation: drift 20s infinite alternate steps(12, jump-none);
     opacity: 0.6;
     will-change: auto;
 }
@@ -209,13 +213,14 @@ body::after {
 }
 
 /* ── ANİMASYONLAR ────────────────────────────────────────────── */
-/* DİKKAT: animation-fill-mode ("both") KULLANILMAZ. Vault kartlarının
-   wrapper'ında (.card-wrapper) kalıcı transform: translateY(0) bırakır;
-   Chromium wrapper'ı composited layer olarak tutup, içindeki backdrop-
-   filter'lı shell'in arkaplan örneklemesini boşaltır → camın buğusu
-   yalnızca kartlarda kaybolur (settings kartlarında wrapper olmadığı için
-   sorun yok). Son kare zaten doğal durumla aynı (opacity:1, translateY:0),
-   bu yüzden fill-mode'suz görsel fark yoktur. */
+/* animation-fill-mode: "both" KULLANILMAZ (wrapper transform composited
+   layer → backdrop-filter buğusu kaybolur). "backwards" ise güvenlidir
+   ve .filter-reveal'de kullanılır: kart hidden durumdayken animation
+   eklenir, backwards from keyframe'i (opacity:0) hemen uygulanır;
+   kart hidden=false olduğunda zaten opacity:0'dan başlar → flash yok. */
+
+/* glass-ready gate kaldırıldı — vault kartları saf CSS --glass-vivid-blur
+   ile GPU tarafından boyanır; JS tier override'i çift render yaratıyordu. */
 .card-animated {
     animation: fadeUp 0.24s cubic-bezier(0.2,0.8,0.2,1);
 }
@@ -258,9 +263,13 @@ body::after {
    varsa Chromium wrapper'ı composited layer'a alır, içteki backdrop-
    filter'lı shell'in arkaplan örneklemesi boşalır ve cam buğusu
    animasyon boyunca kaybolur ("önce buğusuz, sonra buğulu" iki aşamalı
-   görünüm). Sadece opacity animasyonu bu sorunu yaratmaz. */
+   görünüm). Sadece opacity animasyonu bu sorunu yaratmaz.
+   fill-mode:backwards — from keyframes (opacity:0) animasyon başlamadan
+   önce uygulanır; böylece class eklenmesi ile animasyon başlangıcı
+   arasındaki 1 karelik boşlukta kart tam opacity'de çizilmez. */
+/* Filtre geçişlerinde kartlara uygulanan reveal animasyonu. */
 .filter-reveal {
-    animation: filterFadeIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: filterFadeIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 @keyframes filterFadeIn {
     from { opacity: 0; }

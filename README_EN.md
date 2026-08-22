@@ -32,6 +32,9 @@ Keep your data on your device and protect it using a master password.
 
 ---
 
+> [!WARNING]
+> ŞifreKasam V3 will be rewritten entirely in Rust from the ground up, without the assistance of artificial intelligence. *(not promising tho)*
+
 ## What is ŞifreKasam?
 
 **ŞifreKasam** is a locally running desktop password manager. Your data is stored on your device and encrypted using a master password. The application is distributed as an Electron and Flask-based desktop package.

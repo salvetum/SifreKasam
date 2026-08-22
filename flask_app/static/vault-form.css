@@ -498,3 +498,11 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 /* ── PROGRESS BAR ────────────────────────────────────────────── */
 .progress-bar { transition: width 0.3s ease, background-color 0.3s ease; }
 
+/* Card expiry stepper — inherit settings-number-stepper look */
+.vault-field .settings-number-stepper {
+    width: 100%;
+}
+.vault-field .settings-number-stepper .settings-timeout-input {
+    font-size: 0.85rem;
+}
+

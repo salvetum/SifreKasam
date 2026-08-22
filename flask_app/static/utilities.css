@@ -52,22 +52,36 @@
     left: 50%;
     z-index: 50;
     opacity: 0;
+    pointer-events: none;
     transform: translateX(-50%) translateY(20px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
 }
 #bulk-toolbar.is-visible {
     opacity: 1;
+    pointer-events: auto;
     transform: translateX(-50%) translateY(0);
 }
 
-.card-delay-0 { animation-delay: 0ms; }
-.card-delay-1 { animation-delay: 18ms; }
-.card-delay-2 { animation-delay: 36ms; }
-.card-delay-3 { animation-delay: 54ms; }
-.card-delay-4 { animation-delay: 72ms; }
-.card-delay-5 { animation-delay: 90ms; }
-.card-delay-6 { animation-delay: 108ms; }
-.card-delay-7 { animation-delay: 126ms; }
-.card-delay-8 { animation-delay: 144ms; }
+/* ── Animated Show/Hide Utility ── */
+.anim-slide-in {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.anim-slide-in.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.card-delay-0 { --stagger: 0ms;   animation-delay: 0ms; }
+.card-delay-1 { --stagger: 18ms;  animation-delay: 18ms; }
+.card-delay-2 { --stagger: 36ms;  animation-delay: 36ms; }
+.card-delay-3 { --stagger: 54ms;  animation-delay: 54ms; }
+.card-delay-4 { --stagger: 72ms;  animation-delay: 72ms; }
+.card-delay-5 { --stagger: 90ms;  animation-delay: 90ms; }
+.card-delay-6 { --stagger: 108ms; animation-delay: 108ms; }
+.card-delay-7 { --stagger: 126ms; animation-delay: 126ms; }
+.card-delay-8 { --stagger: 144ms; animation-delay: 144ms; }
 
 .modal-title-display { font-family: var(--font-display); }
 .modal-title-compact { font-size: 0.95rem; }
@@ -124,6 +138,13 @@
 .settings-switch-input:disabled {
     cursor: not-allowed;
     opacity: 0.48;
+}
+.settings-card-toggle.is-bg-locked .settings-card-head {
+    opacity: 0.5;
+}
+.settings-card-toggle.is-bg-locked .settings-card-head h4::after {
+    content: ' \2022';
+    opacity: 0.5;
 }
 
 @keyframes settingsSwitchOn {

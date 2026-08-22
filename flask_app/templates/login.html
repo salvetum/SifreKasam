@@ -546,6 +546,7 @@
 </style>
 
 {% set first_setup_active = first_setup|default(false) %}
+{% set lan_client = is_lan_client|default(false) %}
 <div class="entry-login-wrap">
     <main class="entry-login-shell">
         <section class="entry-login-info" aria-label="{{ _('Kasa') }}">
@@ -580,8 +581,21 @@
                     {{ _('Ana Şifre Oluştur') if first_setup_active else _('Kilidi Aç') }}
                 </h2>
                 <p class="entry-login-card-subtitle">
-                    {{ _('Yeni kasanız için bir ana şifre belirleyin.') if first_setup_active else _('Ana şifrenizle devam edin.') }}
+                    {% if first_setup_active %}
+                        {{ _('Yeni kasanız için bir ana şifre belirleyin.') }}
+                    {% elif lan_client %}
+                        {{ _('LAN erişim şifrenizle devam edin.') }}
+                    {% else %}
+                        {{ _('Ana şifrenizle devam edin.') }}
+                    {% endif %}
                 </p>
+
+                {% if lan_client and not first_setup_active %}
+                <div class="mb-4 py-2 px-3 text-left text-sm" role="note">
+                    <i class="fa-solid fa-wifi mr-2 text-amber-400"></i>
+                    <span>{{ _('Ana şifreniz ağa gönderilmez. Bilgisayardaki Ayarlar > LAN bölümünde gösterilen LAN erişim şifresini girin.') }}</span>
+                </div>
+                {% endif %}
 
                 {% if error %}
                 <div class="mb-4 py-2 px-3 text-left text-sm kasa-alert-danger"

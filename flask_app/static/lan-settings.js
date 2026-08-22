@@ -20,8 +20,13 @@ export function initLanSettings({ apiJson }) {
   const lanAddressWrap = document.getElementById('lan-address-wrap');
   const lanAddress = document.getElementById('lan-address');
   const lanPendingNote = document.getElementById('lan-pending-note');
+  const lanPasswordWrap = document.getElementById('lan-password-wrap');
+  const lanPassword = document.getElementById('lan-password');
 
   const lanActiveOnLoad = Boolean(lanToggle && lanToggle.checked);
+
+  function _showEl(el) { if (el) { el.classList.remove('hidden'); el.classList.add('is-visible'); } }
+  function _hideEl(el) { if (el) el.classList.remove('is-visible'); }
 
   async function fetchLanInfo() {
     if (!lanAddress) return;
@@ -30,9 +35,18 @@ export function initLanSettings({ apiJson }) {
       const data = await apiJson('/api/lan-info');
       if (Array.isArray(data.ips) && data.ips.length > 0) {
         lanAddress.textContent = `${data.ssl ? 'https://' : 'http://'}${data.ips[0]}:${data.port}`;
-        return;
+      } else {
+        lanAddress.textContent = window._('Ağ bağlantısı bulunamadı');
       }
-      lanAddress.textContent = window._('Ağ bağlantısı bulunamadı');
+      if (lanPasswordWrap && lanPassword) {
+        if (data.lan_password) {
+          lanPassword.textContent = data.lan_password;
+          _showEl(lanPasswordWrap);
+        } else {
+          _hideEl(lanPasswordWrap);
+        }
+      }
+      return;
     } catch {
       lanAddress.textContent = window._('Bilgi alınamadı');
     }
@@ -40,10 +54,11 @@ export function initLanSettings({ apiJson }) {
 
   function showPending() {
     if (!lanInfoBox) return;
-    lanInfoBox.classList.remove('hidden');
-    if (lanAddressWrap) lanAddressWrap.classList.add('hidden');
+    _showEl(lanInfoBox);
+    _hideEl(lanAddressWrap);
+    _hideEl(lanPasswordWrap);
     if (lanPendingNote) {
-      lanPendingNote.classList.remove('hidden');
+      _showEl(lanPendingNote);
     } else if (lanAddress) {
       lanAddress.textContent = window._('Ağ bağlantısı bulunamadı');
     }
@@ -51,20 +66,37 @@ export function initLanSettings({ apiJson }) {
 
   function showActive() {
     if (!lanInfoBox) return;
-    lanInfoBox.classList.remove('hidden');
-    if (lanAddressWrap) lanAddressWrap.classList.remove('hidden');
-    if (lanPendingNote) lanPendingNote.classList.add('hidden');
+    _showEl(lanInfoBox);
+    _showEl(lanAddressWrap);
+    _hideEl(lanPendingNote);
     fetchLanInfo();
   }
 
   function hide() {
-    lanInfoBox?.classList.add('hidden');
+    _hideEl(lanInfoBox);
   }
 
   // LAN zaten kayıtlı ve çalışıyorken sayfa yüklendiyse adresi doğrudan göster.
   if (lanActiveOnLoad) {
     showActive();
   }
+
+  document.querySelectorAll('.lan-copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const targetId = btn.getAttribute('data-copy-target');
+      const target = document.getElementById(targetId);
+      if (!target || !target.textContent) return;
+      try {
+        await navigator.clipboard.writeText(target.textContent);
+        btn.classList.add('copied');
+        btn.querySelector('i').className = 'fa-solid fa-check';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.querySelector('i').className = 'fa-regular fa-copy';
+        }, 1200);
+      } catch (_) {}
+    });
+  });
 
   return { lanToggle, lanInfoBox, lanAddress, fetchLanInfo, showPending, showActive, hide };
 

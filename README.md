@@ -32,6 +32,9 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
 
 ---
 
+> [!WARNING]
+> ŞifreKasam V3, tamamen baştan sona Rust ile yapay zekâ desteği olmadan yeniden yazılacaktır. *(söz degil)*
+
 ## ŞifreKasam Nedir?
 
 **ŞifreKasam**, yerel çalışan bir masaüstü şifre yöneticisidir. Veriler cihazda tutulur, ana şifreyle şifrelenir ve uygulama Electron ile Flask tabanlı bir masaüstü paket olarak çalışır.

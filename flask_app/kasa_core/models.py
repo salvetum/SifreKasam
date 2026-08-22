@@ -28,6 +28,7 @@ class Record(db.Model):
     encrypted_comment = db.Column(db.String, default="")
     is_pinned = db.Column(db.Integer, default=0)
     expiry_date = db.Column(db.DateTime, nullable=True)
+    card_holder = db.Column(db.String, default="")
     created_at = db.Column(db.DateTime, default=utc_now_naive)
     updated_at = db.Column(
         db.DateTime,

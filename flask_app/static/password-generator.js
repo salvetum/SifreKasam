@@ -193,7 +193,10 @@ export function initPasswordGenerator({
 
     const history = getGeneratorHistory();
 
-    if (empty) empty.hidden = history.length > 0;
+    if (empty) {
+      if (history.length > 0) empty.classList.remove('is-visible');
+      else empty.classList.add('is-visible');
+    }
     if (clearBtn) clearBtn.hidden = history.length === 0;
 
     list.replaceChildren();
