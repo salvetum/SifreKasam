@@ -37,6 +37,7 @@ const {
   getSavedHardwareAcceleration,
   getSavedWindowBackgroundColor,
 } = require('./src/main/preferences');
+const rt = require('./src/main/runtime-state');
 
 function resolvePath(...segments) {
   return app.isPackaged
@@ -75,18 +76,6 @@ const LAN_RESTART_MIN_INTERVAL_MS = 15_000;
 
 // ─── UYGULAMA DURUMU ──────────────────────────────────────────────────────────
 
-let PORT         = 0;
-let flaskProcess = null;
-let mainWindow   = null;
-let tray         = null;
-let isQuiting    = false;
-let lanRuntimeEnabled = false;
-let resetSavedLanOnNextStart = true;
-let isRestartingFlask = false;
-let lanReconciliationTimer = null;
-let lastLanRestartAttempt = 0;
-let rendererLowPowerRequested = false;
-let backendPageRecoveryAttempts = 0;
 
 app.commandLine.appendSwitch('disable-spell-checking');
 app.commandLine.appendSwitch('log-level', '3');
@@ -102,12 +91,12 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    if (!mainWindow.isVisible())  mainWindow.show();
-    mainWindow.focus();
-    if (mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-      mainWindow.webContents.send('kasa:second-instance');
+    if (!rt.mainWindow) return;
+    if (rt.mainWindow.isMinimized()) rt.mainWindow.restore();
+    if (!rt.mainWindow.isVisible())  rt.mainWindow.show();
+    rt.mainWindow.focus();
+    if (rt.mainWindow.webContents && !rt.mainWindow.webContents.isDestroyed()) {
+      rt.mainWindow.webContents.send('kasa:second-instance');
     }
   });
 
@@ -125,14 +114,14 @@ if (!gotTheLock) {
 async function onAppReady() {
   try {
     verifyPackagedStartupResources();
-    PORT = await findFreePort();
+    rt.PORT = await findFreePort();
     await createWindow();
     createTray();
 
     let progressTimer = null;
     const showProgressMessage = () => {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      mainWindow.webContents.executeJavaScript(`
+      if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
+      rt.mainWindow.webContents.executeJavaScript(`
         (function () {
           var lang = document.documentElement.lang || 'tr';
           var msgs = {
@@ -151,7 +140,7 @@ async function onAppReady() {
     const flaskTimeoutMs = isFirstRun() ? FLASK_TIMEOUT_FIRST_RUN_MS : FLASK_TIMEOUT_MS;
 
     if (isRunningAsAdmin()) {
-      await dialog.showMessageBox(mainWindow, {
+      await dialog.showMessageBox(rt.mainWindow, {
         type: 'warning',
         title: 'ŞifreKasam',
         message: 'ŞifreKasam yönetici (Administrator) olarak çalışıyor.',
@@ -168,8 +157,8 @@ async function onAppReady() {
     } catch (firstErr) {
       clearProgressTimer();
 
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.executeJavaScript(`
+      if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
+        rt.mainWindow.webContents.executeJavaScript(`
           (function () {
             var lang = document.documentElement.lang || 'tr';
             var msgs = {
@@ -190,7 +179,7 @@ async function onAppReady() {
       } catch (retryErr) {
         clearProgressTimer();
 
-        const result = await dialog.showMessageBox(mainWindow, {
+        const result = await dialog.showMessageBox(rt.mainWindow, {
           type: 'warning',
           title: 'ŞifreKasam',
           message: 'Arka plan hizmeti başlatılamadı',
@@ -203,7 +192,7 @@ async function onAppReady() {
         if (result.response === 0) {
           try {
             progressTimer = setTimeout(showProgressMessage, 12_000);
-            if (flaskProcess) {
+            if (rt.flaskProcess) {
               await new Promise((resolve, reject) => {
                 waitForBackendReady(resolve, reject);
               });
@@ -225,9 +214,9 @@ async function onAppReady() {
 
     clearProgressTimer();
 
-    if (mainWindow) {
+    if (rt.mainWindow) {
       try {
-        const loadingLanguage = await mainWindow.webContents.executeJavaScript(
+        const loadingLanguage = await rt.mainWindow.webContents.executeJavaScript(
           "localStorage.getItem('kasa-lang') || ''",
           true
         );
@@ -239,9 +228,9 @@ async function onAppReady() {
         }
       } catch (_) { /* Loading ekranı tercihi yoksa kayıtlı backend dili kullanılır. */ }
       try {
-        await mainWindow.webContents.executeJavaScript('transitionToApp()');
+        await rt.mainWindow.webContents.executeJavaScript('transitionToApp()');
       } catch (_) { /* loading.html henüz yüklenmemiş olabilir */ }
-      mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
+      rt.mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
       applyContentProtection();
       await loadBackendPage('/login?entry=loading');
       startLanReconciliation();
@@ -256,7 +245,7 @@ async function onAppReady() {
 // ─── PENCERE ──────────────────────────────────────────────────────────────────
 
 async function createWindow() {
-  mainWindow = new BrowserWindow({
+  rt.mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: resolvePath('favicon.ico'),
@@ -274,16 +263,16 @@ async function createWindow() {
     },
   });
 
-  mainWindow.setMenu(null);
+  rt.mainWindow.setMenu(null);
   let windowShown = false;
   const showWindow = () => {
-    if (windowShown || !mainWindow || mainWindow.isDestroyed()) return;
+    if (windowShown || !rt.mainWindow || rt.mainWindow.isDestroyed()) return;
     windowShown = true;
-    mainWindow.show();
+    rt.mainWindow.show();
   };
-  mainWindow.once('ready-to-show', showWindow);
+  rt.mainWindow.once('ready-to-show', showWindow);
   setTimeout(showWindow, 1_200);
-  await mainWindow.loadFile(resolveLoadingPagePath(), {
+  await rt.mainWindow.loadFile(resolveLoadingPagePath(), {
     query: {
       theme:        resolveEffectiveTheme(),
       themeMode:    getSavedThemeMode(),
@@ -297,7 +286,7 @@ async function createWindow() {
   });
 
   // Harici linkleri sistem tarayıcısında aç
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  rt.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsedUrl = new URL(url);
       if (['https:', 'http:', 'mailto:'].includes(parsedUrl.protocol)) {
@@ -312,7 +301,7 @@ async function createWindow() {
   });
 
   // Ana uygulama penceresinin yerel kasa arayüzünden ayrılmasını engelle.
-  mainWindow.webContents.on('will-navigate', (event, url) => {
+  rt.mainWindow.webContents.on('will-navigate', (event, url) => {
     let parsedUrl;
     try {
       parsedUrl = new URL(url);
@@ -322,7 +311,7 @@ async function createWindow() {
     }
     const isLocalAppUrl = parsedUrl.protocol === `${PROTOCOL}:`
       && parsedUrl.hostname === HOST
-      && Number(parsedUrl.port) === PORT;
+      && Number(parsedUrl.port) === rt.PORT;
     if (isLocalAppUrl) return;
 
     event.preventDefault();
@@ -334,20 +323,20 @@ async function createWindow() {
     }
   });
 
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+  rt.mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (!isMainFrame || !validatedURL?.startsWith(`https://${HOST}:`)) return;
     const description = String(errorDescription || '');
     const isCertificateNoise = errorCode === -202
       || errorCode === -201
       || SSL_NOISE_PATTERNS.some((pattern) => description.includes(pattern));
-    if (isCertificateNoise && backendPageRecoveryAttempts < 2) {
+    if (isCertificateNoise && rt.backendPageRecoveryAttempts < 2) {
       event.preventDefault();
-      backendPageRecoveryAttempts += 1;
+      rt.backendPageRecoveryAttempts += 1;
       if (markLocalCertificateNoiseReported()) {
         console.warn(`Yerel self-signed SSL uyarısı için yeniden deneme yapılıyor (${errorCode}: ${description}).`);
       }
       setTimeout(() => {
-        if (!mainWindow || mainWindow.isDestroyed()) return;
+        if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
         loadBackendPage('/login?entry=loading').catch((error) => {
           showFriendlyFatalError('WEB', error, 'ŞifreKasam arayüzü başlatılamadı.');
         });
@@ -362,11 +351,11 @@ async function createWindow() {
     );
   });
 
-  mainWindow.webContents.on('did-finish-load', () => {
-    backendPageRecoveryAttempts = 0;
+  rt.mainWindow.webContents.on('did-finish-load', () => {
+    rt.backendPageRecoveryAttempts = 0;
   });
 
-  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+  rt.mainWindow.webContents.on('render-process-gone', (_event, details) => {
     const rendererError = new Error(
       `Renderer kapandı: ${details.reason} (çıkış kodu: ${details.exitCode ?? 'yok'})`
     );
@@ -381,7 +370,7 @@ async function createWindow() {
     );
   });
 
-  mainWindow.webContents.on('console-message', (event, _level, message, _line, sourceId) => {
+  rt.mainWindow.webContents.on('console-message', (event, _level, message, _line, sourceId) => {
     const text = String(message || '');
     const source = String(sourceId || '');
     const isLocalCertificateNoise = source.startsWith(`${PROTOCOL}://${HOST}:`)
@@ -394,7 +383,7 @@ async function createWindow() {
     }
   });
 
-  mainWindow.webContents.on('before-input-event', (event, input) => {
+  rt.mainWindow.webContents.on('before-input-event', (event, input) => {
     const key = input.key || '';
     const isHistoryKey = HISTORY_NAVIGATION_KEYS.has(key)
       || (input.alt && (key === 'ArrowLeft' || key === 'ArrowRight'));
@@ -409,8 +398,8 @@ async function createWindow() {
   const _TOKEN_INJECT_PATHS = new Set([
     '/heartbeat', '/shutdown', '/api/lan-info', '/settings/runtime',
   ]);
-  mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
-    { urls: [`${PROTOCOL}://${HOST}:${PORT}/*`] },
+  rt.mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
+    { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/*`] },
     (details, callback) => {
       try {
         const { pathname } = new URL(details.url);
@@ -422,8 +411,8 @@ async function createWindow() {
     }
   );
 
-  mainWindow.webContents.session.webRequest.onCompleted(
-    { urls: [`${PROTOCOL}://${HOST}:${PORT}/save_settings`] },
+  rt.mainWindow.webContents.session.webRequest.onCompleted(
+    { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/save_settings`] },
     (details) => {
       if (details.method === 'POST' && details.statusCode >= 200 && details.statusCode < 300) {
         setTimeout(syncLanRuntimeState, 250);
@@ -431,8 +420,8 @@ async function createWindow() {
     }
   );
 
-  mainWindow.webContents.session.webRequest.onCompleted(
-    { urls: [`${PROTOCOL}://${HOST}:${PORT}/settings/content-protection`] },
+  rt.mainWindow.webContents.session.webRequest.onCompleted(
+    { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/settings/content-protection`] },
     (details) => {
       if (details.method === 'POST' && details.statusCode >= 200 && details.statusCode < 300) {
         setTimeout(applyContentProtection, 250);
@@ -441,34 +430,34 @@ async function createWindow() {
   );
 
   // Kapat yerine gizle / tepside çalışmaya devam et
-  mainWindow.on('close', (event) => {
-    if (isQuiting) return;
+  rt.mainWindow.on('close', (event) => {
+    if (rt.isQuiting) return;
     event.preventDefault();
     checkMinimizeToTray()
       .then((shouldMinimize) => {
         if (shouldMinimize) {
           setRendererLowPower(true);
-          mainWindow.hide();
+          rt.mainWindow.hide();
         } else {
-          isQuiting = true;
+          rt.isQuiting = true;
           app.quit();
         }
       })
       .catch(() => {
-        isQuiting = true;
+        rt.isQuiting = true;
         app.quit();
       });
   });
 
-  mainWindow.on('hide', () => {
+  rt.mainWindow.on('hide', () => {
     setRendererLowPower(true);
   });
-  mainWindow.on('show', () => setRendererLowPower(false));
-  mainWindow.on('minimize', () => {
+  rt.mainWindow.on('show', () => setRendererLowPower(false));
+  rt.mainWindow.on('minimize', () => {
     setRendererLowPower(true);
   });
-  mainWindow.on('restore', () => setRendererLowPower(false));
-  mainWindow.on('closed', () => { mainWindow = null; });
+  rt.mainWindow.on('restore', () => setRendererLowPower(false));
+  rt.mainWindow.on('closed', () => { rt.mainWindow = null; });
 }
 
 // ─── SİSTEM TEPSİSİ ───────────────────────────────────────────────────────────
@@ -478,44 +467,44 @@ function createTray() {
     const iconPath = process.platform === 'win32'
       ? resolvePath('favicon.ico')
       : resolvePath('assets', 'tray-icon.png');
-    tray = new Tray(iconPath);
-    tray.setToolTip('ŞifreKasam');
-    tray.setContextMenu(Menu.buildFromTemplate([
+    rt.tray = new Tray(iconPath);
+    rt.tray.setToolTip('ŞifreKasam');
+    rt.tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Göster', click: showMainWindow },
       { type: 'separator' },
-      { label: 'Çıkış',  click: () => { isQuiting = true; app.quit(); } },
+      { label: 'Çıkış',  click: () => { rt.isQuiting = true; app.quit(); } },
     ]));
-    tray.on('click', showMainWindow);
+    rt.tray.on('click', showMainWindow);
   } catch (err) {
     console.error('Tray icon yuklenemedi, tray ozelligi atlaniyor:', err);
-    tray = null;
+    rt.tray = null;
   }
 }
 
 function showMainWindow() {
-  if (!mainWindow) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.setAlwaysOnTop(true);
-  mainWindow.show();
+  if (!rt.mainWindow) return;
+  if (rt.mainWindow.isMinimized()) rt.mainWindow.restore();
+  rt.mainWindow.setAlwaysOnTop(true);
+  rt.mainWindow.show();
   setRendererLowPower(false);
-  mainWindow.focus();
-  mainWindow.setAlwaysOnTop(false);
+  rt.mainWindow.focus();
+  rt.mainWindow.setAlwaysOnTop(false);
 }
 
 function setRendererLowPower(enabled) {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
   const nextState = Boolean(enabled);
-  const wasLowPower = rendererLowPowerRequested;
-  rendererLowPowerRequested = nextState;
+  const wasLowPower = rt.rendererLowPowerRequested;
+  rt.rendererLowPowerRequested = nextState;
 
-  if (!nextState && (wasLowPower || mainWindow.isVisible())
-      && typeof mainWindow.webContents.invalidate === 'function') {
-    mainWindow.webContents.invalidate();
+  if (!nextState && (wasLowPower || rt.mainWindow.isVisible())
+      && typeof rt.mainWindow.webContents.invalidate === 'function') {
+    rt.mainWindow.webContents.invalidate();
   }
   const script = nextState
     ? 'window.KASA_SET_LOW_POWER?.(true);'
     : 'window.KASA_RESUME_RENDERER?.();';
-  mainWindow.webContents
+  rt.mainWindow.webContents
     .executeJavaScript(script, true)
     .catch(() => {});
 }
@@ -525,7 +514,7 @@ function setRendererLowPower(enabled) {
 function checkMinimizeToTray() {
   return new Promise((resolve) => {
     const req = https.request(
-      { hostname: HOST, port: PORT, path: '/settings/tray',
+      { hostname: HOST, port: rt.PORT, path: '/settings/tray',
         method: 'GET', headers: { 'X-App-Token': APP_TOKEN }, timeout: 1000,
         ...getPinnedHttpsOptions() },
       (res) => {
@@ -546,12 +535,12 @@ function checkMinimizeToTray() {
 // Ekran yakalama engeli yalnızca Windows/macOS native API'lerinde çalışır;
 // Linux'ta setContentProtection no-op'tur, bu yüzden çağrıyı hiç yapmıyoruz.
 async function applyContentProtection() {
-  if (!PORT) return;
+  if (!rt.PORT) return;
   if (process.platform !== 'win32' && process.platform !== 'darwin') return;
   try {
     const state = await requestBackendJson('/settings/content-protection');
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setContentProtection(state.content_protection_enabled === true);
+    if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
+      rt.mainWindow.setContentProtection(state.content_protection_enabled === true);
     }
   } catch (_) {
     /* Backend henüz hazır değilse sessizce atla; değişiklik hook'u tekrar dener. */
@@ -561,30 +550,30 @@ async function applyContentProtection() {
 // ─── FLASK SUNUCUSU ───────────────────────────────────────────────────────────
 
 async function startFlaskServer(timeoutMs) {
-  if (flaskProcess) {
+  if (rt.flaskProcess) {
     await stopFlaskServer();
   }
   return new Promise((resolve, reject) => {
     const isWin = process.platform === 'win32';
     const backendBinary = isWin ? 'SifreKasam.exe' : 'SifreKasam';
-    const flaskHost = lanRuntimeEnabled ? '0.0.0.0' : HOST;
+    const flaskHost = rt.lanRuntimeEnabled ? '0.0.0.0' : HOST;
     const [command, args] = app.isPackaged
       ? [resolvePath(path.join('backend', backendBinary)), []]
       : [PYTHON_COMMAND, [path.join(__dirname, 'flask_app', 'app.py')]];
 
-    console.log(`Flask baslatiliyor: ${command} ${args.join(' ')} (${flaskHost}:${PORT})`);
+    console.log(`Flask baslatiliyor: ${command} ${args.join(' ')} (${flaskHost}:${rt.PORT})`);
 
     const spawnedProcess = spawn(command, args, {
       env: { ...process.env, APP_TOKEN,
              FLASK_SECRET_KEY: APP_TOKEN,
              APP_VERSION: app.getVersion(),
              FLASK_HOST: flaskHost,
-             FLASK_PORT: String(PORT), PORT: String(PORT),
-             KASA_RESET_LAN_ON_START: resetSavedLanOnNextStart ? '1' : '0' },
+             FLASK_PORT: String(rt.PORT), PORT: String(rt.PORT),
+             KASA_RESET_LAN_ON_START: rt.resetSavedLanOnNextStart ? '1' : '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    flaskProcess = spawnedProcess;
-    resetSavedLanOnNextStart = false;
+    rt.flaskProcess = spawnedProcess;
+    rt.resetSavedLanOnNextStart = false;
     let startupComplete = false;
     let startupSettled = false;
 
@@ -611,12 +600,12 @@ async function startFlaskServer(timeoutMs) {
       failStartup(new Error(`Flask baslatilamadi (spawn hatası): ${err.message}\nKomut: ${command}`))
     );
     spawnedProcess.on('exit', (code, signal) => {
-      if (flaskProcess === spawnedProcess) flaskProcess = null;
+      if (rt.flaskProcess === spawnedProcess) rt.flaskProcess = null;
       const exitDetail = `kod ${code ?? 'yok'}, sinyal ${signal || 'yok'}`;
       const error = new Error(`Flask beklenmedik cikis (${exitDetail}):\n${stderrBuffer}`);
       if (!startupComplete) {
         failStartup(error);
-      } else if (!isQuiting && !isRestartingFlask) {
+      } else if (!rt.isQuiting && !rt.isRestartingFlask) {
         showFriendlyFatalError('BCK', error, 'ŞifreKasam arka plan hizmeti beklenmedik şekilde durdu.');
       }
     });
@@ -631,7 +620,7 @@ function requestBackendJson(pathname, { method = 'GET', body = null, timeout = 1
     const req = https.request(
       {
         hostname: HOST,
-        port: PORT,
+        port: rt.PORT,
         path: pathname,
         method,
         timeout,
@@ -665,25 +654,25 @@ function requestBackendJson(pathname, { method = 'GET', body = null, timeout = 1
 }
 
 async function syncLanRuntimeState() {
-  if (!PORT || isRestartingFlask) return;
+  if (!rt.PORT || rt.isRestartingFlask) return;
   try {
     const state = await requestBackendJson('/settings/runtime');
     // Yalnizca kayitli (istenen) degerle gercek runtime'i kiyasla.
-    // lanRuntimeEnabled onbellek degeri restart yarida kalirsa gercekten
+    // rt.lanRuntimeEnabled onbellek degeri restart yarida kalirsa gercekten
     // kopabildigi icin kiyaslama olarak kullanilmaz; aksi halde her ayar
     // kaydinda gereksiz restart tetiklenip yukleme ekrani kalici olabilir.
     const desiredLanEnabled = state.lan_enabled === true;
     const actualLanEnabled = state.runtime_lan_enabled === true;
-    if (lanRuntimeEnabled !== desiredLanEnabled) {
-      lanRuntimeEnabled = desiredLanEnabled;
+    if (rt.lanRuntimeEnabled !== desiredLanEnabled) {
+      rt.lanRuntimeEnabled = desiredLanEnabled;
       startLanReconciliation();
     }
     if (desiredLanEnabled !== actualLanEnabled) {
       const now = Date.now();
       // Restart basarisiz olursa poller belirli araliklarla yeniden dener;
       // restart firtinasi olusmamasi icin iki deneme arasina minimum sure koy.
-      if (now - lastLanRestartAttempt < LAN_RESTART_MIN_INTERVAL_MS) return;
-      lastLanRestartAttempt = now;
+      if (now - rt.lastLanRestartAttempt < LAN_RESTART_MIN_INTERVAL_MS) return;
+      rt.lastLanRestartAttempt = now;
       await restartFlaskServer(desiredLanEnabled);
     }
   } catch (err) {
@@ -697,14 +686,14 @@ async function syncLanRuntimeState() {
 // LAN kapaliyken her 3 sn'de TLS handshake + DB sorgusu yapmak gereksiz CPU
 // harcar; bos durumda 20 sn, LAN acikken 5 sn'de bir kontrol yeterlidir.
 function startLanReconciliation() {
-  if (lanReconciliationTimer) clearInterval(lanReconciliationTimer);
-  const interval = lanRuntimeEnabled
+  if (rt.lanReconciliationTimer) clearInterval(rt.lanReconciliationTimer);
+  const interval = rt.lanRuntimeEnabled
     ? LAN_RECONCILE_ACTIVE_INTERVAL_MS
     : LAN_RECONCILE_IDLE_INTERVAL_MS;
-  lanReconciliationTimer = setInterval(() => {
+  rt.lanReconciliationTimer = setInterval(() => {
     syncLanRuntimeState().catch(() => {});
   }, interval);
-  if (lanReconciliationTimer.unref) lanReconciliationTimer.unref();
+  if (rt.lanReconciliationTimer.unref) rt.lanReconciliationTimer.unref();
 }
 
 // ─── LAN FIREWALL (paketli uygulama) ─────────────────────────────────────────
@@ -759,7 +748,7 @@ async function ensureLanFirewallRuleAndWarn() {
   if (!program) return;
   if (addLanFirewallRule(ruleName, program)) return;
   try {
-    await dialog.showMessageBox(mainWindow, {
+    await dialog.showMessageBox(rt.mainWindow, {
       type: 'warning',
       title: 'ŞifreKasam',
       message: 'LAN erişimi açıldı.',
@@ -771,15 +760,15 @@ async function ensureLanFirewallRuleAndWarn() {
 }
 
 async function restartFlaskServer(nextLanEnabled) {
-  isRestartingFlask = true;
+  rt.isRestartingFlask = true;
   try {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.executeJavaScript(
+    if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
+      rt.mainWindow.webContents.executeJavaScript(
         "document.body.classList.add('is-page-loading')"
       ).catch(() => {});
     }
     await stopFlaskServer();
-    lanRuntimeEnabled = nextLanEnabled;
+    rt.lanRuntimeEnabled = nextLanEnabled;
     startLanReconciliation();
     // LAN açılışında sertifika LAN IP içerecek şekilde yeniden üretilmiş
     // olabilir; eskimiş pin önbelleğini temizle.
@@ -789,15 +778,15 @@ async function restartFlaskServer(nextLanEnabled) {
       await ensureLanFirewallRuleAndWarn();
     }
     // Flask başarıyla restart olduktan sonra, sayfayı yeniden yükle
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
       await loadBackendPage('/login?entry=loading');
     }
   } catch (err) {
     dialog.showErrorBox('Ağ Ayarı Uygulanamadı', err.message);
   } finally {
-    isRestartingFlask = false;
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.executeJavaScript(
+    rt.isRestartingFlask = false;
+    if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
+      rt.mainWindow.webContents.executeJavaScript(
         "document.body.classList.remove('is-page-loading')"
       ).catch(() => {});
     }
@@ -806,7 +795,7 @@ async function restartFlaskServer(nextLanEnabled) {
 
 function stopFlaskServer() {
   return new Promise((resolve) => {
-    const proc = flaskProcess;
+    const proc = rt.flaskProcess;
     if (!proc) {
       resolve();
       return;
@@ -816,11 +805,11 @@ function stopFlaskServer() {
     const finish = () => {
       if (settled) return;
       settled = true;
-      if (flaskProcess === proc) flaskProcess = null;
+      if (rt.flaskProcess === proc) rt.flaskProcess = null;
       resolve();
     };
     const onExit = () => {
-      if (flaskProcess === proc) flaskProcess = null;
+      if (rt.flaskProcess === proc) rt.flaskProcess = null;
       finish();
     };
 
@@ -877,7 +866,7 @@ function waitForBackendReady(resolve, reject, timeoutMs) {
 
     const request = https.request({
       hostname: HOST,
-      port: PORT,
+      port: rt.PORT,
       path: '/heartbeat',
       method: 'POST',
       timeout: BACKEND_PROBE_TIMEOUT_MS,
@@ -927,23 +916,23 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  isQuiting = true;
+  rt.isQuiting = true;
   shutdownFlask();
 });
 
 app.on('will-quit', () => {
-  isQuiting = true;
+  rt.isQuiting = true;
   shutdownFlask();
 });
 
 function shutdownFlask() {
-  if (!flaskProcess) return;
+  if (!rt.flaskProcess) return;
 
-  const pid = flaskProcess.pid;
-  flaskProcess = null;
+  const pid = rt.flaskProcess.pid;
+  rt.flaskProcess = null;
 
   const req = https.request({
-    hostname: HOST, port: PORT, path: '/shutdown',
+    hostname: HOST, port: rt.PORT, path: '/shutdown',
     method: 'POST', headers: { 'X-App-Token': APP_TOKEN },
     ...getPinnedHttpsOptions(),
   });
@@ -983,12 +972,12 @@ function verifyPackagedStartupResources() {
 }
 
 async function loadBackendPage(pathname) {
-  if (!mainWindow || mainWindow.isDestroyed()) {
+  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) {
     throw new Error('Ana pencere kullanılamıyor.');
   }
   try {
-    const targetUrl = `${PROTOCOL}://${HOST}:${PORT}${pathname}`;
-    await mainWindow.loadURL(targetUrl);
+    const targetUrl = `${PROTOCOL}://${HOST}:${rt.PORT}${pathname}`;
+    await rt.mainWindow.loadURL(targetUrl);
   } catch (err) {
     console.error('loadBackendPage failed:', pathname, err.message);
     throw err;
