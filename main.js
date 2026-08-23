@@ -1,6 +1,6 @@
 // ─── IMPORTS ──────────────────────────────────────────────────────────────────
 
-const { app, BrowserWindow, shell, dialog, Tray, Menu } = require('electron');
+const { app, BrowserWindow, shell, dialog } = require('electron');
 const path   = require('path');
 
 const {
@@ -45,6 +45,7 @@ const {
   waitForBackendReady,
   findFreePort,
 } = require('./src/main/backend-process');
+const { createTray, setRendererLowPower } = require('./src/main/tray');
 const {
   APP_TOKEN,
   HOST,
@@ -451,55 +452,6 @@ async function createWindow() {
   });
   rt.mainWindow.on('restore', () => setRendererLowPower(false));
   rt.mainWindow.on('closed', () => { rt.mainWindow = null; });
-}
-
-// ─── SİSTEM TEPSİSİ ───────────────────────────────────────────────────────────
-
-function createTray() {
-  try {
-    const iconPath = process.platform === 'win32'
-      ? resolvePath('favicon.ico')
-      : resolvePath('assets', 'tray-icon.png');
-    rt.tray = new Tray(iconPath);
-    rt.tray.setToolTip('ŞifreKasam');
-    rt.tray.setContextMenu(Menu.buildFromTemplate([
-      { label: 'Göster', click: showMainWindow },
-      { type: 'separator' },
-      { label: 'Çıkış',  click: () => { rt.isQuiting = true; app.quit(); } },
-    ]));
-    rt.tray.on('click', showMainWindow);
-  } catch (err) {
-    console.error('Tray icon yuklenemedi, tray ozelligi atlaniyor:', err);
-    rt.tray = null;
-  }
-}
-
-function showMainWindow() {
-  if (!rt.mainWindow) return;
-  if (rt.mainWindow.isMinimized()) rt.mainWindow.restore();
-  rt.mainWindow.setAlwaysOnTop(true);
-  rt.mainWindow.show();
-  setRendererLowPower(false);
-  rt.mainWindow.focus();
-  rt.mainWindow.setAlwaysOnTop(false);
-}
-
-function setRendererLowPower(enabled) {
-  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
-  const nextState = Boolean(enabled);
-  const wasLowPower = rt.rendererLowPowerRequested;
-  rt.rendererLowPowerRequested = nextState;
-
-  if (!nextState && (wasLowPower || rt.mainWindow.isVisible())
-      && typeof rt.mainWindow.webContents.invalidate === 'function') {
-    rt.mainWindow.webContents.invalidate();
-  }
-  const script = nextState
-    ? 'window.KASA_SET_LOW_POWER?.(true);'
-    : 'window.KASA_RESUME_RENDERER?.();';
-  rt.mainWindow.webContents
-    .executeJavaScript(script, true)
-    .catch(() => {});
 }
 
 
