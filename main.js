@@ -38,6 +38,7 @@ const {
   getSavedWindowBackgroundColor,
 } = require('./src/main/preferences');
 const rt = require('./src/main/runtime-state');
+const { createBackendNet } = require('./src/main/backend-net');
 
 function resolvePath(...segments) {
   return app.isPackaged
@@ -76,6 +77,16 @@ const LAN_RESTART_MIN_INTERVAL_MS = 15_000;
 
 // ─── UYGULAMA DURUMU ──────────────────────────────────────────────────────────
 
+
+// Backend ag katmani: sabitler/durum enjeksiyonu
+const { requestBackendJson, waitForBackendReady, findFreePort } = createBackendNet({
+  host: HOST,
+  getToken: () => APP_TOKEN,
+  getPort: () => rt.PORT,
+  timeoutMs: FLASK_TIMEOUT_MS,
+  retryIntervalMs: RETRY_INTERVAL_MS,
+  probeTimeoutMs: BACKEND_PROBE_TIMEOUT_MS,
+});
 
 app.commandLine.appendSwitch('disable-spell-checking');
 app.commandLine.appendSwitch('log-level', '3');
@@ -614,44 +625,6 @@ async function startFlaskServer(timeoutMs) {
   });
 }
 
-function requestBackendJson(pathname, { method = 'GET', body = null, timeout = 1200 } = {}) {
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : null;
-    const req = https.request(
-      {
-        hostname: HOST,
-        port: rt.PORT,
-        path: pathname,
-        method,
-        timeout,
-        agent: getBackendKeepAliveAgent(),
-        ...getPinnedHttpsOptions(),
-        headers: {
-          'X-App-Token': APP_TOKEN,
-          ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
-        },
-      },
-      (res) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => {
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            reject(new Error(`Backend ${pathname} HTTP ${res.statusCode}`));
-            return;
-          }
-          try { resolve(data ? JSON.parse(data) : {}); }
-          catch (err) { reject(err); }
-        });
-      }
-    );
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy(new Error(`Backend ${pathname} zaman asimi`));
-    });
-    if (payload) req.write(payload);
-    req.end();
-  });
-}
 
 async function syncLanRuntimeState() {
   if (!rt.PORT || rt.isRestartingFlask) return;
@@ -840,74 +813,6 @@ function stopFlaskServer() {
   });
 }
 
-function waitForBackendReady(resolve, reject, timeoutMs) {
-  const effectiveTimeout = timeoutMs || FLASK_TIMEOUT_MS;
-  const deadline = Date.now() + effectiveTimeout;
-  let lastError = 'HTTPS bağlantısı kurulamadı.';
-
-  const retry = () => {
-    if (Date.now() >= deadline) {
-      reject(new Error(
-        `Flask ${effectiveTimeout / 1000}s içinde HTTPS üzerinden hazır olmadı: ${lastError}`
-      ));
-      return;
-    }
-    setTimeout(probe, RETRY_INTERVAL_MS);
-  };
-
-  const probe = () => {
-    let probeHandled = false;
-    const retryProbe = (error) => {
-      if (probeHandled) return;
-      probeHandled = true;
-      lastError = error instanceof Error ? error.message : String(error || lastError);
-      retry();
-    };
-
-    const request = https.request({
-      hostname: HOST,
-      port: rt.PORT,
-      path: '/heartbeat',
-      method: 'POST',
-      timeout: BACKEND_PROBE_TIMEOUT_MS,
-      ...getPinnedHttpsOptions(),
-      headers: { 'X-App-Token': APP_TOKEN },
-    }, (response) => {
-      response.resume();
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (!probeHandled) {
-          probeHandled = true;
-          resolve();
-        }
-        return;
-      }
-      retryProbe(new Error(`Backend HTTP ${response.statusCode}`));
-    });
-
-    request.once('error', retryProbe);
-    request.once('timeout', () => {
-      request.destroy(new Error('Backend HTTPS kontrolü zaman aşımına uğradı.'));
-    });
-    request.end();
-  };
-
-  probe();
-}
-
-function findFreePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.unref();
-    server.on('error', reject);
-    server.listen(0, HOST, () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      server.close(() =>
-        port ? resolve(port) : reject(new Error('Bos port bulunamadi.'))
-      );
-    });
-  });
-}
 
 // ─── UYGULAMA OLAYLARI ────────────────────────────────────────────────────────
 
