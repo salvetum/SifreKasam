@@ -25,7 +25,13 @@ from flask import (Flask, Response, abort, g, jsonify, has_request_context,
 from flask_login import current_user, login_required, login_user, logout_user
 
 from kasa_core.appearance import AppearanceSettings
-from kasa_core.certificates import ensure_self_signed_cert
+from kasa_core.certificates import (
+    cert_missing_lan_ips,
+    detect_lan_ips,
+    ensure_self_signed_cert,
+    migrate_legacy_ssl_files,
+    normalize_pem_file,
+)
 from kasa_core.constants import (
     APP_VERSION_DEFAULT,
     CARD_PAGE_SIZE,
@@ -1597,28 +1603,9 @@ def update_check():
 
 @app.route('/api/lan-info')
 def lan_info():
-    ips = []
-    # Gerçek ağ arayüzünü bul: 8.8.8.8'e bağlanmayı dene
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.settimeout(1)
-            sock.connect(('8.8.8.8', 53))
-            ips.append(sock.getsockname()[0])
-    except Exception:
-        pass
-    # Fallback: tüm non-127 IP'leri topla
-    if not ips:
-        hostname = socket.gethostname()
-        try:
-            for info in socket.getaddrinfo(hostname, None, family=socket.AF_INET):
-                addr = info[4][0]
-                if not addr.startswith('127.'):
-                    ips.append(addr)
-        except Exception:
-            pass
     payload = {
         'hostname': socket.gethostname(),
-        'ips': sorted(set(ips)),
+        'ips': detect_lan_ips(),
         'port': safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535),
         'ssl': os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE),
     }
@@ -2127,48 +2114,12 @@ def migrate_txt_to_db(mp: str):
 
 # ─── SSL SERTİFİKASI (self-signed) ─────────────────────────────────────────────
 
-def _migrate_legacy_ssl_files():
-    old_cert = os.path.join(DATA_DIR, 'cert.pem')
-    old_key  = os.path.join(DATA_DIR, 'key.pem')
-    os.makedirs(SSL_DIR, exist_ok=True)
-    for old, new in ((old_cert, CERT_FILE), (old_key, KEY_FILE)):
-        if os.path.exists(old) and not os.path.exists(new):
-            os.replace(old, new)
-            log.info("SSL dosyasi %s -> %s tasindi", old, new)
-
-def _detect_lan_ips() -> list[str]:
-    """Ağ üzerinden erişilebilir IPv4 adreslerini döndürür (loopback hariç)."""
-    ips: list[str] = []
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.settimeout(1)
-            sock.connect(('8.8.8.8', 53))
-            ips.append(sock.getsockname()[0])
-    except Exception:
-        pass
-    if not ips:
-        hostname = socket.gethostname()
-        try:
-            for info in socket.getaddrinfo(hostname, None, family=socket.AF_INET):
-                addr = info[4][0]
-                if not addr.startswith('127.'):
-                    ips.append(addr)
-        except Exception:
-            pass
-    return sorted(set(ips))
-
-def _cert_missing_lan_ips(extra_ips: list[str]) -> bool:
-    try:
-        with open(CERT_FILE, 'rb') as f:
-            cert = x509.load_pem_x509_certificate(f.read())
-        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-        present = {str(ip) for ip in san.value.get_values_for_type(x509.IPAddress)}
-        return bool(extra_ips) and not set(extra_ips).issubset(present)
-    except Exception:
-        return True
+# ─── SSL HAZIRLIK ─────────────────────────────────────────────────────────────
+# Sertifika üretimi, LAN IP tespiti ve PEM düzeltmeleri kasa_core/certificates
+# içinde; burada yalnızca veri yolları ve LAN ayarı bağlanır.
 
 def _ensure_self_signed_cert():
-    _migrate_legacy_ssl_files()
+    migrate_legacy_ssl_files(DATA_DIR, SSL_DIR, CERT_FILE, KEY_FILE, log)
     lan_ips: list[str] = []
     lan_on = False
     try:
@@ -2177,9 +2128,9 @@ def _ensure_self_signed_cert():
     except Exception:
         pass
     if lan_on:
-        lan_ips = _detect_lan_ips()
+        lan_ips = detect_lan_ips()
     missing = not (os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE))
-    force = lan_on and bool(lan_ips) and not missing and _cert_missing_lan_ips(lan_ips)
+    force = lan_on and bool(lan_ips) and not missing and cert_missing_lan_ips(CERT_FILE, lan_ips)
     try:
         ensure_self_signed_cert(
             CERT_FILE, KEY_FILE, log,
@@ -2191,29 +2142,7 @@ def _ensure_self_signed_cert():
 
 _ensure_self_signed_cert()
 
-# Normalize double-encoded PEM files (some installers produced a PEM that base64-encodes
-# a PEM block, which breaks Python's SSL PEM parser). If detected, fix in-place.
-def _normalize_pem_files():
-    try:
-        if os.path.exists(CERT_FILE):
-            with open(CERT_FILE, 'rb') as f:
-                data = f.read()
-            # If cert file contains a base64 blob which decodes to a PEM, replace it.
-            import re, base64
-            m = re.search(b'-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----', data, re.S)
-            if m:
-                inner = m.group(1).strip()
-                try:
-                    dec = base64.b64decode(inner)
-                    if b'-----BEGIN CERTIFICATE-----' in dec:
-                        with open(CERT_FILE, 'wb') as f:
-                            f.write(dec)
-                        log.info('Double-encoded PEM detected and normalized for %s', CERT_FILE)
-                except Exception:
-                    pass
-    except Exception:
-        log.debug('PEM normalization failed', exc_info=True)
-
+_normalize_pem_files = lambda: normalize_pem_file(CERT_FILE, log)
 _normalize_pem_files()
 
 # ─── BAŞLATMA ─────────────────────────────────────────────────────────────────

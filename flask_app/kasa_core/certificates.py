@@ -1,8 +1,11 @@
 """Self-signed localhost certificate generation."""
 
+import base64
 import ipaddress
 import logging
 import os
+import re
+import socket
 from datetime import timedelta
 
 from cryptography import x509
@@ -11,6 +14,84 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from kasa_core.time_utils import utc_now
+
+
+log = logging.getLogger(__name__)
+
+
+def detect_lan_ips() -> list[str]:
+    """Ağ üzerinden erişilebilir IPv4 adreslerini döndürür (loopback hariç)."""
+    ips: list[str] = []
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(1)
+            sock.connect(('8.8.8.8', 53))
+            ips.append(sock.getsockname()[0])
+    except Exception:
+        pass
+    if not ips:
+        hostname = socket.gethostname()
+        try:
+            for info in socket.getaddrinfo(hostname, None, family=socket.AF_INET):
+                addr = info[4][0]
+                if not addr.startswith('127.'):
+                    ips.append(addr)
+        except Exception:
+            pass
+    return sorted(set(ips))
+
+
+def cert_missing_lan_ips(cert_file: str, extra_ips: list[str]) -> bool:
+    try:
+        with open(cert_file, 'rb') as f:
+            cert = x509.load_pem_x509_certificate(f.read())
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        present = {str(ip) for ip in san.value.get_values_for_type(x509.IPAddress)}
+        return bool(extra_ips) and not set(extra_ips).issubset(present)
+    except Exception:
+        return True
+
+
+def migrate_legacy_ssl_files(
+    data_dir: str,
+    ssl_dir: str,
+    cert_file: str,
+    key_file: str,
+    logger: logging.Logger | None = None,
+) -> None:
+    logger = logger or log
+    old_cert = os.path.join(data_dir, 'cert.pem')
+    old_key = os.path.join(data_dir, 'key.pem')
+    os.makedirs(ssl_dir, exist_ok=True)
+    for old, new in ((old_cert, cert_file), (old_key, key_file)):
+        if os.path.exists(old) and not os.path.exists(new):
+            os.replace(old, new)
+            logger.info("SSL dosyasi %s -> %s tasindi", old, new)
+
+
+def normalize_pem_file(cert_file: str, logger: logging.Logger | None = None) -> None:
+    """Normalize double-encoded PEM files (some installers produced a PEM that
+    base64-encodes a PEM block, which breaks Python's SSL PEM parser).
+    If detected, fix in-place."""
+    logger = logger or log
+    try:
+        if os.path.exists(cert_file):
+            with open(cert_file, 'rb') as f:
+                data = f.read()
+            # If cert file contains a base64 blob which decodes to a PEM, replace it.
+            m = re.search(b'-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----', data, re.S)
+            if m:
+                inner = m.group(1).strip()
+                try:
+                    dec = base64.b64decode(inner)
+                    if b'-----BEGIN CERTIFICATE-----' in dec:
+                        with open(cert_file, 'wb') as f:
+                            f.write(dec)
+                        logger.info('Double-encoded PEM detected and normalized for %s', cert_file)
+                except Exception:
+                    pass
+    except Exception:
+        logger.debug('PEM normalization failed', exc_info=True)
 
 
 def ensure_self_signed_cert(
