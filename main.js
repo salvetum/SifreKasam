@@ -5,7 +5,6 @@ const path   = require('path');
 const fs     = require('fs');
 const net    = require('net');
 const https  = require('https');
-const crypto = require('crypto');
 const kill   = require('tree-kill');
 const { spawn, spawnSync } = require('child_process');
 
@@ -39,12 +38,26 @@ const {
 } = require('./src/main/preferences');
 const rt = require('./src/main/runtime-state');
 const { createBackendNet } = require('./src/main/backend-net');
-
-function resolvePath(...segments) {
-  return app.isPackaged
-    ? path.join(process.resourcesPath, ...segments)
-    : path.join(__dirname, ...segments);
-}
+const {
+  APP_TOKEN,
+  HOST,
+  FLASK_TIMEOUT_MS,
+  FLASK_TIMEOUT_FIRST_RUN_MS,
+  RETRY_INTERVAL_MS,
+  BACKEND_PROBE_TIMEOUT_MS,
+  PROTOCOL,
+  HISTORY_NAVIGATION_KEYS,
+  SSL_NOISE_PATTERNS,
+  LAN_RECONCILE_IDLE_INTERVAL_MS,
+  LAN_RECONCILE_ACTIVE_INTERVAL_MS,
+  LAN_RESTART_MIN_INTERVAL_MS,
+  resolvePath,
+} = require('./src/main/config');
+const {
+  resolveLoadingPagePath,
+  verifyPackagedStartupResources,
+  loadBackendPage,
+} = require('./src/main/page-loader');
 
 // ─── SQUIRREL KURULUM HANDLER (EN ÜSTTE OLMALI) ──────────────────────────────
 
@@ -52,31 +65,8 @@ if (process.platform === 'win32' && handleSquirrelEvent({ resolvePath })) proces
 
 // ─── SABİTLER ─────────────────────────────────────────────────────────────────
 
-const APP_TOKEN        = crypto.randomBytes(32).toString('hex');
-const HOST             = '127.0.0.1';
-const FLASK_TIMEOUT_MS = 60_000;
-const FLASK_TIMEOUT_FIRST_RUN_MS = 90_000;
-const RETRY_INTERVAL_MS = 500;
-const BACKEND_PROBE_TIMEOUT_MS = 1_500;
 const PYTHON_COMMAND = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const safeModeRequested = process.argv.includes(SAFE_MODE_FLAG);
-
-const PROTOCOL            = 'https';
-const HISTORY_NAVIGATION_KEYS = new Set(['BrowserBack', 'BrowserForward']);
-const SSL_NOISE_PATTERNS = [
-  'ERR_CERT_AUTHORITY_INVALID',
-  'ERR_CERT_COMMON_NAME_INVALID',
-  'ERR_CERT_DATE_INVALID',
-  'ERR_CERT_INVALID',
-  'certificate',
-  'SSL',
-];
-const LAN_RECONCILE_IDLE_INTERVAL_MS = 20_000;
-const LAN_RECONCILE_ACTIVE_INTERVAL_MS = 5_000;
-const LAN_RESTART_MIN_INTERVAL_MS = 15_000;
-
-// ─── UYGULAMA DURUMU ──────────────────────────────────────────────────────────
-
 
 // Backend ag katmani: sabitler/durum enjeksiyonu
 const { requestBackendJson, waitForBackendReady, findFreePort } = createBackendNet({
@@ -851,40 +841,4 @@ function shutdownFlask() {
       }
     });
   } catch (_) {}
-}
-
-// ─── YARDIMCI FONKSİYONLAR ───────────────────────────────────────────────────
-
-function resolveLoadingPagePath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'backend', '_internal', 'templates', 'loading.html');
-  }
-  return path.join(__dirname, 'flask_app', 'templates', 'loading.html');
-}
-
-function verifyPackagedStartupResources() {
-  if (!app.isPackaged) return;
-
-  const backendBinary = process.platform === 'win32' ? 'SifreKasam.exe' : 'SifreKasam';
-  const requiredFiles = [
-    resolveLoadingPagePath(),
-    resolvePath('backend', backendBinary),
-  ];
-  const missingFiles = requiredFiles.filter((filePath) => !fs.existsSync(filePath));
-  if (missingFiles.length) {
-    throw new Error(`Eksik paket dosyaları: ${missingFiles.join(', ')}`);
-  }
-}
-
-async function loadBackendPage(pathname) {
-  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) {
-    throw new Error('Ana pencere kullanılamıyor.');
-  }
-  try {
-    const targetUrl = `${PROTOCOL}://${HOST}:${rt.PORT}${pathname}`;
-    await rt.mainWindow.loadURL(targetUrl);
-  } catch (err) {
-    console.error('loadBackendPage failed:', pathname, err.message);
-    throw err;
-  }
 }
