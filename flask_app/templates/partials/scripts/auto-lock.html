@@ -1,0 +1,37 @@
+    <!-- Auto-lock Script -->
+    <script nonce="{{ csp_nonce }}">
+        {% if AUTO_LOCK_ENABLED %}
+        let idleTime = 0;
+        const lockThreshold = {{ AUTO_LOCK_TIMEOUT }};
+        let automaticLockPending = false;
+        function lockVaultAndRedirect() {
+            if (automaticLockPending) return;
+            automaticLockPending = true;
+            fetch('{{ url_for("lock") }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' }
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('lock-failed');
+                    window.location.replace('{{ url_for("login") }}');
+                })
+                .catch(function () {
+                    automaticLockPending = false;
+                    idleTime = 0;
+                    clearPageLoadingOverlay();
+                });
+        }
+        function timerIncrement() {
+            idleTime++;
+            if (idleTime >= lockThreshold) {
+                lockVaultAndRedirect();
+            }
+        }
+        let idleInterval = setInterval(timerIncrement, 60000);
+        function resetTimer() { idleTime = 0; }
+        ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(
+            event => document.addEventListener(event, resetTimer, true)
+        );
+        {% endif %}
+    </script>
+

@@ -1,0 +1,24 @@
+    <!-- Mouse4/Mouse5 history tuşlarını engelle; aksi halde loading overlay siyah ekranda kalabiliyor. -->
+    <script nonce="{{ csp_nonce }}">
+        function clearPageLoadingOverlay() {
+            document.body.classList.remove('is-page-loading');
+            document.querySelector('.page-loading-overlay')?.setAttribute('aria-hidden', 'true');
+        }
+
+        function blockMouseHistoryButton(e) {
+            if (e.button === 3 || e.button === 4) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                sessionStorage.setItem('kasa-block-mouse-history', '1');
+                clearPageLoadingOverlay();
+                setTimeout(function () {
+                    sessionStorage.removeItem('kasa-block-mouse-history');
+                }, 700);
+            }
+        }
+
+        ['mousedown', 'mouseup', 'auxclick'].forEach(function (eventName) {
+            document.addEventListener(eventName, blockMouseHistoryButton, true);
+        });
+    </script>
+

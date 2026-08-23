@@ -1,0 +1,24 @@
+    <!-- Kısayol: Ctrl+L ile kilit -->
+    <script nonce="{{ csp_nonce }}">
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                e.preventDefault();
+                if (window.location.pathname !== '{{ url_for("login") }}') {
+                    if (typeof lockVaultAndRedirect === 'function') {
+                        lockVaultAndRedirect();
+                    } else {
+                        fetch('{{ url_for("lock") }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' }
+                        })
+                            .then(function (response) {
+                                if (!response.ok) throw new Error('lock-failed');
+                                window.location.replace('{{ url_for("login") }}');
+                            })
+                            .catch(function () {});
+                    }
+                }
+            }
+        });
+    </script>
+

@@ -1,0 +1,7 @@
+    <!-- Service Worker (PWA) — self-signed SSL mobilde çalışmaz sadece localhost'ta dene -->
+    <script nonce="{{ csp_nonce }}">
+        if ('serviceWorker' in navigator && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
+            var swUrl = '{{ url_for("sw") }}?v=assets-v111';
+            navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(function () {});
+        }
+    </script>

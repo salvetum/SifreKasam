@@ -1,0 +1,11 @@
+    <!-- First-load fade-in tetikleyici -->
+    <script nonce="{{ csp_nonce }}">
+        if (document.documentElement.classList.contains('kasa-first-load')) {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    document.documentElement.classList.add('kasa-first-load-enter');
+                });
+            });
+        }
+    </script>
+

@@ -1,0 +1,14 @@
+    <!-- Mobil geri tuşu loading loop fix -->
+    <script nonce="{{ csp_nonce }}">
+        window.addEventListener('pageshow', function (e) {
+            clearPageLoadingOverlay();
+        });
+        window.addEventListener('popstate', function () {
+            clearPageLoadingOverlay();
+            if (sessionStorage.getItem('kasa-block-mouse-history') === '1') {
+                sessionStorage.removeItem('kasa-block-mouse-history');
+                history.forward();
+            }
+        });
+    </script>
+
