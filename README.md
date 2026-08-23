@@ -57,7 +57,7 @@ karmaşıklığını aynı anda üstlenip motivasyon kaybına yol açabilir.
   üzerinden)
 - GPU tabanlı, gerçek zamanlı "liquid glass" (buzlu/kırılmalı cam) görsel
   efekti — CSS taklidi değil, gerçek shader tabanlı render
-- Windows ve Linux desteği
+- Windows ve Linux desteği _(Android için belki)_
 
 ### Neler v2'den devralınmayacak
 
@@ -125,7 +125,7 @@ losing motivation.
   ecosystem)
 - A GPU-based, real-time "liquid glass" visual effect — not a CSS
   imitation, but genuine shader-based rendering
-- Windows and Linux support
+- Windows and Linux support _(also might be for android)_
 
 ### What will NOT carry over from v2
 
