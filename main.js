@@ -1,6 +1,6 @@
 // ─── IMPORTS ──────────────────────────────────────────────────────────────────
 
-const { app, BrowserWindow, shell, dialog, Tray, Menu, nativeTheme } = require('electron');
+const { app, BrowserWindow, shell, dialog, Tray, Menu } = require('electron');
 const path   = require('path');
 const fs     = require('fs');
 const net    = require('net');
@@ -17,6 +17,26 @@ const {
   relaunchInSafeMode,
 } = require('./src/main/fatal-errors');
 const { handleSquirrelEvent } = require('./src/main/squirrel');
+const {
+  registerCertificateErrorHandler,
+  getPinnedHttpsOptions,
+  getBackendKeepAliveAgent,
+  resetPinnedCertificateCache,
+  markLocalCertificateNoiseReported,
+} = require('./src/main/certificates');
+const {
+  isFirstRun,
+  resolveEffectiveTheme,
+  getSavedThemeMode,
+  getSavedGlassEffects,
+  getSavedGlassQuality,
+  getSavedInterfaceAnimations,
+  getSavedLanguage,
+  getSavedAccentColor,
+  getSavedBackgroundStyle,
+  getSavedHardwareAcceleration,
+  getSavedWindowBackgroundColor,
+} = require('./src/main/preferences');
 
 function resolvePath(...segments) {
   return app.isPackaged
@@ -40,7 +60,6 @@ const PYTHON_COMMAND = process.env.PYTHON || (process.platform === 'win32' ? 'py
 const safeModeRequested = process.argv.includes(SAFE_MODE_FLAG);
 
 const PROTOCOL            = 'https';
-const GLASS_EFFECTS_FALSY = new Set(['false', '0', 'off', 'disabled']);
 const HISTORY_NAVIGATION_KEYS = new Set(['BrowserBack', 'BrowserForward']);
 const SSL_NOISE_PATTERNS = [
   'ERR_CERT_AUTHORITY_INVALID',
@@ -66,7 +85,6 @@ let resetSavedLanOnNextStart = true;
 let isRestartingFlask = false;
 let lanReconciliationTimer = null;
 let lastLanRestartAttempt = 0;
-let hasReportedLocalCertificateNoise = false;
 let rendererLowPowerRequested = false;
 let backendPageRecoveryAttempts = 0;
 
@@ -93,256 +111,13 @@ if (!gotTheLock) {
     }
   });
 
-  // Self-signed SSL sertifikasını kabul et
-  // Not: birden fazla kaynak için aynı sertifika hatası tekrar tekrar gelebilir. Bu yüzden
-  // - aynı sertifikayı geçici olarak güvenmek için fingerprint önbelleği tutuyoruz,
-  // - yalnızca bilinmeyen sertifikalar için kullanıcıya prompt gösteriyoruz.
-  const _temporaryTrustedFingerprints = new Set();
-  function _fpHex(buf) {
-    try { return crypto.createHash('sha256').update(buf).digest('hex'); } catch (_) { return null; }
-  }
-
-  function _normalizeCertToDer(certData) {
-    if (!certData) return null;
-    try {
-      const buf = Buffer.isBuffer(certData) ? certData : Buffer.from(String(certData));
-      const asUtf = buf.toString('utf8');
-      if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
-        return Buffer.from(new crypto.X509Certificate(asUtf).raw);
-      }
-      return Buffer.from(new crypto.X509Certificate(buf).raw);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function _isExpectedLocalCertificate(certBuffer) {
-    if (!certBuffer) return false;
-    try {
-      const pemOrBuffer = Buffer.isBuffer(certBuffer) ? certBuffer : Buffer.from(String(certBuffer));
-      const cert = new crypto.X509Certificate(pemOrBuffer);
-      const subject = cert.subject || '';
-      const issuer = cert.issuer || '';
-      const san = cert.subjectAltName || '';
-      const matchesAppName = subject.includes('CN=ŞifreKasam') || subject.includes('CN=SifreKasam');
-      const isSelfSigned = subject === issuer;
-      const hasLocalHosts = san.includes('DNS:localhost') || san.includes('IP Address:127.0.0.1') || san.includes('IP Address:::1');
-      return Boolean(matchesAppName && isSelfSigned && hasLocalHosts);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  app.on('certificate-error', (event, _webContents, url, _error, _certificate, callback) => {
-    if (!url.startsWith(`https://${HOST}:`)) {
-      callback(false);
-      return;
-    }
-
-    event.preventDefault();
-    try { loadPinnedCertificate(); } catch (_) {}
-    const presentedRaw = _certificate && _certificate.data ? Buffer.from(_certificate.data) : null;
-    const presented = _normalizeCertToDer(presentedRaw);
-    const presentedFp = presentedRaw ? _fpHex(presentedRaw) : null;
-
-    // Aynı sertifikayı daha önce geçici olarak kabul ettiysek direkt kabul et
-    if (presentedFp && _temporaryTrustedFingerprints.has(presentedFp)) {
-      callback(true);
-      return;
-    }
-
-    // Pinned sertifika ile DER normalization sonrası tam eşleşiyorsa kabul et
-    if (pinnedCertificateDer && presented
-        && presented.length === pinnedCertificateDer.length
-        && presented.equals(pinnedCertificateDer)) {
-      if (!hasReportedLocalCertificateNoise) {
-        hasReportedLocalCertificateNoise = true;
-        console.warn('Yerel self-signed SSL sertifikasi kabul edildi; tekrar eden Chromium sertifika loglari susturuldu.');
-      }
-      callback(true);
-      return;
-    }
-
-    // Pin mevcut ama eşleşmiyor (sertifika yeniden üretilmiş) VEYASE pin hiç yok
-    // (ilk açılış) — sertifika uygulamanın kendi ürettiği self-signed sertifikası
-    // ise otomatik kabul et. Eşzamanlı isteklerin hepsine tek tek diyalog
-    // göstermemek için kritik. Heuristic geçerse pin'i güncelle.
-    if (_isExpectedLocalCertificate(presentedRaw)) {
-      if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
-      if (presented && !pinnedCertificateDer) {
-        try {
-          const dataDir = getDataDir();
-          const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
-          if (certPath) {
-            let presentedPem = null;
-            const asUtf = presentedRaw.toString('utf8');
-            if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
-              presentedPem = asUtf;
-            }
-            if (presentedPem) {
-              try { fs.mkdirSync(path.dirname(certPath), { recursive: true }); } catch (_) {}
-              fs.writeFileSync(certPath, presentedPem, { encoding: 'utf8' });
-              pinnedCertificatePem = fs.readFileSync(certPath);
-              pinnedCertificateDer = presented;
-              pinnedCertificateMtime = fs.statSync(certPath).mtimeMs;
-            }
-          }
-        } catch (_) { /* Pin güncellenemezse geçici güven yeterli */ }
-      }
-      callback(true);
-      return;
-    }
-
-    // Sunulan sertifikayı PEM formatına dönüştür (kullanıcıya göstermek ve kaydetmek için)
-    let presentedPem = null;
-    if (presentedRaw) {
-      const asUtf = presentedRaw.toString('utf8');
-      if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
-        presentedPem = asUtf;
-      } else {
-        const certBase64 = presentedRaw.toString('base64');
-        const chunks = certBase64.match(/.{1,64}/g) || [certBase64];
-        presentedPem = `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n`;
-      }
-    }
-
-    const message = pinnedCertificateDer
-      ? 'Sunulan yerel SSL sertifikası beklenenle eşleşmiyor.'
-      : 'Yerel SSL sertifikası bulunamadı.';
-    const detail = 'Bu uygulamanın arka plan hizmeti self-signed bir sertifika kullanıyor. Sertifikayı kabul etmek güvenli olabilir ancak yalnızca cihazınızda çalıştığınıza emin olun. İsterseniz sertifikayı kalıcı olarak kaydedebilirsiniz (daha sonra otomatik olarak doğrulanır), yalnızca bu oturum için geçici olarak kabul edebilir veya bağlantıyı reddedebilirsiniz.';
-    const buttons = presentedPem ? ['Güven ve Kaydet', 'Geçici Güven', 'Reddet'] : ['Geçici Güven', 'Reddet'];
-
-    dialog.showMessageBox({
-      type: 'warning',
-      title: 'ŞifreKasam - Sertifika Doğrulama',
-      message,
-      detail,
-      buttons,
-      defaultId: 0,
-      noLink: true,
-    }).then(({ response }) => {
-      // 0 = Güven ve Kaydet, 1 = Geçici Güven, 2 = Reddet
-      if (presentedPem && response === 0) {
-        try {
-          const dataDir = getDataDir();
-          const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
-          if (certPath) {
-            try { fs.mkdirSync(path.dirname(certPath), { recursive: true }); } catch (_) {}
-            fs.writeFileSync(certPath, presentedPem, { encoding: 'utf8' });
-            pinnedCertificatePem = fs.readFileSync(certPath);
-            try { pinnedCertificateDer = Buffer.from(new crypto.X509Certificate(pinnedCertificatePem).raw); } catch (_) { pinnedCertificateDer = presented; }
-            console.warn('Yerel sertifika kaydedildi ve pin güncellendi.');
-            callback(true);
-            return;
-          }
-        } catch (err) {
-          console.warn('Sertifika kaydedilemedi, geçici güven veriliyor:', err.message);
-          if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
-          callback(true);
-          return;
-        }
-      }
-
-      const tempTrustIndex = presentedPem ? 1 : 0;
-      if (response === tempTrustIndex) {
-        if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
-        console.warn('Kullanıcı sertifikayı geçici olarak kabul etti. (kaydedilmedi)');
-        callback(true);
-        return;
-      }
-
-      callback(false);
-    }).catch((err) => {
-      console.warn('Sertifika onay diyaloğu açılamadı, bağlantı reddediliyor:', err.message);
-      callback(false);
-    });
-  });
+  registerCertificateErrorHandler(HOST);
 
   app.whenReady()
     .then(onAppReady)
     .catch((err) => {
       showFriendlyFatalError('BAS', err);
     });
-}
-
-// ─── YEREL SERTİFİKA SABİTLEME ───────────────────────────────────────────────
-
-let pinnedCertificatePem = null;
-let pinnedCertificateDer = null;
-let pinnedCertificateMtime = 0;
-let warnedPinnedCertificateUnavailable = false;
-
-function loadPinnedCertificate() {
-  try {
-    const dataDir = getDataDir();
-    const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
-    if (certPath && fs.existsSync(certPath)) {
-      // Sertifika LAN açılışında LAN IP içerecek şekilde yeniden üretilebiliyor;
-      // dosya değiştiğinde eski pin'in takılı kalmasın diye mtime'ı izle.
-      const mtime = fs.statSync(certPath).mtimeMs;
-      if (pinnedCertificatePem === null || mtime !== pinnedCertificateMtime) {
-        pinnedCertificatePem = fs.readFileSync(certPath);
-        pinnedCertificateDer = Buffer.from(new crypto.X509Certificate(pinnedCertificatePem).raw);
-        pinnedCertificateMtime = mtime;
-      }
-      return true;
-    }
-  } catch (error) {
-    if (!warnedPinnedCertificateUnavailable) {
-      warnedPinnedCertificateUnavailable = true;
-      console.warn('Yerel SSL sertifikasi okunamadi:', error.message);
-    }
-  }
-  if (!warnedPinnedCertificateUnavailable) {
-    warnedPinnedCertificateUnavailable = true;
-    console.warn('Yerel SSL sertifikasi bulunamadi; ana istekler sertifika dogrulamasi olmadan yapilacak.');
-  }
-  return false;
-}
-
-function getPinnedHttpsOptions() {
-  if (loadPinnedCertificate()) {
-    return { rejectUnauthorized: true, ca: pinnedCertificatePem };
-  }
-  // Pin yokken yalnızca localhost'a bağlanmayı zorla (ilk kurulum penceresi).
-  return {
-    rejectUnauthorized: false,
-    checkServerIdentity: (hostname) => {
-      const allowed = ['127.0.0.1', 'localhost', '::1'];
-      if (!allowed.includes(hostname)) {
-        return new Error(`Beklenmeyen hostname: ${hostname}`);
-      }
-    },
-  };
-}
-
-// Backend'e giden tekrarlanan istekler için yeniden kullanılabilir bağlantı
-// havuzu. Her istekte yeni TLS handshake yapmak (özellikle LAN poller ve
-// heartbeat) gereksiz CPU + gecikme üretir; keep-alive aynı socket'i
-// yeniden kullanır. Sertifika yenilenince (LAN restart) havuz sıfırlanır.
-let backendKeepAliveAgent = null;
-function getBackendKeepAliveAgent() {
-  if (!backendKeepAliveAgent) {
-    backendKeepAliveAgent = new https.Agent({
-      keepAlive: true,
-      maxSockets: 4,
-      keepAliveMsecs: 1500,
-    });
-  }
-  return backendKeepAliveAgent;
-}
-function resetBackendKeepAliveAgent() {
-  if (backendKeepAliveAgent) {
-    backendKeepAliveAgent.destroy();
-    backendKeepAliveAgent = null;
-  }
-}
-
-function resetPinnedCertificateCache() {
-  pinnedCertificatePem = null;
-  pinnedCertificateDer = null;
-  pinnedCertificateMtime = 0;
-  resetBackendKeepAliveAgent();
 }
 
 // ─── UYGULAMA HAZIR ───────────────────────────────────────────────────────────
@@ -568,8 +343,7 @@ async function createWindow() {
     if (isCertificateNoise && backendPageRecoveryAttempts < 2) {
       event.preventDefault();
       backendPageRecoveryAttempts += 1;
-      if (!hasReportedLocalCertificateNoise) {
-        hasReportedLocalCertificateNoise = true;
+      if (markLocalCertificateNoiseReported()) {
         console.warn(`Yerel self-signed SSL uyarısı için yeniden deneme yapılıyor (${errorCode}: ${description}).`);
       }
       setTimeout(() => {
@@ -615,8 +389,7 @@ async function createWindow() {
     if (!isLocalCertificateNoise) return;
 
     event.preventDefault();
-    if (!hasReportedLocalCertificateNoise) {
-      hasReportedLocalCertificateNoise = true;
+    if (markLocalCertificateNoiseReported()) {
       console.warn('Yerel self-signed SSL konsol uyarıları tekrar etmeyecek şekilde susturuldu.');
     }
   });
@@ -1219,117 +992,5 @@ async function loadBackendPage(pathname) {
   } catch (err) {
     console.error('loadBackendPage failed:', pathname, err.message);
     throw err;
-  }
-}
-
-function getConfigDir() {
-  if (process.platform === 'win32') return process.env.APPDATA;
-  return process.env.XDG_CONFIG_HOME || path.join(process.env.HOME, '.config');
-}
-
-function isFirstRun() {
-  const configDir = getConfigDir();
-  if (!configDir) return false;
-  const dataDir = process.platform === 'win32'
-    ? path.join(configDir, '.SifrekasamV2')
-    : path.join(configDir, 'sifrekasam');
-  try {
-    return !fs.existsSync(path.join(dataDir, 'ssl', 'cert.pem'));
-  } catch (_) {
-    return false;
-  }
-}
-
-function readThemeFile() {
-  const configDir = getConfigDir();
-  if (!configDir) return null;
-  const dataDir = process.platform === 'win32'
-    ? path.join(configDir, '.SifrekasamV2')
-    : path.join(configDir, 'sifrekasam');
-  const file = path.join(dataDir, 'theme.json');
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
-}
-
-function getSavedThemeMode() {
-  try {
-    const data = readThemeFile();
-    return ['light', 'dark', 'system'].includes(data?.theme_mode) ? data.theme_mode : 'dark';
-  } catch (_) { return 'dark'; }
-}
-
-function resolveEffectiveTheme() {
-  const mode = getSavedThemeMode();
-  if (mode === 'system') {
-    return process.platform === 'darwin' || process.platform === 'win32'
-      ? nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
-      : 'dark';
-  }
-  return mode === 'light' ? 'light' : 'dark';
-}
-
-function getSavedGlassEffects() {
-  try {
-    const data = readThemeFile();
-    return !GLASS_EFFECTS_FALSY.has(String(data?.glass_effects_enabled).toLowerCase());
-  } catch (_) { return true; }
-}
-
-function getSavedHardwareAcceleration() {
-  try {
-    const data = readThemeFile();
-    return !GLASS_EFFECTS_FALSY.has(String(data?.hardware_acceleration_enabled).toLowerCase());
-  } catch (_) { return true; }
-}
-
-function getSavedGlassQuality() {
-  try {
-    const data = readThemeFile();
-    return ['low', 'normal', 'high'].includes(data?.glass_quality)
-      ? data.glass_quality
-      : 'normal';
-  } catch (_) { return 'normal'; }
-}
-
-function getSavedInterfaceAnimations() {
-  try {
-    const data = readThemeFile();
-    return !GLASS_EFFECTS_FALSY.has(String(data?.interface_animations_enabled).toLowerCase());
-  } catch (_) { return true; }
-}
-
-function getSavedLanguage() {
-  try {
-    const data = readThemeFile();
-    return data?.language || 'tr';
-  } catch (_) { return 'tr'; }
-}
-
-function getSavedAccentColor() {
-  try {
-    const data = readThemeFile();
-    return /^#[0-9a-fA-F]{6}$/.test(data?.accent_color || '') ? data.accent_color : '#7c6ff7';
-  } catch (_) { return '#7c6ff7'; }
-}
-
-function getSavedBackgroundStyle() {
-  try {
-    const data = readThemeFile();
-    return ['aurora', 'midnight', 'mesh', 'plain'].includes(data?.background_style)
-      ? data.background_style
-      : 'aurora';
-  } catch (_) { return 'aurora'; }
-}
-
-function getSavedWindowBackgroundColor() {
-  if (resolveEffectiveTheme() === 'light') return '#eef2ff';
-  switch (getSavedBackgroundStyle()) {
-    case 'plain':
-      return '#080912';
-    case 'midnight':
-      return '#101326';
-    case 'mesh':
-      return '#111827';
-    default:
-      return '#101326';
   }
 }
