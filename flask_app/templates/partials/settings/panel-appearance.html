@@ -1,0 +1,266 @@
+                    <section id="settings-panel-appearance" class="settings-panel settings-panel-appearance active" role="tabpanel"
+                             aria-labelledby="settings-tab-appearance" data-settings-panel="appearance">
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-palette"></i></span>
+                        <div>
+                            <h3 id="settings-section-appearance">{{ _('Görünüm') }}</h3>
+                            <p>{{ _('Tema, arkaplan ve vurgu rengini buradan ayarlayın.') }}</p>
+                        </div>
+                    </div>
+                    <!-- Renk ve Arkaplan -->
+                    <div class="settings-card settings-appearance-card">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-palette" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4>{{ _('Renk ve Arkaplan') }}</h4>
+                                <p>{{ _('Arkaplan stili, ana vurgu rengi ve canlı önizleme.') }}</p>
+                            </div>
+                            <div id="appearance-preview" class="appearance-preview" aria-hidden="true"></div>
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="appearance-field">
+                                <span id="accent-color-label">{{ _('Vurgu Rengi') }}</span>
+                                <div class="accent-control-row custom-color-picker" id="accent-color-picker">
+                                    <input type="hidden" name="accent_color" id="accent-color-input" value="{{ ACCENT_COLOR }}">
+                                    <button type="button" id="accent-color-trigger" class="color-picker-trigger"
+                                        aria-haspopup="dialog" aria-expanded="false" aria-controls="accent-color-popover"
+                                        aria-label="{{ _('Renk seçiciyi aç') }}">
+                                        <span id="accent-color-swatch" class="color-picker-trigger-swatch" aria-hidden="true"></span>
+                                        <span class="color-picker-trigger-copy">
+                                            <strong id="accent-color-trigger-value">{{ ACCENT_COLOR }}</strong>
+                                            <small>{{ _('Renk seçiciyi aç') }}</small>
+                                        </span>
+                                        <i class="fa-solid fa-palette" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" id="accent-color-scrim" class="color-picker-scrim"
+                                        aria-label="{{ _('Renk seçiciyi kapat') }}" hidden></button>
+                                    <div id="accent-color-popover" class="color-picker-popover" role="dialog"
+                                        aria-modal="false" aria-labelledby="accent-color-picker-title" hidden>
+                                        <div class="color-picker-header">
+                                            <div>
+                                                <h5 id="accent-color-picker-title">{{ _('Vurgu Rengi') }}</h5>
+                                                <p>{{ _('Ton, doygunluk ve parlaklığı ayarlayın.') }}</p>
+                                            </div>
+                                            <button type="button" id="accent-color-close" class="kasa-close-btn"
+                                                aria-label="{{ _('Renk seçiciyi kapat') }}">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </div>
+                                        <div class="color-picker-current">
+                                            <span id="accent-color-preview" aria-hidden="true"></span>
+                                            <div>
+                                                <strong id="accent-color-picker-value">{{ ACCENT_COLOR }}</strong>
+                                                <output id="accent-color-rgb" aria-live="polite">RGB</output>
+                                            </div>
+                                        </div>
+                                        <label class="color-picker-slider" for="accent-hue-input">
+                                            <span><strong>{{ _('Ton') }}</strong><output id="accent-hue-value">0°</output></span>
+                                            <input type="range" id="accent-hue-input" min="0" max="360" step="1" value="0">
+                                        </label>
+                                        <label class="color-picker-slider" for="accent-saturation-input">
+                                            <span><strong>{{ _('Doygunluk') }}</strong><output id="accent-saturation-value">0%</output></span>
+                                            <input type="range" id="accent-saturation-input" min="0" max="100" step="1" value="0">
+                                        </label>
+                                        <label class="color-picker-slider" for="accent-brightness-input">
+                                            <span><strong>{{ _('Parlaklık') }}</strong><output id="accent-brightness-value">0%</output></span>
+                                            <input type="range" id="accent-brightness-input" min="0" max="100" step="1" value="0">
+                                        </label>
+                                        <div class="color-picker-code-row">
+                                            <label for="accent-color-text">
+                                                <span>HEX</span>
+                                                <input type="text" id="accent-color-text" value="{{ ACCENT_COLOR }}"
+                                                    maxlength="7" pattern="#?[0-9a-fA-F]{6}" class="kasa-field"
+                                                    aria-label="{{ _('Vurgu Rengi Kodu') }}">
+                                            </label>
+                                            <button type="button" id="accent-color-reset" class="kasa-btn kasa-btn-muted"
+                                                data-default-accent="#7c6ff7">
+                                                <i class="fa-solid fa-arrow-rotate-left"></i>
+                                                {{ _('Varsayılana Dön') }}
+                                            </button>
+                                            <button type="button" id="accent-color-random" class="kasa-btn kasa-btn-muted"
+                                                aria-label="{{ _('Rastgele renk üret') }}">
+                                                <i class="fa-solid fa-dice"></i>
+                                                {{ _('Rastgele') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="background_style" id="background-style-hidden" value="{{ BACKGROUND_STYLE }}">
+                            <div class="accent-preset-row" role="group" aria-label="{{ _('Hazır renkler') }}">
+                                <button type="button" class="accent-preset-purple" data-accent-preset="#7c6ff7" aria-pressed="false"><span></span>{{ _('Mor') }}</button>
+                                <button type="button" class="accent-preset-blue" data-accent-preset="#38bdf8" aria-pressed="false"><span></span>{{ _('Mavi') }}</button>
+                                <button type="button" class="accent-preset-green" data-accent-preset="#22c55e" aria-pressed="false"><span></span>{{ _('Yeşil') }}</button>
+                                <button type="button" class="accent-preset-amber" data-accent-preset="#f59e0b" aria-pressed="false"><span></span>{{ _('Amber') }}</button>
+                                <button type="button" class="accent-preset-rose" data-accent-preset="#f43f5e" aria-pressed="false"><span></span>{{ _('Rose') }}</button>
+                                <button type="button" class="accent-preset-teal" data-accent-preset="#14b8a6" aria-pressed="false"><span></span>{{ _('Turkuaz') }}</button>
+                                <button type="button" class="accent-preset-indigo" data-accent-preset="#6366f1" aria-pressed="false"><span></span>{{ _('İndigo') }}</button>
+                                <button type="button" class="accent-preset-lime" data-accent-preset="#84cc16" aria-pressed="false"><span></span>{{ _('Lime') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-bg-card">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-image" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4>{{ _('Arkaplan') }}</h4>
+                                <p>{{ _('Ana görünümün arkaplan stilini seçin.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-body">
+                        <div class="background-choice-grid" role="group" aria-label="{{ _('Arkaplan seçenekleri') }}">
+                            <button type="button" data-background-option="aurora" aria-pressed="false">
+                                <strong>{{ _('Aurora') }}</strong>
+                                <small>{{ _('Yumuşak renk patlamaları') }}</small>
+                            </button>
+                            <button type="button" data-background-option="midnight" aria-pressed="false">
+                                <strong>{{ _('Gece') }}</strong>
+                                <small>{{ _('Daha sakin koyu yüzey') }}</small>
+                            </button>
+                            <button type="button" data-background-option="mesh" aria-pressed="false">
+                                <strong>{{ _('Mesh') }}</strong>
+                                <small>{{ _('Daha canlı çok renkli alan') }}</small>
+                            </button>
+                            <button type="button" data-background-option="plain" aria-pressed="false">
+                                <strong>{{ _('Sade') }}</strong>
+                                <small>{{ _('Düşük dikkat dağıtma') }}</small>
+                            </button>
+                            <button type="button" id="custom-bg-btn" data-background-option="custom" aria-pressed="false">
+                                <strong>{{ _('Özel') }}</strong>
+                                <small>{{ _('Resim, GIF veya video yükleyin') }}</small>
+                            </button>
+                            <input type="file" id="custom-bg-input" accept="image/png,image/jpeg,image/webp,image/gif,video/webm,video/mp4" hidden>
+                        </div>
+                        <p class="custom-bg-limit-hint"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> {{ _('8 taneye kadar arkaplan ekleyebilirsiniz.') }}</p>
+                        <div id="custom-bg-gallery" class="custom-bg-gallery hidden" aria-live="polite">
+                            <div class="custom-bg-gallery-head">
+                                <span class="text-xs text-kasa-text-muted">{{ _('Arkaplan geçmişi') }}</span>
+                                <button type="button" id="custom-bg-gallery-clear" class="kasa-btn kasa-btn-muted">
+                                    <i class="fa-solid fa-trash-can"></i> {{ _('Tümünü Sil') }}
+                                </button>
+                            </div>
+                            <div id="custom-bg-gallery-grid" class="custom-bg-gallery-grid"></div>
+                        </div>
+                        </div>
+                    </div>
+                    <!-- Tema Modu -->
+                    <div class="settings-card settings-theme-card">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-theme-title">{{ _('Tema') }}</h4>
+                                <p>{{ _('Açık, koyu veya sistem temasını kullan.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <select name="theme_mode" id="theme-mode-select"
+                                class="kasa-field settings-inline-select" aria-labelledby="setting-theme-title"
+                                data-custom-select>
+                                <option value="light" {% if THEME_MODE == 'light' %}selected{% endif %}>{{ _('Açık') }}</option>
+                                <option value="dark" {% if THEME_MODE == 'dark' %}selected{% endif %}>{{ _('Koyu') }}</option>
+                                <option value="system" {% if THEME_MODE == 'system' %}selected{% endif %}>{{ _('Sistem') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-gradients-title">{{ _('Gradient Katmanları') }}</h4>
+                                <p>{{ _('Kartlarda ve arkaplanda renk geçişlerini kullan.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="gradients_enabled" id="gradients-toggle" {% if GRADIENTS_ENABLED %}checked{% endif %} aria-labelledby="setting-gradients-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-card-sheen-title">{{ _('Üst Kenar Işıltısı') }}</h4>
+                                <p>{{ _('Kartların üst kenarında ince parlak buz çizgisi.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="card_sheen_enabled" id="card-sheen-toggle" {% if CARD_SHEEN_ENABLED %}checked{% endif %} aria-labelledby="setting-card-sheen-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-border-all" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-card-frame-title">{{ _('Buzlu Çerçeve') }}</h4>
+                                <p>{{ _('Kart kenarlarında buzlu çerçeve halkası.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="card_frame_enabled" id="card-frame-toggle" {% if CARD_FRAME_ENABLED %}checked{% endif %} aria-labelledby="setting-card-frame-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-card-depth-title">{{ _('Katmanlı Derinlik') }}</h4>
+                                <p>{{ _('Kartların altındaki katmanlı yumuşak gölge.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="card_depth_enabled" id="card-depth-toggle" {% if CARD_DEPTH_ENABLED %}checked{% endif %} aria-labelledby="setting-card-depth-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-droplet" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-vault-accent-title">{{ _('Kart Vurgu Rengi') }}</h4>
+                                <p>{{ _('Kartlarda accent renk gradyanını göster.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="vault_accent_enabled" id="vault-accent-toggle" {% if VAULT_ACCENT_ENABLED %}checked{% endif %} aria-labelledby="setting-vault-accent-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-droplet" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-chroma-title">{{ _('Chroma RGB') }}</h4>
+                                <p>{{ _('Vurgu rengini yumuşak bir renk döngüsünde değiştir.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="chroma_accent_enabled" id="chroma-accent-toggle" {% if CHROMA_ACCENT_ENABLED %}checked{% endif %} aria-labelledby="setting-chroma-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chroma-speed-card" class="settings-card settings-chroma-speed-card{% if not CHROMA_ACCENT_ENABLED %} is-collapsed{% endif %}" aria-hidden="{{ 'false' if CHROMA_ACCENT_ENABLED else 'true' }}">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-chroma-speed-title">{{ _('Renk Döngüsü Hızı') }}</h4>
+                                <p>{{ _('Tam bir renk döngüsünün süresini seçin.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <select name="chroma_accent_speed" id="chroma-speed-select" class="kasa-field settings-inline-select" aria-labelledby="setting-chroma-speed-title" data-custom-select {% if not CHROMA_ACCENT_ENABLED %}disabled{% endif %}>
+                                <option value="8" {% if CHROMA_ACCENT_SPEED == 8 %}selected{% endif %}>{{ _('8 saniye · Hızlı') }}</option>
+                                <option value="15" {% if CHROMA_ACCENT_SPEED == 15 %}selected{% endif %}>{{ _('15 saniye · Normal') }}</option>
+                                <option value="30" {% if CHROMA_ACCENT_SPEED == 30 %}selected{% endif %}>{{ _('30 saniye · Sakin') }}</option>
+                                <option value="60" {% if CHROMA_ACCENT_SPEED == 60 %}selected{% endif %}>{{ _('60 saniye · Çok sakin') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    </section>

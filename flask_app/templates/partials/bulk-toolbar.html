@@ -1,0 +1,18 @@
+<!-- ── TOPLU İŞLEM ARAÇ ÇUBUĞU ──────────────────────────────── -->
+<div id="bulk-toolbar" class="glass rounded-2xl px-4 py-3 shadow-2xl border border-kasa-border-hi flex items-center gap-3" role="toolbar" aria-label="{{ _('Toplu işlem araçları') }}" aria-hidden="true">
+    <span class="text-sm text-kasa-text-muted whitespace-nowrap" aria-live="polite"><span id="bulk-count">0</span> {{ _('seçili') }}</span>
+    <div class="w-px h-6 bg-kasa-border"></div>
+    <button type="button" id="bulk-category-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
+        <i class="fa-solid fa-tag mr-1"></i>{{ _('Kategori') }}
+    </button>
+    <button type="button" id="bulk-export-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
+        <i class="fa-solid fa-download mr-1"></i>{{ _('Dışa Aktar') }}
+    </button>
+    <button type="button" id="bulk-delete-btn" class="kasa-btn kasa-btn-danger text-xs px-3 py-1.5">
+        <i class="fa-solid fa-trash-can mr-1"></i>{{ _('Sil') }}
+    </button>
+    <button type="button" id="bulk-cancel-btn" class="kasa-close-btn text-sm" title="{{ _('İptal') }}" aria-label="{{ _('İptal') }}">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+</div>
+

@@ -1,0 +1,83 @@
+                    <section id="settings-panel-access" class="settings-panel" role="tabpanel"
+                             aria-labelledby="settings-tab-access" data-settings-panel="access" hidden>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-language"></i></span>
+                        <div>
+                            <h3 id="settings-section-language-network">{{ _('Dil ve Ağ') }}</h3>
+                            <p>{{ _('Arayüz dili ve yerel ağ erişim ayarları.') }}</p>
+                        </div>
+                    </div>
+                    <!-- Dil Seçici -->
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h4 id="setting-language-title" class="text-sm font-medium mb-0.5">{{ _('Dil') }}</h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Arayüz dilini değiştir.') }}</p>
+                        </div>
+                        <select id="settings-language-select"
+                            class="text-sm px-2 py-1.5 rounded-lg kasa-field settings-language-select"
+                            aria-labelledby="setting-language-title" data-custom-select>
+                            {% for lang in AVAILABLE_LANGS %}
+                            <option value="{{ lang.code }}" {% if lang.code == CURRENT_LANG %}selected{% endif %}>
+                                {{ lang.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- LAN Erişimi -->
+                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
+                        <div>
+                            <h4 id="setting-lan-title" class="text-sm font-medium mb-0.5">{{ _('LAN Erişimi') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold settings-dev-badge">{{ _('GELİŞTİRME') }}</span></h4>
+                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('Mobil cihazdan bağlanmak için ağ üzerinden erişime izin ver.') }}</p>
+                        </div>
+                        <div class="settings-switch-control">
+                            <input class="settings-switch-input" type="checkbox" name="lan_enabled" id="lan-enabled-toggle" {% if LAN_ENABLED %}checked{% endif %} aria-labelledby="setting-lan-title">
+                        </div>
+                    </div>
+                    <div id="lan-restart-note" class="lan-restart-note">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span>{{ _('Ayarlar kaydedildiğinde program otomatik olarak yeniden başlatılır.') }}</span>
+                    </div>
+                    <div id="lan-warning-cards" class="lan-warning-cards-wrap">
+                        <div class="lan-warning-card">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <p>{{ _('LAN modu açıkken aynı ağdaki cihazlar giriş yapmayı deneyebilir. Yalnızca güvendiğiniz ağlarda kullanın; bu özelliği açarak riski kabul etmiş olursunuz.') }}</p>
+                        </div>
+                    </div>
+                    <div id="lan-info-box" class="lan-info-grid {% if not LAN_ENABLED %}hidden{% endif %}">
+                        <div id="lan-address-card" class="lan-info-card">
+                            <div class="lan-info-card-header">
+                                <i class="fa-solid fa-wifi"></i>
+                                <span class="font-semibold text-kasa-text">{{ _('Ağ Adresi') }}</span>
+                            </div>
+                            <div id="lan-address-wrap">
+                                <div class="lan-info-card-row">
+                                    <div id="lan-address" class="lan-info-card-value">{{ _('Yükleniyor...') }}</div>
+                                    <button type="button" class="lan-copy-btn" data-copy-target="lan-address" aria-label="{{ _('Kopyala') }}">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                                <p class="lan-info-card-hint">{{ _('Bu adresi mobil cihazınızın tarayıcısına yazın.') }}</p>
+                            </div>
+                        </div>
+                        <div id="lan-password-card" class="lan-info-card">
+                            <div class="lan-info-card-header">
+                                <i class="fa-solid fa-shield-halved"></i>
+                                <span class="font-semibold text-kasa-text">{{ _('LAN Şifresi') }}</span>
+                            </div>
+                            <div id="lan-password-wrap">
+                                <div class="lan-info-card-row">
+                                    <div id="lan-password" class="lan-info-card-value">-</div>
+                                    <button type="button" class="lan-copy-btn" data-copy-target="lan-password" aria-label="{{ _('Kopyala') }}">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                                <p class="lan-info-card-hint">{{ _('Mobil cihazınızda giriş yaparken bu şifreyi kullanın; ana şifreniz ağa gönderilmez.') }}</p>
+                            </div>
+                        </div>
+                        <div id="lan-pending-note" class="lan-pending-note hidden">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>{{ _('LAN erişiminin aktif olması için ayarları kaydetmeniz gerekiyor.') }}</span>
+                        </div>
+                    </div>
+                    </section>

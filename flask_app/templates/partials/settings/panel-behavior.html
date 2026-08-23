@@ -1,0 +1,50 @@
+                    <section id="settings-panel-behavior" class="settings-panel" role="tabpanel"
+                             aria-labelledby="settings-tab-behavior" data-settings-panel="behavior" hidden>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-sliders"></i></span>
+                        <div>
+                            <h3 id="settings-section-behavior">{{ _('Davranış') }}</h3>
+                            <p>{{ _('Kilitleme, pencere ve günlük kullanım tercihleri.') }}</p>
+                        </div>
+                    </div>
+                    <!-- Otomatik Kilitleme -->
+                    <div class="settings-toggle-card settings-auto-lock-card">
+                        <div class="settings-toggle-main">
+                            <div class="settings-toggle-copy">
+                                <h4 id="setting-auto-lock-title" class="text-sm font-medium mb-0.5">{{ _('Otomatik Kilitleme') }}</h4>
+                                <p class="text-xs text-kasa-text-muted mb-0">{{ _('Hareketsizlik durumunda kasayı kilitle.') }}</p>
+                            </div>
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="auto_lock_enabled" id="auto_lock_enabled" {% if AUTO_LOCK_ENABLED %}checked{% endif %} aria-labelledby="setting-auto-lock-title">
+                            </div>
+                        </div>
+                        <div class="settings-timeout-row">
+                            <label class="text-xs text-kasa-text-muted" for="auto_lock_timeout">{{ _('Zaman Aşımı (Dakika)') }}</label>
+                            <div class="settings-number-stepper" data-number-stepper>
+                                <input type="number" name="auto_lock_timeout" id="auto_lock_timeout" min="1" max="60"
+                                    step="1" value="{{ AUTO_LOCK_TIMEOUT }}" inputmode="numeric"
+                                    class="kasa-field settings-timeout-input">
+                                <button type="button" data-step-direction="up"
+                                    aria-label="{{ _('Bir dakika artır') }}">
+                                    <i class="fa-solid fa-chevron-up"></i>
+                                </button>
+                                <button type="button" data-step-direction="down"
+                                    aria-label="{{ _('Bir dakika azalt') }}">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Tepsiye Küçült -->
+                    <div class="settings-toggle-card">
+                        <div class="settings-toggle-main">
+                            <div class="settings-toggle-copy">
+                                <h4 id="setting-tray-title" class="text-sm font-medium mb-0.5">{{ _('Tepsiye Küçült') }}</h4>
+                                <p class="text-xs text-kasa-text-muted mb-0">{{ _('Kapatınca uygulamayı sistem tepsisinde tut.') }}</p>
+                            </div>
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" id="setting-minimize-to-tray" aria-labelledby="setting-tray-title">
+                            </div>
+                        </div>
+                    </div>
+                    </section>

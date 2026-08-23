@@ -1,0 +1,97 @@
+<!-- Şifre Üretici Modal -->
+<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="password-generator-title" data-target-input="modal-generated-password-display" data-create-record-url="{{ url_for('ekle_sayfasi') }}">
+    <div class="modal-dialog generator-modal-dialog">
+        <div class="modal-content generator-modal-content">
+            <div class="modal-header">
+                <h2 id="password-generator-title" class="modal-title modal-title-display font-bold">
+                    {{ _('Şifre Üretici') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body generator-modal-body">
+                <div class="generator-layout">
+                    <section class="generator-output-card">
+                        <div class="generator-output-kicker">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            {{ _('Yeni Şifre') }}
+                        </div>
+                        <div class="generator-output-row">
+                            <input type="text" class="flex-1 px-3 py-2.5 kasa-field text-sm generated-password-field" id="modal-generated-password-display" readonly
+                                placeholder="{{ _('Şifreniz burada görünecek…') }}" aria-label="{{ _('Oluşturulan Şifre') }}">
+                            <button class="kasa-btn kasa-btn-icon generator-copy-btn"
+                                    type="button" id="modal-copy-generated-password-btn" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}">
+                                <i class="fa-solid fa-copy text-sm"></i>
+                            </button>
+                        </div>
+                        <div class="generator-strength-card">
+                            <div class="flex justify-between items-center mb-1">
+                                <small class="text-kasa-text-muted text-xs">{{ _('Şifre Gücü') }}</small>
+                                <small id="modal-strength-label" class="text-xs text-kasa-text-muted">—</small>
+                            </div>
+                            <div class="h-1.5 rounded-full bg-kasa-border-hi overflow-hidden">
+                                <div id="modal-strength-bar" class="progress-bar strength-meter-fill h-full rounded-full transition-all duration-300"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="passwordGeneratorModal_options" class="generator-panel generator-options-card">
+                        <div class="flex justify-between items-center mb-2">
+                            <small class="text-kasa-text-muted">{{ _('Uzunluk') }}</small>
+                            <span id="modal-length-display" class="font-bold text-sm">16</span>
+                        </div>
+                        <label class="sr-only" for="modal-length">{{ _('Şifre Uzunluğu') }}</label>
+                        <input type="range" class="generator-length-range w-full mb-3" min="8" max="32" value="16" id="modal-length">
+
+                        <div class="generator-option-grid generator-checkboxes">
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-uppercase">
+                                <input type="checkbox" id="modal-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük Harf') }}
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-lowercase">
+                                <input type="checkbox" id="modal-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük Harf') }}
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-numbers">
+                                <input type="checkbox" id="modal-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-symbols">
+                                <input type="checkbox" id="modal-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="gen-history-section generator-history-card">
+                        <div class="gen-history-header">
+                            <button type="button" class="gen-history-toggle" aria-expanded="true" aria-controls="generator-history-body">
+                                <span><i class="fa-regular fa-clock"></i> {{ _('Geçmiş') }}</span>
+                                <i class="fa-solid fa-chevron-down gen-history-chevron"></i>
+                            </button>
+                            <div class="gen-history-header-right">
+                                <button type="button" id="generator-history-clear" class="gen-history-clear-btn" title="{{ _('Geçmişi Temizle') }}" hidden>
+                                    <i class="fa-solid fa-trash-can"></i> {{ _('Geçmişi Temizle') }}
+                                </button>
+                            </div>
+                        </div>
+                        <div id="generator-history-body" class="gen-history-body">
+                            <div id="generator-history-empty" class="gen-history-empty">
+                                {{ _('Henüz geçmiş yok.') }}
+                            </div>
+                            <div id="generator-history-list"></div>
+                        </div>
+                    </section>
+                </div>
+                    </div>
+
+            <div class="modal-footer">
+                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('Kapat') }}</button>
+                <button type="button" class="kasa-btn kasa-btn-muted" id="modal-create-record-from-password">
+                    <i class="fa-solid fa-file-circle-plus"></i>{{ _('Bu Şifreyle Kayıt Oluştur') }}
+                </button>
+                <button type="button" class="kasa-btn kasa-btn-primary" id="modal-gen-now">
+                    <i class="fa-solid fa-rotate mr-1"></i>{{ _('Yeni Üret') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+

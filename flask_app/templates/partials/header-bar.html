@@ -1,0 +1,129 @@
+<!-- ── HEADER ─────────────────────────────────────────────────── -->
+<header class="flex flex-col gap-4 mb-8 card-animated">
+
+    <!-- Üst satır: Başlık + Aksiyonlar -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+            <h1 id="dashboard-title" class="text-4xl kasa-page-title brand-title-animated leading-tight">
+                {{ _('ŞifreKasam') }}
+            </h1>
+            <!-- Ayarlar (başlık yanı dropdown) -->
+            <div class="kasa-dropdown" data-kasa-dropdown>
+                <button type="button" id="settings-dropdown-trigger" class="kasa-dropdown-trigger"
+                    title="{{ _('Ayarlar') }}" aria-label="{{ _('Ayarlar') }}"
+                    aria-haspopup="menu" aria-expanded="false"
+                    aria-controls="settings-dropdown-menu">
+                    <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                    <i class="fa-solid fa-chevron-down kasa-dropdown-caret" aria-hidden="true"></i>
+                </button>
+                <div id="settings-dropdown-menu" class="kasa-dropdown-menu" role="menu"
+                    aria-labelledby="settings-dropdown-trigger" hidden>
+                    <button type="button" role="menuitem" class="kasa-dropdown-item"
+                        data-kasa-modal="settingsModal">
+                        <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                        <span class="kasa-dropdown-item-copy">
+                            <strong>{{ _('Ayarlar') }}</strong>
+                        </span>
+                        <i class="fa-solid fa-chevron-right kasa-dropdown-item-arrow" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- Şifre üretici -->
+            <button type="button" data-kasa-modal="passwordGeneratorModal" title="{{ _('Şifre Üret') }}"
+                aria-haspopup="dialog" aria-controls="passwordGeneratorModal"
+                class="kasa-btn kasa-btn-muted">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> {{ _('Üretici') }}
+            </button>
+            <!-- Sağlık raporu -->
+            <a href="{{ url_for('saglik_raporu') }}" title="{{ _('Şifre Sağlık Raporu') }}"
+               class="kasa-btn kasa-btn-danger">
+                <i class="fa-solid fa-heart-pulse"></i> {{ _('Şifre Sağlığı') }}
+            </a>
+            <!-- Kasayı Kilitle -->
+            <button type="button" id="lock-vault-btn" title="{{ _('Kasayı Kilitle') }}"
+                class="kasa-btn kasa-btn-danger">
+                <i class="fa-solid fa-lock"></i> {{ _('Kilitle') }}
+            </button>
+            <!-- Yeni Ekle -->
+            <a href="{{ url_for('ekle_sayfasi') }}"
+               class="kasa-btn kasa-btn-primary">
+                <i class="fa-solid fa-plus text-xs"></i>{{ _('Yeni Ekle') }}
+            </a>
+        </div>
+    </div>
+
+    <!-- ── İSTATİSTİK SATIRI ──────────────────────────────────── -->
+    <div class="glass rounded-xl px-4 py-2 flex flex-wrap items-center gap-y-1 stats-bar-layout" id="stats-bar">
+        <div class="flex items-center gap-1.5">
+            <span class="stats-icon stats-icon-accent"><i class="fa-solid fa-database"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-toplam">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('kayıt') }}</span>
+        </div>
+        <span class="stats-separator">|</span>
+        <div class="flex items-center gap-1.5">
+            <span class="stats-icon stats-icon-warning"><i class="fa-solid fa-star"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-pinned">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('favori') }}</span>
+        </div>
+        <span class="stats-separator">|</span>
+        <div class="flex items-center gap-1.5">
+            <span class="stats-icon stats-icon-danger"><i class="fa-solid fa-shield-exclamation"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-zayif">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('zayıf') }}</span>
+        </div>
+        <span class="stats-separator">|</span>
+        <div class="flex items-center gap-1.5">
+            <span class="stats-icon stats-icon-info"><i class="fa-solid fa-clock"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-eski">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('eski') }}</span>
+        </div>
+        <span class="stats-separator">|</span>
+        <div class="flex items-center gap-1.5">
+            <span class="stats-icon stats-icon-danger"><i class="fa-solid fa-calendar-xmark"></i></span>
+            <span class="font-semibold text-sm text-kasa-text" id="stat-expired">—</span>
+            <span class="text-xs text-kasa-text-muted">{{ _('süresi doldu') }}</span>
+        </div>
+    </div>
+
+    <!-- Alt satır: Seçim + Filtre + Arama -->
+    <div class="flex flex-wrap justify-between items-center gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex flex-wrap gap-1.5" id="category-filter" role="group" aria-label="{{ _('Kayıt filtreleri') }}">
+            <button type="button" data-filter="all"
+                class="filter-btn filter-btn-active active" aria-pressed="true">{{ _('Tümü') }}</button>
+            <button type="button" data-filter="favorites"
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-star"></i> {{ _('Favori') }}</button>
+            <button type="button" data-filter="Website"
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-globe"></i> {{ _('Web') }}</button>
+            <button type="button" data-filter="Application"
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-desktop"></i> {{ _('Uygulama') }}</button>
+            <button type="button" data-filter="CreditCard"
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-credit-card"></i> {{ _('Kart') }}</button>
+            <button type="button" data-filter="SecureNote"
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-note-sticky"></i> {{ _('Not') }}</button>
+            <button type="button" data-filter="Other"
+                class="filter-btn" aria-pressed="false"><i class="fa-solid fa-folder"></i> {{ _('Diğer') }}</button>
+        </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0" id="bulk-and-search-group">
+            <label class="bulk-select-all-control flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer select-none whitespace-nowrap" id="select-all-label" for="select-all" hidden>
+                <input type="checkbox" id="select-all" class="bulk-select-checkbox">
+                {{ _('Tümünü seç') }}
+            </label>
+            <button type="button" id="bulk-toggle-btn" title="{{ _('Toplu Seç') }}" aria-pressed="false"
+                class="kasa-btn kasa-btn-muted kasa-transition-fast">
+                <i class="fa-solid fa-check-square"></i> {{ _('Toplu Seç') }}
+            </button>
+            <div class="record-search-wrap">
+                <label for="search-input" class="sr-only">{{ _('Kayıt ara') }}</label>
+                <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
+                    class="w-full px-3 py-2 kasa-field text-sm">
+            </div>
+        </div>
+    </div>
+
+</header>
+

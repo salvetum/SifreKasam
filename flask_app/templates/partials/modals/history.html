@@ -1,0 +1,22 @@
+<!-- Şifre Geçmişi Modal -->
+<div class="kasa-modal" id="historyModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="history-modal-title">
+    <div class="modal-dialog history-modal-dialog">
+        <div class="modal-content history-modal-content">
+            <div class="modal-header">
+                <h2 id="history-modal-title" class="modal-title modal-title-compact font-semibold">
+                    <i class="fa-solid fa-clock-rotate-left mr-2 text-[#38bdf8]"></i>{{ _('Şifre Geçmişi') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="history-list" class="history-list" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('Kapat') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,31 @@
+                    <section id="settings-panel-data" class="settings-panel" role="tabpanel"
+                             aria-labelledby="settings-tab-data" data-settings-panel="data" hidden>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-database"></i></span>
+                        <div>
+                            <h3 id="settings-section-data">{{ _('Veri ve Yedekleme') }}</h3>
+                            <p>{{ _('Kasa verilerini içe aktarın veya dışa aktarın.') }}</p>
+                        </div>
+                    </div>
+                    <!-- İçe/Dışa Aktar Butonları -->
+                    <div class="settings-action-grid">
+                        <button type="button" data-kasa-modal="importModal"
+                            class="settings-action-card">
+                            <span class="settings-action-icon"><i class="fa-solid fa-upload"></i></span>
+                            <span class="settings-action-copy">
+                                <strong>{{ _('İçe Aktar') }}</strong>
+                                <small>{{ _('Yedek dosyasından kayıt ekle.') }}</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                        </button>
+                        <button type="button" id="settings-export-btn" data-kasa-modal="exportModal"
+                            class="settings-action-card">
+                            <span class="settings-action-icon settings-action-icon-success"><i class="fa-solid fa-download"></i></span>
+                            <span class="settings-action-copy">
+                                <strong>{{ _('Dışa Aktar') }}</strong>
+                                <small>{{ _('Yedek formatını seçin ve indirin.') }}</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                        </button>
+                    </div>
+                    </section>

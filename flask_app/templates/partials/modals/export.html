@@ -1,0 +1,52 @@
+<!-- Dışa Aktar Modal -->
+<div class="kasa-modal" id="exportModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="export-modal-title">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="export-modal-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-download mr-2 modal-icon-accent-2"></i>{{ _('Dışa Aktar') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-sm text-kasa-text-muted mb-3">{{ _('Yedek dosyası formatını seçin.') }}</p>
+                <div class="settings-action-grid settings-action-grid-single">
+                    <button type="button" class="settings-action-card" data-export-format="kasa"
+                        data-export-url="{{ url_for('export_data', format='kasa') }}">
+                        <span class="settings-action-icon"><i class="fa-solid fa-vault"></i></span>
+                        <span class="settings-action-copy">
+                            <strong>{{ _('ŞifreKasam Yedeği') }} (.kasa)</strong>
+                            <small>{{ _('Uygulamaya özel, yeniden içe aktarılabilir yedek.') }}</small>
+                        </span>
+                        <i class="fa-solid fa-download settings-action-arrow"></i>
+                    </button>
+                    <button type="button" class="settings-action-card" data-export-format="json"
+                        data-export-url="{{ url_for('export_data', format='json') }}">
+                        <span class="settings-action-icon"><i class="fa-solid fa-code"></i></span>
+                        <span class="settings-action-copy">
+                            <strong>{{ _('JSON Yedeği') }} (.json)</strong>
+                            <small>{{ _('Yapılandırılmış ve taşınabilir veri formatı.') }}</small>
+                        </span>
+                        <i class="fa-solid fa-download settings-action-arrow"></i>
+                    </button>
+                    <button type="button" class="settings-action-card" data-export-format="txt"
+                        data-export-url="{{ url_for('export_data', format='txt') }}">
+                        <span class="settings-action-icon"><i class="fa-solid fa-file-lines"></i></span>
+                        <span class="settings-action-copy">
+                            <strong>{{ _('Metin Yedeği') }} (.txt)</strong>
+                            <small>{{ _('Okunabilir eski metin formatı.') }}</small>
+                        </span>
+                        <i class="fa-solid fa-download settings-action-arrow"></i>
+                    </button>
+                </div>
+                <div class="lan-warning-card export-warning-card mt-3">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <p>{{ _('Dışa aktarılan yedek dosyası şifreleri düz metin içerebilir. Dosyayı güvenli bir yerde saklayın ve paylaşmayın.') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

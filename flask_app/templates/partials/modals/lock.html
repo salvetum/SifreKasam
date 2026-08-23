@@ -1,0 +1,367 @@
+<!-- Kasa Kilitleme Modal -->
+<div class="kasa-modal" id="lockVaultModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lock-vault-title">
+    <div class="modal-dialog lock-vault-modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="lock-vault-title" class="modal-title font-semibold">
+                    <i class="fa-solid fa-lock mr-2"></i>{{ _('Kasayı Kilitle') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body lock-vault-modal-body">
+                <span class="lock-vault-icon" aria-hidden="true"><i class="fa-solid fa-lock"></i></span>
+                <p>{{ _('Kasanızı kilitlemek istediğinize emin misiniz?') }}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('Vazgeç') }}</button>
+                <button type="button" id="confirm-lock-vault" class="kasa-btn kasa-btn-primary">
+                    <i class="fa-solid fa-lock mr-2"></i>{{ _('Evet, Kilitle') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.expiry-badge').forEach(function (el) {
+        var expiryStr = el.getAttribute('data-expiry');
+        if (!expiryStr) return;
+        var parts = expiryStr.split('-');
+        var expiry = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        var now = new Date();
+        now.setHours(0, 0, 0, 0);
+        var diff = Math.floor((expiry - now) / 86400000);
+        if (diff < 0) {
+            el.textContent = _('Süresi doldu');
+            el.className = 'expiry-badge expiry-badge-expired';
+        } else if (diff <= 30) {
+            el.textContent = diff + ' ' + _('gün kaldı');
+            el.className = 'expiry-badge expiry-badge-warning';
+        } else {
+            el.textContent = expiryStr;
+            el.className = 'expiry-badge expiry-badge-ok';
+        }
+    });
+
+    // ── Toplu İşlemler ──
+    var selected = new Set();
+    var bulkToolbar = document.getElementById('bulk-toolbar');
+    var bulkCount = document.getElementById('bulk-count');
+    var selectAllLabel = document.getElementById('select-all-label');
+    var selectAll = document.getElementById('select-all');
+    var bulkToggleBtn = document.getElementById('bulk-toggle-btn');
+    var bulkMode = false;
+
+    function setBulkMode(on) {
+        bulkMode = on;
+        bulkToggleBtn.classList.toggle('bulk-active', on);
+        bulkToggleBtn.setAttribute('aria-pressed', String(on));
+        document.querySelectorAll('.select-item').forEach(function (cb) {
+            cb.closest('label').hidden = !on;
+        });
+        selectAllLabel.hidden = !on;
+        if (!on) {
+            selected.clear();
+            document.querySelectorAll('.select-item').forEach(function (cb) { cb.checked = false; });
+            updateBulkUI();
+        }
+    }
+
+    bulkToggleBtn.addEventListener('click', function () { setBulkMode(!bulkMode); });
+    function getVisibleCheckboxes() {
+        return Array.from(document.querySelectorAll('.card-wrapper:not([hidden]) .select-item'));
+    }
+
+    function updateBulkUI() {
+        var count = selected.size;
+        var visibleCheckboxes = getVisibleCheckboxes();
+        bulkCount.textContent = count;
+        if (count > 0) {
+            bulkToolbar.removeAttribute('aria-hidden');
+            requestAnimationFrame(function () {
+                bulkToolbar.classList.add('is-visible');
+            });
+        } else {
+            bulkToolbar.classList.remove('is-visible');
+            bulkToolbar.setAttribute('aria-hidden', 'true');
+        }
+        selectAll.checked = visibleCheckboxes.length > 0 && visibleCheckboxes.every(function (cb) { return selected.has(cb.value); });
+        selectAll.indeterminate = !selectAll.checked && visibleCheckboxes.some(function (cb) { return selected.has(cb.value); });
+    }
+
+    document.querySelectorAll('.select-item').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            if (this.checked) selected.add(this.value);
+            else selected.delete(this.value);
+            updateBulkUI();
+        });
+    });
+
+    document.getElementById('select-all').addEventListener('change', function () {
+        getVisibleCheckboxes().forEach(function (cb) {
+            cb.checked = this.checked;
+            if (this.checked) selected.add(cb.value);
+            else selected.delete(cb.value);
+        }, this);
+        updateBulkUI();
+    });
+
+    window.addEventListener('kasa:cards-page-changed', updateBulkUI);
+
+    document.getElementById('bulk-cancel-btn').addEventListener('click', function () {
+        document.querySelectorAll('.select-item').forEach(function (cb) {
+            cb.checked = false;
+        });
+        selected.clear();
+        updateBulkUI();
+    });
+
+    document.getElementById('bulk-delete-btn').addEventListener('click', function () {
+        var button = this;
+        var ids = Array.from(selected);
+        if (ids.length === 0 || button.disabled) return;
+        Swal.fire({
+            title: ids.length + ' ' + _('kaydı sil?'),
+            text: _('Bu işlem geri alınamaz.'),
+            icon: 'warning',
+            showCancelButton: true,
+            heightAuto: false,
+            scrollbarPadding: false,
+            confirmButtonText: _('Evet, Sil'),
+            cancelButtonText: _('Vazgeç'),
+            color: 'var(--text)',
+            buttonsStyling: false,
+            customClass: {
+                popup: 'kasa-swal-popup', title: 'kasa-swal-title',
+                htmlContainer: 'kasa-swal-text', actions: 'kasa-swal-actions',
+                confirmButton: 'kasa-btn kasa-btn-danger',
+                cancelButton: 'kasa-btn kasa-btn-muted'
+            }
+        }).then(async function (res) {
+            if (!res.isConfirmed) return;
+            button.disabled = true;
+            try {
+                var response = await window.KASA_API_FETCH('/api/bulk/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ids })
+                });
+                if (!response || !response.ok) throw new Error('bulk-delete-failed');
+                window.location.reload();
+            } catch (error) {
+                window.KASA_SHOW_WARNING_TOAST(_('Hata oluştu.'));
+            } finally {
+                button.disabled = false;
+            }
+        });
+    });
+
+    document.getElementById('bulk-export-btn').addEventListener('click', async function () {
+        var button = this;
+        var ids = Array.from(selected);
+        if (ids.length === 0 || button.disabled) return;
+        button.disabled = true;
+        try {
+            var response = await window.KASA_API_FETCH('/api/bulk/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids })
+            });
+            if (!response || !response.ok) throw new Error('bulk-export-failed');
+            window.KASA_TRIGGER_BLOB_DOWNLOAD(
+                await response.blob(),
+                'toplu_export.json'
+            );
+        } catch (error) {
+            window.KASA_SHOW_WARNING_TOAST(_('Dışa aktarma başarısız oldu.'));
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    document.getElementById('bulk-category-btn').addEventListener('click', function () {
+        var ids = Array.from(selected);
+        if (ids.length === 0) return;
+        document.getElementById('bulk-category-count').textContent = ids.length;
+    window._bulkIds = ids;
+    window.kasaModalAc('bulkCategoryModal');
+});
+
+    document.getElementById('bulk-category-apply').addEventListener('click', async function () {
+        var button = this;
+        var category = document.getElementById('bulk-category-input').value.trim();
+        if (!category) { showToast({ text: _('Lütfen bir kategori girin.'), gravity: 'top' }); return; }
+        if (button.disabled) return;
+        button.disabled = true;
+        try {
+            var response = await window.KASA_API_FETCH('/api/bulk/category', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: window._bulkIds, category: category })
+            });
+            if (!response || !response.ok) throw new Error('bulk-category-failed');
+            window.kasaModalKapat('bulkCategoryModal');
+            window.location.reload();
+        } catch (error) {
+            window.KASA_SHOW_WARNING_TOAST(_('Hata oluştu.'));
+        } finally {
+            button.disabled = false;
+        }
+    });
+});
+
+// ── Dil Değiştirme (Ayarlar) ──
+document.getElementById('settings-language-select')?.addEventListener('change', function () {
+    var lang = this.value;
+    var select = this;
+    window.KASA_SET_PAGE_LOADING?.(true, {
+        title: _('Dil değiştiriliyor…'),
+        subtitle: _('Arayüz seçilen dilde yeniden yükleniyor.')
+    });
+    fetch('/settings/language', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' },
+        body: JSON.stringify({ language: lang })
+    }).then(function (response) {
+        if (!response.ok) throw new Error('language-save-failed');
+        return response.json();
+    }).then(function (data) {
+        localStorage.setItem('kasa-lang', data.language || lang);
+        window.location.reload();
+    }).catch(function () {
+        select.value = window.LANG || 'tr';
+        select.kasaSyncCustomSelect?.();
+        window.KASA_SET_PAGE_LOADING?.(false);
+        window.KASA_SHOW_WARNING_TOAST?.(_('Dil değiştirilemedi.'));
+    });
+});
+
+// ── Ana Şifre Değiştirme ──
+function handlePasswordChangeSubmit(e) {
+    e.preventDefault();
+    var oldPw = document.getElementById('cp-old').value;
+    var newPw = document.getElementById('cp-new').value;
+    var confirmPw = document.getElementById('cp-confirm').value;
+    if (newPw !== confirmPw) {
+        showToast({ text: _('Yeni şifreler eşleşmiyor.'), gravity: 'top' });
+        return;
+    }
+    var fd = new FormData();
+    fd.append('old_password', oldPw);
+    fd.append('new_password', newPw);
+    var btn = document.getElementById('cp-submit');
+    btn.disabled = true;
+    var spinner = document.createElement('i');
+    spinner.className = 'fa-solid fa-spinner fa-spin mr-2';
+    btn.replaceChildren(spinner, document.createTextNode(_('Şifreleniyor…')));
+    document.getElementById('cp-progress').hidden = false;
+    document.getElementById('cp-bar').value = 0;
+    document.getElementById('cp-pct').textContent = '0%';
+    window.KASA_SET_PAGE_LOADING?.(true, {
+        title: _('Ana şifre güncelleniyor'),
+        subtitle: _('Kayıtlar yeniden şifreleniyor…')
+    });
+    fetch('/change-password', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' },
+        body: fd
+    })
+        .then(function (r) {
+            if (!r.ok) {
+                return r.json().then(function (d) { throw new Error(d.error || _('Bir hata oluştu.')); });
+            }
+            return r.json();
+        })
+        .then(function (data) {
+            function resetPasswordChangeUi(message) {
+                if (message) {
+                    showToast({ text: message, gravity: 'top' });
+                }
+                btn.disabled = false;
+                btn.textContent = _('Şifreyi Güncelle ve Re-encrypt Et');
+                window.KASA_SET_PAGE_LOADING?.(false);
+            }
+
+            function pollPasswordChange() {
+                fetch('/change-password/progress/' + data.task_id)
+                    .then(function (r) {
+                        return r.json().then(function (payload) {
+                            if (!r.ok) {
+                                throw new Error(payload.error || _('Bir hata oluştu.'));
+                            }
+                            return payload;
+                        });
+                    })
+                    .then(function (p) {
+                        if (p.progress >= 0) {
+                            document.getElementById('cp-bar').value = Math.max(0, Math.min(100, p.progress));
+                            document.getElementById('cp-pct').textContent = p.progress + '%';
+                        }
+                        if (p.progress === -1 || p.error) {
+                            resetPasswordChangeUi(_('Hata: ') + (p.error || _('Bilinmeyen hata')));
+                            return;
+                        }
+                        if (p.done === true) {
+                            document.getElementById('cp-bar').value = 100;
+                            document.getElementById('cp-pct').textContent = '100%';
+                            window.kasaModalKapat('changePasswordModal');
+                            window.location.href = '/logout';
+                            return;
+                        }
+                        window.setTimeout(pollPasswordChange, 250);
+                    })
+                    .catch(function (err) {
+                        resetPasswordChangeUi(err.message);
+                    });
+            }
+
+            pollPasswordChange();
+        })
+        .catch(function (err) {
+            showToast({ text: err.message, gravity: 'top' });
+            btn.disabled = false;
+            btn.textContent = _('Şifreyi Güncelle ve Re-encrypt Et');
+            window.KASA_SET_PAGE_LOADING?.(false);
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('changePasswordForm')?.addEventListener('submit', handlePasswordChangeSubmit);
+    document.getElementById('confirm-lock-vault')?.addEventListener('click', function () {
+        if (this.dataset.pending === 'true') return;
+        this.dataset.pending = 'true';
+        this.disabled = true;
+        var spinner = document.createElement('i');
+        spinner.className = 'fa-solid fa-spinner fa-spin mr-2';
+        this.replaceChildren(spinner, document.createTextNode(_('Evet, Kilitle')));
+
+        fetch('{{ url_for("lock") }}', {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': window.KASA_CSRF_TOKEN || '' }
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('lock-failed');
+                window.location.href = '{{ url_for("login") }}';
+            })
+            .catch(function () {
+                var button = document.getElementById('confirm-lock-vault');
+                var icon = document.createElement('i');
+                icon.className = 'fa-solid fa-lock mr-2';
+                button.disabled = false;
+                delete button.dataset.pending;
+                button.replaceChildren(icon, document.createTextNode(_('Evet, Kilitle')));
+                showToast({ text: _('İşlem tamamlanamadı.'), gravity: 'top' });
+            });
+    });
+});
+
+function lockVault() {
+    window.kasaModalAc?.('lockVaultModal');
+}
+
+document.getElementById('lock-vault-btn')?.addEventListener('click', lockVault);
+</script>
+

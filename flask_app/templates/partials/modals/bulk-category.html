@@ -1,0 +1,26 @@
+<!-- Toplu Kategori Değiştir Modal -->
+<div class="kasa-modal" id="bulkCategoryModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="bulk-category-title">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="bulk-category-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-tag mr-2 modal-icon-accent"></i>{{ _('Kategori Değiştir') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-sm text-kasa-text-muted mb-3"><span id="bulk-category-count">0</span> {{ _('kaydın kategorisi değiştirilecek.') }}</p>
+                <label class="sr-only" for="bulk-category-input">{{ _('Yeni kategori adı') }}</label>
+                <input type="text" id="bulk-category-input" placeholder="{{ _('Yeni kategori adı…') }}"
+                    class="w-full px-3 py-2.5 kasa-field text-sm">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('İptal') }}</button>
+                <button type="button" class="kasa-btn kasa-btn-primary" id="bulk-category-apply">{{ _('Uygula') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+

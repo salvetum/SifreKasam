@@ -1,0 +1,52 @@
+<!-- İçe Aktar Modal -->
+<div class="kasa-modal" id="importModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="import-modal-title">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="import-modal-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-upload mr-2 modal-icon-accent"></i>{{ _('İçe Aktar') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="import-form" action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="mb-4">
+                        <label for="import-file" class="block text-sm font-medium text-kasa-text-muted mb-2">{{ _('Dosya Seçin') }}</label>
+                        <input type="file" class="import-file-input" id="import-file" name="file"
+                            accept=".json,.kasa,.txt" required>
+                        <label for="import-file" id="import-drop-zone" class="import-drop-zone" role="button"
+                            tabindex="0" data-max-bytes="{{ config.get('MAX_CONTENT_LENGTH', 5242880) }}">
+                            <span class="import-drop-icon" aria-hidden="true">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </span>
+                            <span class="import-drop-copy">
+                                <strong>{{ _('Dosyayı buraya sürükleyin') }}</strong>
+                                <small>{{ _('veya bilgisayarınızdan seçin') }}</small>
+                            </span>
+                            <span class="import-browse-button">
+                                <i class="fa-regular fa-folder-open"></i>
+                                {{ _('Dosya Seç') }}
+                            </span>
+                            <span id="import-file-name" class="import-file-name" aria-live="polite">
+                                {{ _('Dosya seçilmedi') }}
+                            </span>
+                        </label>
+                        <div class="mt-3 p-3 kasa-panel-soft text-xs text-kasa-text-muted leading-loose">
+                            <i class="fa-solid fa-circle-info mr-1 text-[#38bdf8]"></i>
+                            <strong class="text-kasa-text">.kasa</strong> — {{ _('ŞifreKasam formatı') }} &nbsp;·&nbsp;
+                            <strong class="text-kasa-text">.json</strong> — {{ _('ham yedek') }} &nbsp;·&nbsp;
+                            <strong class="text-kasa-text">.txt</strong> — {{ _('eski format') }}
+                        </div>
+                    </div>
+                    <button type="submit" id="import-submit" class="w-full kasa-btn kasa-btn-primary" aria-live="polite">
+                        <i class="fa-solid fa-file-import mr-2"></i>{{ _('İçe Aktar') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+

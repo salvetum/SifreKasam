@@ -1,0 +1,70 @@
+<!-- Ayarlar Modal -->
+<div class="kasa-modal" id="settingsModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="settings-modal-title">
+    <div class="modal-dialog settings-modal-dialog">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h2 id="settings-modal-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-gear mr-2 modal-icon-accent"></i>{{ _('Ayarlar') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form action="{{ url_for('save_settings') }}" method="POST" data-settings-form aria-labelledby="settings-modal-title">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="settings-workspace">
+                    <nav class="settings-nav" role="tablist" aria-label="{{ _('Ayar kategorileri') }}">
+                        <button type="button" id="settings-tab-appearance" class="settings-nav-btn active" role="tab"
+                                aria-selected="true" aria-controls="settings-panel-appearance" data-settings-tab="appearance">
+                            <i class="fa-solid fa-palette"></i><span>{{ _('Görünüm') }}</span>
+                        </button>
+                        <button type="button" id="settings-tab-performance" class="settings-nav-btn" role="tab"
+                                aria-selected="false" aria-controls="settings-panel-performance" data-settings-tab="performance" tabindex="-1">
+                            <i class="fa-solid fa-gauge-high"></i><span>{{ _('Performans') }}</span>
+                        </button>
+                        <button type="button" id="settings-tab-behavior" class="settings-nav-btn" role="tab"
+                                aria-selected="false" aria-controls="settings-panel-behavior" data-settings-tab="behavior" tabindex="-1">
+                            <i class="fa-solid fa-sliders"></i><span>{{ _('Davranış') }}</span>
+                        </button>
+                        <button type="button" id="settings-tab-data" class="settings-nav-btn" role="tab"
+                                aria-selected="false" aria-controls="settings-panel-data" data-settings-tab="data" tabindex="-1">
+                            <i class="fa-solid fa-database"></i><span>{{ _('Veri ve Yedekleme') }}</span>
+                        </button>
+                        <button type="button" id="settings-tab-access" class="settings-nav-btn" role="tab"
+                                aria-selected="false" aria-controls="settings-panel-access" data-settings-tab="access" tabindex="-1">
+                            <i class="fa-solid fa-language"></i><span>{{ _('Dil ve Ağ') }}</span>
+                        </button>
+                        <button type="button" id="settings-tab-security" class="settings-nav-btn" role="tab"
+                                aria-selected="false" aria-controls="settings-panel-security" data-settings-tab="security" tabindex="-1">
+                            <i class="fa-solid fa-shield-halved"></i><span>{{ _('Güvenlik') }}</span>
+                        </button>
+                        <button type="button" id="settings-tab-application" class="settings-nav-btn" role="tab"
+                                aria-selected="false" aria-controls="settings-panel-application" data-settings-tab="application" tabindex="-1">
+                            <i class="fa-solid fa-circle-info"></i><span>{{ _('Uygulama') }}</span>
+                        </button>
+                    </nav>
+                    <div class="modal-body settings-body">
+{% include 'partials/settings/panel-appearance.html' %}
+{% include 'partials/settings/panel-performance.html' %}
+{% include 'partials/settings/panel-behavior.html' %}
+{% include 'partials/settings/panel-data.html' %}
+{% include 'partials/settings/panel-access.html' %}
+{% include 'partials/settings/panel-security.html' %}
+{% include 'partials/settings/panel-application.html' %}
+                    </div>
+                </div>
+                <div class="modal-footer flex justify-between items-center w-full">
+                    <div class="text-xs text-kasa-text-muted text-left">
+                        <div><span class="font-semibold">ŞifreKasam</span> v{{ APP_VERSION }}</div>
+                        <div class="opacity-75">By Salvetum</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('İptal') }}</button>
+                        <button type="submit" class="kasa-btn kasa-btn-primary px-4">{{ _('Kaydet') }}</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+

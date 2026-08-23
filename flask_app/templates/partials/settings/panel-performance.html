@@ -1,0 +1,110 @@
+                    <section id="settings-panel-performance" class="settings-panel" role="tabpanel"
+                             aria-labelledby="settings-tab-performance" data-settings-panel="performance" hidden>
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-gauge-high"></i></span>
+                        <div>
+                            <h3 id="settings-section-performance">{{ _('Performans') }}</h3>
+                            <p>{{ _('Görsel efektleri cihazınızın performansına göre ayarlayın.') }}</p>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-power-save-title">{{ _('Tasarruf Modu') }}</h4>
+                                <p>{{ _('Arka planda veya hareketsizken kaynak kullanımını azaltır.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="power_save_enabled" id="power-save-toggle" {% if POWER_SAVE_ENABLED %}checked{% endif %} aria-labelledby="setting-power-save-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-fan" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-motion-title">{{ _('Hareketli Arkaplan') }}</h4>
+                                <p>{{ _('Arkaplan bloblarını yumuşak şekilde hareket ettir.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="animated_backgrounds_enabled" id="animated-backgrounds-toggle" {% if ANIMATED_BACKGROUNDS_ENABLED %}checked{% endif %} aria-labelledby="setting-motion-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-interface-animations-title">{{ _('Arayüz Animasyonları') }}</h4>
+                                <p>{{ _('Geçişleri ve etkileşim animasyonlarını kullan.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="interface_animations_enabled" id="interface-animations-toggle" {% if INTERFACE_ANIMATIONS_ENABLED %}checked{% endif %} aria-labelledby="setting-interface-animations-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-fill-drip" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-glass-title">{{ _('Cam Efektleri') }}</h4>
+                                <p>{{ _('Bulanık cam yüzeylerini aç veya kapat.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <div class="settings-switch-control">
+                                <input class="settings-switch-input" type="checkbox" name="glass_effects_enabled" id="glass-effects-toggle" {% if GLASS_EFFECTS_ENABLED %}checked{% endif %} aria-labelledby="setting-glass-title">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="glass-quality-card" class="settings-card settings-glass-quality-card{% if not GLASS_EFFECTS_ENABLED %} is-collapsed{% endif %}" aria-hidden="{{ 'false' if GLASS_EFFECTS_ENABLED else 'true' }}">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-sun" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-glass-quality-title">{{ _('Cam Kalitesi') }}</h4>
+                                <p>{{ _('Bulanıklık seviyesini performansa göre ayarla.') }}</p>
+                            </div>
+                        </div>
+                        <div class="settings-card-control">
+                            <select name="glass_quality" id="glass-quality-select"
+                                class="kasa-field settings-inline-select" aria-labelledby="setting-glass-quality-title"
+                                data-custom-select {% if not GLASS_EFFECTS_ENABLED %}disabled{% endif %}>
+                                <option value="low" {% if GLASS_QUALITY == 'low' %}selected{% endif %}>{{ _('Düşük') }}</option>
+                                <option value="normal" {% if GLASS_QUALITY == 'normal' %}selected{% endif %}>{{ _('Normal') }}</option>
+                                <option value="high" {% if GLASS_QUALITY == 'high' %}selected{% endif %}>{{ _('Yüksek') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="glass-scales-card" class="settings-card settings-glass-quality-card settings-glass-scales-card{% if not GLASS_EFFECTS_ENABLED %} is-collapsed{% endif %}" aria-hidden="{{ 'false' if GLASS_EFFECTS_ENABLED else 'true' }}">
+                        <div class="settings-scale-block">
+                            <div class="settings-scale-head">
+                                <div class="settings-card-copy">
+                                    <h4 id="setting-glass-blur-title">{{ _('Buğu Gücü') }}</h4>
+                                    <p>{{ _('Cam yüzeylerdeki bulanıklığın ne kadar güçlü olduğu.') }}</p>
+                                </div>
+                                <output id="glass-blur-output" class="settings-range-output" for="glass-blur-range">{{ (GLASS_BLUR * 100)|round|int }}%</output>
+                            </div>
+                            <input type="range" id="glass-blur-range" name="glass_blur" min="0" max="150" step="5"
+                                value="{{ (GLASS_BLUR * 100)|round|int }}" class="settings-range-input"
+                                data-scale-key="glass-blur" aria-labelledby="setting-glass-blur-title">
+                        </div>
+                        <div class="settings-scale-block">
+                            <div class="settings-scale-head">
+                                <div class="settings-card-copy">
+                                    <h4 id="setting-glass-veil-title">{{ _('Perde Yoğunluğu') }}</h4>
+                                    <p>{{ _('Beyaz perde katmanının görünürlüğü.') }}</p>
+                                </div>
+                                <output id="glass-veil-output" class="settings-range-output" for="glass-veil-range">{{ (GLASS_VEIL * 100)|round|int }}%</output>
+                            </div>
+                            <input type="range" id="glass-veil-range" name="glass_veil" min="0" max="200" step="5"
+                                value="{{ (GLASS_VEIL * 100)|round|int }}" class="settings-range-input"
+                                data-scale-key="glass-veil" aria-labelledby="setting-glass-veil-title">
+                        </div>
+                    </div>
+                    </section>
