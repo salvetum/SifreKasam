@@ -34,6 +34,7 @@ if str(FLASK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLASK_APP_DIR))
 
 import app as app_module  # noqa: E402
+from kasa_core import backgrounds as backgrounds_module  # noqa: E402
 from kasa_core.import_export import (  # noqa: E402
     build_export_payload,
     parse_expiry,
@@ -724,7 +725,7 @@ class CustomBackgroundUploadTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = app_module.app.test_client()
         self._token = {'X-App-Token': app_module.APP_TOKEN}
-        app_module._background_upload_log.clear()
+        backgrounds_module._upload_log.clear()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True

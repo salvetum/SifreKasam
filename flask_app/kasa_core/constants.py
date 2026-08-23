@@ -1,6 +1,6 @@
 """Application constants shared by backend modules."""
 
-APP_VERSION_DEFAULT = "2.7.0-beta.2"
+APP_VERSION_DEFAULT = "2.7.0-beta.3"
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 
@@ -47,6 +47,7 @@ DEFAULT_VAULT_ACCENT_ENABLED = True
 DEFAULT_CONTENT_PROTECTION_ENABLED = False
 DEFAULT_HARDWARE_ACCELERATION_ENABLED = True
 DEFAULT_POWER_SAVE_ENABLED = True
+DEFAULT_LAN_WARNING_ACKNOWLEDGED = False
 
 LEGACY_PBKDF2_SALT = b"kasa_masaustu_salt_12345"
 PBKDF2_SALT_SETTING = "pbkdf2_salt_b64"

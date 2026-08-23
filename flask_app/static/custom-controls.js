@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.2 - Özel Form Kontrolleri modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.3 - Özel Form Kontrolleri modülü (ES Module)
  *
  * 2b. bölüm: data-custom-select sarmalayıcıları, data-number-stepper ve
  * ilgili açık dropdown / scroll / resize davranışları.

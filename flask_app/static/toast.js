@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.2 - Toast modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.3 - Toast modülü (ES Module)
  *
  * 4. bölüm toast çekirdeği: showToast/showSuccessToast/showWarningToast,
  * legacy window köprüleri (showToast, KASA_API_FETCH, KASA_SHOW_WARNING_TOAST,

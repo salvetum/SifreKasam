@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.2 - Ekle / Düzenle Formu modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.3 - Ekle / Düzenle Formu modülü (ES Module)
  *
  * 10. bölüm: kayıt tipine göre alan gösterimi, şifre üretici
  * açma/kapama davranışı ve form geçiş animasyonu.

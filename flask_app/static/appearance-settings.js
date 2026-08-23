@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.2 - Görünüm Ayarları modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.3 - Görünüm Ayarları modülü (ES Module)
  *
  * 3. bölüm: tema/efekt toggle'ları, glass kalitesi, vurgu rengi seçici,
  * chroma akcent, özel arka plan yükleme/galeri.

@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.2 - Şifre Gücü modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.3 - Şifre Gücü modülü (ES Module)
  *
  * 7. bölüm: window.updateStrengthMeter ve sayfa şifresi güç göstergesi.
  * initPasswordStrength, app.js içindeki DOMContentLoaded sırasında çağrılır.

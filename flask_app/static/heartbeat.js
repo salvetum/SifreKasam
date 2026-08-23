@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.2 - Heartbeat / Tasarruf Modu modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.3 - Heartbeat / Tasarruf Modu modülü (ES Module)
  *
  * 1. bölüm: heartbeat gönderimi, düşük güç modu ve
  * renderer repaint yönetimi.

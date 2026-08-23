@@ -1,4 +1,4 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v115';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v117';
 const BG_URL_PREFIX = '/api/background/';
 const ASSETS = [
   '{{ url_for("static", filename="tokens.css") }}',
@@ -23,6 +23,7 @@ const ASSETS = [
   '{{ url_for("static", filename="sweetalert2.min.css") }}',
   '{{ url_for("static", filename="toastify.min.css") }}',
   '{{ url_for("static", filename="app.js") }}',
+  '{{ url_for("static", filename="color-math.js") }}',
   '{{ url_for("static", filename="liquid-glass.js") }}',
   '{{ url_for("static", filename="password-generator.js") }}',
   '{{ url_for("static", filename="toast.js") }}',

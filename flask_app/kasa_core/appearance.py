@@ -21,6 +21,7 @@ from kasa_core.constants import (
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
     DEFAULT_POWER_SAVE_ENABLED,
+    DEFAULT_LAN_WARNING_ACKNOWLEDGED,
 )
 from kasa_core.extensions import db
 from kasa_core.models import Setting
@@ -443,3 +444,27 @@ class AppearanceSettings:
         self.set_setting("power_save_enabled", str(enabled).lower())
         self.save_file(power_save_enabled=enabled)
         return enabled
+
+    def get_lan_warning_acknowledged(self) -> bool:
+        try:
+            value = self.get_setting("lan_warning_acknowledged")
+            if value is not None:
+                return normalize_theme_option(
+                    value,
+                    DEFAULT_LAN_WARNING_ACKNOWLEDGED,
+                )
+        except Exception:
+            pass
+        return normalize_theme_option(
+            self.load_file().get("lan_warning_acknowledged"),
+            DEFAULT_LAN_WARNING_ACKNOWLEDGED,
+        )
+
+    def save_lan_warning_acknowledged(self, value: object) -> bool:
+        acknowledged = normalize_theme_option(
+            value,
+            DEFAULT_LAN_WARNING_ACKNOWLEDGED,
+        )
+        self.set_setting("lan_warning_acknowledged", str(acknowledged).lower())
+        self.save_file(lan_warning_acknowledged=acknowledged)
+        return acknowledged

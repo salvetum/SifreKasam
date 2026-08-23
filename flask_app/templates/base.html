@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ CURRENT_LANG|default('tr') }}" class="dark" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
@@ -118,6 +118,11 @@
         document.documentElement.setAttribute('data-kasa-power-save', normalizedPowerSave);
         localStorage.setItem('kasa-power-save', normalizedPowerSave);
 
+        if (!localStorage.getItem('kasa-lan-warning-dismissed')
+            && {{ 'true' if LAN_WARNING_ACKNOWLEDGED else 'false' }}) {
+            localStorage.setItem('kasa-lan-warning-dismissed', '1');
+        }
+
         const normalizeChromaSpeed = function (value) {
             const speed = Number(value);
             return [8, 15, 30, 60].includes(speed) ? speed : 15;
@@ -177,8 +182,19 @@
                     window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + url + '); }');
                 } else {
                     window.KASA_SET_RUNTIME_STYLE('custom-background', '');
+                    customLayer.classList.remove('is-loaded');
                 }
             };
+            if (normalizedBackground === 'custom') {
+                /* background-image kuralı elemandan bağımsız — ilk boyamadan ÖNCE
+                   enjekte edilirse görsel parse sırasında fetch edilmeye başlar
+                   ve cam kartların backdrop örneklemesi ilk kareden doğru olur. */
+                var preLayer = document.getElementById('custom-bg-layer');
+                var preUrl = preLayer ? preLayer.getAttribute('data-bg-url') : '';
+                if (preUrl) {
+                    window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + preUrl + '); }');
+                }
+            }
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', activateCustomLayer);
             } else {
@@ -216,7 +232,7 @@
     <title>{{ title or _('ŞifreKasam | Güvenli Şifre Yöneticisi') }}</title>
 
     <!-- Meta Tags -->
-    <meta name="description" content="ŞifreKasam v2.7.0-beta.2 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
+    <meta name="description" content="ŞifreKasam v2.7.0-beta.3 - Güvenli, hızlı ve modern masaüstü şifre yöneticiniz.">
     <meta name="theme-color" content="#080912">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -252,12 +268,15 @@
     <link href="{{ url_for('static', filename='theme-overrides.css') }}?v=68" rel="stylesheet">
     <link href="{{ url_for('static', filename='misc.css') }}?v=69" rel="stylesheet">
     <link href="{{ url_for('static', filename='glass.css') }}?v=81" rel="stylesheet">
+    {% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL and not CUSTOM_BACKGROUND_IS_VIDEO %}
+    <link rel="preload" as="image" href="{{ CUSTOM_BACKGROUND_URL }}">
+    {% endif %}
 </head>
 <body class="bg-kasa-bg text-kasa-text font-sans min-h-screen overflow-y-scroll">
 
     <!-- 3. Animasyonlu Blob (opsiyonel) -->
     <div class="blob-accent" aria-hidden="true"></div>
-    <div id="custom-bg-layer" aria-hidden="true"{% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL %} data-bg-url="{{ CUSTOM_BACKGROUND_URL }}"{% if CUSTOM_BACKGROUND_IS_VIDEO %} data-bg-type="video" data-animated="true"{% endif %}{% endif %}>
+    <div id="custom-bg-layer" aria-hidden="true"{% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL %} class="is-active is-loaded" data-bg-url="{{ CUSTOM_BACKGROUND_URL }}"{% if CUSTOM_BACKGROUND_IS_VIDEO %} data-bg-type="video" data-animated="true"{% endif %}{% endif %}>
         <video id="custom-bg-video" autoplay muted loop playsinline preload="auto" tabindex="-1" aria-hidden="true"></video>
     </div>
     <div id="default-bg-texture" aria-hidden="true"></div>
@@ -296,7 +315,7 @@
     <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='toastify.min.js') }}?v=2" defer></script>
 
     <!-- Our Custom Scripts -->
-    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.16" defer></script>
+    <script type="module" nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='app.js') }}?v=9.18" defer></script>
     <!-- Liquid Glass — saf CSS backdrop blur (GPU-uyumlu), tüm
          .glass / .glass-sm yüzeylerde, data-glass-quality="high"
          iken; özel yüzeyler (.settings-modal-content, .entry-login-card)

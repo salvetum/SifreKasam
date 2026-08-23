@@ -107,6 +107,8 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.7.0-beta.2',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.7.0-beta.2',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.7.0-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.7.0-beta.1',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.6.3-beta.3',

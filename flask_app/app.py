@@ -109,6 +109,24 @@ from kasa_core.records import (
     append_password_history as _append_password_history,
     delete_records_and_history as _delete_records_and_history,
 )
+from kasa_core.backgrounds import (
+    background_state_lock as _background_state_lock,
+    background_upload_allowed as _background_upload_allowed,
+    clear_custom_background_history as _clear_custom_background_history,
+    find_custom_background as _find_custom_background,
+    list_custom_background_history as _list_custom_background_history,
+    move_current_to_history as _move_current_to_history,
+    optimize_custom_background as _optimize_custom_background,
+    remove_old_custom_backgrounds as _remove_old_custom_backgrounds,
+    safe_background_filename as _safe_background_filename,
+    validate_custom_background as _validate_custom_background,
+    VIDEO_EXTS as _VIDEO_EXTS,
+    _custom_background_history_dir,
+    _ensure_background_metadata,
+    _load_custom_background_metadata,
+    _save_custom_background_metadata,
+)
+from kasa_core import lan_access, login_lockout
 from kasa_core.time_utils import utc_iso_timestamp
 from kasa_core.reports import (
     build_vault_report_payloads as _calculate_vault_report_payloads,
@@ -673,177 +691,46 @@ def _lan_access_enabled() -> bool:
         return False
 
 # ─── LAN ERİŞİM ŞİFRESİ ───────────────────────────────────────────────────────
-# LAN üzerinden girişte ana şifre ağa gönderilmez; uygulamanın ürettiği ayrı,
-# rastgele bir "LAN erişim şifresi" kullanılır. Kasa anahtarı bu şifreyle
-# sarılmış (wrap) halde veritabanında saklanır; böylece LAN istemcileri ana
-# şifreyi bilmeden kasayı açabilir. LAN şifresinin düz metni hiçbir zaman diskte
-# saklanmaz: kullanıcıya gösterim için yalnızca kasa anahtarıyla şifrelenmiş
-# kopyası (lan_access_secret) tutulur ve yerel oturumdayken çözülür.
-LAN_ACCESS_HASH_SETTING   = 'lan_access_hash'
-LAN_ACCESS_SECRET_SETTING = 'lan_access_secret'
-LAN_VAULT_WRAP_SETTING    = 'lan_vault_wrap'
-LAN_PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'  # 0/o/1/i/l karışıklığı önlenir
-LAN_PASSWORD_LENGTH  = 10
+# Kasa anahtarı sarma/çözme ve ayar yaşam döngüsü kasa_core/lan_access içinde;
+# burada yalnızca çalışma anındaki kasa anahtarı durumunu bağlayan sarmalayıcılar kalır.
 
 def _generate_lan_access_password() -> str:
-    """Telefonda kolay yazılabilir, ~50 bit entropili rastgele LAN şifresi."""
-    return ''.join(secrets.choice(LAN_PASSWORD_ALPHABET)
-                   for _ in range(LAN_PASSWORD_LENGTH))
+    return lan_access.generate_password()
 
-def _lan_wrap_key(lan_password: str, salt: bytes) -> bytes:
-    """LAN şifresinden türetilen kasa-anahtari sarma anahtarı."""
-    return _derive_key_with_salt(lan_password, salt)
-
-def _build_lan_vault_wrap(lan_password: str, vault_key: bytes) -> str:
-    """Kasa anahtarını LAN şifresiyle sarar; 'salt_b64:token' biçiminde döner."""
-    salt_b64 = _new_salt_b64()
-    wrap_key = _lan_wrap_key(lan_password, base64.b64decode(salt_b64))
-    token = Fernet(wrap_key).encrypt(vault_key).decode()
-    return f'{salt_b64}:{token}'
+LAN_PASSWORD_ALPHABET = lan_access.LAN_PASSWORD_ALPHABET
+LAN_PASSWORD_LENGTH = lan_access.LAN_PASSWORD_LENGTH
 
 def _unwrap_lan_vault_key(lan_password: str) -> bytes | None:
-    """LAN şifresiyle sarılmış kasa anahtarını açar."""
-    wrap = _get_setting(LAN_VAULT_WRAP_SETTING)
-    if not wrap:
-        return None
-    try:
-        salt_b64, _, token = wrap.partition(':')
-        wrap_key = _lan_wrap_key(lan_password, base64.b64decode(salt_b64))
-        return Fernet(wrap_key).decrypt(token.encode())
-    except Exception:
-        log.warning('LAN kasa anahtari cozulemedi.', exc_info=True)
-        return None
-
-def _set_lan_access_secret(vault_key: bytes, lan_password: str) -> None:
-    """LAN şifresinin düz metnini kasa anahtarıyla şifreleyip saklar."""
-    _set_setting(LAN_ACCESS_SECRET_SETTING,
-                 Fernet(vault_key).encrypt(lan_password.encode()).decode())
+    return lan_access.unwrap_vault_key(
+        lan_password, _get_setting(lan_access.LAN_VAULT_WRAP_SETTING))
 
 def _get_lan_access_password(vault_key: bytes | None) -> str | None:
-    """Yerel oturum (kasa anahtarı bellekteyken) LAN şifresini çözer."""
-    secret = _get_setting(LAN_ACCESS_SECRET_SETTING)
-    if not secret or not vault_key:
-        return None
-    try:
-        return Fernet(vault_key).decrypt(secret.encode()).decode()
-    except Exception:
-        log.warning('LAN erisim sifresi cozulemedi.', exc_info=True)
-        return None
+    return lan_access.decrypt_stored_password(vault_key)
 
 def _ensure_lan_access_setup() -> tuple[str | None, bool]:
-    """LAN şifresi + kasa anahtarı sarmalını eksikse oluşturur.
-
-    Dönüş: (düz metin LAN şifresi, yeni üretildi mi). Kasa anahtarı bellekte
-    değilse (yerel oturum yoksa) hiçbir şey yapmaz ve (None, False) döner.
-    """
-    vault_key = _get_vault_key()
-    if not vault_key:
-        return None, False
-    if _get_setting(LAN_ACCESS_HASH_SETTING):
-        if not _get_setting(LAN_VAULT_WRAP_SETTING):
-            lan_password = _get_lan_access_password(vault_key)
-            if lan_password:
-                _set_setting(LAN_VAULT_WRAP_SETTING,
-                             _build_lan_vault_wrap(lan_password, vault_key))
-        return _get_lan_access_password(vault_key), False
-    lan_password = _generate_lan_access_password()
-    _set_setting(LAN_ACCESS_HASH_SETTING, hash_master_password(lan_password))
-    _set_lan_access_secret(vault_key, lan_password)
-    _set_setting(LAN_VAULT_WRAP_SETTING,
-                 _build_lan_vault_wrap(lan_password, vault_key))
-    return lan_password, True
+    return lan_access.ensure_setup(_get_vault_key)
 
 def _clear_lan_access_settings() -> None:
-    """LAN kapandığında şifre/sarmal kayıtlarını siler (sonraki açılışta yeni şifre)."""
-    for key in (LAN_ACCESS_HASH_SETTING, LAN_ACCESS_SECRET_SETTING,
-                LAN_VAULT_WRAP_SETTING):
-        Setting.query.filter_by(key=key).delete()
+    lan_access.clear_settings()
 
 def _refresh_lan_access_bindings(old_key: bytes, new_key: bytes) -> None:
-    """Ana şifre değişince LAN şifresiyle kasa anahtarı bağlarını yeniler."""
-    if not _get_setting(LAN_ACCESS_HASH_SETTING):
-        return
-    try:
-        lan_password = _get_lan_access_password(old_key)
-        if not lan_password:
-            log.warning('LAN erisim sifresi ana sifre degisimi sirasinda cozulemedi.')
-            return
-        _set_lan_access_secret(new_key, lan_password)
-        _set_setting(LAN_VAULT_WRAP_SETTING,
-                     _build_lan_vault_wrap(lan_password, new_key))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        log.exception('LAN erisim sarmallari yenilenemedi.')
+    lan_access.refresh_bindings(old_key, new_key)
 
-_login_attempts: dict[str, dict[str, float | int]] = {}
-_login_attempts_lock = threading.Lock()
-LOGIN_LOCK_THRESHOLD = 5
-LOGIN_LOCK_BASE_SECONDS = 30
-LOGIN_LOCK_MAX_SECONDS = 30 * 60
-LOGIN_LOCKOUT_FILE = os.path.join(DATA_DIR, 'login_lockout.json')
+# ─── GİRİŞ BRUTE-FORCE KORUMASI ──────────────────────────────────────────────
+# Üstel geri çekilme durumu kasa_core/login_lockout içinde; IP anahtarı isteğe
+# bağlı olduğu için yalnızca anahtar üretimi burada.
+
+_login_attempts = login_lockout._login_attempts
+_login_backoff_seconds = login_lockout.backoff_seconds
+_login_retry_after = login_lockout.retry_after
+_record_login_failure = login_lockout.record_failure
+_reset_login_failures = login_lockout.reset_failures
 
 def _login_attempt_key() -> str:
     # LAN açıkken aynı ağdaki istemciler için IP bazlı brute-force limiti uygular.
     if _lan_access_enabled():
         return request.remote_addr or 'unknown'
     return 'local'
-
-def _save_login_lockout() -> None:
-    now = time.time()
-    expired = [k for k, v in _login_attempts.items()
-               if now - float(v.get('locked_until', 0)) > LOGIN_LOCK_MAX_SECONDS and int(v.get('failures', 0)) >= LOGIN_LOCK_THRESHOLD]
-    for k in expired:
-        _login_attempts.pop(k, None)
-    try:
-        with open(LOGIN_LOCKOUT_FILE, 'w', encoding='utf-8') as f:
-            json.dump(_login_attempts, f)
-    except OSError:
-        pass
-
-def _load_login_lockout() -> None:
-    if not os.path.isfile(LOGIN_LOCKOUT_FILE):
-        return
-    try:
-        with open(LOGIN_LOCKOUT_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            _login_attempts.update(data)
-    except (OSError, json.JSONDecodeError):
-        pass
-
-_load_login_lockout()
-
-def _login_retry_after(key: str) -> int:
-    with _login_attempts_lock:
-        state = _login_attempts.get(key) or {}
-        retry_after = int(max(0, float(state.get('locked_until', 0)) - time.time()))
-        if retry_after <= 0 and state.get('locked_until'):
-            state.pop('locked_until', None)
-        return retry_after
-
-def _login_backoff_seconds(failures: int) -> int:
-    """Başarısız girişler sürdükçe bekleme süresini 30 dakikaya kadar katlar."""
-    if failures < LOGIN_LOCK_THRESHOLD:
-        return 0
-    exponent = failures - LOGIN_LOCK_THRESHOLD
-    return min(LOGIN_LOCK_BASE_SECONDS * (2 ** exponent), LOGIN_LOCK_MAX_SECONDS)
-
-def _record_login_failure(key: str) -> int:
-    with _login_attempts_lock:
-        state = _login_attempts.setdefault(key, {'failures': 0, 'locked_until': 0.0})
-        failures = int(state.get('failures', 0)) + 1
-        state['failures'] = failures
-        wait_seconds = _login_backoff_seconds(failures)
-        if wait_seconds:
-            state['locked_until'] = max(float(state.get('locked_until', 0)), time.time() + wait_seconds)
-        _save_login_lockout()
-        return int(max(0, float(state.get('locked_until', 0)) - time.time()))
-
-def _reset_login_failures(key: str) -> None:
-    with _login_attempts_lock:
-        _login_attempts.pop(key, None)
-        _save_login_lockout()
 
 _LOGIN_LOCKED_TEMPLATE = "Çok fazla başarısız deneme, {seconds} saniye sonra tekrar deneyin."
 
@@ -1132,7 +1019,7 @@ def login():
                 first_setup=True, is_lan_client=True,
             ), 403
 
-        lan_hash = _get_setting(LAN_ACCESS_HASH_SETTING)
+        lan_hash = _get_setting(lan_access.LAN_ACCESS_HASH_SETTING)
         if not lan_hash or not verify_master_password(lan_hash, mp):
             _clear_vault_password()
             session.clear()
@@ -1736,7 +1623,7 @@ def lan_info():
         'ssl': os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE),
     }
     if _lan_access_enabled():
-        payload['lan_access_configured'] = bool(_get_setting(LAN_ACCESS_HASH_SETTING))
+        payload['lan_access_configured'] = bool(_get_setting(lan_access.LAN_ACCESS_HASH_SETTING))
         # Düz metin LAN şifresi yalnızca kasa anahtarı bellekteyken (yerel oturum)
         # çözülür; ana şifre bu yanıtta asla yer almaz.
         lan_password = _get_lan_access_password(_get_vault_key())
@@ -1873,344 +1760,6 @@ def settings_appearance():
         "vault_accent_enabled": get_vault_accent_enabled(),
         "power_save_enabled": get_power_save_enabled(),
     })
-
-# ─── ÖZEL ARKA PLAN YÜKLEME ─────────────────────────────────────────────────
-
-_ALLOWED_BACKGROUND_MIMES = {
-    'image/png': '.png',
-    'image/jpeg': '.jpg',
-    'image/webp': '.webp',
-    'image/gif': '.gif',
-    'video/webm': '.webm',
-    'video/mp4': '.mp4',
-}
-
-_IMAGE_FORMAT_MIMES = {
-    'PNG': 'image/png',
-    'JPEG': 'image/jpeg',
-    'WEBP': 'image/webp',
-    'GIF': 'image/gif',
-}
-
-_VIDEO_EXTS = ('.webm', '.mp4')
-
-def _validate_custom_background(file_storage):
-    """Validate uploaded file via header sniffing and size limits.
-
-    Görüntüler Pillow ile doğrulanır (header-only, tam çözümleme yapılmaz);
-    WebM/MP4 videoları magic-byte imzasıyla tanınır (``1A45DFA3`` = EBML,
-    ``ftyp`` = MP4 kutusu). Boyut sınırı formata göre seçilir.
-    """
-    from PIL import Image
-    Image.MAX_IMAGE_PIXELS = CUSTOM_BACKGROUND_MAX_PIXELS
-
-    try:
-        file_storage.seek(0, 2)
-        size = file_storage.tell()
-        file_storage.seek(0)
-        head = file_storage.stream.read(12) if hasattr(file_storage.stream, 'read') else b''
-        file_storage.seek(0)
-    except Exception:
-        file_storage.seek(0)
-        return None, 'Geçersiz dosya formatı.'
-
-    ext = None
-    if head[:4] == b'\x1a\x45\xdf\xa3':
-        ext = '.webm'
-    elif b'ftyp' in head[:12]:
-        ext = '.mp4'
-
-    if ext is None:
-        try:
-            img = Image.open(file_storage.stream)
-            fmt = (img.format or '').upper()
-            width, height = img.size
-        except Exception:
-            file_storage.seek(0)
-            return None, 'Geçersiz dosya formatı.'
-        finally:
-            file_storage.seek(0)
-        mime = _IMAGE_FORMAT_MIMES.get(fmt)
-        if not mime:
-            return None, 'Desteklenmeyen dosya formatı. PNG, JPEG, WebP, GIF, WebM veya MP4 yükleyin.'
-        if width * height > CUSTOM_BACKGROUND_MAX_PIXELS or max(width, height) > CUSTOM_BACKGROUND_MAX_DIMENSION:
-            return None, 'Görsel çözünürlüğü çok yüksek. Maksimum 24MP ve maksimum kenar 8192px olabilir.'
-        ext = _ALLOWED_BACKGROUND_MIMES[mime]
-
-    mime = _EXT_TO_MIME.get(ext, '')
-    if mime == 'image/gif':
-        max_bytes = CUSTOM_BACKGROUND_MAX_GIF_BYTES
-    elif mime.startswith('video/'):
-        max_bytes = CUSTOM_BACKGROUND_MAX_VIDEO_BYTES
-    else:
-        max_bytes = CUSTOM_BACKGROUND_MAX_IMAGE_BYTES
-    if size > max_bytes:
-        limit_mb = max_bytes // (1024 * 1024)
-        return None, f'Dosya boyutu {limit_mb}MB sınırını aşıyor.'
-
-    return ext, None
-
-
-def _optimize_custom_background(file_storage, filepath, ext):
-    """Statik görüntüleri yeniden boyutlandırıp sıkıştırarak kaydeder.
-
-    GIF ve videolar (WebM/MP4) animasyonu/akışı bozmamak için kaynak
-    formatında olduğu gibi kopyalanır. Arkaplan ``cover`` olarak gösterildiği
-    için görünüm değişmez; yalnızca yükleme/servis hızı artar. Optimizasyon
-    başarısız olursa orijinal dosya kaydedilir (işlev bozulmaz).
-    """
-    if ext in ('.gif', '.webm', '.mp4'):
-        file_storage.seek(0)
-        file_storage.save(filepath)
-        return
-
-    from PIL import Image, ImageOps
-    Image.MAX_IMAGE_PIXELS = CUSTOM_BACKGROUND_MAX_PIXELS
-
-    file_storage.seek(0)
-    try:
-        with Image.open(file_storage.stream) as img:
-            img = ImageOps.exif_transpose(img)
-            if img.mode not in ('RGB', 'RGBA'):
-                has_alpha = 'A' in img.getbands() or (
-                    img.mode == 'P' and 'transparency' in img.info)
-                img = img.convert('RGBA' if has_alpha else 'RGB')
-            if max(img.size) > CUSTOM_BACKGROUND_MAX_DIM:
-                img.thumbnail((CUSTOM_BACKGROUND_MAX_DIM, CUSTOM_BACKGROUND_MAX_DIM), Image.LANCZOS)
-            if ext == '.png':
-                img.save(filepath, format='PNG', optimize=True)
-            elif ext == '.webp':
-                img.save(filepath, format='WEBP', quality=85, method=6)
-            else:
-                img.convert('RGB').save(filepath, format='JPEG', quality=85, optimize=True, progressive=True)
-    except Exception:
-        file_storage.seek(0)
-        file_storage.save(filepath)
-
-
-def _remove_old_custom_backgrounds():
-    """Delete all files in the backgrounds directory (keep only the latest)."""
-    if not os.path.isdir(BACKGROUND_DIR):
-        return
-    for name in os.listdir(BACKGROUND_DIR):
-        filepath = os.path.join(BACKGROUND_DIR, name)
-        if os.path.isfile(filepath):
-            try:
-                os.unlink(filepath)
-            except OSError:
-                pass
-
-
-def _find_custom_background():
-    """Return the path of the current custom background file, or None."""
-    if not os.path.isdir(BACKGROUND_DIR):
-        return None
-    for name in os.listdir(BACKGROUND_DIR):
-        filepath = os.path.join(BACKGROUND_DIR, name)
-        if os.path.isfile(filepath):
-            return filepath
-    return None
-
-
-_CUSTOM_BACKGROUND_NAME_RE = re.compile(r'^[0-9a-f]{32}\.(png|jpg|webp|gif|webm|mp4)$')
-
-
-def _custom_background_history_dir():
-    history_dir = os.path.join(BACKGROUND_DIR, 'history')
-    os.makedirs(history_dir, exist_ok=True)
-    try:
-        os.chmod(history_dir, 0o700)
-    except OSError:
-        pass
-    return history_dir
-
-
-def _safe_background_filename(name):
-    """Return the basename only if it is a known UUID-style background file."""
-    base = os.path.basename(name or '')
-    if base and _CUSTOM_BACKGROUND_NAME_RE.match(base):
-        return base
-    return None
-
-
-_BACKGROUND_METADATA_NAME = 'metadata.json'
-_background_state_lock = threading.Lock()
-_EXT_TO_MIME = {ext: mime for mime, ext in _ALLOWED_BACKGROUND_MIMES.items()}
-
-_background_upload_log: dict[str, list[float]] = {}
-_background_upload_lock = threading.Lock()
-
-
-def _background_upload_allowed(client_key: str) -> bool:
-    """Sliding-window rate limit for custom background uploads per client.
-
-    LAN üzerinden kimliği doğrulanmış bir istemcinin tekrar tekrar 50MB'ye
-    kadar dosya yazarak disk/hafıza DoS'u yapmasını sınırlar.
-    """
-    now = time.monotonic()
-    with _background_upload_lock:
-        stamps = _background_upload_log.setdefault(client_key, [])
-        stamps[:] = [t for t in stamps if now - t < CUSTOM_BACKGROUND_UPLOAD_WINDOW_SECONDS]
-        if len(stamps) >= CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW:
-            return False
-        stamps.append(now)
-        return True
-
-
-def _custom_background_metadata_path():
-    return os.path.join(_custom_background_history_dir(), _BACKGROUND_METADATA_NAME)
-
-
-def _load_custom_background_metadata():
-    """Load the {filename: {size,width,height,mime}} JSON index for history."""
-    meta_path = _custom_background_metadata_path()
-    try:
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            return data
-    except (OSError, ValueError):
-        pass
-    return {}
-
-
-def _save_custom_background_metadata(meta):
-    """Atomically write the metadata index (temp file + os.replace)."""
-    meta_path = _custom_background_metadata_path()
-    tmp = meta_path + '.tmp'
-    try:
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(meta, f)
-        os.replace(tmp, meta_path)
-    except OSError:
-        try:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
-        except OSError:
-            pass
-
-
-def _compute_background_metadata(filepath, ext):
-    """Return {size, width, height, mime} for a saved background file."""
-    info = {
-        'size': 0,
-        'width': None,
-        'height': None,
-        'mime': _EXT_TO_MIME.get((ext or '').lower(), ''),
-    }
-    try:
-        info['size'] = os.path.getsize(filepath)
-    except OSError:
-        pass
-    try:
-        from PIL import Image
-        with Image.open(filepath) as img:
-            info['width'] = img.width
-            info['height'] = img.height
-            info['mime'] = _IMAGE_FORMAT_MIMES.get((img.format or '').upper(), info['mime'])
-    except Exception:
-        pass
-    return info
-
-
-def _ensure_background_metadata(meta, filename, filepath):
-    """Return metadata for a file, computing and caching it if missing."""
-    entry = meta.get(filename)
-    if entry is not None:
-        return entry
-    entry = _compute_background_metadata(filepath, os.path.splitext(filename)[1])
-    meta[filename] = entry
-    return entry
-
-
-def _list_custom_background_history():
-    """Return history entries as [{filename, mtime, size, width, height, mime}]
-    sorted newest-first. Metadata is computed lazily for legacy files and
-    persisted back to the JSON index."""
-    history_dir = _custom_background_history_dir()
-    meta = _load_custom_background_metadata()
-    changed = False
-    entries = []
-    try:
-        for name in os.listdir(history_dir):
-            filename = _safe_background_filename(name)
-            if not filename:
-                continue
-            filepath = os.path.join(history_dir, filename)
-            try:
-                mtime = os.path.getmtime(filepath)
-            except OSError:
-                continue
-            existed = filename in meta
-            info = _ensure_background_metadata(meta, filename, filepath)
-            if not existed:
-                changed = True
-            entries.append({
-                'filename': filename,
-                'mtime': mtime,
-                'size': info.get('size'),
-                'width': info.get('width'),
-                'height': info.get('height'),
-                'mime': info.get('mime'),
-            })
-    except OSError:
-        return []
-    entries.sort(key=lambda entry: entry['mtime'], reverse=True)
-    if changed:
-        _save_custom_background_metadata(meta)
-    return entries
-
-
-def _prune_custom_background_history():
-    """Delete the oldest history entries beyond the configured limit."""
-    history_dir = _custom_background_history_dir()
-    pruned = []
-    for entry in _list_custom_background_history()[CUSTOM_BACKGROUND_HISTORY_LIMIT:]:
-        filepath = os.path.join(history_dir, entry['filename'])
-        try:
-            os.unlink(filepath)
-            pruned.append(entry['filename'])
-        except OSError:
-            pass
-    if pruned:
-        meta = _load_custom_background_metadata()
-        for name in pruned:
-            meta.pop(name, None)
-        _save_custom_background_metadata(meta)
-
-
-def _move_current_to_history():
-    """Move the current root background into history (if any) and prune."""
-    if not os.path.isdir(BACKGROUND_DIR):
-        return
-    history_dir = _custom_background_history_dir()
-    for name in os.listdir(BACKGROUND_DIR):
-        filename = _safe_background_filename(name)
-        if not filename:
-            continue
-        source = os.path.join(BACKGROUND_DIR, filename)
-        if not os.path.isfile(source):
-            continue
-        try:
-            shutil.move(source, os.path.join(history_dir, filename))
-        except OSError:
-            pass
-    _prune_custom_background_history()
-
-
-def _clear_custom_background_history():
-    """Delete all files (and the metadata index) in the history directory."""
-    history_dir = os.path.join(BACKGROUND_DIR, 'history')
-    if not os.path.isdir(history_dir):
-        return
-    for name in os.listdir(history_dir):
-        filepath = os.path.join(history_dir, name)
-        if os.path.isfile(filepath):
-            try:
-                os.unlink(filepath)
-            except OSError:
-                pass
-
 
 @app.route('/api/background/upload', methods=['POST'])
 @login_required

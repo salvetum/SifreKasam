@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.2 - Şifre Üretici modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.3 - Şifre Üretici modülü (ES Module)
  *
  * 8. ve 8b. bölümler: şifre üretici ve üretici geçmişi.
  * app.js (main modül) içindeki DOMContentLoaded sırasında
