@@ -36,6 +36,11 @@ const LAN_RECONCILE_IDLE_INTERVAL_MS = 20_000;
 const LAN_RECONCILE_ACTIVE_INTERVAL_MS = 5_000;
 const LAN_RESTART_MIN_INTERVAL_MS = 15_000;
 
+// Güvenli mod talebi (--sifrekasam-safe-mode); hem ana süreç akışı hem de
+// renderer çökmesi durumunda yeniden başlatma kararı için kullanılır.
+const { SAFE_MODE_FLAG } = require('./fatal-errors');
+const safeModeRequested = process.argv.includes(SAFE_MODE_FLAG);
+
 module.exports = {
   APP_ROOT,
   resolvePath,
@@ -51,4 +56,5 @@ module.exports = {
   LAN_RECONCILE_IDLE_INTERVAL_MS,
   LAN_RECONCILE_ACTIVE_INTERVAL_MS,
   LAN_RESTART_MIN_INTERVAL_MS,
+  safeModeRequested,
 };
