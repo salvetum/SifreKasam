@@ -309,12 +309,18 @@ class TranslationCoverageTests(unittest.TestCase):
         self.assertEqual(missing, [], f"Missing English translations: {missing}")
 
     def test_settings_language_change_does_not_restart_login_flow(self) -> None:
-        index_template = (
-            PROJECT_ROOT / "flask_app" / "templates" / "index.html"
-        ).read_text(encoding="utf-8")
+        templates_dir = PROJECT_ROOT / "flask_app" / "templates"
+        index_template = (templates_dir / "index.html").read_text(encoding="utf-8")
+        # Dil degisikligi mantigi partial dosyalara tasinabilir; tum sablon
+        # agacini birlikte tarayarak yeniden yonlendirme desenini arıyoruz.
+        rendered_sources = [index_template] + [
+            p.read_text(encoding="utf-8")
+            for p in sorted(templates_dir.glob("partials/**/*.html"))
+        ]
+        combined = "\n".join(rendered_sources)
 
-        self.assertNotIn("window.location.href = '/loading?lang='", index_template)
-        self.assertIn("window.location.reload();", index_template)
+        self.assertNotIn("window.location.href = '/loading?lang='", combined)
+        self.assertIn("window.location.reload();", combined)
 
 
 class RouteContractTests(unittest.TestCase):
