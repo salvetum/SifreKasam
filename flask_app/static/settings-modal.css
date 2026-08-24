@@ -728,9 +728,8 @@
         linear-gradient(135deg, rgba(var(--accent-rgb), 0.42), rgba(var(--accent-2-rgb), 0.22));
 }
 
-html[data-kasa-motion="on"] .appearance-preview {
-    animation: softPulse 2.8s ease-in-out infinite;
-}
+/* Not: appearance-preview uzerindeki sonsuz softPulse accent nabzi
+   kaldirildi — panel girisi bittikten sonra beliren "hafif accent" bunuydu. */
 
 .accent-preset-row {
     display: grid;

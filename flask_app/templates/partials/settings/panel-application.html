@@ -42,13 +42,4 @@
                         </a>
                     </div>
                     <div id="update-check-result" class="update-check-result hidden" aria-live="polite"></div>
-                    <div class="flex items-center justify-between p-3 rounded-xl glass-sm">
-                        <div>
-                            <h4 id="setting-hardware-acceleration-title" class="text-sm font-medium mb-0.5">{{ _('Donanım Hızlandırma') }}</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">{{ _('GPU tabanlı çizimi kullan. Görsel sorun yaşarsan kapat.') }}</p>
-                        </div>
-                        <div class="settings-switch-control">
-                            <input class="settings-switch-input" type="checkbox" name="hardware_acceleration_enabled" id="hardware-acceleration-toggle" {% if HARDWARE_ACCELERATION_ENABLED %}checked{% endif %} aria-labelledby="setting-hardware-acceleration-title">
-                        </div>
-                    </div>
                     </section>
