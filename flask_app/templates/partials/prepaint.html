@@ -185,8 +185,38 @@
                    ve cam kartların backdrop örneklemesi ilk kareden doğru olur. */
                 var preLayer = document.getElementById('custom-bg-layer');
                 var preUrl = preLayer ? preLayer.getAttribute('data-bg-url') : '';
-                if (preUrl) {
+                if (preUrl && preLayer.getAttribute('data-bg-type') !== 'video') {
                     window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + preUrl + '); }');
+
+                    /* Kart bölgesindeki açılış flası: ilk boya background-image'ın
+                       decode'unu BEKLEMEZ; görsel 1-3 kare sonra belirince cam
+                       kartların backdrop-filter örnekleminde kontrast zıplaması
+                       görünür bir flaş oluşturuyordu. İlk boyayı decode'a
+                       kilitliyoruz: html'e konan işaret attribute'ü gövdeyi
+                       gizler (html seviyesindeki kasa-first-load sisteminden
+                       bağımsız elemanda çalıştığı için çakışmaz), görsel hazır
+                       olunca sayfa TEK karede, arkaplanı yerinde olarak boyanır.
+                       Güvenlik ağı: 600 ms içinde mutlaka serbest bırakılır. */
+                    var bgHoldReleased = false;
+                    var bgHoldTimer = null;
+                    var releaseBackgroundHold = function () {
+                        if (bgHoldReleased) return;
+                        bgHoldReleased = true;
+                        if (bgHoldTimer !== null) clearTimeout(bgHoldTimer);
+                        document.documentElement.removeAttribute('data-kasa-bg-wait');
+                    };
+                    document.documentElement.setAttribute('data-kasa-bg-wait', '');
+                    var bgDecodeProbe = new Image();
+                    bgDecodeProbe.onload = function () {
+                        if (typeof bgDecodeProbe.decode === 'function') {
+                            bgDecodeProbe.decode().then(releaseBackgroundHold, releaseBackgroundHold);
+                        } else {
+                            releaseBackgroundHold();
+                        }
+                    };
+                    bgDecodeProbe.onerror = releaseBackgroundHold;
+                    bgDecodeProbe.src = preUrl;
+                    bgHoldTimer = setTimeout(releaseBackgroundHold, 600);
                 }
             }
             if (document.readyState === 'loading') {
@@ -217,6 +247,10 @@
         }
     </script>
     <style nonce="{{ csp_nonce }}">
+        /* Özel arkaplan decode bekletmesi: attribute HEAD'de konur, gövde
+           parse edilene kadar kural etkisizdir — ilk boya asla "görselsiz"
+           kare göstermez. */
+        html[data-kasa-bg-wait] body { opacity: 0; }
         html.kasa-first-load { opacity: 0; }
         html.kasa-first-load-enter {
             opacity: 1;
