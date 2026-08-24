@@ -192,6 +192,20 @@
     border-radius: 20px;
 }
 
+/* ── Sayfa girişi: yüzeyler sırayla süzülerek gelir ────────────────
+   hero -> main -> access -> notes; yan panel (Süre/Kaydet) access ile
+   birlikte belirir. backwards fill: sırası gelmeden opacity 0'da bekler,
+   animasyon bitince transform düşer (cam güvenliği). */
+@keyframes vaultPanelIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.99); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.vault-form-hero   { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) backwards; }
+.vault-form-main   { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 80ms backwards; }
+.vault-form-access { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 160ms backwards; }
+.vault-form-notes  { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 240ms backwards; }
+.vault-form-side   { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 160ms backwards; }
+
 .vault-form-panel.has-open-select-layer,
 .settings-panel.has-open-select-layer {
     position: relative;

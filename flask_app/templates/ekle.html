@@ -231,16 +231,16 @@
             </section>
 
             <section class="vault-form-actions">
-                <span class="kasa-unsaved-badge" id="ekle-unsaved-badge" data-unsaved-badge data-kasa-pop hidden>
-                    <i class="fa-solid fa-circle" aria-hidden="true"></i>
-                    <span class="kasa-unsaved-badge-text">{{ _('Kaydedilmemiş değişiklikler var') }}</span>
-                </span>
                 <button type="submit" id="save-btn" class="kasa-btn kasa-btn-primary">
                     <i class="fa-solid fa-save mr-2"></i>{{ _('Kaydet') }}
                 </button>
                 <a href="{{ url_for('index') }}" class="kasa-btn kasa-btn-muted">
                     {{ _('Vazgeç') }}
                 </a>
+                <span class="kasa-unsaved-badge" id="ekle-unsaved-badge" data-unsaved-badge data-kasa-pop hidden>
+                    <i class="fa-solid fa-circle" aria-hidden="true"></i>
+                    <span class="kasa-unsaved-badge-text">{{ _('Kaydedilmemiş değişiklikler var') }}</span>
+                </span>
             </section>
         </aside>
     </form>

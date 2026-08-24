@@ -419,7 +419,9 @@
     50% { opacity: 0.35; }
 }
 .vault-form-actions .kasa-unsaved-badge {
-    align-self: center;
+    /* Kaydet/Vazgeç satırının ALTINDA, tam genişlik ortalanmış */
+    grid-column: 1 / -1;
+    justify-content: center;
 }
 .modal-footer .kasa-unsaved-badge {
     align-self: center;

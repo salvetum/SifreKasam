@@ -77,12 +77,16 @@ export function initVaultForm() {
 
       clearTimeout(el._atShow);
       clearTimeout(el._atHide);
+      // Cam güvenliği: kasa-field girdileri backdrop-filter'lı olduğundan
+      // yalnız opacity animasyonu; eğriler motion token'larıyla ayni hissi
+      // verir (swift giriş, keskin çıkış).
+      const SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
       if (show) {
         if (!el.hidden) return;
         el.hidden = false;
         el.style.opacity = '0';
-        el.style.transition = 'opacity 0.22s ease';
+        el.style.transition = 'opacity 180ms ' + SWIFT;
         requestAnimationFrame(function () {
           requestAnimationFrame(function () {
             el.style.opacity = '1';
@@ -91,11 +95,11 @@ export function initVaultForm() {
         el._atShow = setTimeout(function () {
           el.style.opacity = '';
           el.style.transition = '';
-        }, 280);
+        }, 220);
       } else {
         if (el.hidden) return;
         el.style.opacity = '1';
-        el.style.transition = 'opacity 0.16s ease';
+        el.style.transition = 'opacity 130ms ease';
         requestAnimationFrame(function () {
           el.style.opacity = '0';
         });
@@ -103,7 +107,7 @@ export function initVaultForm() {
           el.hidden = true;
           el.style.opacity = '';
           el.style.transition = '';
-        }, 200);
+        }, 150);
       }
     }
 
