@@ -423,6 +423,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // ─── KAYDEDİLMEMİŞ DEĞİŞİKLİK ROZETİ (form[data-unsaved-track]) ─────────
+  // Form yüklendiği andaki değerleri baseline alır; değişen her alanda
+  // badge görünür, submit ile sıfırlanır. Programatik kayıtlar (örn. saat
+  // alanının adım butonu) gerçek input/change olayı yaydığı için yakalanır.
+  document.querySelectorAll('form[data-unsaved-track]').forEach(form => {
+    // Baseline, tum init modulleri (custom-controls/vault-form/appearance)
+    // alan degerlerini hallettikten SONRA alinmali; aksi halde ilk kurulumda
+    // degisen bir alan kalici "kirli" gorunur.
+    setTimeout(() => {
+    const badge = form.querySelector('[data-unsaved-badge]');
+    if (!badge) return;
+
+    const fields = () => Array.from(
+      form.querySelectorAll('input[name], select[name], textarea[name]')
+    ).filter(field => !field.disabled);
+
+    const snapshot = () => JSON.stringify(
+      fields().map(field => {
+        if (field.type === 'checkbox' || field.type === 'radio') {
+          return field.checked ? '1' : '0';
+        }
+        return String(field.value ?? '').trim();
+      })
+    );
+
+    let baseline = snapshot();
+    const refresh = () => {
+      const dirty = snapshot() !== baseline;
+      badge.hidden = !dirty;
+      badge.setAttribute('aria-hidden', String(!dirty));
+    };
+
+    form.addEventListener('input', refresh);
+    form.addEventListener('change', refresh);
+    form.addEventListener('submit', () => {
+      baseline = snapshot();
+      if (!badge.hidden) refresh();
+    });
+    }, 0);
+  });
+
   document.addEventListener('click', (e) => {
     if (!(e.target instanceof Element)) return;
     const link = e.target.closest('a');
@@ -742,6 +783,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let settingsFormSnapshot = getSettingsSnapshot();
 
+    // Kaydedilmemiş değişiklik rozeti.
+    const settingsUnsavedBadge = document.getElementById('settings-unsaved-badge');
+    const APPEARANCE_AUTOSAVE_FIELDS = new Set([
+      'accent_color', 'background_style', 'chroma_accent_enabled', 'chroma_accent_speed',
+      'animated_backgrounds_enabled', 'interface_animations_enabled', 'gradients_enabled',
+      'card_sheen_enabled', 'card_frame_enabled', 'card_depth_enabled',
+      'vault_accent_enabled', 'power_save_enabled',
+    ]);
+    const updateSettingsUnsavedBadge = (nextSnapshot) => {
+      if (!settingsUnsavedBadge) return;
+      const dirty = nextSnapshot !== undefined
+        ? nextSnapshot !== settingsFormSnapshot
+        : getSettingsSnapshot() !== settingsFormSnapshot;
+      settingsUnsavedBadge.hidden = !dirty;
+      settingsUnsavedBadge.setAttribute('aria-hidden', String(!dirty));
+    };
+    const settingsFormDirtyListen = () => {
+      settingsForm.querySelectorAll('input[name], select[name], textarea[name]')
+        .forEach(field => field.addEventListener('input', () => updateSettingsUnsavedBadge()));
+      settingsForm.addEventListener('change', () => updateSettingsUnsavedBadge());
+      // Otomatik kaydedilen görünüm ayarları (appearance-settings.js) alanı
+      // değiştirince badge yanmasın; YALNIZCA otomatik kaydedilen alanlar
+      // baseline'a katılır — diğer bekleyen değişiklikler kirli kalır.
+      window.addEventListener('kasa:appearance-saved', () => {
+        try {
+          const previous = new Map(JSON.parse(settingsFormSnapshot));
+          const merged = JSON.parse(getSettingsSnapshot()).map(([fieldName, value]) => [
+            fieldName,
+            APPEARANCE_AUTOSAVE_FIELDS.has(fieldName)
+              ? value
+              : (previous.has(fieldName) ? previous.get(fieldName) : value),
+          ]);
+          merged.sort(([leftName], [rightName]) => leftName.localeCompare(rightName));
+          settingsFormSnapshot = JSON.stringify(merged);
+        } catch (_) {
+          settingsFormSnapshot = getSettingsSnapshot();
+        }
+        updateSettingsUnsavedBadge();
+      });
+    };
+    settingsFormDirtyListen();
+    // Init modulleri alanlari hallettikten sonra baseline'i tazele.
+    setTimeout(() => {
+      settingsFormSnapshot = getSettingsSnapshot();
+      updateSettingsUnsavedBadge(settingsFormSnapshot);
+    }, 0);
+
     // LAN uyarısı: toggle açılırken gösterilir (kayıt anında değil).
     // "Bir daha gösterme" seçimi localStorage'da tutulur.
     const LAN_WARNING_DISMISS_KEY = 'kasa-lan-warning-dismissed';
@@ -939,6 +1027,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (data.lan_enabled) showActive(); else hide();
         }
         settingsFormSnapshot = getSettingsSnapshot();
+        updateSettingsUnsavedBadge(settingsFormSnapshot);
         showSuccessToast(window._('Ayarlar kaydedildi.'));
         if (data.restart_required) {
           showSuccessToast(window._('Yeniden başlatılıyor...'));

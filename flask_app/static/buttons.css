@@ -394,3 +394,38 @@
 
 .card-icon-btn { color: #d5daea; }
 
+
+/* Kaydedilmemiş değişiklik rozeti */
+.kasa-unsaved-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid rgba(245,158,11,0.38);
+    border-radius: 999px;
+    background: rgba(245,158,11,0.10);
+    color: #fbbf24;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+.kasa-unsaved-badge i {
+    font-size: 0.5rem;
+    animation: kasaUnsavedPulse 1.6s ease-in-out infinite;
+}
+@keyframes kasaUnsavedPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+.vault-form-actions .kasa-unsaved-badge {
+    align-self: center;
+}
+.modal-footer .kasa-unsaved-badge {
+    align-self: center;
+}
+[data-bs-theme="light"] .kasa-unsaved-badge {
+    color: #b45309;
+    border-color: rgba(180,83,9,0.35);
+    background: rgba(180,83,9,0.08);
+}

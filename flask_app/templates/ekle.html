@@ -17,7 +17,7 @@
         </a>
     </header>
 
-    <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form aria-labelledby="vault-form-title">
+    <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form data-unsaved-track aria-labelledby="vault-form-title">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <section class="vault-form-panel vault-form-main" aria-labelledby="vault-section-basic">
             <div class="vault-section-head">
@@ -231,6 +231,10 @@
             </section>
 
             <section class="vault-form-actions">
+                <span class="kasa-unsaved-badge" id="ekle-unsaved-badge" data-unsaved-badge hidden>
+                    <i class="fa-solid fa-circle" aria-hidden="true"></i>
+                    <span class="kasa-unsaved-badge-text">{{ _('Kaydedilmemiş değişiklikler var') }}</span>
+                </span>
                 <button type="submit" id="save-btn" class="kasa-btn kasa-btn-primary">
                     <i class="fa-solid fa-save mr-2"></i>{{ _('Kaydet') }}
                 </button>

@@ -140,7 +140,8 @@ export function initAppearanceSettings({
     toggle.checked = themeFeatureEnabled(attribute);
     toggle.addEventListener('change', () => {
       applyThemeFeature(attribute, storageKey, toggle.checked);
-      apiPost('/settings/appearance', { [apiKey]: toggle.checked });
+      apiPost('/settings/appearance', { [apiKey]: toggle.checked })
+        .finally(() => window.dispatchEvent(new CustomEvent('kasa:appearance-saved')));
     });
   };
 
@@ -464,7 +465,10 @@ export function initAppearanceSettings({
         card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
         vault_accent_enabled: vaultAccentToggle?.checked ?? themeFeatureEnabled('data-kasa-vault-accent'),
         power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
-      }).finally(() => { appearanceSavePromise = null; });
+      }).finally(() => {
+        appearanceSavePromise = null;
+        window.dispatchEvent(new CustomEvent('kasa:appearance-saved'));
+      });
     }, 250);
   };
 
@@ -486,7 +490,10 @@ export function initAppearanceSettings({
       card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
       vault_accent_enabled: vaultAccentToggle?.checked ?? themeFeatureEnabled('data-kasa-vault-accent'),
       power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
-    }).finally(() => { appearanceSavePromise = null; });
+    }).finally(() => {
+      appearanceSavePromise = null;
+      window.dispatchEvent(new CustomEvent('kasa:appearance-saved'));
+    });
     return appearanceSavePromise;
   };
 
