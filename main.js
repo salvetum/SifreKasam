@@ -14,6 +14,7 @@ const {
 } = require('./src/main/preferences');
 const { registerCertificateErrorHandler } = require('./src/main/certificates');
 const {
+  HOST,
   FLASK_TIMEOUT_MS,
   FLASK_TIMEOUT_FIRST_RUN_MS,
   safeModeRequested,
@@ -28,6 +29,7 @@ const {
   shutdownFlask,
   requestBackendJson,
   waitForBackendReady,
+  findFreePort,
 } = require('./src/main/backend-process');
 const { createTray } = require('./src/main/tray');
 const {
