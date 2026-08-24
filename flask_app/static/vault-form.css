@@ -502,8 +502,13 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 .vault-field .settings-number-stepper {
     width: 100%;
 }
+/* kasa-field radius/focus-ring kurallarını (background.css input.kasa-field
+   !important dâhil) ezerek stepper görünümünü bozmasın: köşeler kare kalır,
+   odak halkasını yalnızca kapsayıcının focus-within'i çizer. */
 .vault-field .settings-number-stepper .settings-timeout-input {
     font-size: 0.85rem;
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 
 /* ── KART ÜÇLÜ SATIRI (Ay | Yıl | CVV) ───────────────────────── */
