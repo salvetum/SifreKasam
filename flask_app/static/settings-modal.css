@@ -149,35 +149,14 @@
 }
 
 .settings-panel.active {
+    /* Giris/cikis animasyonu app.js'teki Web Animations API motorunda
+       (yon duyarli, timer'siz); burada yalniz gorunurluk mekaniği var. */
     display: grid;
-    animation: settingsPanelIn var(--dur-slow) var(--ease-swift) backwards;
-    /* contain yalnizca layout/style izolasyonu saglar; will-change:transform
-       KULLANILMAZ — kalici layer promotion, panel icindeki backdrop-filter
-       cam kartlarinin buğusunu kalicı bozuyor (base.css'teki cam notu). */
     contain: layout style;
 }
 
-.settings-panel.is-exiting {
-    display: grid;
-    opacity: 0;
-    transform: translateX(-6px);
-    transition: opacity 0.16s ease, transform 0.16s ease;
-    pointer-events: none;
-}
-
-/* Panel gecisi fonksiyonel bir geri bildirimdir (260ms'lik kisa fade+9px
-   kayma); kullanici uygulamada hareketi acik tuttugunda Windows'un
-   "animasyon efektleri" ayari (prefers-reduced-motion) bunu kisip
-   gecisin aninda yapilmasina yol acabiliyordu. Uygulamanin kendi hareket
-   tercihi on iken animasyon, OS tercihinden bagimsiz tam surede oynar.
-   base.css'teki global reduce kilidi (0,0,0)+important'tan daha yuksek
-   ozgulluk + important ile gecilir; data-kasa-motion="off" ise kural
-   eslesmez ve OS tercihine donulur. */
-html[data-kasa-motion="on"] .settings-panel.active,
-html[data-kasa-motion="on"] .settings-panel.is-exiting {
-    animation-duration: var(--motion-normal) !important;
-    transition-duration: 0.16s !important;
-}
+/* Panel gecisi app.js'teki WAAI motoruyla yonetiliyor; eski
+   is-exiting / settingsItemIn kurallari kaldirildi. */
 
 .settings-panel[hidden] {
     display: none !important;
@@ -691,25 +670,8 @@ html[data-kasa-motion="on"] .settings-panel.is-exiting {
     box-shadow: 0 0 12px rgba(255, 70, 70, 0.5);
 }
 
-.kasa-modal.is-open .settings-panel.active > *:not(.settings-glass-quality-card):not(.settings-chroma-speed-card):not(.chroma-toggle-row) {
-    animation: settingsItemIn var(--dur-base) var(--ease-swift) backwards;
-}
-
-.kasa-modal.is-open .settings-panel.active > .glass-toggle-row > .settings-glass-quality-card:not(.is-collapsed),
-.kasa-modal.is-open .settings-panel.active > .settings-chroma-speed-card:not(.is-collapsed),
-.kasa-modal.is-open .settings-panel.active > .chroma-toggle-row {
-    animation: settingsItemIn var(--dur-base) var(--ease-swift) 66ms backwards;
-}
-
-.kasa-modal.is-open .settings-panel.active > *:nth-child(1) { animation-delay: 0ms; }
-.kasa-modal.is-open .settings-panel.active > *:nth-child(2) { animation-delay: 30ms; }
-.kasa-modal.is-open .settings-panel.active > *:nth-child(3) { animation-delay: 60ms; }
-.kasa-modal.is-open .settings-panel.active > *:nth-child(n+4) { animation-delay: 90ms; }
-
-@keyframes settingsItemIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+/* Öğe stagger'ı app.js'teki WAAI motorunda (yön duyarlı, 30ms adım);
+   eski CSS nth-child gecikmeleri kaldirildi. */
 
 .settings-appearance-card .accent-preset-row {
     grid-template-columns: repeat(4, minmax(0, 1fr));

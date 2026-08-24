@@ -654,31 +654,24 @@ document.addEventListener('DOMContentLoaded', () => {
   if (settingsForm) {
     const settingsTabs = Array.from(settingsForm.querySelectorAll('[data-settings-tab]'));
     const settingsPanels = Array.from(settingsForm.querySelectorAll('[data-settings-panel]'));
-    const panelExitTimers = new WeakMap();
+
+    // ── Sekme geçiş motoru v2: Web Animations API ──────────────────────
+    // CSS class/kareframe dansının (restart yarışları, setTimeout senkronu)
+    // yerine programatik animasyon: her geçişte GARANTİ başlar, bitişi
+    // promise ile senkronlanır. Yön duyarlıdır: aşağı giderken içerik
+    // sağdan, yukarı gelirken soldan süzülür.
+    const WAAI_SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const WAAI_EXIT = 'cubic-bezier(0.4, 0, 0.2, 1)';
+    let activeSettingsPanel = settingsPanels.find(panel => panel.classList.contains('active')) || null;
+    const pendingExitAnims = new WeakMap();
+
+    const motionDisabled = () => document.documentElement.getAttribute('data-kasa-animations') === 'off'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const activateSettingsTab = (tabName, focusTab = false) => {
       const nextTab = settingsTabs.find(tab => tab.dataset.settingsTab === tabName);
       const nextPanel = settingsPanels.find(panel => panel.dataset.settingsPanel === tabName);
       if (!nextTab || !nextPanel) return;
-
-      // Sekme gecis tanilamasi (konsoldan __tabDiag ile okunur)
-      try {
-        const diag = {
-          to: tabName,
-          t: Math.round(performance.now()),
-          reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
-          animDur: getComputedStyle(nextPanel).animationDuration
-        };
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          try {
-            const a = nextPanel.getAnimations()[0];
-            diag.animAfter2f = a ? a.playState + '@' + Math.round(a.currentTime || 0) : 'none';
-            diag.opAfter2f = +(+getComputedStyle(nextPanel).opacity).toFixed(2);
-          } catch (_) {}
-        }));
-        window.__tabDiag = window.__tabDiag || [];
-        window.__tabDiag.push(diag);
-      } catch (_) {}
 
       settingsTabs.forEach(tab => {
         const isActive = tab === nextTab;
@@ -686,30 +679,83 @@ document.addEventListener('DOMContentLoaded', () => {
         tab.setAttribute('aria-selected', String(isActive));
         tab.tabIndex = isActive ? 0 : -1;
       });
-      settingsPanels.forEach(panel => {
-        const isActive = panel === nextPanel;
-        if (!isActive && !panel.hidden && panel.classList.contains('active')) {
-          panel.classList.add('is-exiting');
-          panel.classList.remove('active');
-          panelExitTimers.set(panel, setTimeout(() => {
-            panelExitTimers.delete(panel);
-            panel.hidden = true;
-            panel.classList.remove('is-exiting');
-          }, 180));
-        } else if (isActive) {
-          const pendingExit = panelExitTimers.get(panel);
-          if (pendingExit) {
-            clearTimeout(pendingExit);
-            panelExitTimers.delete(panel);
+
+      if (nextPanel === activeSettingsPanel) {
+        if (focusTab) nextTab.focus();
+        return;
+      }
+
+      const prevPanel = activeSettingsPanel;
+      activeSettingsPanel = nextPanel;
+      const goingDown = prevPanel
+        ? settingsPanels.indexOf(nextPanel) > settingsPanels.indexOf(prevPanel)
+        : true;
+
+      // Sekme gecis tanilamasi (konsoldan __tabDiag ile okunur)
+      try {
+        const diag = {
+          to: tabName,
+          dir: goingDown ? 'down' : 'up',
+          t: Math.round(performance.now()),
+          reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+          engine: 'waapi'
+        };
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          try {
+            diag.opAfter2f = +(+getComputedStyle(nextPanel).opacity).toFixed(2);
+          } catch (_) {}
+        }));
+        window.__tabDiag = window.__tabDiag || [];
+        window.__tabDiag.push(diag);
+      } catch (_) {}
+
+      const reduced = motionDisabled();
+
+      // 1) ÇIKIŞ: eski panel soldan kayarak söner; bitince gizlenir.
+      if (prevPanel && !prevPanel.hidden) {
+        (pendingExitAnims.get(prevPanel) || []).forEach(a => a.cancel());
+        const exitAnim = prevPanel.animate(
+          [
+            { opacity: 1, transform: 'none' },
+            { opacity: 0, transform: `translateX(${goingDown ? -12 : 12}px)` },
+          ],
+          { duration: reduced ? 0 : 130, easing: WAAI_EXIT, fill: 'forwards' }
+        );
+        pendingExitAnims.set(prevPanel, [exitAnim]);
+        exitAnim.finished.then(() => {
+          if ((pendingExitAnims.get(prevPanel) || []).includes(exitAnim)) {
+            pendingExitAnims.delete(prevPanel);
+            prevPanel.classList.remove('active');
+            prevPanel.hidden = true;
           }
-          panel.classList.remove('is-exiting');
-          panel.hidden = false;
-          panel.classList.add('active');
-        } else {
-          panel.hidden = true;
-          panel.classList.remove('active');
-        }
-      });
+        }).catch(() => {});
+      }
+
+      // 2) GİRİŞ: yeni panel yön duyarlı süzülme + öğe stagger'ı.
+      nextPanel.getAnimations().forEach(a => a.cancel());
+      nextPanel.classList.remove('is-exiting');
+      nextPanel.hidden = false;
+      nextPanel.classList.add('active');
+
+      if (!reduced) {
+        nextPanel.animate(
+          [
+            { opacity: 0, transform: `translateX(${goingDown ? 20 : -20}px)` },
+            { opacity: 1, transform: 'none' },
+          ],
+          { duration: 300, easing: WAAI_SWIFT }
+        );
+        Array.from(nextPanel.children).forEach((child, index) => {
+          child.animate(
+            [
+              { opacity: 0, transform: 'translateY(10px)' },
+              { opacity: 1, transform: 'none' },
+            ],
+            { duration: 240, delay: 40 + Math.min(index, 8) * 30, easing: WAAI_SWIFT, fill: 'backwards' }
+          );
+        });
+      }
+
       if (focusTab) nextTab.focus();
     };
 
