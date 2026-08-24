@@ -74,43 +74,52 @@ export function initVaultForm() {
     const origPattern     = passwordInput ? passwordInput.getAttribute('pattern') : null;
     const origPlaceholder = passwordInput ? passwordInput.placeholder : '';
 
-    function animateToggle(el, show) {
-      if (!el) return;
+    // ── Alan varlık motoru v3: Web Animations API, fill'siz ────────────
+    // fill:'forwards' KULLANILMAZ: haritadan düşen bir çıkış animasyonu
+    // opaklığı sonsuza dek 0'da kilitleyebiliyordu. Dolgu olmadan hiçbir
+    // animasyon değer sabileyemez; gizleme kararı _kasaWantHidden
+    // bayrağıyla verilir. Cam güvenliği: yalnız opacity animasyonu.
+    const FIELD_SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const FIELD_EXIT = 'cubic-bezier(0.4, 0, 0.2, 1)';
+    const formMotionOff = () => document.documentElement.getAttribute('data-kasa-animations') === 'off'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      clearTimeout(el._atShow);
-      clearTimeout(el._atHide);
-      // Cam güvenliği: kasa-field girdileri backdrop-filter'lı olduğundan
-      // yalnız opacity animasyonu; eğriler motion token'larıyla ayni hissi
-      // verir (swift giriş, keskin çıkış).
-      const SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const animateToggle = (el, show) => {
+      if (!el) return;
+      if (el._kasaAnim) {
+        el._kasaAnim.cancel();
+        el._kasaAnim = null;
+      }
 
       if (show) {
-        if (!el.hidden) return;
+        el._kasaWantHidden = false;
+        const wasHidden = el.hidden;
         el.hidden = false;
-        el.style.opacity = '0';
-        el.style.transition = 'opacity 180ms ' + SWIFT;
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () {
-            el.style.opacity = '1';
-          });
-        });
-        el._atShow = setTimeout(function () {
-          el.style.opacity = '';
-          el.style.transition = '';
-        }, 220);
-      } else {
-        if (el.hidden) return;
-        el.style.opacity = '1';
-        el.style.transition = 'opacity 130ms ease';
-        requestAnimationFrame(function () {
-          el.style.opacity = '0';
-        });
-        el._atHide = setTimeout(function () {
-          el.hidden = true;
-          el.style.opacity = '';
-          el.style.transition = '';
-        }, 150);
+        if (formMotionOff()) return;
+        const from = wasHidden ? 0 : +(+getComputedStyle(el).opacity).toFixed(2);
+        el._kasaAnim = el.animate(
+          [{ opacity: from }, { opacity: 1 }],
+          { duration: wasHidden ? 180 : 140, easing: FIELD_SWIFT }
+        );
+        return;
       }
+
+      if (el.hidden) return;
+      if (formMotionOff()) {
+        el.hidden = true;
+        return;
+      }
+      el._kasaWantHidden = true;
+      const exitAnim = el.animate(
+        [{ opacity: 1 }, { opacity: 0 }],
+        { duration: 130, easing: FIELD_EXIT }
+      );
+      el._kasaAnim = exitAnim;
+      exitAnim.finished.then(() => {
+        if (el._kasaWantHidden && el._kasaAnim === exitAnim) {
+          el.hidden = true;
+        }
+      }).catch(() => {});
     }
 
     generateBtn?.addEventListener('click', () => {
