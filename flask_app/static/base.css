@@ -224,7 +224,7 @@ body::after {
 .card-animated {
     /* both fill: gecikmeli kademeli girişte kart, sirasi gelene dek
        opacity:0'da bekler (gorunup sonra kaybolma yanip sonmesi yok) */
-    animation: fadeUp var(--dur-base) var(--ease-swift) both;
+    animation: fadeUp var(--dur-base) var(--ease-swift) backwards;
 }
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }

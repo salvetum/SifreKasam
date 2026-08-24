@@ -150,12 +150,10 @@
 
 .settings-panel.active {
     display: grid;
-    animation: settingsPanelIn var(--dur-slow) var(--ease-swift) both;
-    /* Giriş animasyonu boyunca paneli tek compositing katmanında tutar:
-       translateX her karede altındaki onlarca backdrop-filter kartının
-       arkaplan örneklemini yeniden tetiklediğinden zayıf GPU'larda ilk
-       kareler düşüp animasyon "oynamamış" gibi görünüyordu. */
-    will-change: opacity, transform;
+    animation: settingsPanelIn var(--dur-slow) var(--ease-swift) backwards;
+    /* contain yalnizca layout/style izolasyonu saglar; will-change:transform
+       KULLANILMAZ — kalici layer promotion, panel icindeki backdrop-filter
+       cam kartlarinin buğusunu kalicı bozuyor (base.css'teki cam notu). */
     contain: layout style;
 }
 
@@ -694,7 +692,7 @@ html[data-kasa-motion="on"] .settings-panel.is-exiting {
 }
 
 .kasa-modal.is-open .settings-panel.active > *:not(.settings-glass-quality-card):not(.settings-chroma-speed-card):not(.chroma-toggle-row) {
-    animation: settingsItemIn var(--dur-base) var(--ease-swift) both;
+    animation: settingsItemIn var(--dur-base) var(--ease-swift) backwards;
 }
 
 .kasa-modal.is-open .settings-panel.active > .glass-toggle-row > .settings-glass-quality-card:not(.is-collapsed),
