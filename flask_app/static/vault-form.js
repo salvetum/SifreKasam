@@ -6,6 +6,8 @@
  * initVaultForm, app.js içindeki DOMContentLoaded sırasında çağrılır.
  */
 
+import { copyToClipboard } from './reveal-copy.js';
+
 export function initVaultForm() {
 
   const kayitTipiSelect = document.getElementById('kayit_tipi');
@@ -124,6 +126,17 @@ export function initVaultForm() {
         : 'fa-solid fa-xmark fa-xs';
     });
 
+    // Üreticinin solundaki kopyala düğmesi: şifreye tıklanabilir kopyalama.
+    const passwordCopyBtn = el('page-copy-btn');
+    const passwordLine = passwordGroup ? passwordGroup.querySelector('.vault-password-line') : null;
+    if (passwordCopyBtn) {
+      passwordCopyBtn.addEventListener('click', async () => {
+        const value = passwordInput ? passwordInput.value : '';
+        if (!value) return;
+        await copyToClipboard(value, passwordCopyBtn.querySelector('i'));
+      });
+    }
+
     const toggleFormFields = () => {
       try {
       const config = FIELD_CONFIGS[kayitTipiSelect.value] || FIELD_CONFIGS.default;
@@ -185,7 +198,7 @@ export function initVaultForm() {
       const genIcon = generateBtn?.querySelector('i');
       if (genIcon) genIcon.className = 'fa-solid fa-wand-magic-sparkles fa-xs';
 
-      if (generateBtn) generateBtn.style.display = isCard ? 'none' : '';
+      if (passwordLine) passwordLine.classList.toggle('has-no-generator', isCard);
 
       if (isimLabel)     isimLabel.textContent    = config.isim;
       if (loginLabel    && config.login)    loginLabel.textContent    = config.login;

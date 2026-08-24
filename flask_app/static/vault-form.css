@@ -540,8 +540,16 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     }
 }
 
-/* E-posta gizliyken (kart modu) kullanıcı adı / kart numarası tam genişlik. */
-.vault-form-row-two:has(> #email_group[hidden]) {
-    grid-template-columns: minmax(0, 1fr);
+/* E-posta gizliyken (kart modu) kullanıcı adı / kart numarası tam genişliğe
+   YUMUŞAKça açılır: track sayısı sabit tutulup ikinci kolon 0'a çekilir
+   (farklı track sayıları interpolasyon yapamaz); dar ekranda tek kolon
+   stacking korunur. */
+@media (min-width: 760px) {
+    .vault-form-row-two {
+        transition: grid-template-columns var(--dur-slow) var(--ease-swift);
+    }
+    .vault-form-row-two:has(> #email_group[hidden]) {
+        grid-template-columns: minmax(0, 1fr) 0%;
+    }
 }
 

@@ -52,6 +52,67 @@
     transform: translateY(-50%) scale(0.97);
 }
 
+/* ── Üreticinin solunda, hover/odakla açılan kopyala düğmesi ─────── */
+.vault-form-access .vault-password-line .password-copy-btn {
+    position: absolute !important;
+    right: calc(0.35rem + 36px + 5px);
+    top: 50%;
+    width: 36px;
+    min-height: 36px;
+    height: 36px;
+    padding: 0 !important;
+    border-radius: 12px !important;
+    transform: translateY(-50%) translateX(8px) scale(0.85);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 2;
+    transition:
+        opacity var(--dur-fast) ease,
+        transform var(--dur-base) var(--ease-spring),
+        right var(--dur-base) var(--ease-swift);
+}
+.vault-form-access .vault-password-line:hover .password-copy-btn,
+.vault-form-access .vault-password-line:focus-within .password-copy-btn {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(-50%);
+}
+
+/* Hover/odakta metin alanı, iki düğmeye de yer açmak için yumuşakça daralır */
+.vault-form-access .vault-password-line .vault-password-input {
+    transition: padding-right var(--dur-base) var(--ease-swift);
+}
+.vault-form-access .vault-password-line:hover .vault-password-input,
+.vault-form-access .vault-password-line:focus-within .vault-password-input {
+    padding-right: calc(var(--control-height) + 1rem + 41px) !important;
+}
+
+/* ── Tip değişimi: üretici düğmesi display:none yerine yumuşakça çekilir ── */
+.vault-form-access .vault-password-line .generator-copy-btn {
+    transition:
+        opacity var(--dur-fast) ease,
+        transform var(--dur-base) var(--ease-spring),
+        width var(--dur-base) var(--ease-swift),
+        right var(--dur-base) var(--ease-swift),
+        border-color var(--dur-fast) ease;
+}
+.vault-form-access .vault-password-line.has-no-generator .generator-copy-btn {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border-width: 0;
+    opacity: 0;
+    pointer-events: none;
+    right: 0.35rem;
+    transform: translateY(-50%) scale(0.8);
+}
+.vault-form-access .vault-password-line.has-no-generator .password-copy-btn {
+    right: 0.4rem;
+}
+.vault-form-access .vault-password-line.has-no-generator .vault-password-input {
+    padding-right: 0.9rem !important;
+}
+
 .vault-strength-card {
     display: grid;
     grid-template-columns: minmax(190px, 0.42fr) minmax(0, 1fr);

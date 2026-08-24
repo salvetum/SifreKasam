@@ -130,6 +130,10 @@
                         <input type="text" name="password" id="page-password" placeholder="••••••••"
                             value="{{ kayit.full_data.Password if kayit }}"
                             class="kasa-field vault-password-input">
+                        <button type="button" id="page-copy-btn" title="{{ _('Kopyala') }}"
+                            aria-label="{{ _('Kopyala') }}" class="kasa-btn kasa-btn-icon password-copy-btn">
+                            <i class="fa-solid fa-copy text-xs"></i>
+                        </button>
                         <button type="button" id="page-generate-btn" title="{{ _('Şifre Üretici') }}"
                             aria-label="{{ _('Şifre Üretici') }}" aria-controls="pageGenerator" aria-expanded="false"
                             class="kasa-btn kasa-btn-icon generator-copy-btn">
