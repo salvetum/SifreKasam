@@ -151,6 +151,12 @@
 .settings-panel.active {
     display: grid;
     animation: settingsPanelIn var(--motion-normal) var(--ease-out) both;
+    /* Giriş animasyonu boyunca paneli tek compositing katmanında tutar:
+       translateX her karede altındaki onlarca backdrop-filter kartının
+       arkaplan örneklemini yeniden tetiklediğinden zayıf GPU'larda ilk
+       kareler düşüp animasyon "oynamamış" gibi görünüyordu. */
+    will-change: opacity, transform;
+    contain: layout style;
 }
 
 .settings-panel.is-exiting {
