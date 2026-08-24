@@ -167,6 +167,20 @@
     pointer-events: none;
 }
 
+/* Panel gecisi fonksiyonel bir geri bildirimdir (260ms'lik kisa fade+9px
+   kayma); kullanici uygulamada hareketi acik tuttugunda Windows'un
+   "animasyon efektleri" ayari (prefers-reduced-motion) bunu kisip
+   gecisin aninda yapilmasina yol acabiliyordu. Uygulamanin kendi hareket
+   tercihi on iken animasyon, OS tercihinden bagimsiz tam surede oynar.
+   base.css'teki global reduce kilidi (0,0,0)+important'tan daha yuksek
+   ozgulluk + important ile gecilir; data-kasa-motion="off" ise kural
+   eslesmez ve OS tercihine donulur. */
+html[data-kasa-motion="on"] .settings-panel.active,
+html[data-kasa-motion="on"] .settings-panel.is-exiting {
+    animation-duration: var(--motion-normal) !important;
+    transition-duration: 0.16s !important;
+}
+
 .settings-panel[hidden] {
     display: none !important;
 }

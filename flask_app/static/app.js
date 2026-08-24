@@ -652,6 +652,25 @@ document.addEventListener('DOMContentLoaded', () => {
       const nextPanel = settingsPanels.find(panel => panel.dataset.settingsPanel === tabName);
       if (!nextTab || !nextPanel) return;
 
+      // Sekme gecis tanilamasi (konsoldan __tabDiag ile okunur)
+      try {
+        const diag = {
+          to: tabName,
+          t: Math.round(performance.now()),
+          reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+          animDur: getComputedStyle(nextPanel).animationDuration
+        };
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          try {
+            const a = nextPanel.getAnimations()[0];
+            diag.animAfter2f = a ? a.playState + '@' + Math.round(a.currentTime || 0) : 'none';
+            diag.opAfter2f = +(+getComputedStyle(nextPanel).opacity).toFixed(2);
+          } catch (_) {}
+        }));
+        window.__tabDiag = window.__tabDiag || [];
+        window.__tabDiag.push(diag);
+      } catch (_) {}
+
       settingsTabs.forEach(tab => {
         const isActive = tab === nextTab;
         tab.classList.toggle('active', isActive);
