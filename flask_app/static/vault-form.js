@@ -21,7 +21,8 @@ export function initVaultForm() {
         commentRows: 3, commentPlaceholder: _t('Notlar…'), commentRequired: false,
       },
       SecureNote: {
-        isim: _t('Not Başlığı'), comment: _t('Not İçeriği'),
+        isim: _t('Not Başlığı'), login: _t('Kullanıcı Adı'), email: _t('E-posta'), password: _t('Şifre'),
+        comment: _t('Not İçeriği'),
         sectionTitle: _t('Not'),
         sectionDesc: _t('Gizli notlarınızı burada saklayın.'),
         showLogin: false, showEmail: false, showPassword: false, showKategori: true,
@@ -55,7 +56,9 @@ export function initVaultForm() {
     const passwordLabel   = el('password_label');
     const commentLabel    = el('comment_label');
     const cardHolderGroup = el('card_holder_group');
-    const cardExpiryGroup = el('card-expiry-group');
+    const cardTripleRow   = el('card_triple_row');
+    const expiryAyField   = el('expiry_ay_field');
+    const expiryYilField  = el('expiry_yil_field');
     const expiryCalendar  = el('expiry-calendar-wrapper');
     const expiryCalendarField = expiryCalendar ? expiryCalendar.closest('.vault-field') : null;
     const expirySidebarSection = el('vault-section-expiry') ? el('vault-section-expiry').closest('.vault-form-panel') : null;
@@ -118,7 +121,6 @@ export function initVaultForm() {
     });
 
     const toggleFormFields = () => {
-      console.log('[vault-form] toggleFormFields called, value:', kayitTipiSelect.value);
       try {
       const config = FIELD_CONFIGS[kayitTipiSelect.value] || FIELD_CONFIGS.default;
       const isCard = kayitTipiSelect.value === 'CreditCard';
@@ -132,7 +134,9 @@ export function initVaultForm() {
 
       if (strengthCard) animateToggle(strengthCard, config.showPassword && !isCard);
       if (cardHolderGroup) animateToggle(cardHolderGroup, isCard);
-      if (cardExpiryGroup) animateToggle(cardExpiryGroup, isCard);
+      if (cardTripleRow) cardTripleRow.classList.toggle('is-active', isCard);
+      if (expiryAyField) animateToggle(expiryAyField, isCard);
+      if (expiryYilField) animateToggle(expiryYilField, isCard);
       if (expirySidebarSection) animateToggle(expirySidebarSection, !isCard);
       else if (expiryCalendarField) animateToggle(expiryCalendarField, !isCard);
 
@@ -158,7 +162,8 @@ export function initVaultForm() {
           passwordInput.setAttribute('pattern', '[0-9]*');
           passwordInput.placeholder = '000';
         } else {
-          passwordInput.maxLength = origMaxLength;
+          if (origMaxLength >= 0) passwordInput.maxLength = origMaxLength;
+          else passwordInput.removeAttribute('maxlength');
           if (origInputMode !== null) passwordInput.setAttribute('inputmode', origInputMode);
           else passwordInput.removeAttribute('inputmode');
           if (origPattern !== null) passwordInput.setAttribute('pattern', origPattern);
@@ -196,7 +201,7 @@ export function initVaultForm() {
       el('login')       && (el('login').disabled       = !config.showLogin);
       el('email')       && (el('email').disabled       = !config.showEmail);
       el('page-password') && (el('page-password').disabled = !config.showPassword);
-      } catch(err) { console.error('[vault-form] toggleFormFields ERROR:', err); }
+      } catch(err) { console.error('[vault-form] toggleFormFields ERROR:', err && err.message || err); }
     };
 
     toggleFormFields();

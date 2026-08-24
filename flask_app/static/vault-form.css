@@ -506,3 +506,23 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     font-size: 0.85rem;
 }
 
+/* ── KART ÜÇLÜ SATIRI (Ay | Yıl | CVV) ───────────────────────── */
+/* Pasifken şeffaf kapsayıcı: alt alanlar normal akışta tam genişlik. */
+.vault-form-card-triple {
+    display: contents;
+}
+
+@media (min-width: 760px) {
+    .vault-form-card-triple.is-active {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+        gap: 0 1rem;
+        align-items: start;
+    }
+}
+
+/* E-posta gizliyken (kart modu) kullanıcı adı / kart numarası tam genişlik. */
+.vault-form-row-two:has(> #email_group[hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
