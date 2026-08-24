@@ -314,6 +314,21 @@
         if (expiryAy) expiryAy.addEventListener('input', syncHiddenFromCardExpiry);
         if (expiryYil) expiryYil.addEventListener('input', syncHiddenFromCardExpiry);
 
+        // 1-2 haneli yıl kısaltmasını tam yıla açar: "34" -> "2034".
+        // blur'da çalışır (custom-controls'un min=2000 clamp'i change'de devreye
+        // girdiğinden önce yakalanır); programatik set input event'i tetiklemediği
+        // için gizli alan senkronu elle çağrılır.
+        function expandYearShorthand() {
+            if (!expiryYil) return;
+            const raw = expiryYil.value.trim();
+            if (!/^\d{1,2}$/.test(raw)) return;
+            expiryYil.value = String(2000 + parseInt(raw, 10));
+            syncHiddenFromCardExpiry();
+        }
+        if (expiryYil) expiryYil.addEventListener('blur', expandYearShorthand);
+        const ekleForm = document.getElementById('ekle-form');
+        if (ekleForm) ekleForm.addEventListener('submit', expandYearShorthand, true);
+
         function render() {
             titleEl.textContent = MONTHS_TR[viewMonth] + ' ' + viewYear;
             titleEl.classList.remove('kasa-calendar-title-anim');

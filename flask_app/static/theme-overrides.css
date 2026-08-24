@@ -159,7 +159,11 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-switch-input:che
     box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
 }
 
-.settings-timeout-input {
+/* input.settings-timeout-input / .settings-number-stepper önekleri,
+   background.css'teki input.kasa-field !important kuralını (0,1,1) geçmek için:
+   kutu stepper kapsayıcısına ait — köşeler kare, odak halkası kapsayıcıda. */
+input.settings-timeout-input,
+.settings-number-stepper .settings-timeout-input {
     grid-column: 1;
     grid-row: 1 / 3;
     width: 100%;
