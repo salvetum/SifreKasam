@@ -28,7 +28,7 @@
     transform: translateY(-4px) scale(0.98);
     transform-origin: top left;
     pointer-events: none;
-    transition: opacity 150ms ease, transform 180ms var(--ease-out);
+    transition: opacity var(--dur-fast) ease, transform var(--dur-base) var(--ease-out);
 }
 
 .kasa-calendar-popup[hidden] {
@@ -78,7 +78,7 @@
     color: var(--text-muted);
     font-size: 0.7rem;
     cursor: pointer;
-    transition: color 120ms ease, background 120ms ease, border-color 120ms ease, transform 140ms var(--ease-out);
+    transition: color 120ms ease, background 120ms ease, border-color 120ms ease, transform var(--dur-fast) var(--ease-out);
 }
 
 .kasa-calendar-nav:hover {

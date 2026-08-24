@@ -76,7 +76,7 @@ html[data-kasa-low-power="on"] .kasa-modal-content {
     opacity: 0;
     transform: translateY(10px);
     pointer-events: none;
-    transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 180ms;
+    transition: opacity var(--dur-base) ease, transform var(--dur-base) ease, visibility 0s linear var(--dur-base);
 }
 
 .power-save-overlay.is-active {
@@ -148,10 +148,10 @@ html[data-kasa-low-power="on"] .kasa-modal-content {
     animation: powerSaveDot 720ms ease-in-out infinite alternate;
 }
 .power-save-overlay.is-restoring .power-save-dots span:nth-child(2) { animation-delay: 120ms; }
-.power-save-overlay.is-restoring .power-save-dots span:nth-child(3) { animation-delay: 240ms; }
+.power-save-overlay.is-restoring .power-save-dots span:nth-child(3) { animation-delay: var(--dur-base); }
 
 .kasa-resume-fade {
-    animation: kasaResumeFade 300ms var(--ease-out) both;
+    animation: kasaResumeFade var(--dur-slow) var(--ease-out) both;
 }
 
 @keyframes powerSaveDot {
@@ -222,7 +222,9 @@ body::after {
 /* glass-ready gate kaldırıldı — vault kartları saf CSS --glass-vivid-blur
    ile GPU tarafından boyanır; JS tier override'i çift render yaratıyordu. */
 .card-animated {
-    animation: fadeUp 0.24s cubic-bezier(0.2,0.8,0.2,1);
+    /* both fill: gecikmeli kademeli girişte kart, sirasi gelene dek
+       opacity:0'da bekler (gorunup sonra kaybolma yanip sonmesi yok) */
+    animation: fadeUp var(--dur-base) var(--ease-swift) both;
 }
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }

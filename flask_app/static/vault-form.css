@@ -432,7 +432,7 @@
     border-color: rgba(239,68,68,0.72) !important;
     background-color: rgba(239,68,68,0.075) !important;
     box-shadow: 0 0 0 3px rgba(239,68,68,0.13) !important;
-    animation: invalidFieldPulse 320ms var(--ease-out) both;
+    animation: invalidFieldPulse var(--dur-slow) var(--ease-out) both;
 }
 
 @keyframes invalidFieldPulse {

@@ -26,38 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── SABİTLER & YARDIMCILAR ───────────────────────────────────────────────
 
-  window.kasaAnimateToggle = function (el, show) {
-    if (!el) return;
-    clearTimeout(el._aShow);
-    clearTimeout(el._aHide);
-    if (show) {
-      if (!el.hidden) return;
-      el.hidden = false;
-      el.style.opacity = '0';
-      el.style.transition = 'opacity 0.22s ease';
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => { el.style.opacity = ''; el.style.transition = ''; });
-      });
-    } else {
-      if (el.hidden) return;
-      el.style.opacity = '0';
-      el.style.transition = 'opacity 0.18s ease';
-      el._aHide = setTimeout(() => { el.hidden = true; el.style.opacity = ''; el.style.transition = ''; }, 220);
-    }
-  };
-
-  window.kasaAnimateClassToggle = function (el, show) {
-    if (!el) return;
-    clearTimeout(el._aShow);
-    clearTimeout(el._aHide);
-    if (show) {
-      el.classList.add('is-visible');
-      el._aShow = setTimeout(() => { el.style.opacity = ''; el.style.transform = ''; }, 280);
-    } else {
-      el.classList.remove('is-visible');
-    }
-  };
-
   const notifyVaultWriteLocked = async (response) => {
     if (!response || ![409, 423].includes(response.status)) return;
 

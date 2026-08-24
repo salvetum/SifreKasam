@@ -41,7 +41,7 @@ export function initModalSystem({ customSelectStates, closeCustomSelect }) {
         remainingModals.forEach(remainingModal => remainingModal.classList.remove('is-top-modal'));
         remainingModals[remainingModals.length - 1].classList.add('is-top-modal');
       }
-    }, transitionsDisabled ? 0 : 280);
+    }, transitionsDisabled ? 0 : 190);
   };
 
   document.querySelectorAll('.kasa-modal').forEach(modal => {

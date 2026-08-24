@@ -395,7 +395,7 @@
 .card-icon-btn { color: #d5daea; }
 
 
-/* Kaydedilmemiş değişiklik rozeti */
+/* ── Kaydedilmemiş değişiklik rozeti ─────────────────────────────── */
 .kasa-unsaved-badge {
     display: inline-flex;
     align-items: center;
@@ -429,3 +429,30 @@
     border-color: rgba(180,83,9,0.35);
     background: rgba(180,83,9,0.08);
 }
+
+/* ── [data-kasa-pop]: display:none ↔ görünür geçişleri için
+   modern giriş/çıkış (Chromium @starting-style + allow-discrete).
+   JS yalnızca hidden attribute'unu flip eder; giriş yaylanarak,
+   çıkış yumuşakça olur — setTimeout senkronu gerekmez. ── */
+[data-kasa-pop] {
+    transition:
+        opacity var(--dur-fast) ease,
+        transform var(--dur-base) var(--ease-spring),
+        display var(--dur-fast) allow-discrete,
+        overlay var(--dur-fast) allow-discrete;
+}
+[data-kasa-pop][hidden] {
+    opacity: 0;
+    transform: translateY(4px) scale(0.9);
+    pointer-events: none;
+}
+@starting-style {
+    [data-kasa-pop]:not([hidden]) {
+        opacity: 0;
+        transform: translateY(6px) scale(0.9);
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    [data-kasa-pop] { transition: none; }
+}
+

@@ -127,7 +127,7 @@
     background-color: var(--accent);
     background-position: calc(100% - 2px) 50%;
     box-shadow: 0 0 0 1px rgba(var(--accent-rgb),0.12), 0 5px 14px rgba(var(--accent-rgb),0.22);
-    animation: settingsSwitchOn 240ms var(--ease-out);
+    animation: settingsSwitchOn var(--dur-base) var(--ease-out);
 }
 .settings-switch-input:hover { border-color: rgba(var(--accent-rgb),0.48); }
 .settings-switch-input:active { transform: scale(0.92); }

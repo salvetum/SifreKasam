@@ -151,7 +151,7 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-switch-input:che
         linear-gradient(145deg, rgba(255,255,255,0.065), rgba(255,255,255,0.025)),
         var(--glass);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
-    transition: border-color 160ms ease, box-shadow 160ms ease;
+    transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
 .settings-number-stepper:focus-within {
@@ -197,7 +197,7 @@ input.settings-timeout-input,
     color: var(--text-muted);
     background: rgba(255,255,255,0.035);
     cursor: pointer;
-    transition: color 140ms ease, background 140ms ease;
+    transition: color var(--dur-fast) ease, background var(--dur-fast) ease;
 }
 
 .settings-number-stepper button[data-step-direction="down"] {
