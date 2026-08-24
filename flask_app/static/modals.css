@@ -432,18 +432,25 @@
 
 .gen-history-empty {
     text-align: center;
-    padding: 1.2rem 0.5rem;
     font-size: 0.82rem;
     color: var(--text-muted);
     opacity: 0;
     max-height: 0;
     overflow: hidden;
+    /* Dikey padding yalnizca gorunur durumda: max-height:0 tek basina
+       padding'i saklamaz (content negatif olamaz), gizliyken hayalet
+       bosluk birakiyordu — Geçmiş başlığıyla ilk öğe arasındaki fazladan
+       boşluğun nedeni buydu. */
+    padding-top: 0;
+    padding-bottom: 0;
     transition: opacity 0.2s ease, max-height 0.24s ease, padding 0.2s ease;
 }
 
 .gen-history-empty.is-visible {
     opacity: 1;
     max-height: 100px;
+    padding-top: 1.2rem;
+    padding-bottom: 1.2rem;
 }
 
 .gen-history-item {
