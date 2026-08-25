@@ -219,18 +219,6 @@
 .vault-form-panel.kasa-collapsible {
     padding: 0;
 }
-/* Strength kartı: iki-kolon düzeni çöküş sarmalayıcısına taşınır */
-#vault-strength-card > .kasa-field-clip {
-    display: grid;
-    grid-template-columns: minmax(190px, 0.42fr) minmax(0, 1fr);
-    align-items: center;
-    gap: 0.9rem;
-}
-@media (max-width: 720px) {
-    #vault-strength-card > .kasa-field-clip {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
 
 /* ── Sayfa girişi: yüzeyler sırayla süzülerek gelir ────────────────
    hero -> main -> access -> notes; yan panel (Süre/Kaydet) access ile
@@ -593,3 +581,97 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     }
 }
 
+
+/* ── FAZ B: Şifre Sağlığı (kompakt, şifrenin altında) ────────────── */
+.password-health {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.6rem 0.7rem;
+    border: var(--border-glass);
+    border-radius: 13px;
+    background:
+        var(--glass-vivid-tint),
+        linear-gradient(160deg,
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.10)),
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.05))),
+        var(--glass);
+}
+.ph-top {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+}
+.ph-segments {
+    display: flex;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 7px;
+}
+.ph-segments span {
+    flex: 1 1 0;
+    border-radius: 99px;
+    background: rgba(var(--accent-rgb), 0.14);
+    transition: background var(--dur-base) var(--ease-swift),
+                box-shadow var(--dur-base) ease;
+}
+/* Seviye renkleri: barEl (=.ph-segments) strength-level-N tasır */
+.ph-segments.strength-level-1 span:nth-child(-n+1),
+.ph-segments.strength-level-1 span:nth-child(2) { background: transparent; }
+.ph-segments.strength-level-0 span:nth-child(-n+1) { background: var(--strength-c0); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c0) 45%, transparent); }
+.ph-segments.strength-level-1 span:nth-child(1) { background: var(--strength-c1); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c1) 45%, transparent); }
+.ph-segments.strength-level-2 span:nth-child(-n+2) { background: var(--strength-c2); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c2) 40%, transparent); }
+.ph-segments.strength-level-3 span:nth-child(-n+3) { background: var(--strength-c3); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c3) 40%, transparent); }
+.ph-segments.strength-level-4 span:nth-child(-n+4) { background: var(--strength-c4); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c4) 42%, transparent); }
+
+.ph-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--text-muted);
+    border: 1px solid var(--border-glass);
+}
+.ph-badge:not(:empty) {
+    color: var(--strength-c2);
+    border-color: color-mix(in srgb, var(--strength-c2) 40%, transparent);
+    background: color-mix(in srgb, var(--strength-c2) 10%, transparent);
+}
+.ph-badge[data-level="0"], .ph-badge[data-level="1"] { color: var(--strength-c0); border-color: color-mix(in srgb, var(--strength-c0) 42%, transparent); background: color-mix(in srgb, var(--strength-c0) 10%, transparent); }
+.ph-badge[data-level="2"] { color: var(--strength-c2); border-color: color-mix(in srgb, var(--strength-c2) 42%, transparent); background: color-mix(in srgb, var(--strength-c2) 10%, transparent); }
+.ph-badge[data-level="3"] { color: var(--strength-c3); border-color: color-mix(in srgb, var(--strength-c3) 42%, transparent); background: color-mix(in srgb, var(--strength-c3) 10%, transparent); }
+.ph-badge[data-level="4"] { color: var(--strength-c4); border-color: color-mix(in srgb, var(--strength-c4) 46%, transparent); background: color-mix(in srgb, var(--strength-c4) 12%, transparent); }
+
+.ph-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.ph-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--text-muted);
+    border: 1px solid var(--border-glass);
+    background: rgba(255,255,255, calc(var(--glass-veil-scale) * 0.04));
+}
+.ph-chip i { font-size: 0.58rem; }
+.ph-chip.ph-crack i { color: var(--accent-2); }
+.ph-chip.ph-warn {
+    color: var(--warning);
+    border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.ph-chip.ph-miss { color: #fca5a5; border-color: rgba(239,68,68,0.30); background: rgba(239,68,68,0.08); }

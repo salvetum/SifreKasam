@@ -54,6 +54,7 @@ export function initPasswordStrength({ apiJson }) {
     const requestId = (previousState?.requestId || 0) + 1;
     barEl.classList.remove(...STRENGTH_CLASS_NAMES);
     if (!password) {
+      if (options.customRender && typeof options.onResult === 'function') options.onResult(null);
       labelEl.innerText = '';
       strengthMeterStates.set(labelEl, { requestId, timer: 0 });
       return;
@@ -71,7 +72,6 @@ export function initPasswordStrength({ apiJson }) {
           }),
         });
         if (strengthMeterStates.get(labelEl)?.requestId !== requestId) return;
-        if (typeof options.onResult === 'function') options.onResult();
 
         const score = Math.max(0, Math.min(4, Number(result.score) || 0));
         const level = STRENGTH_LEVELS[score];
@@ -84,6 +84,9 @@ export function initPasswordStrength({ apiJson }) {
             .map(requirement => STRENGTH_REQUIREMENT_LABELS[requirement])
             .filter(Boolean)
           : [];
+        const extras = { score, level, crackTime, missingRequirements };
+        if (typeof options.onResult === 'function') options.onResult(extras);
+        if (options.customRender) return; // arayuzu cagiran tarafa biraktik
 
         barEl.classList.add(level.className);
         if (missingRequirements.length && score < 3) {
@@ -108,12 +111,16 @@ export function initPasswordStrength({ apiJson }) {
   const pagePassword  = document.getElementById('page-password');
   const strengthBar   = document.getElementById('password-strength-bar');
   const strengthText  = document.getElementById('password-strength-text');
+  const phCrack       = document.getElementById('ph-crack');
+  const phCrackText   = document.getElementById('ph-crack-text');
+  const phContext     = document.getElementById('ph-context');
+  const phMissWrap    = document.getElementById('ph-miss-wrap');
   if (pagePassword && strengthBar && strengthText) {
     const strengthContextFields = ['isim', 'login', 'email', 'website_url']
       .map(fieldId => document.getElementById(fieldId))
       .filter(Boolean);
 
-    const CONTEXT_TOKEN_SPLIT = /[^0-9A-Za-zÇĞİÖŞÜçğıöş]+/;
+    const CONTEXT_TOKEN_SPLIT = /[^0-9A-Za-z\u00C0-\u024F\u0400-\u04FF]+/;
 
     const contextVariants = (value) => {
       const text = String(value || '').trim().slice(0, 200);
@@ -156,6 +163,45 @@ export function initPasswordStrength({ apiJson }) {
     const contextHasMatch = (password) =>
       contextInputs().some(value => contextMatchesPassword(password, value));
 
+    // ── FAZ B: kompakt şifre sağlığı arayüzü ──
+    const renderHealth = (extras, matched) => {
+      if (!extras) {
+        if (strengthText) { strengthText.textContent = ''; delete strengthText.dataset.level; }
+        if (phCrack) phCrack.hidden = true;
+        if (phContext) phContext.hidden = true;
+        if (phMissWrap) phMissWrap.replaceChildren();
+        return;
+      }
+      const { score, level, crackTime, missingRequirements } = extras;
+      if (strengthText) {
+        strengthText.textContent = window._(level.textKey);
+        strengthText.dataset.level = String(score);
+      }
+      if (phCrack) {
+        phCrack.hidden = !crackTime;
+        if (phCrackText) {
+          phCrackText.textContent = crackTime
+            ? `${window._('tahmini dayanım:')} ${crackTime}`
+            : '';
+        }
+      }
+      if (phMissWrap) {
+        phMissWrap.replaceChildren();
+        if (score < 3) {
+          missingRequirements.forEach(reqLabel => {
+            const chip = document.createElement('span');
+            chip.className = 'ph-chip ph-miss';
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid fa-xmark';
+            icon.setAttribute('aria-hidden', 'true');
+            chip.append(icon, document.createTextNode(window._(reqLabel)));
+            phMissWrap.appendChild(chip);
+          });
+        }
+      }
+      if (phContext) phContext.hidden = !matched;
+    };
+
     let lastContextMatched = false;
     let lastAppliedKey = '';
 
@@ -175,7 +221,10 @@ export function initPasswordStrength({ apiJson }) {
         strengthText,
         userInputs,
         {
-          onResult: () => {
+          customRender: true,
+          contextMatched: matched,
+          onResult: (extras) => {
+            renderHealth(extras, matched);
             lastContextMatched = matched;
             lastAppliedKey = strengthKey;
           },

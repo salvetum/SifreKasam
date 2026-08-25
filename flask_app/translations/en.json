@@ -466,5 +466,6 @@
   "Bu gereksinimler zorunludur; zayıf şifreler kabul edilmez.": "These requirements are mandatory; weak passwords are not accepted.",
   "Evet, Aç": "Yes, Enable",
   "Kaydedilmemiş değişiklikler var": "You have unsaved changes.",
-  "Hız ve kaynak kullanımı tercihleri.": "Speed and resource usage preferences."
+  "Hız ve kaynak kullanımı tercihleri.": "Speed and resource usage preferences.",
+  "Şifre alan bilgileri içeriyor": "Your password contains personal details."
 }

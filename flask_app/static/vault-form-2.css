@@ -113,60 +113,6 @@
     padding-right: 0.9rem !important;
 }
 
-.vault-strength-card {
-    display: grid;
-    grid-template-columns: minmax(190px, 0.42fr) minmax(0, 1fr);
-    align-items: center;
-    gap: 0.9rem;
-    padding: 0.85rem;
-    border: 1px solid rgba(var(--accent-rgb), 0.18);
-    border-radius: 16px;
-    background:
-        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 40%),
-        rgba(255,255,255,0.035);
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
-}
-
-.vault-strength-head {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    min-width: 0;
-}
-
-.vault-strength-head > span {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    flex: 0 0 34px;
-    border: 1px solid rgba(var(--accent-rgb), 0.24);
-    border-radius: 12px;
-    color: var(--accent-2);
-    background: rgba(var(--accent-rgb), 0.10);
-}
-
-.vault-strength-head strong,
-.vault-strength-head small {
-    display: block;
-}
-
-.vault-strength-head strong {
-    color: var(--text);
-    font-size: 0.84rem;
-}
-
-.vault-strength-head small {
-    color: var(--text-muted);
-    font-size: 0.7rem;
-    line-height: 1.35;
-}
-
-.vault-strength {
-    min-height: auto;
-}
-
 .vault-generator-panel {
     overflow: hidden;
     max-height: 460px;
@@ -223,8 +169,7 @@
 }
 
 @media (max-width: 720px) {
-    .settings-action-grid,
-    .vault-strength-card {
+    .settings-action-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 

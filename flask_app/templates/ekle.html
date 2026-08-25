@@ -142,19 +142,23 @@
                     </div>
                 </div>
 
-            <div class="vault-strength-card" id="vault-strength-card" data-collapse="height">
-                <div class="vault-strength-head">
-                    <span><i class="fa-solid fa-shield-halved"></i></span>
-                    <div>
-                        <strong>{{ _('Şifre Güvenliği') }}</strong>
-                        <small>{{ _('Tahmini dayanımı burada görebilirsiniz.') }}</small>
+            <div class="password-health" id="vault-strength-card" data-collapse="height">
+                <div class="ph-top">
+                    <div class="ph-segments" id="password-strength-bar" aria-hidden="true">
+                        <span></span><span></span><span></span><span></span>
                     </div>
+                    <span class="ph-badge" id="password-strength-text"></span>
                 </div>
-                <div class="vault-strength">
-                    <div class="h-1.5 rounded-full bg-kasa-border-hi overflow-hidden" id="password-strength-container">
-                        <div id="password-strength-bar" class="progress-bar strength-meter-fill h-full rounded-full transition-all duration-300"></div>
-                    </div>
-                    <small id="password-strength-text" class="text-kasa-text-muted text-xs"></small>
+                <div class="ph-chips">
+                    <span class="ph-chip ph-crack" id="ph-crack" hidden>
+                        <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                        <span id="ph-crack-text"></span>
+                    </span>
+                    <span id="ph-miss-wrap" class="ph-miss-wrap"></span>
+                    <span class="ph-chip ph-warn" id="ph-context" hidden>
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span>{{ _('Şifre alan bilgileri içeriyor') }}</span>
+                    </span>
                 </div>
             </div>
 

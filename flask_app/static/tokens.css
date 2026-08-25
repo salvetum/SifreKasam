@@ -46,6 +46,13 @@
     --danger:        #ef4444;
     --warning:       #f59e0b;
     --success:       #22c55e;
+
+    /* ── Şifre sağlığı skalası (skor 0-4) ── */
+    --strength-c0: #ef4444;
+    --strength-c1: #fb923c;
+    --strength-c2: #eab308;
+    --strength-c3: #22c55e;
+    --strength-c4: #10b981;
     --info:          #38bdf8;
     --focus-ring:    0 0 0 3px rgba(124,111,247,0.18);
     --shadow-soft:   0 12px 30px rgba(0,0,0,0.18);
