@@ -1,4 +1,4 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v143';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v144';
 const BG_URL_PREFIX = '/api/background/';
 const ASSETS = [
   '{{ url_for("static", filename="tokens.css") }}',

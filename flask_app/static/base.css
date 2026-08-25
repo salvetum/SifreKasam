@@ -234,6 +234,13 @@ body::after {
 }
 /* Özel arkaplan decode gate'i sürerken kart girişlerini dondur:
    bg ilk karesi GPU'ya oturmadan kartlar örnekleme yapmasın. */
+
+/* DEĞİŞİKLİK 1: vault kartları render+görsel yüklemesi bitene dek gizli.
+   vault-index.js data-cards-wait'i kaldırınca stagger'lı giriş başlar. */
+html[data-cards-wait] .vault-card-curtain > .card-animated {
+    animation-play-state: paused;
+}
+
 html[data-kasa-bg-wait] .card-animated {
     animation-play-state: paused;
 }

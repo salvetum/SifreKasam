@@ -238,11 +238,29 @@ export function initVaultIndex({
 
     const revealOverlay = document.getElementById('card-reveal-overlay');
 
-    requestAnimationFrame(() => {
-      cardContainer.classList.remove('vault-card-curtain');
-      if (revealOverlay) {
-        requestAnimationFrame(() => { revealOverlay.classList.add('fade'); });
-      }
+    // DEĞİŞİKLİK 1: tüm kartlar DOM'da + kapak görselleri yüklenene dek
+    // giriş animasyonları duraklatılır; sonra topluca oynatılır.
+    const finishInitialReveal = () => {
+      document.documentElement.removeAttribute('data-cards-wait');
+      requestAnimationFrame(() => {
+        cardContainer.classList.remove('vault-card-curtain');
+        if (revealOverlay) {
+          requestAnimationFrame(() => { revealOverlay.classList.add('fade'); });
+        }
+      });
+    };
+    document.documentElement.setAttribute('data-cards-wait', '');
+    const cardImgs = Array.from(cardContainer.querySelectorAll('img'));
+    const imgPromises = cardImgs.map(img => new Promise(resolve => {
+      if (img.complete) return resolve();
+      img.addEventListener('load', () => resolve(), { once: true });
+      img.addEventListener('error', () => resolve(), { once: true });
+    }));
+    Promise.race([
+      Promise.allSettled(imgPromises),
+      new Promise(resolve => setTimeout(resolve, 1200)),
+    ]).then(() => {
+      requestAnimationFrame(() => requestAnimationFrame(finishInitialReveal));
     });
 
     let searchTimeout;

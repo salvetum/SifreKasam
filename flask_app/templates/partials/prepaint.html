@@ -223,7 +223,17 @@
                     };
                     bgDecodeProbe.onerror = releaseBackgroundHold;
                     bgDecodeProbe.src = preUrl;
-                    bgHoldTimer = setTimeout(releaseBackgroundHold, 600);
+                    // Ek garanti: ayni kaynagi kullanan tam boy Image da
+                    // load+decode tamamlanmadan gate kaldirilmaz (GPU upload
+                    // ilk composite'ten once baslamis olur).
+                    var bgFullImg = new Image();
+                    bgFullImg.onload = function () {
+                        if (typeof bgFullImg.decode === 'function') {
+                            bgFullImg.decode().then(function(){}, function(){});
+                        }
+                    };
+                    bgFullImg.src = preUrl;
+                    bgHoldTimer = setTimeout(releaseBackgroundHold, 1500); // tolerans: yavas disk/ag
                 }
             }
             if (document.readyState === 'loading') {
