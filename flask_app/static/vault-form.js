@@ -202,10 +202,10 @@ export function initVaultForm() {
     if (!motionOff() && targets.length) {
       outAnims = targets.map(p => p.animate(
         [
-          { opacity: 1, transform: 'none' },
-          { opacity: 0, transform: `translateY(${goingDown ? -5 : 5}px)` },
+          { opacity: 1 },
+          { opacity: 0 },
         ],
-        { duration: 80, easing: EASE_EXIT, fill: 'forwards' }
+        { duration: 90, easing: EASE_EXIT, fill: 'forwards' }
       ));
       liveAnims.push(...outAnims);
       await Promise.allSettled(outAnims.map(a => a.finished)).catch(() => {});
@@ -222,13 +222,12 @@ export function initVaultForm() {
     // 3) GİRİŞ: paneller yeni haliyle süzülür
     if (!motionOff() && targets.length) {
       void document.body.offsetHeight;
-      const dirY = goingDown ? 14 : -14;
-      const inAnims = targets.map((p, i) => p.animate(
+      const inAnims = targets.map(p => p.animate(
         [
-          { opacity: 0, transform: `translateY(${dirY}px)` },
-          { opacity: 1, transform: 'none' },
+          { opacity: 0 },
+          { opacity: 1 },
         ],
-        { duration: 170, delay: Math.min(i, 3) * 22, easing: EASE_SWIFT }
+        { duration: 170, easing: EASE_SWIFT }
       ));
       liveAnims.push(...inAnims);
     }
