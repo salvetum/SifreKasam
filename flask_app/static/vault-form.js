@@ -127,20 +127,14 @@ export function initVaultForm() {
         clearTimeout(el._kasaCollapseT);
 
         if (show) {
+          // Cam notu: clip opakligi animate EDILMEZ — icindeki kasa-field
+          // girdilerinin backdrop-filter'i gruplanip SONANDA belirdigi
+          // icin 'accent flash' tam olarak buydu. Yükseklik geçişi yeter.
           const wasHidden = el.hidden;
           el.hidden = false;
           setExpanded(el, false);
-          if (formMotionOff() || !wasHidden) {
-            setExpanded(el, true);
-            el._kasaEverAnimated = true;
-            return;
-          }
-          void el.offsetHeight; // 0fr'den başlaması için reflow
           setExpanded(el, true);
-          el._kasaAnim = clip.animate(
-            [{ opacity: 0 }, { opacity: 1 }],
-            { duration: 220, easing: FIELD_SWIFT }
-          );
+          el._kasaEverAnimated = true;
           return;
         }
 
@@ -151,11 +145,9 @@ export function initVaultForm() {
           setExpanded(el, false);
           return;
         }
-        setExpanded(el, false); // yükseklik + opaklık AYNI sürede, aynı eğriyle
-        el._kasaAnim = clip.animate(
-          [{ opacity: 1 }, { opacity: 0 }],
-          { duration: 300, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
-        );
+        // Çikista da opaklık YOK: içerik overflow:hidden ile üstten
+        // kırpılarak kapanır — cam baştan sona aynı kalır, sıçrama olmaz.
+        setExpanded(el, false);
         // Gizlemeyi geçişin bittiği KAREYE hizala (setTimeout keyfi gecikme
         // yaratip tam bitiste ekstra relayout -> kasma yapabiliyordu).
         let doneFlag = false;
@@ -272,7 +264,10 @@ export function initVaultForm() {
       if (cardTripleRow) cardTripleRow.classList.toggle('is-active', isCard);
 
       accessField(loginGroup, config.showLogin);
-      accessField(emailGroup, config.showEmail);
+      // E-posta grubu kasa-field (cam) içerir: opaklık fade'i camı anında
+      // söndürüp geri getirdiği için YOK — hareketi kolon %0 genişlik
+      // geçişi zaten sağlıyor.
+      if (emailGroup) setPresenceInstant(emailGroup, config.showEmail);
       accessField(passwordGroup, config.showPassword);
       if (strengthCard) {
         if (swallowAccess) setPresenceInstant(strengthCard, false);

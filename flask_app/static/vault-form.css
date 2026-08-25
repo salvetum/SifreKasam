@@ -811,18 +811,18 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
             rgba(255,255,255, calc(var(--glass-veil-scale) * 0.09)),
             rgba(255,255,255, calc(var(--glass-veil-scale) * 0.05))),
         var(--glass);
+    /* opacity bilinçli olarak YOK: panel içindeki cam girdilerin
+       backdrop-filter'ı gruplanıp kapanışta anında sönmüyordu. */
     transition:
-        max-height 260ms cubic-bezier(0.16, 1, 0.3, 1),
-        opacity 210ms ease,
-        transform 230ms cubic-bezier(0.16, 1, 0.3, 1),
-        padding 230ms ease,
-        margin 230ms ease,
-        border-color 230ms ease;
+        max-height 300ms var(--ease-inout),
+        transform 280ms var(--ease-inout),
+        padding 280ms ease,
+        margin 280ms ease,
+        border-color 280ms ease;
 }
 
 .vault-generator-panel.is-collapsed {
     max-height: 0;
-    opacity: 0;
     margin-top: -0.5rem;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
