@@ -1009,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof data.glass_effects_enabled === 'boolean' && glassToggle) {
           glassToggle.checked = data.glass_effects_enabled;
           const value = data.glass_effects_enabled ? 'on' : 'off';
-          document.documentElement.setAttribute('data-glass-effects', value);
+          document.documentElement.setAttribute('data-glass-effects', 'off');
           localStorage.setItem('kasa-glass-effects', value);
           syncGlassQualityVisibility(data.glass_effects_enabled, false);
         }

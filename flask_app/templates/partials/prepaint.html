@@ -42,7 +42,7 @@
 
         const storedGlassEffects = localStorage.getItem('kasa-glass-effects') || "{{ 'on' if GLASS_EFFECTS_ENABLED else 'off' }}";
         const normalizedGlassEffects = storedGlassEffects === 'off' ? 'off' : 'on';
-        document.documentElement.setAttribute('data-glass-effects', normalizedGlassEffects);
+        document.documentElement.setAttribute('data-glass-effects', 'off'); // v5: gerçek cam örneklemesi kalıcı olarak kapalı
         localStorage.setItem('kasa-glass-effects', normalizedGlassEffects);
 
         const normalizeGlassQuality = function (value) {

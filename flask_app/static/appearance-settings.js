@@ -118,7 +118,7 @@ export function initAppearanceSettings({
 
     glassToggle.addEventListener('change', () => {
       const value = glassToggle.checked ? 'on' : 'off';
-      document.documentElement.setAttribute('data-glass-effects', value);
+      document.documentElement.setAttribute('data-glass-effects', 'off');
       localStorage.setItem('kasa-glass-effects', value);
       syncGlassQualityVisibility(glassToggle.checked);
       apiPost('/settings/glass-effects', { enabled: glassToggle.checked });
