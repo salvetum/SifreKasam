@@ -208,9 +208,9 @@
 .kasa-collapsible > .kasa-field-clip {
     min-height: 0;
     overflow: hidden;
-    /* Boyama yalnizca clip icinde: cam yeniden ornekleme maliyeti
-       cokme boyunca sabit kalir, son karede kasma olmaz. */
-    contain: layout paint style;
+    /* Kendi raster katmanı: kırpma kenarlarında 1px çizgi/artefakt
+       oluşmasını ve bitişik camların yeniden örneklenmesini engeller. */
+    transform: translateZ(0);
 }
 /* Bölüm seviyesindekiler (.vault-form-panel) zaten grid; kendi
    padding'leri çökerken de küçülsün diye clip padding'i üstlenir. */
@@ -456,8 +456,29 @@
     border-radius: var(--radius-sm) !important;
     color: var(--text) !important;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
-    backdrop-filter: var(--glass-blur-sm);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
+}
+
+/* ── FORM KAPSAMI: girdilerde gerçek cam örnekleme YOK ─────────────
+   Panellerin arka planı neredeyse düz olduğu için blur görsel olarak
+   kayıpsız; buna karşılık backdrop-filter, kompozitörün en kırılgan
+   özelliği (opaklık/transform/kırpma animasyonlarında ton sıçraması,
+       ara çizgiler, border kaybı). Form kapsamında bilinçli olarak
+   flat + opak-vari zemin kullanılır — görünüm aynı, hata sınıfı yok. */
+.vault-form-grid .kasa-field {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background:
+        linear-gradient(145deg,
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.085)),
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.045))),
+        rgba(11,13,24, calc(0.30 + var(--glass-veil-scale) * 0.22)) !important;
+}
+[data-bs-theme="light"] .vault-form-grid .kasa-field {
+    background:
+        linear-gradient(145deg,
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.60)),
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.40))),
+        rgba(244,246,252, calc(0.55 + var(--glass-veil-scale) * 0.20)) !important;
 }
 
 .kasa-field:focus {
