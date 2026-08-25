@@ -242,6 +242,20 @@
 .vault-form-notes  { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 240ms backwards; }
 .vault-form-side   { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 160ms backwards; }
 
+/* ÇİFT ANİMASYON FIX: display:none ↔ görünür geçişlerinde Chromium CSS
+   animasyonlarını BAŞTAN oynatıyor; access bölümü her tip dönüşünde
+   hidden flip'lediğinden vaultPanelIn + WAAI girişi üst üste binip
+   çift animasyon üretiyordu. İlk yükleme tamamlanınca (son panelin
+   animationend'i / güvenlik timeout'u) CSS girişleri kapatılır — tip
+   geçişlerinde yalnız WAAI motoru kalır. */
+body.form-booted .vault-form-hero,
+body.form-booted .vault-form-main,
+body.form-booted .vault-form-access,
+body.form-booted .vault-form-notes,
+body.form-booted .vault-form-side {
+    animation: none;
+}
+
 .vault-form-panel.has-open-select-layer,
 .settings-panel.has-open-select-layer {
     position: relative;

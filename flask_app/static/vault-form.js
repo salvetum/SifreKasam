@@ -238,6 +238,18 @@ export function initVaultForm() {
   applyTypeState(currentType, FIELD_CONFIGS[currentType] || FIELD_CONFIGS.default, currentType === 'CreditCard');
   kayitTipiSelect.addEventListener('change', () => { onTypeChange(); });
 
+  // ÇİFT ANİMASYON FIX: yükleme girişi (vaultPanelIn) bittikten sonra
+  // CSS girişlerini kapat — display:none geçişlerinde Chromium bu
+  // animasyonları yeniden oynatıp WAAI girişiyle üst üste bindiriyordu.
+  const bootSide = document.querySelector('.vault-form-side');
+  const markBooted = () => document.body.classList.add('form-booted');
+  if (bootSide) {
+    bootSide.addEventListener('animationend', markBooted, { once: true });
+    setTimeout(markBooted, 1200); // güvenlik ağı
+  } else {
+    markBooted();
+  }
+
   // ─── Üretici paneli ───
   generateBtn?.addEventListener('click', () => {
     const isVisible = pageGenerator && !pageGenerator.classList.contains('is-collapsed');
