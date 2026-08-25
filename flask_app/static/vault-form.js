@@ -224,7 +224,8 @@ export function initVaultForm() {
     applyTypeState(type, config, isCard);
 
     // 3) GİRİŞ: paneller yeni haliyle süzülür
-    const visibleIns = allTargets.filter(p => !p.hidden);
+    const visibleIns = allTargets.filter(p => !p.hidden && p !== expirySidebarSection);
+    const sideSecEl = expirySidebarSection;
     if (!motionOff() && visibleIns.length) {
       void document.body.offsetHeight;
       // GİRİŞTE OPAKLIK YOK: cam yüzeyin opaklığı animate edilirse
@@ -238,6 +239,16 @@ export function initVaultForm() {
         { duration: 190, easing: EASE_SWIFT }
       ));
       liveAnims.push(...inAnims);
+    }
+    if (!motionOff() && sideSecEl && !sideSecEl.hidden) {
+      const sideIn = sideSecEl.animate(
+        [
+          { opacity: 0, transform: `translateY(${goingDown ? -10 : 10}px)` },
+          { opacity: 1, transform: 'none' },
+        ],
+        { duration: 180, delay: 280, easing: EASE_SWIFT, fill: 'backwards' }
+      );
+      liveAnims.push(sideIn);
     }
   };
 
