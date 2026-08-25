@@ -203,9 +203,9 @@ export function initVaultForm() {
       outAnims = targets.map(p => p.animate(
         [
           { opacity: 1, transform: 'none' },
-          { opacity: 0, transform: `translateY(${goingDown ? -8 : 8}px)` },
+          { opacity: 0, transform: `translateY(${goingDown ? -5 : 5}px)` },
         ],
-        { duration: 110, easing: EASE_EXIT, fill: 'forwards' }
+        { duration: 80, easing: EASE_EXIT, fill: 'forwards' }
       ));
       liveAnims.push(...outAnims);
       await Promise.allSettled(outAnims.map(a => a.finished)).catch(() => {});
@@ -228,7 +228,7 @@ export function initVaultForm() {
           { opacity: 0, transform: `translateY(${dirY}px)` },
           { opacity: 1, transform: 'none' },
         ],
-        { duration: 190, delay: Math.min(i, 3) * 40, easing: EASE_SWIFT }
+        { duration: 170, delay: Math.min(i, 3) * 22, easing: EASE_SWIFT }
       ));
       liveAnims.push(...inAnims);
     }

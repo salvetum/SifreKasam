@@ -231,6 +231,11 @@ body::after {
 html[data-kasa-bg-wait] .card-animated {
     animation-play-state: paused;
 }
+/* Custom arkaplan canlı iken stagger kapat: boş slotlar canlı görseli
+   gösterip toplu dolum anında 'flash' okutuyor. */
+html[data-kasa-background='custom'] .vault-card-curtain > .card-animated {
+    animation-delay: 0ms !important;
+}
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0);    }
