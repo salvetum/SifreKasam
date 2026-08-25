@@ -750,9 +750,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ]
               : [
                   { opacity: 1, transform: 'none' },
-                  { opacity: 0, transform: `translateX(${goingDown ? -10 : 10}px)` },
+                  { opacity: 0, transform: `translateX(${goingDown ? -12 : 12}px)` },
                 ],
-            { duration: 110, easing: WAAI_EXIT, fill: 'forwards' }
+            { duration: 190, easing: WAAI_EXIT, fill: 'forwards' }
           ));
           Promise.allSettled(exitAnims.map(a => a.finished)).then(() => {
             if (!prevPanel._kasaExiting) return; // bu sürede geri dönüldü
@@ -775,6 +775,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!reduced) {
         const dirX = goingDown ? 22 : -22;
+        // Giris ~90ms gecikmeli: cikan panelin cikisi once TAM olarak
+        // gorunur, sonra yenisi iceri süzülür. CAM hedeflerde opaklik
+        // animasyona girmez (ton sicramasi yok), yalnizca kayar.
         collectTargets(nextPanel).forEach(({ el, glass }, index) => {
           el.animate(
             glass
@@ -787,8 +790,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   { opacity: 1, transform: 'none' },
                 ],
             {
-              duration: glass ? 300 : 240,
-              delay: Math.min(index, 8) * 30,
+              duration: glass ? 300 : 250,
+              delay: 90 + Math.min(index, 8) * 26,
               easing: WAAI_SWIFT,
               fill: 'backwards',
             }

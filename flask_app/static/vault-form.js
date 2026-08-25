@@ -85,7 +85,7 @@ export function initVaultForm() {
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // A1 yukseklik katmani yardimcilari
-    const COLLAPSE_MS = 320;
+    const COLLAPSE_MS = 300;
     const ensureClip = (el) => {
       if (el._kasaClip && el.firstElementChild === el._kasaClip) return el._kasaClip;
       const clip = document.createElement('div');
@@ -151,10 +151,10 @@ export function initVaultForm() {
           setExpanded(el, false);
           return;
         }
-        setExpanded(el, false); // yükseklik yumuşakça çöker (--dur-slow)
+        setExpanded(el, false); // yükseklik + opaklık AYNI sürede, aynı eğriyle
         el._kasaAnim = clip.animate(
           [{ opacity: 1 }, { opacity: 0 }],
-          { duration: 150, easing: FIELD_EXIT }
+          { duration: 300, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
         );
         // Gizlemeyi geçişin bittiği KAREYE hizala (setTimeout keyfi gecikme
         // yaratip tam bitiste ekstra relayout -> kasma yapabiliyordu).
@@ -171,7 +171,7 @@ export function initVaultForm() {
           if (e.target === el && e.propertyName === 'grid-template-rows') finishHide();
         };
         el.addEventListener('transitionend', onEnd);
-        setTimeout(finishHide, COLLAPSE_MS + 160); // güvenlik ağı
+        setTimeout(finishHide, COLLAPSE_MS + 120); // güvenlik ağı
         return;
       }
 

@@ -199,7 +199,8 @@
 [data-collapse="height"].kasa-collapsible:not([hidden]) {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows var(--dur-slow) var(--ease-swift);
+    /* Kapanis icin simetrik egri: hizli-baslayip sonunda surunme yok */
+    transition: grid-template-rows var(--dur-slow) var(--ease-inout);
 }
 [data-collapse="height"].kasa-collapsible:not([hidden]).is-expanded {
     grid-template-rows: 1fr;
@@ -207,6 +208,9 @@
 .kasa-collapsible > .kasa-field-clip {
     min-height: 0;
     overflow: hidden;
+    /* Boyama yalnizca clip icinde: cam yeniden ornekleme maliyeti
+       cokme boyunca sabit kalir, son karede kasma olmaz. */
+    contain: layout paint style;
 }
 /* Bölüm seviyesindekiler (.vault-form-panel) zaten grid; kendi
    padding'leri çökerken de küçülsün diye clip padding'i üstlenir. */
