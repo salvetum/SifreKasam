@@ -1086,37 +1086,3 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: scale(1.05);
 }
 
-
-/* ── Yan sütun (Süre + Kaydet): gerçek blur örneklemesi YOK ────────
-   Bu sütun tip değişiminde hidden flip'leniyor; Chromium display:none
-   geçişlerinde backdrop-filter katmanını 1-2 kare geç promote ediyor
-   → her yüzey önce buğusuz, sonra buğulu boyanıyordu ('çift render').
-   Sütundaki TÜM yüzeyler eşdeğer opak token zeminini kullanır;
-   görünüm aynı dilde kalır, artefakt imkânsız hale gelir. */
-.vault-form-side .vault-form-panel,
-.vault-form-side .vault-form-actions,
-.vault-form-side .kasa-field,
-.vault-form-side .kasa-btn {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-.vault-form-side .vault-form-panel {
-    background:
-        var(--glass-vivid-tint),
-        linear-gradient(160deg,
-            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.10)),
-            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.05))),
-        var(--panel-bg, var(--glass));
-}
-.vault-form-side .vault-form-actions {
-    background:
-        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 38%),
-        var(--panel-bg, var(--glass));
-}
-.vault-form-side .kasa-field {
-    background:
-        linear-gradient(145deg,
-            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.10)),
-            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.05))),
-        var(--glass) !important;
-}
