@@ -1,0 +1,45 @@
+<section class="vault-form-panel vault-form-main" aria-labelledby="vault-section-basic">
+            <div class="vault-section-head">
+                <span><i class="fa-solid fa-layer-group"></i></span>
+                <div>
+                    <h2 id="vault-section-basic">{{ _('Temel Bilgiler') }}</h2>
+                    <p>{{ _('Kayıt türü, kategori ve başlık alanları.') }}</p>
+                </div>
+            </div>
+
+            <div class="vault-form-row vault-form-row-two">
+                <div class="vault-field">
+                    <label for="kayit_tipi">{{ _('Kayıt Tipi') }}</label>
+                    <select name="kayit_tipi" id="kayit_tipi" required class="kasa-field" data-custom-select>
+                        <option value="Website"    data-icon="fa-globe"      {% if kayit and kayit.full_data['Website name'] %}selected{% endif %}>{{ _('Website') }}</option>
+                        <option value="Application" data-icon="fa-desktop"    {% if kayit and kayit.full_data['Application'] %}selected{% endif %}>{{ _('Uygulama') }}</option>
+                        <option value="CreditCard"  data-icon="fa-credit-card" {% if kayit and kayit.full_data['CreditCard'] %}selected{% endif %}>{{ _('Kredi Kartı') }}</option>
+                        <option value="SecureNote"  data-icon="fa-note-sticky" {% if kayit and kayit.full_data['SecureNote'] %}selected{% endif %}>{{ _('Not') }}</option>
+                        <option value="Other"       data-icon="fa-folder"     {% if kayit and kayit.full_data['Account name'] %}selected{% endif %}>{{ _('Diğer') }}</option>
+                    </select>
+                </div>
+
+                <div class="vault-field" id="kategori_group" data-collapse="height">
+                    <label for="kategori">{{ _('Kategori') }}</label>
+                    <input type="text" name="kategori" id="kategori" placeholder="{{ _('Genel') }}"
+                        value="{{ kayit.full_data.Category if kayit else 'Genel' }}"
+                        class="kasa-field">
+                </div>
+            </div>
+
+            <div class="vault-field">
+                <label for="isim" id="isim_label">{{ _('İsim / Başlık') }}</label>
+                <input type="text" name="isim" id="isim" required placeholder="{{ _('Örn: Google, Netflix…') }}"
+                    value="{{ kayit.full_data['Website name'] or kayit.full_data['Application'] or kayit.full_data['Account name'] or kayit.full_data['CreditCard'] or kayit.full_data['SecureNote'] if kayit }}"
+                    class="kasa-field">
+            </div>
+
+            <div class="vault-field" id="website_url_group" data-collapse="height" hidden>
+                <label for="website_url">{{ _('Website URL') }}</label>
+                <input type="text" name="website_url" id="website_url" placeholder="https://…"
+                    value="{{ kayit.full_data['Website URL'] if kayit and 'Website URL' in kayit.full_data }}"
+                    class="kasa-field">
+            </div>
+        </section>
+
+        

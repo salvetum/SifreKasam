@@ -1,0 +1,52 @@
+<aside class="vault-form-side">
+            <section class="vault-form-panel vault-form-expiry" data-collapse="height" aria-labelledby="vault-section-expiry">
+                <div class="vault-section-head">
+                    <span><i class="fa-regular fa-calendar"></i></span>
+                    <div>
+                        <h2 id="vault-section-expiry">{{ _('Süre') }}</h2>
+                        <p>{{ _('Opsiyonel son kullanma tarihi.') }}</p>
+                    </div>
+                </div>
+
+                <div class="vault-field">
+                    <label for="expiry_date_display">{{ _('Son Kullanma Tarihi') }}</label>
+                    <div class="kasa-calendar-wrapper" id="expiry-calendar-wrapper">
+                        <input type="text" id="expiry_date_display" readonly
+                            placeholder="GG.AA.YYYY"
+                            class="kasa-field kasa-calendar-trigger" aria-describedby="expiry-help"
+                            aria-haspopup="dialog" aria-expanded="false">
+                        <input type="hidden" name="expiry_date" id="expiry_date"
+                            value="{{ kayit.full_data.expiry_date if kayit and kayit.full_data.expiry_date }}">
+                        <div class="kasa-calendar-popup" id="expiry-calendar-popup" role="dialog" aria-label="{{ _('Tarih seçici') }}" hidden>
+                            <div class="kasa-calendar-header">
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-prev-year" aria-label="{{ _('Önceki yıl') }}"><i class="fa-solid fa-angles-left"></i></button>
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-prev-month" aria-label="{{ _('Önceki ay') }}"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span class="kasa-calendar-title" id="expiry-calendar-title"></span>
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-next-month" aria-label="{{ _('Sonraki ay') }}"><i class="fa-solid fa-chevron-right"></i></button>
+                                <button type="button" class="kasa-calendar-nav kasa-calendar-next-year" aria-label="{{ _('Sonraki yıl') }}"><i class="fa-solid fa-angles-right"></i></button>
+                            </div>
+                            <div class="kasa-calendar-weekdays" id="expiry-calendar-weekdays"></div>
+                            <div class="kasa-calendar-grid" id="expiry-calendar-grid"></div>
+                            <div class="kasa-calendar-footer">
+                                <button type="button" class="kasa-calendar-today-btn kasa-btn kasa-btn-muted text-xs">{{ _('Bugün') }}</button>
+                                <button type="button" class="kasa-calendar-clear-btn kasa-btn kasa-btn-muted text-xs">{{ _('Temizle') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="vault-help" id="expiry-help">{{ _('Tarih geçtiğinde kayıt süresi dolmuş olarak işaretlenir.') }}</p>
+                </div>
+            </section>
+
+            <section class="vault-form-actions">
+                <button type="submit" id="save-btn" class="kasa-btn kasa-btn-primary">
+                    <i class="fa-solid fa-save mr-2"></i>{{ _('Kaydet') }}
+                </button>
+                <a href="{{ url_for('index') }}" class="kasa-btn kasa-btn-muted">
+                    {{ _('Vazgeç') }}
+                </a>
+                <span class="kasa-unsaved-badge" id="ekle-unsaved-badge" data-unsaved-badge data-kasa-pop hidden>
+                    <i class="fa-solid fa-circle" aria-hidden="true"></i>
+                    <span class="kasa-unsaved-badge-text">{{ _('Kaydedilmemiş değişiklikler var') }}</span>
+                </span>
+            </section>
+        

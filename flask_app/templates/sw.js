@@ -1,4 +1,4 @@
-const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v138';
+const CACHE = 'kasa-v{{ APP_VERSION }}-assets-v139';
 const BG_URL_PREFIX = '/api/background/';
 const ASSETS = [
   '{{ url_for("static", filename="tokens.css") }}',
@@ -13,7 +13,6 @@ const ASSETS = [
   '{{ url_for("static", filename="background.css") }}',
   '{{ url_for("static", filename="custom-select.css") }}',
   '{{ url_for("static", filename="settings-modal.css") }}',
-  '{{ url_for("static", filename="vault-form-2.css") }}',
   '{{ url_for("static", filename="date-picker.css") }}',
   '{{ url_for("static", filename="theme-overrides.css") }}',
   '{{ url_for("static", filename="misc.css") }}',
