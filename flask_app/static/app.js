@@ -709,40 +709,62 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (_) {}
 
       const reduced = motionDisabled();
+      // Cam yüzey tespiti: backdrop-filter'li bir elementin opakligini
+      // animate etmek, animasyon bitince ornekleme tam guce gecirken TON
+      // sicramasi yaratir (kullanicinin "hafif accent" algisi). Bu yuzden
+      // cam yuzeyler YALNIZCA transform ile kayar — hep tam opak.
+      const isGlass = (el) => {
+        try { return getComputedStyle(el).backdropFilter !== 'none'; } catch (_) { return false; }
+      };
+      const collectTargets = (panel) => {
+        const targets = [];
+        Array.from(panel.children).forEach(child => {
+          if (child.classList.contains('settings-action-grid')) {
+            // Sarmalayici saydam: icindeki kartlar tek tek girer
+            Array.from(child.querySelectorAll(':scope > .settings-action-card')).forEach(card => {
+              targets.push({ el: card, glass: true });
+            });
+          } else {
+            targets.push({ el: child, glass: isGlass(child) });
+          }
+        });
+        return targets;
+      };
 
-      // 1) ÇIKIŞ: eski panelin ÇOCUKLARI söner (panel seviyesinde opacity/
-      // transform animasyonu yapmıyoruz — ata gruplaması backdrop-filter
-      // örneklemesini değiştirip animasyon bitince ton kaymasına yol açar).
-      // v3 alan motorundaki desen: istek bayrağı + iptal edilebilir dolgu.
+      // 1) ÇIKIŞ: eski panelin öğeleri söner; CAM olanlar kayarak çıkar
+      // (opaklık yok → ton sıçraması yok).
       if (prevPanel && !prevPanel.hidden) {
         prevPanel._kasaExiting = true;
-        const prevKids = Array.from(prevPanel.children);
+        const prevTargets = collectTargets(prevPanel);
         if (reduced) {
           prevPanel._kasaExiting = false;
           prevPanel.classList.remove('active');
           prevPanel.hidden = true;
         } else {
-          const exitAnims = prevKids.map(child =>
-            child.animate(
-              [
-                { opacity: 1, transform: 'none' },
-                { opacity: 0, transform: `translateX(${goingDown ? -10 : 10}px)` },
-              ],
-              { duration: 110, easing: WAAI_EXIT, fill: 'forwards' }
-            )
-          );
+          const exitAnims = prevTargets.map(({ el, glass }) => el.animate(
+            glass
+              ? [
+                  { transform: 'none' },
+                  { transform: `translateX(${goingDown ? -26 : 26}px)` },
+                ]
+              : [
+                  { opacity: 1, transform: 'none' },
+                  { opacity: 0, transform: `translateX(${goingDown ? -10 : 10}px)` },
+                ],
+            { duration: 110, easing: WAAI_EXIT, fill: 'forwards' }
+          ));
           Promise.allSettled(exitAnims.map(a => a.finished)).then(() => {
             if (!prevPanel._kasaExiting) return; // bu sürede geri dönüldü
             prevPanel._kasaExiting = false;
             prevPanel.classList.remove('active');
             prevPanel.hidden = true;
-            prevKids.forEach(k => k.getAnimations().forEach(a => a.cancel()));
+            prevTargets.forEach(t => t.el.getAnimations().forEach(a => a.cancel()));
           });
         }
       }
 
-      // 2) GİRİŞ: cam kartların KENDİLERİ yön duyarlı süzülür (öz-opaklık
-      // kendi backdrop-filter örneklemini bozmaz), panel anında görünür.
+      // 2) GİRİŞ: cam olmayanlar fade+slide, CAM olanlar yalnız slide
+      // (tam opak — bitişte hiçbir ton değişimi olmaz).
       nextPanel._kasaExiting = false;
       Array.from(nextPanel.children).forEach(child => {
         child.getAnimations().forEach(a => a.cancel());
@@ -751,14 +773,24 @@ document.addEventListener('DOMContentLoaded', () => {
       nextPanel.classList.add('active');
 
       if (!reduced) {
-        const dirX = goingDown ? 20 : -20;
-        Array.from(nextPanel.children).forEach((child, index) => {
-          child.animate(
-            [
-              { opacity: 0, transform: `translateX(${dirX}px)` },
-              { opacity: 1, transform: 'none' },
-            ],
-            { duration: 270, delay: Math.min(index, 8) * 30, easing: WAAI_SWIFT, fill: 'backwards' }
+        const dirX = goingDown ? 22 : -22;
+        collectTargets(nextPanel).forEach(({ el, glass }, index) => {
+          el.animate(
+            glass
+              ? [
+                  { transform: `translateX(${dirX}px)` },
+                  { transform: 'none' },
+                ]
+              : [
+                  { opacity: 0, transform: `translateX(${Math.round(dirX * 0.6)}px)` },
+                  { opacity: 1, transform: 'none' },
+                ],
+            {
+              duration: glass ? 300 : 240,
+              delay: Math.min(index, 8) * 30,
+              easing: WAAI_SWIFT,
+              fill: 'backwards',
+            }
           );
         });
       }
