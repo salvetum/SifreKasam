@@ -1086,3 +1086,34 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: scale(1.05);
 }
 
+
+/* ═══ NÜKLEER FIX: Yan sütun blur'suz ══════════════════════════
+   display:none geçişlerinde Chromium backdrop-filter katmanını geç
+   promote ediyor → her yüzey önce buğusuz, sonra buğulu boyanıyordu.
+   Yan sütundaki TÜM yüzeylerden kaldırılıyor; beyaz gradient
+   opaklaştırılarak görsel denge sağlanıyor. */
+.vault-form-side .vault-form-panel,
+.vault-form-side .vault-form-actions,
+.vault-form-side .kasa-field,
+.vault-form-side .kasa-btn {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.vault-form-side .vault-form-panel {
+    background:
+        linear-gradient(145deg,
+            rgba(255,255,255,0.11),
+            rgba(255,255,255,0.055)),
+        var(--panel-bg) !important;
+    box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+.vault-form-side .vault-form-actions {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 38%),
+        linear-gradient(145deg,
+            rgba(255,255,255,0.09),
+            rgba(255,255,255,0.04)),
+        var(--panel-bg) !important;
+}
