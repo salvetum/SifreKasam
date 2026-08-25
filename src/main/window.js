@@ -5,7 +5,7 @@
 // kayıtlarından sonra LAN/icerik-koruma senkronizasyonu, tepsiye küçültme.
 
 const path = require('path');
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 
 const rt = require('./runtime-state');
 const {
@@ -214,6 +214,13 @@ async function createWindow() {
       }
     }
   );
+
+  // webRequest kancası bazı ortamlarda güvenilir tetiklenmediği için
+  // renderer, LAN ayarı kaydedildiğinde doğrudan haber veriyor; poller
+  // (5-20 sn) yalnızca yedek mutabakat olarak kalıyor.
+  ipcMain.on('kasa:lan-saved', () => {
+    setTimeout(syncLanRuntimeState, 120);
+  });
 
   rt.mainWindow.webContents.session.webRequest.onCompleted(
     { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/settings/content-protection`] },

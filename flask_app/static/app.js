@@ -663,7 +663,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const WAAI_SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
     const WAAI_EXIT = 'cubic-bezier(0.4, 0, 0.2, 1)';
     let activeSettingsPanel = settingsPanels.find(panel => panel.classList.contains('active')) || null;
-    const pendingExitAnims = new WeakMap();
 
     const motionDisabled = () => document.documentElement.getAttribute('data-kasa-animations') === 'off'
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -711,47 +710,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const reduced = motionDisabled();
 
-      // 1) ÇIKIŞ: eski panel soldan kayarak söner; bitince gizlenir.
+      // 1) ÇIKIŞ: eski panelin ÇOCUKLARI söner (panel seviyesinde opacity/
+      // transform animasyonu yapmıyoruz — ata gruplaması backdrop-filter
+      // örneklemesini değiştirip animasyon bitince ton kaymasına yol açar).
+      // v3 alan motorundaki desen: istek bayrağı + iptal edilebilir dolgu.
       if (prevPanel && !prevPanel.hidden) {
-        (pendingExitAnims.get(prevPanel) || []).forEach(a => a.cancel());
-        const exitAnim = prevPanel.animate(
-          [
-            { opacity: 1, transform: 'none' },
-            { opacity: 0, transform: `translateX(${goingDown ? -12 : 12}px)` },
-          ],
-          { duration: reduced ? 0 : 130, easing: WAAI_EXIT, fill: 'forwards' }
-        );
-        pendingExitAnims.set(prevPanel, [exitAnim]);
-        exitAnim.finished.then(() => {
-          if ((pendingExitAnims.get(prevPanel) || []).includes(exitAnim)) {
-            pendingExitAnims.delete(prevPanel);
+        prevPanel._kasaExiting = true;
+        const prevKids = Array.from(prevPanel.children);
+        if (reduced) {
+          prevPanel._kasaExiting = false;
+          prevPanel.classList.remove('active');
+          prevPanel.hidden = true;
+        } else {
+          const exitAnims = prevKids.map(child =>
+            child.animate(
+              [
+                { opacity: 1, transform: 'none' },
+                { opacity: 0, transform: `translateX(${goingDown ? -10 : 10}px)` },
+              ],
+              { duration: 110, easing: WAAI_EXIT, fill: 'forwards' }
+            )
+          );
+          Promise.allSettled(exitAnims.map(a => a.finished)).then(() => {
+            if (!prevPanel._kasaExiting) return; // bu sürede geri dönüldü
+            prevPanel._kasaExiting = false;
             prevPanel.classList.remove('active');
             prevPanel.hidden = true;
-          }
-        }).catch(() => {});
+            prevKids.forEach(k => k.getAnimations().forEach(a => a.cancel()));
+          });
+        }
       }
 
-      // 2) GİRİŞ: yeni panel yön duyarlı süzülme + öğe stagger'ı.
-      nextPanel.getAnimations().forEach(a => a.cancel());
-      nextPanel.classList.remove('is-exiting');
+      // 2) GİRİŞ: cam kartların KENDİLERİ yön duyarlı süzülür (öz-opaklık
+      // kendi backdrop-filter örneklemini bozmaz), panel anında görünür.
+      nextPanel._kasaExiting = false;
+      Array.from(nextPanel.children).forEach(child => {
+        child.getAnimations().forEach(a => a.cancel());
+      });
       nextPanel.hidden = false;
       nextPanel.classList.add('active');
 
       if (!reduced) {
-        nextPanel.animate(
-          [
-            { opacity: 0, transform: `translateX(${goingDown ? 20 : -20}px)` },
-            { opacity: 1, transform: 'none' },
-          ],
-          { duration: 300, easing: WAAI_SWIFT }
-        );
+        const dirX = goingDown ? 20 : -20;
         Array.from(nextPanel.children).forEach((child, index) => {
           child.animate(
             [
-              { opacity: 0, transform: 'translateY(10px)' },
+              { opacity: 0, transform: `translateX(${dirX}px)` },
               { opacity: 1, transform: 'none' },
             ],
-            { duration: 240, delay: 40 + Math.min(index, 8) * 30, easing: WAAI_SWIFT, fill: 'backwards' }
+            { duration: 270, delay: Math.min(index, 8) * 30, easing: WAAI_SWIFT, fill: 'backwards' }
           );
         });
       }
@@ -1045,6 +1052,9 @@ document.addEventListener('DOMContentLoaded', () => {
         showSuccessToast(window._('Ayarlar kaydedildi.'));
         if (data.restart_required) {
           showSuccessToast(window._('Yeniden başlatılıyor...'));
+          // Electron'a anında haber ver: poll döngüsünü beklemeden LAN
+          // mutabakatı başlasın (webRequest kancası güvenilir değil).
+          try { window.kasaIpc?.notifyLanSaved?.(); } catch (_) {}
         }
       } catch {
         showWarningToast(window._('Ayarlar kaydedilemedi.'));
