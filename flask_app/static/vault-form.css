@@ -487,6 +487,22 @@ body.form-booted .vault-form-side {
 
 .kasa-field option { background: #131527; color: var(--text); }
 
+/* ── Tarih girdisi: cam yerine eşdeğer opak zemin ──────────────────
+   Bu girdi hidden flip'lenen bölümün içinde; Chromium display:none'dan
+   çıkarken backdrop-filter'ı 1-2 kare geç devreye sokuyor → "ilk
+   buğusuz sonra buğulu" flaşı. Blur'lu zemin, aynı token'lardan
+   üretilen opak katmanla değiştirilince artefakt kökten kalkar;
+   --glass/--veil-scale tema ve yoğunluğa otomatik uyum sağlar. */
+#expiry_date_display {
+    background:
+        linear-gradient(145deg,
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.10)),
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.05))),
+        var(--glass) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
 .kasa-field {
     transition:
         border-color 160ms ease,
