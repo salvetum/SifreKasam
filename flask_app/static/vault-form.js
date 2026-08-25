@@ -227,12 +227,15 @@ export function initVaultForm() {
     const visibleIns = allTargets.filter(p => !p.hidden);
     if (!motionOff() && visibleIns.length) {
       void document.body.offsetHeight;
+      // GİRİŞTE OPAKLIK YOK: cam yüzeyin opaklığı animate edilirse
+      // bitişte blur/ton tek karede tam güce geçer ("buğusuz→buğulu").
+      // Yalnızca transform: panel anında belirir, yerine kayar.
       const inAnims = visibleIns.map(p => p.animate(
         [
-          { opacity: 0 },
-          { opacity: 1 },
+          { transform: `translateY(${goingDown ? -12 : 12}px)` },
+          { transform: 'none' },
         ],
-        { duration: 170, easing: EASE_SWIFT }
+        { duration: 190, easing: EASE_SWIFT }
       ));
       liveAnims.push(...inAnims);
     }
