@@ -192,6 +192,9 @@ export function initVaultForm() {
 
     const goingDown = TYPE_ORDER.indexOf(type) >= TYPE_ORDER.indexOf(prevRequested);
     const targets = [mainPanel, accessSection, notesPanel].filter(Boolean);
+    // Süre bölümü de dalga ritmine katılır (yoksa anında pop = çift olay algısı)
+    const sideSec = expirySidebarSection;
+    const allTargets = sideSec ? [...targets, sideSec] : targets;
 
     // Önceki döngüden kalan TÜM canlı animasyonlar iptal (çift hareket yok)
     liveAnims.forEach(a => a.cancel());
@@ -199,8 +202,8 @@ export function initVaultForm() {
 
     // 1) ÇIKIŞ: paneller hızca söner
     let outAnims = [];
-    if (!motionOff() && targets.length) {
-      outAnims = targets.map(p => p.animate(
+    if (!motionOff() && allTargets.length) {
+      outAnims = allTargets.map(p => p.animate(
         [
           { opacity: 1 },
           { opacity: 0 },
@@ -220,9 +223,10 @@ export function initVaultForm() {
     applyTypeState(type, config, isCard);
 
     // 3) GİRİŞ: paneller yeni haliyle süzülür
-    if (!motionOff() && targets.length) {
+    const visibleIns = allTargets.filter(p => !p.hidden);
+    if (!motionOff() && visibleIns.length) {
       void document.body.offsetHeight;
-      const inAnims = targets.map(p => p.animate(
+      const inAnims = visibleIns.map(p => p.animate(
         [
           { opacity: 0 },
           { opacity: 1 },
