@@ -19,6 +19,7 @@
 import { copyToClipboard } from './reveal-copy.js';
 
 const TYPE_ORDER = ['Website', 'Application', 'CreditCard', 'SecureNote', 'Other'];
+let sureRevealGen = 0;
 const EASE_SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const EASE_EXIT = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
@@ -177,6 +178,8 @@ export function initVaultForm() {
 
   let liveAnims = [];
   const onTypeChange = async () => {
+    sureRevealGen++;
+    if (expirySidebarSection) { expirySidebarSection.style.transition = ''; expirySidebarSection.style.opacity = ''; }
     const type = kayitTipiSelect.value;
     // AYNI tip tekrar seçilirse hiçbir şey yapma (custom select her tıkta
     // change dispatch edebiliyor → tam döngü = kullanıcıya çift render).
@@ -240,15 +243,24 @@ export function initVaultForm() {
       ));
       liveAnims.push(...inAnims);
     }
-    if (!motionOff() && sideSecEl && !sideSecEl.hidden) {
-      const sideIn = sideSecEl.animate(
-        [
-          { opacity: 0, transform: `translateY(${goingDown ? -10 : 10}px)` },
-          { opacity: 1, transform: 'none' },
-        ],
-        { duration: 180, delay: 280, easing: EASE_SWIFT, fill: 'backwards' }
-      );
-      liveAnims.push(sideIn);
+    if (sideSecEl && !sideSecEl.hidden && !motionOff()) {
+      // RENDER KAPISI: inline opacity 0 (stil, animasyon degil — iptal
+      // edilemez). Blur promote olup yuzey boyandiktan ~3 kare sonra
+      // tek fade ile acilir.
+      sideSecEl.style.opacity = '0';
+      void sideSecEl.offsetHeight;
+      const gen = ++sureRevealGen;
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (gen !== sureRevealGen || sideSecEl.hidden) return;
+        sideSecEl.style.transition = 'opacity 190ms cubic-bezier(0.22, 1, 0.36, 1)';
+        sideSecEl.style.opacity = '1';
+        setTimeout(() => {
+          if (gen === sureRevealGen) {
+            sideSecEl.style.transition = '';
+            sideSecEl.style.opacity = '';
+          }
+        }, 240);
+      })));
     }
   };
 
