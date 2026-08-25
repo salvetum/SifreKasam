@@ -217,7 +217,22 @@ export function initVaultForm() {
     // Üreticinin solundaki kopyala düğmesi: şifreye tıklanabilir kopyalama.
     const passwordCopyBtn = el('page-copy-btn');
     const passwordLine = passwordGroup ? passwordGroup.querySelector('.vault-password-line') : null;
+    const formEl = document.getElementById('ekle-form');
     if (passwordCopyBtn) {
+    // A2: gönderim kilidi + spinner (ekle.html inline'dan taşındı)
+    const saveBtnEl = document.getElementById('save-btn');
+    formEl?.addEventListener('submit', function (e) {
+      if (this.dataset.submitted) { e.preventDefault(); return; }
+      this.dataset.submitted = 'true';
+      if (saveBtnEl) {
+        const spinner = document.createElement('i');
+        spinner.className = 'fa-solid fa-spinner fa-spin mr-2';
+        saveBtnEl.replaceChildren(spinner, document.createTextNode(window._('Kaydediliyor…')));
+        saveBtnEl.disabled = true;
+        saveBtnEl.classList.add('is-submitting');
+      }
+    });
+
       passwordCopyBtn.addEventListener('click', async () => {
         const value = passwordInput ? passwordInput.value : '';
         if (!value) return;

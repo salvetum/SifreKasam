@@ -13,6 +13,7 @@ import { initHeartbeat } from './heartbeat.js';
 import { initAppearanceSettings } from './appearance-settings.js';
 import { initVaultIndex } from './vault-index.js';
 import { initVaultForm } from './vault-form.js';
+import { initFormCalendar } from './form-calendar.js';
 import {
   normalizeHexColor,
   hexToRgb,
@@ -1294,6 +1295,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── 10. EKLE / DÜZENLE SAYFASI (vault-form.js) ───────────────────────────
   initVaultForm();
+  initFormCalendar();
 
   refreshStatsBar();
 });
