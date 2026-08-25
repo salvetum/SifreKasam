@@ -120,21 +120,47 @@ export function initVaultForm() {
     const animateToggle = (el, show) => {
       if (!el) return;
 
-      // ── HEIGHT kolonu: data-collapse="height" ──
+      // ── HEIGHT kolonu v5: İKİ FAZLI ──────────────────────────────
+      // Cam inputlar GÖRÜNÜRKEN boyut değiştirmek her karede yeniden
+      // örnekleme yapar → smear + bitişte snap. Bu yüzden:
+      //   GİZLE: içerik 110ms'de söner → boş kabuk 100ms lineer çöker
+      //   AÇ:    boş kabuk 100ms'de açılır → içerik 150ms'de belirir
+      // Toplam ~210-250ms; cam asla görünürken resize olmaz.
       if (el.dataset.collapse === 'height') {
         const clip = ensureClip(el);
         if (el._kasaAnim) { el._kasaAnim.cancel(); el._kasaAnim = null; }
         clearTimeout(el._kasaCollapseT);
 
+        const sizePhase = () => {
+          el.classList.add('kasa-size-anim');
+          return new Promise(res => setTimeout(res, 120));
+        };
+        const endSizePhase = () => {
+          // steady state: gecis yok, class temiz
+          el.classList.remove('kasa-size-anim');
+        };
+
         if (show) {
-          // Cam notu: clip opakligi animate EDILMEZ — icindeki kasa-field
-          // girdilerinin backdrop-filter'i gruplanip SONANDA belirdigi
-          // icin 'accent flash' tam olarak buydu. Yükseklik geçişi yeter.
+          el._kasaWantHidden = false;
           const wasHidden = el.hidden;
           el.hidden = false;
-          setExpanded(el, false);
-          setExpanded(el, true);
-          el._kasaEverAnimated = true;
+          setExpanded(el, false);           // 0fr baslangic
+          if (formMotionOff() || !wasHidden) {
+            setExpanded(el, true);
+            el._kasaEverAnimated = true;
+            return;
+          }
+          void el.offsetHeight;             // 0fr'i kilitle
+          setExpanded(el, true);            // KABUK acilir (110ms lineer)
+          sizePhase().then(() => {
+            endSizePhase();
+            if (!el._kasaWantHidden && !el.hidden) {
+              el._kasaAnim = clip.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 150, easing: FIELD_SWIFT }
+              );
+            }
+          });
           return;
         }
 
@@ -145,27 +171,25 @@ export function initVaultForm() {
           setExpanded(el, false);
           return;
         }
-        // Çikista da opaklık YOK: içerik overflow:hidden ile üstten
-        // kırpılarak kapanır — cam baştan sona aynı kalır, sıçrama olmaz.
-        setExpanded(el, false);
-        // Gizlemeyi geçişin bittiği KAREYE hizala (setTimeout keyfi gecikme
-        // yaratip tam bitiste ekstra relayout -> kasma yapabiliyordu).
-        let doneFlag = false;
-        const finishHide = () => {
-          if (doneFlag || !el._kasaWantHidden) return;
-          doneFlag = true;
-          el.removeEventListener('transitionend', onEnd);
-          el.hidden = true;
-          setExpanded(el, false);
-          if (el._kasaAnim) { el._kasaAnim.cancel(); el._kasaAnim = null; }
-        };
-        const onEnd = (e) => {
-          if (e.target === el && e.propertyName === 'grid-template-rows') finishHide();
-        };
-        el.addEventListener('transitionend', onEnd);
-        setTimeout(finishHide, COLLAPSE_MS + 120); // güvenlik ağı
+        // FAZ 1: icerik hizla söner (cam gorunurken sadece opaklik)
+        el._kasaAnim = clip.animate(
+          [{ opacity: 1 }, { opacity: 0 }],
+          { duration: 110, easing: FIELD_EXIT }
+        );
+        el._kasaAnim.finished.catch(() => {}).then(() => {
+          if (!el._kasaWantHidden) return;
+          // FAZ 2: bos kabuk coker (cam artik gorunmez)
+          sizePhase().then(() => {
+            if (!el._kasaWantHidden) { endSizePhase(); return; }
+            el.hidden = true;
+            setExpanded(el, false);
+            endSizePhase();
+            if (el._kasaAnim) { el._kasaAnim.cancel(); el._kasaAnim = null; }
+          });
+        });
         return;
       }
+
 
       // ── OPACITY kolonu (row-two üyeleri vb.) ──
       if (el._kasaAnim) {
@@ -264,10 +288,7 @@ export function initVaultForm() {
       if (cardTripleRow) cardTripleRow.classList.toggle('is-active', isCard);
 
       accessField(loginGroup, config.showLogin);
-      // E-posta grubu kasa-field (cam) içerir: opaklık fade'i camı anında
-      // söndürüp geri getirdiği için YOK — hareketi kolon %0 genişlik
-      // geçişi zaten sağlıyor.
-      if (emailGroup) setPresenceInstant(emailGroup, config.showEmail);
+      accessField(emailGroup, config.showEmail);
       accessField(passwordGroup, config.showPassword);
       if (strengthCard) {
         if (swallowAccess) setPresenceInstant(strengthCard, false);
