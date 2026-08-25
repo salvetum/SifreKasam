@@ -194,7 +194,8 @@ export function initVaultForm() {
     const targets = [mainPanel, accessSection, notesPanel].filter(Boolean);
     // Süre bölümü de dalga ritmine katılır (yoksa anında pop = çift olay algısı)
     const sideSec = expirySidebarSection;
-    const allTargets = sideSec ? [...targets, sideSec] : targets;
+    const allTargets = sideSec ? [...targets, sideSec] : targets; // enter icin
+    const waveTargets = targets; // cikista yalnizca ana paneller
 
     // Önceki döngüden kalan TÜM canlı animasyonlar iptal (çift hareket yok)
     liveAnims.forEach(a => a.cancel());
@@ -202,8 +203,8 @@ export function initVaultForm() {
 
     // 1) ÇIKIŞ: paneller hızca söner
     let outAnims = [];
-    if (!motionOff() && allTargets.length) {
-      outAnims = allTargets.map(p => p.animate(
+    if (!motionOff() && waveTargets.length) {
+      outAnims = waveTargets.map(p => p.animate(
         [
           { opacity: 1 },
           { opacity: 0 },
