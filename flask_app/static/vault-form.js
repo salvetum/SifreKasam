@@ -244,23 +244,17 @@ export function initVaultForm() {
       liveAnims.push(...inAnims);
     }
     if (sideSecEl && !sideSecEl.hidden && !motionOff()) {
-      // RENDER KAPISI: inline opacity 0 (stil, animasyon degil — iptal
-      // edilemez). Blur promote olup yuzey boyandiktan ~3 kare sonra
-      // tek fade ile acilir.
+      // RENDER KAPISI: blur oturana dek TAMAMEN gorunmez, sonra FADE'SIZ
+      // dogrudan gorunur. Cam uzerinde opacity animasyonu/transition
+      // yapilmaz — Chromium animasyon boyunca blur'u gruplayip erteliyor,
+      // bitisinde tek karede basiyor (buğusuz->buğulu snap'in ta kendisi).
       sideSecEl.style.opacity = '0';
       void sideSecEl.offsetHeight;
       const gen = ++sureRevealGen;
-      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+      setTimeout(() => {
         if (gen !== sureRevealGen || sideSecEl.hidden) return;
-        sideSecEl.style.transition = 'opacity 190ms cubic-bezier(0.22, 1, 0.36, 1)';
-        sideSecEl.style.opacity = '1';
-        setTimeout(() => {
-          if (gen === sureRevealGen) {
-            sideSecEl.style.transition = '';
-            sideSecEl.style.opacity = '';
-          }
-        }, 240);
-      })));
+        sideSecEl.style.opacity = '';
+      }, 160);
     }
   };
 
