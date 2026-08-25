@@ -84,11 +84,11 @@ export function initPasswordStrength({ apiJson }) {
             .map(requirement => STRENGTH_REQUIREMENT_LABELS[requirement])
             .filter(Boolean)
           : [];
+        barEl.classList.add(level.className);
         const extras = { score, level, crackTime, missingRequirements };
         if (typeof options.onResult === 'function') options.onResult(extras);
         if (options.customRender) return; // arayuzu cagiran tarafa biraktik
 
-        barEl.classList.add(level.className);
         if (missingRequirements.length && score < 3) {
           const missingLabels = missingRequirements
             .map(requirement => window._(requirement))
