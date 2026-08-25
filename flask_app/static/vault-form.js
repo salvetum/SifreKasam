@@ -84,15 +84,94 @@ export function initVaultForm() {
     const formMotionOff = () => document.documentElement.getAttribute('data-kasa-animations') === 'off'
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    // A1 yukseklik katmani yardimcilari
+    const COLLAPSE_MS = 320;
+    const ensureClip = (el) => {
+      if (el._kasaClip && el.firstElementChild === el._kasaClip) return el._kasaClip;
+      const clip = document.createElement('div');
+      clip.className = 'kasa-field-clip';
+      while (el.firstChild) clip.appendChild(el.firstChild);
+      el.appendChild(clip);
+      el.classList.add('kasa-collapsible');
+      el._kasaClip = clip;
+      return clip;
+    };
+    const setExpanded = (el, expanded) => el.classList.toggle('is-expanded', expanded);
+
+    // Bolum yutma: bolum tamamen gizlenirken icindeki alanlara tek tek
+    // animasyon yapmak cakisma kaynagidir; aninda hedef duruma cekilir,
+    // bolum kendi cokusuyle tasiyor.
+    const setPresenceInstant = (el, show) => {
+      if (!el) return;
+      if (el._kasaAnim) { el._kasaAnim.cancel(); el._kasaAnim = null; }
+      clearTimeout(el._kasaCollapseT);
+      el._kasaWantHidden = !show;
+      if (el.dataset.collapse === 'height') {
+        ensureClip(el);
+        el.hidden = !show;
+        setExpanded(el, show);
+        if (!show) el._kasaEverAnimated = false;
+      } else {
+        el.hidden = !show;
+        el.style.opacity = '';
+      }
+    };
+
     const animateToggle = (el, show) => {
       if (!el) return;
+
+      // ── HEIGHT kolonu: data-collapse="height" ──
+      if (el.dataset.collapse === 'height') {
+        const clip = ensureClip(el);
+        if (el._kasaAnim) { el._kasaAnim.cancel(); el._kasaAnim = null; }
+        clearTimeout(el._kasaCollapseT);
+
+        if (show) {
+          const wasHidden = el.hidden;
+          el.hidden = false;
+          setExpanded(el, false);
+          if (formMotionOff() || !wasHidden) {
+            setExpanded(el, true);
+            el._kasaEverAnimated = true;
+            return;
+          }
+          void el.offsetHeight; // 0fr'den başlaması için reflow
+          setExpanded(el, true);
+          el._kasaAnim = clip.animate(
+            [{ opacity: 0 }, { opacity: 1 }],
+            { duration: 220, easing: FIELD_SWIFT }
+          );
+          return;
+        }
+
+        if (el.hidden) return;
+        el._kasaWantHidden = true;
+        if (formMotionOff()) {
+          el.hidden = true;
+          setExpanded(el, false);
+          return;
+        }
+        setExpanded(el, false); // yükseklik yumuşakça çöker (--dur-slow)
+        el._kasaAnim = clip.animate(
+          [{ opacity: 1 }, { opacity: 0 }],
+          { duration: 150, easing: FIELD_EXIT }
+        );
+        el._kasaCollapseT = setTimeout(() => {
+          if (!el._kasaWantHidden) return;
+          el.hidden = true;
+          setExpanded(el, false);
+          if (el._kasaAnim) { el._kasaAnim.cancel(); el._kasaAnim = null; }
+        }, COLLAPSE_MS);
+        return;
+      }
+
+      // ── OPACITY kolonu (row-two üyeleri vb.) ──
       if (el._kasaAnim) {
         el._kasaAnim.cancel();
         el._kasaAnim = null;
       }
 
       if (show) {
-        el._kasaWantHidden = false;
         const wasHidden = el.hidden;
         el.hidden = false;
         if (formMotionOff()) return;
@@ -151,16 +230,31 @@ export function initVaultForm() {
       const config = FIELD_CONFIGS[kayitTipiSelect.value] || FIELD_CONFIGS.default;
       const isCard = kayitTipiSelect.value === 'CreditCard';
 
-      if (urlGroup)      animateToggle(urlGroup, kayitTipiSelect.value === 'Website');
-      if (loginGroup)    animateToggle(loginGroup, config.showLogin);
-      if (emailGroup)    animateToggle(emailGroup, config.showEmail);
-      if (passwordGroup) animateToggle(passwordGroup, config.showPassword);
-      if (kategoriGroup) animateToggle(kategoriGroup, config.showKategori);
-      if (accessSection) animateToggle(accessSection, config.showAccess);
+      // Bölüm yutma: access bölümü tamamen gizlenecekse içindeki alanlara
+      // tek tek animasyon yapma — instant hedef duruma çek, bölüm kendi
+      // çöküşüyle taşısın. Bölüm geri açılırken de alanlar animasyonsuz
+      // doğru durumda hazır olur, açılış temiz olur.
+      const swallowAccess = config.showAccess === false;
+      const accessField = (el, desired) => {
+        if (!el) return;
+        if (swallowAccess) setPresenceInstant(el, false);
+        else animateToggle(el, desired);
+      };
 
-      if (strengthCard) animateToggle(strengthCard, config.showPassword && !isCard);
+      if (urlGroup)      animateToggle(urlGroup, kayitTipiSelect.value === 'Website');
+      if (kategoriGroup) animateToggle(kategoriGroup, config.showKategori);
       if (cardHolderGroup) animateToggle(cardHolderGroup, isCard);
       if (cardTripleRow) cardTripleRow.classList.toggle('is-active', isCard);
+
+      accessField(loginGroup, config.showLogin);
+      accessField(emailGroup, config.showEmail);
+      accessField(passwordGroup, config.showPassword);
+      if (strengthCard) {
+        if (swallowAccess) setPresenceInstant(strengthCard, false);
+        else animateToggle(strengthCard, config.showPassword && !isCard);
+      }
+      if (accessSection) animateToggle(accessSection, config.showAccess);
+
       if (expiryAyField) animateToggle(expiryAyField, isCard);
       if (expiryYilField) animateToggle(expiryYilField, isCard);
       if (expirySidebarSection) animateToggle(expirySidebarSection, !isCard);

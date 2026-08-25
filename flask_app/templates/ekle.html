@@ -40,7 +40,7 @@
                     </select>
                 </div>
 
-                <div class="vault-field" id="kategori_group">
+                <div class="vault-field" id="kategori_group" data-collapse="height">
                     <label for="kategori">{{ _('Kategori') }}</label>
                     <input type="text" name="kategori" id="kategori" placeholder="{{ _('Genel') }}"
                         value="{{ kayit.full_data.Category if kayit else 'Genel' }}"
@@ -55,7 +55,7 @@
                     class="kasa-field">
             </div>
 
-            <div class="vault-field" id="website_url_group" hidden>
+            <div class="vault-field" id="website_url_group" data-collapse="height" hidden>
                 <label for="website_url">{{ _('Website URL') }}</label>
                 <input type="text" name="website_url" id="website_url" placeholder="https://…"
                     value="{{ kayit.full_data['Website URL'] if kayit and 'Website URL' in kayit.full_data }}"
@@ -63,7 +63,7 @@
             </div>
         </section>
 
-        <section class="vault-form-panel vault-form-access" id="login_password_row" aria-labelledby="vault-section-access">
+        <section class="vault-form-panel vault-form-access" id="login_password_row" data-collapse="height" aria-labelledby="vault-section-access">
             <div class="vault-section-head">
                 <span><i class="fa-solid fa-key"></i></span>
                 <div>
@@ -72,7 +72,7 @@
                 </div>
             </div>
 
-            <div class="vault-field" id="card_holder_group" hidden>
+            <div class="vault-field" id="card_holder_group" data-collapse="height" hidden>
                 <label for="card_holder">{{ _('Kart Üzerindeki İsim') }}</label>
                 <input type="text" name="card_holder" id="card_holder" placeholder="ADI SOYADI"
                     value="{{ kayit.full_data['Card holder'] if kayit and kayit.full_data.get('Card holder') }}"
@@ -124,7 +124,7 @@
                     </div>
                 </div>
 
-                <div class="vault-field" id="password_group">
+                <div class="vault-field" id="password_group" data-collapse="height">
                     <label for="page-password" id="password_label">{{ _('Şifre') }}</label>
                     <div class="vault-password-line">
                         <input type="text" name="password" id="page-password" placeholder="••••••••"
@@ -142,7 +142,7 @@
                     </div>
                 </div>
 
-            <div class="vault-strength-card" id="vault-strength-card">
+            <div class="vault-strength-card" id="vault-strength-card" data-collapse="height">
                 <div class="vault-strength-head">
                     <span><i class="fa-solid fa-shield-halved"></i></span>
                     <div>
@@ -196,7 +196,7 @@
         </section>
 
         <aside class="vault-form-side">
-            <section class="vault-form-panel vault-form-expiry" aria-labelledby="vault-section-expiry">
+            <section class="vault-form-panel vault-form-expiry" data-collapse="height" aria-labelledby="vault-section-expiry">
                 <div class="vault-section-head">
                     <span><i class="fa-regular fa-calendar"></i></span>
                     <div>

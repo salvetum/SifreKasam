@@ -192,6 +192,46 @@
     border-radius: 20px;
 }
 
+/* ── A1: Yükseklik varlık motoru ────────────────────────────────────
+   data-collapse="height" alanları grid-rows 0fr↔1fr ile açılıp kapanır:
+   tip değişimlerindeki dikey sıçramalar (500px+) animasyona dönüşür.
+   Çocuklar .kasa-field-clip içinde taşınır (min-height:0 şart). */
+[data-collapse="height"].kasa-collapsible:not([hidden]) {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--dur-slow) var(--ease-swift);
+}
+[data-collapse="height"].kasa-collapsible:not([hidden]).is-expanded {
+    grid-template-rows: 1fr;
+}
+.kasa-collapsible > .kasa-field-clip {
+    min-height: 0;
+    overflow: hidden;
+}
+/* Bölüm seviyesindekiler (.vault-form-panel) zaten grid; kendi
+   padding'leri çökerken de küçülsün diye clip padding'i üstlenir. */
+.vault-form-panel.kasa-collapsible > .kasa-field-clip {
+    display: grid;
+    align-content: start;
+    gap: 1rem;
+    padding: 1rem;
+}
+.vault-form-panel.kasa-collapsible {
+    padding: 0;
+}
+/* Strength kartı: iki-kolon düzeni çöküş sarmalayıcısına taşınır */
+#vault-strength-card > .kasa-field-clip {
+    display: grid;
+    grid-template-columns: minmax(190px, 0.42fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.9rem;
+}
+@media (max-width: 720px) {
+    #vault-strength-card > .kasa-field-clip {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 /* ── Sayfa girişi: yüzeyler sırayla süzülerek gelir ────────────────
    hero -> main -> access -> notes; yan panel (Süre/Kaydet) access ile
    birlikte belirir. backwards fill: sırası gelmeden opacity 0'da bekler,
