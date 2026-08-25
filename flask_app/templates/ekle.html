@@ -20,10 +20,9 @@
     <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form data-unsaved-track aria-labelledby="vault-form-title">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         {% include 'partials/form/panel-main.html' %}
-            {% include 'partials/form/panel-access.html' %}
-            {% include 'partials/form/panel-notes.html' %}
-            {% include 'partials/form/panel-side.html' %}
-        </aside>
-    </form>
+        {% include 'partials/form/panel-access.html' %}
+        {% include 'partials/form/panel-notes.html' %}
+        {% include 'partials/form/panel-side.html' %}
+        </form>
 </div>
 {% endblock %}

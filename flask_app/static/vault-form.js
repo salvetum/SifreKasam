@@ -156,12 +156,22 @@ export function initVaultForm() {
           [{ opacity: 1 }, { opacity: 0 }],
           { duration: 150, easing: FIELD_EXIT }
         );
-        el._kasaCollapseT = setTimeout(() => {
-          if (!el._kasaWantHidden) return;
+        // Gizlemeyi geçişin bittiği KAREYE hizala (setTimeout keyfi gecikme
+        // yaratip tam bitiste ekstra relayout -> kasma yapabiliyordu).
+        let doneFlag = false;
+        const finishHide = () => {
+          if (doneFlag || !el._kasaWantHidden) return;
+          doneFlag = true;
+          el.removeEventListener('transitionend', onEnd);
           el.hidden = true;
           setExpanded(el, false);
           if (el._kasaAnim) { el._kasaAnim.cancel(); el._kasaAnim = null; }
-        }, COLLAPSE_MS);
+        };
+        const onEnd = (e) => {
+          if (e.target === el && e.propertyName === 'grid-template-rows') finishHide();
+        };
+        el.addEventListener('transitionend', onEnd);
+        setTimeout(finishHide, COLLAPSE_MS + 160); // güvenlik ağı
         return;
       }
 
