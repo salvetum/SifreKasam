@@ -877,17 +877,3 @@ html[data-bs-theme="light"][data-glass-quality="low"] .glass-sm {
 [data-bs-theme="light"] .text-kasa-text-muted {
     color: #3a4a6b;
 }
-
-/* ══════════════════════════════════════════════════════════════
-   v5 FİNAL: GERÇEK CAM ÖRNEKLEMESİ KALICI OLARAK KAPALI
-   ══════════════════════════════════════════════════════════════
-   backdrop-filter Chromium kompozitörünün en kırılgan özelliği:
-   opaklık/transform/kırpma animasyonlarında ton sıçraması, 1 px
-   çizgiler, border kaybı ve "anında sönme" artefaktları üretiyor.
-   Artık HİÇBİR yüzey gerçek blur örneklemesi yapmıyor; tüm cam
-   görünümü gradient + tint + border ile sağlanıyor (aynı dil,
-   sıfır hata sınıfı, çok daha iyi performans). */
-* , *::before, *::after {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}

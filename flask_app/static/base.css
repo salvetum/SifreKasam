@@ -222,9 +222,14 @@ body::after {
 /* glass-ready gate kaldırıldı — vault kartları saf CSS --glass-vivid-blur
    ile GPU tarafından boyanır; JS tier override'i çift render yaratıyordu. */
 .card-animated {
-    /* both fill: gecikmeli kademeli girişte kart, sirasi gelene dek
-       opacity:0'da bekler (gorunup sonra kaybolma yanip sonmesi yok) */
+    /* both fill: gecikmeli kademeli girişte kart, sırası gelene dek
+       opacity:0'da bekler (görünüp sonra kaybolma yanıp sönmesi yok) */
     animation: fadeUp var(--dur-base) var(--ease-swift) backwards;
+}
+/* Özel arkaplan decode gate'i sürerken kart girişlerini dondur:
+   bg ilk karesi GPU'ya oturmadan kartlar örnekleme yapmasın. */
+html[data-kasa-bg-wait] .card-animated {
+    animation-play-state: paused;
 }
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }

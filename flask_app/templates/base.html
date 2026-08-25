@@ -4,13 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark light">
-    <script nonce="{{ csp_nonce }}">
-        // UI tanilama anahtari: localStorage 'kasa-ui-mode' = 'flat' -> tum
-        // animasyonlar + backdrop-filter + golgeler KAPALI (A/B testi icin).
-        try { if (localStorage.getItem('kasa-ui-mode') === 'flat') {
-            document.documentElement.setAttribute('data-ui-flat', '1');
-        } } catch (e) {}
-    </script>
 {% include 'partials/prepaint.html' %}
     <title>{{ title or _('ŞifreKasam | Güvenli Şifre Yöneticisi') }}</title>
 
@@ -36,7 +29,7 @@
     <!-- Our Custom CSS -->
     <link href="{{ url_for('static', filename='tokens.css') }}?v=70" rel="stylesheet">
     <link href="{{ url_for('static', filename='base.css') }}?v=75" rel="stylesheet">
-    <link href="{{ url_for('static', filename='vault-form.css') }}?v=78" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vault-form.css') }}?v=76" rel="stylesheet">
     <link href="{{ url_for('static', filename='utilities.css') }}?v=69" rel="stylesheet">
     <link href="{{ url_for('static', filename='buttons.css') }}?v=72" rel="stylesheet">
     <link href="{{ url_for('static', filename='cards.css') }}?v=69" rel="stylesheet">
@@ -49,7 +42,7 @@
     <link href="{{ url_for('static', filename='date-picker.css') }}?v=70" rel="stylesheet">
     <link href="{{ url_for('static', filename='theme-overrides.css') }}?v=70" rel="stylesheet">
     <link href="{{ url_for('static', filename='misc.css') }}?v=69" rel="stylesheet">
-    <link href="{{ url_for('static', filename='glass.css') }}?v=82" rel="stylesheet">
+    <link href="{{ url_for('static', filename='glass.css') }}?v=81" rel="stylesheet">
     {% if BACKGROUND_STYLE == 'custom' and CUSTOM_BACKGROUND_URL and not CUSTOM_BACKGROUND_IS_VIDEO %}
     <link rel="preload" as="image" href="{{ CUSTOM_BACKGROUND_URL }}">
     {% endif %}
