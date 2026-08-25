@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark light">
+    <script nonce="{{ csp_nonce }}">
+        // UI tanilama anahtari: localStorage 'kasa-ui-mode' = 'flat' -> tum
+        // animasyonlar + backdrop-filter + golgeler KAPALI (A/B testi icin).
+        try { if (localStorage.getItem('kasa-ui-mode') === 'flat') {
+            document.documentElement.setAttribute('data-ui-flat', '1');
+        } } catch (e) {}
+    </script>
 {% include 'partials/prepaint.html' %}
     <title>{{ title or _('ŞifreKasam | Güvenli Şifre Yöneticisi') }}</title>
 
