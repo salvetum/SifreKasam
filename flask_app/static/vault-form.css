@@ -1086,21 +1086,17 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: scale(1.05);
 }
 
-/* ═══ Yan sutun camийизasyonu ═══════════════════════════════════════════════
-   Backdrop-filter compositor'da 1 kare gecikme uretir (bilinen Chromium bug).
-   Sure paneli ve Kaydet/Vazgec, diger cam yuzeyleriyle birebir ayni gorunumu
-   surdurur — fakat bagimliligi olmayan cok katmanli gradient ile yapilandirilmistir.
-   Compositor bagimliligi yok, acilista hicbir gecikme/kayma uretmez. */
+/* ═══ Yan sütün: erken katman promosyonu ═══════════════════════════════════════════════
+   vaultPanelIn animasyonu form konteynırını gruplayarak yan sütun katmanlarını
+   geç promote ediyor → backdrop-filter ilk karelerde aktif olmuyor.
+   will-change: transform ile katmanlar sayfa yüklenmesinden itibaren hazır tutulur.
+   Backdrop-filter doğal akışından gelir (overlay → shared glass rule). */
 .vault-form-side .vault-form-panel,
 .vault-form-side .vault-form-actions {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background:
-        linear-gradient(145deg,
-            rgba(255,255,255,0.09),
-            rgba(255,255,255,0.04)),
-        linear-gradient(135deg,
-            rgba(var(--accent-rgb), 0.04), transparent 60%),
-        var(--panel-bg) !important;
-    box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+    will-change: transform;
+}
+
+/* Vazgeç butonu kendi backdrop-filter'ını bağımsız kullanır */
+.vault-form-side .kasa-btn[data-btn-vivid="blur"] {
+    will-change: transform;
 }
