@@ -1085,3 +1085,9 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
     transform: scale(1.05);
 }
+
+/* Acilis render kapisi: yan kolon, katmanlari oturup blur kesinlesmeden boyanmaz. Transition YOK — fade'siz tek hamle acilir. */
+html.side-hold .vault-form-side .vault-form-panel,
+html.side-hold .vault-form-side .vault-form-actions {
+    opacity: 0;
+}

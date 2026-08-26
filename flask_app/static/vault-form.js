@@ -266,7 +266,14 @@ export function initVaultForm() {
   // CSS girişlerini kapat — display:none geçişlerinde Chromium bu
   // animasyonları yeniden oynatıp WAAI girişiyle üst üste bindiriyordu.
   const bootSide = document.querySelector('.vault-form-side');
-  const markBooted = () => document.body.classList.add('form-booted');
+  const markBooted = () => {
+    document.body.classList.add('form-booted');
+    // Yan kolon acilis kapisi: katmanlar oturdu, blur kesinlesti ->
+    // 2 kare + tampon sonrasi fade'siz dogrudan goster.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setTimeout(() => document.documentElement.classList.remove('side-hold'), 240);
+    }));
+  };
   if (bootSide) {
     bootSide.addEventListener('animationend', markBooted, { once: true });
     setTimeout(markBooted, 1200); // güvenlik ağı
