@@ -19,7 +19,6 @@
 import { copyToClipboard } from './reveal-copy.js';
 
 const TYPE_ORDER = ['Website', 'Application', 'CreditCard', 'SecureNote', 'Other'];
-let sureRevealGen = 0;
 const EASE_SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const EASE_EXIT = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
@@ -178,8 +177,6 @@ export function initVaultForm() {
 
   let liveAnims = [];
   const onTypeChange = async () => {
-    sureRevealGen++;
-    if (expirySidebarSection) { expirySidebarSection.style.transition = ''; expirySidebarSection.style.opacity = ''; }
     const type = kayitTipiSelect.value;
     // AYNI tip tekrar seçilirse hiçbir şey yapma (custom select her tıkta
     // change dispatch edebiliyor → tam döngü = kullanıcıya çift render).
@@ -227,8 +224,7 @@ export function initVaultForm() {
     applyTypeState(type, config, isCard);
 
     // 3) GİRİŞ: paneller yeni haliyle süzülür
-    const visibleIns = allTargets.filter(p => !p.hidden && p !== expirySidebarSection);
-    const sideSecEl = expirySidebarSection;
+    const visibleIns = allTargets.filter(p => !p.hidden);
     if (!motionOff() && visibleIns.length) {
       void document.body.offsetHeight;
       // GİRİŞTE OPAKLIK YOK: cam yüzeyin opaklığı animate edilirse
@@ -243,19 +239,6 @@ export function initVaultForm() {
       ));
       liveAnims.push(...inAnims);
     }
-    if (sideSecEl && !sideSecEl.hidden && !motionOff()) {
-      // RENDER KAPISI: blur oturana dek TAMAMEN gorunmez, sonra FADE'SIZ
-      // dogrudan gorunur. Cam uzerinde opacity animasyonu/transition
-      // yapilmaz — Chromium animasyon boyunca blur'u gruplayip erteliyor,
-      // bitisinde tek karede basiyor (buğusuz->buğulu snap'in ta kendisi).
-      sideSecEl.style.opacity = '0';
-      void sideSecEl.offsetHeight;
-      const gen = ++sureRevealGen;
-      setTimeout(() => {
-        if (gen !== sureRevealGen || sideSecEl.hidden) return;
-        sideSecEl.style.opacity = '';
-      }, 160);
-    }
   };
 
   // İlk durum animasyonsuz uygulanır, sonra change dinleyicisi bağlanır.
@@ -266,14 +249,7 @@ export function initVaultForm() {
   // CSS girişlerini kapat — display:none geçişlerinde Chromium bu
   // animasyonları yeniden oynatıp WAAI girişiyle üst üste bindiriyordu.
   const bootSide = document.querySelector('.vault-form-side');
-  const markBooted = () => {
-    document.body.classList.add('form-booted');
-    // Yan kolon acilis kapisi: katmanlar oturdu, blur kesinlesti ->
-    // 2 kare + tampon sonrasi fade'siz dogrudan goster.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      setTimeout(() => document.documentElement.classList.remove('side-hold'), 240);
-    }));
-  };
+  const markBooted = () => document.body.classList.add('form-booted');
   if (bootSide) {
     bootSide.addEventListener('animationend', markBooted, { once: true });
     setTimeout(markBooted, 1200); // güvenlik ağı

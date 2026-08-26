@@ -1086,8 +1086,21 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: scale(1.05);
 }
 
-/* Acilis render kapisi: yan kolon, katmanlari oturup blur kesinlesmeden boyanmaz. Transition YOK — fade'siz tek hamle acilir. */
-html.side-hold .vault-form-side .vault-form-panel,
-html.side-hold .vault-form-side .vault-form-actions {
-    opacity: 0;
+/* ═══ Yan sutun camийизasyonu ═══════════════════════════════════════════════
+   Backdrop-filter compositor'da 1 kare gecikme uretir (bilinen Chromium bug).
+   Sure paneli ve Kaydet/Vazgec, diger cam yuzeyleriyle birebir ayni gorunumu
+   surdurur — fakat bagimliligi olmayan cok katmanli gradient ile yapilandirilmistir.
+   Compositor bagimliligi yok, acilista hicbir gecikme/kayma uretmez. */
+.vault-form-side .vault-form-panel,
+.vault-form-side .vault-form-actions {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background:
+        linear-gradient(145deg,
+            rgba(255,255,255,0.09),
+            rgba(255,255,255,0.04)),
+        linear-gradient(135deg,
+            rgba(var(--accent-rgb), 0.04), transparent 60%),
+        var(--panel-bg) !important;
+    box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
