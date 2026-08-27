@@ -1,6 +1,6 @@
 # ŞifreKasam v3 🦀
 
-> **Durum:** Planlama / Erken Öğrenme Aşaması
+> **Durum:** Planlama / Erken Öğrenme Aşaması / V2 sürümünün tamamlanması bekleniyor
 > 
 > **Yapay Zeka Politikası:** Bu projede hiçbir satır yapay zeka tarafından yazılmayacaktır.
 
@@ -19,7 +19,7 @@ bir **yeniden yazım**dır — v1/v2'den hiçbir kod satırı taşınmayacak.
 Bu projenin **birincil hedefi Rust öğrenmek ve dilde ustalaşmaktır.**
 Uygulamayı "daha iyi" hale getirmek ikincil bir hedeftir — yani bazı
 kararlar, "en hızlı/en pratik" yol yerine "en çok öğrendiren" yol
-gözetilerek verilebilir.
+gözetilerek verilebilir. _(bi de electron ve webapplerden nefret ettiğim için)_
 
 ### Temel kural: Yapay zeka desteği yok
 
