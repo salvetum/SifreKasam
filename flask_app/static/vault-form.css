@@ -28,9 +28,8 @@
 .generator-output-card {
     grid-area: output;
     display: grid;
-    align-content: center;
-    gap: 0.9rem;
-    min-height: 172px;
+    align-content: start;
+    gap: 0.85rem;
     padding: 1rem;
 }
 .generator-output-kicker {
@@ -54,8 +53,12 @@
     flex-basis: auto;
 }
 .generator-output-row .kasa-field {
-    min-height: 46px;
-    font-size: 0.92rem;
+    min-height: 58px;
+    padding: 0.25rem 0.9rem;
+    font-size: 1.06rem;
+    font-family: var(--font-mono);
+    text-align: center;
+    letter-spacing: 0.06em;
 }
 .generator-strength-card {
     padding: 0.75rem;
@@ -66,8 +69,8 @@
 .generator-options-card {
     grid-area: options;
     display: grid;
-    align-content: center;
-    gap: 0.75rem;
+    align-content: start;
+    gap: 0.7rem;
     padding: 1rem;
 }
 .generator-option-grid {
@@ -256,6 +259,68 @@ body.form-booted .vault-form-side {
     animation: none;
 }
 
+/* ── Panel hover kaldırma ──────────────────────────────────────── */
+.vault-form-panel {
+    transition:
+        transform var(--dur-base) var(--ease-swift),
+        box-shadow var(--dur-base) var(--ease-swift),
+        border-color var(--dur-fast) ease;
+}
+.vault-form-panel:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.12),
+        0 2px 8px rgba(var(--accent-rgb), 0.08);
+    border-color: var(--glass-border-hi);
+}
+.vault-form-panel:active {
+    transform: translateY(0);
+}
+
+/* ── Section ikonu pop animasyonu ─────────────────────────────────
+   Sayfa girişi: vaultPanelIn bittikten sonra section badge'leri
+   küçük bir scale pulse alır (0 → 1.15 → 1). */
+@keyframes sectionIconPop {
+    0%   { transform: scale(0); }
+    60%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+.vault-form-panel .vault-section-head > span,
+.vault-form-hero .vault-form-icon {
+    animation: sectionIconPop 0.4s var(--ease-spring) backwards;
+}
+.vault-form-main .vault-section-head > span   { animation-delay: 160ms; }
+.vault-form-access .vault-section-head > span { animation-delay: 240ms; }
+.vault-form-notes .vault-section-head > span  { animation-delay: 320ms; }
+.vault-form-expiry .vault-section-head > span { animation-delay: 240ms; }
+body.form-booted .vault-form-panel .vault-section-head > span,
+body.form-booted .vault-form-hero .vault-form-icon {
+    animation: none;
+}
+
+/* ── Focus ring animasyonu ────────────────────────────────────────
+   Input focus olunca accent renkli halka outward expand. */
+.vault-field--icon .kasa-field:focus {
+    box-shadow:
+        0 0 0 0 rgba(var(--accent-rgb), 0.30),
+        0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+.vault-field--icon .kasa-field:focus-visible {
+    animation: focusRingExpand 0.3s var(--ease-swift) forwards;
+}
+@keyframes focusRingExpand {
+    0%   { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.30), 0 0 0 0 rgba(var(--accent-rgb), 0.0); }
+    100% { box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18), 0 0 0 5px rgba(var(--accent-rgb), 0.08); }
+}
+
+/* ── Alan stagger girişi ───────────────────────────────────────────
+   Tip değişiminde panel içindeki alanlar sırayla belirir.
+   JS her alan için animation-delay hesaplar. */
+@keyframes fieldStaggerIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 .vault-form-panel.has-open-select-layer,
 .settings-panel.has-open-select-layer {
     position: relative;
@@ -310,6 +375,137 @@ body.form-booted .vault-form-side {
 .vault-field textarea.kasa-field {
     min-height: 132px;
     line-height: 1.5;
+}
+
+/* ── Alan simgesi: input solundaki ikon + ayırıcı çizgi ─────────────
+   .vault-field-input-wrap (flex, align-items: center) input+icon+divider sarar.
+   İkon solda sabit, 12px sonra çizgi, placeholder çizgiden itibaren başlar. */
+.vault-field-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.vault-field .vault-field-input-wrap .kasa-field,
+.vault-field .vault-field-input-wrap textarea.kasa-field {
+    padding-left: 50px !important; /* icon(34) + gap(12) + divider(2) + padding(2) ≈ 50px */
+    width: 100%;
+}
+/* Not textarea'sında ikon kaldırıldı → sol boşluk diğer alanlarla aynı */
+.vault-field .vault-field-input-wrap textarea#comment.kasa-field {
+    padding-left: 0.85rem !important;
+}
+.vault-field-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    pointer-events: none;
+    color: var(--text-muted);
+    background: transparent;
+    border-radius: var(--control-radius) 0 0 var(--control-radius);
+    font-size: 0.78rem;
+}
+.vault-field-icon::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 60%;
+    background: var(--border);
+    border-radius: 1px;
+}
+.vault-field-icon i {
+    width: 1em;
+    text-align: center;
+    opacity: 0.6;
+    transition: opacity 160ms ease, color 160ms ease;
+}
+.vault-field-input-wrap:focus-within .vault-field-icon i,
+.vault-field-input-wrap .kasa-field:focus + .vault-field-icon i {
+    opacity: 1;
+    color: var(--accent);
+}
+.vault-field-input-wrap:focus-within .vault-field-icon::after {
+    background: var(--accent);
+    opacity: 0.5;
+}
+
+/* ── Not alanı: özel resize tutamacı ────────────────────────────────
+   Native WebKit resizer görünümü kapatılır; resize davranışı korunur.
+   Cam temaya uyan diyagonal şerit deseni sağ alt köşede durur. */
+#comment::-webkit-resizer {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    outline: none;
+}
+.vault-field-resize-grip {
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    z-index: 2;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    opacity: 0.5;
+    background: repeating-linear-gradient(
+        45deg,
+        var(--border) 0 1px,
+        transparent 1px 4px
+    );
+    border-radius: 0 0 var(--radius-sm) 0;
+    transition: opacity 160ms ease;
+}
+.vault-field-input-wrap:focus-within .vault-field-resize-grip {
+    opacity: 1;
+}
+
+/* ── Yardımcı metin (hint) ───────────────────────────────────────── */
+.vault-field-hint {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+/* Sağda: textbox içinde, input hizasında sağa yaslanır.
+   Absolute konum → input tam genişlik kalır, yazı hint'in altına girmez. */
+.vault-field-hint--right {
+    position: absolute;
+    top: 50%;
+    right: 0.85rem;
+    transform: translateY(-50%);
+    z-index: 3;
+    margin: 0;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* CreditCard: kart numarası yazısı hint'in altına girmesin diye sağ dolgu */
+.vault-form-row-two.is-card-number #login_group .kasa-field {
+    padding-right: 10rem !important;
+}
+
+/* CreditCard: login (kart numarası) tam genişlik */
+.vault-form-row-two.is-card-number #login_group {
+    grid-column: 1 / -1;
+}
+/* Select için: custom select overlay kullanılıyorsa simge select wrapper'ına taşınır */
+.vault-field--icon .custom-select-wrap .kasa-field {
+    padding-left: 2.6rem;
+}
+/* password line: copy/generate düğmeleri sağda, ikon solda — çakışma yok */
+.vault-field--icon .vault-password-line .vault-password-input {
+    padding-left: 2.6rem !important;
 }
 
 .vault-form-row {
@@ -372,14 +568,47 @@ body.form-booted .vault-form-side {
 .vault-form-side {
     display: grid;
     gap: 1rem;
+    /* Tek cam yüzey: glass efekti aside'a taşındı.
+       İç paneller (.vault-form-panel / .vault-form-actions) şeffaf
+       container olarak kalır → content toggle'ları backdrop-filter'ı
+       etkilemez → "ilk buğusuz sonra buğulu" flash ENGELLENİR. */
+    position: relative;
+    isolation: isolate;
+    border: var(--border-glass);
+    border-radius: 20px;
+    background:
+        linear-gradient(145deg,
+            rgba(255,255,255,0.075),
+            rgba(255,255,255,0.032));
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    will-change: transform;
+}
+/* İç paneller: cam yüzeyi aside'dan gelir, panel kendi glass'ını kullanmaz */
+.vault-form-side .vault-form-panel,
+.vault-form-side .vault-form-actions {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+    padding: 1rem;
+    will-change: auto;
+}
+/* Panel başlıkları: üst kenar ayırıcı çizgi */
+.vault-form-side .vault-form-panel + .vault-form-panel,
+.vault-form-side .vault-form-panel + .vault-form-actions,
+.vault-form-side .vault-form-actions + .vault-form-panel {
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
 }
 
 .vault-form-actions {
     display: grid;
     grid-template-columns: 1fr;
     gap: 0.75rem;
-    padding: 1rem;
-    border-radius: 20px;
 }
 
 .vault-form-actions .kasa-btn {
@@ -389,6 +618,27 @@ body.form-booted .vault-form-side {
 @media (min-width: 760px) {
     .vault-form-row-two {
         grid-template-columns: var(--grid-2);
+    }
+
+    /* Aynı satırdaki kontrolleri Y ekseninde BİREBİR eşitle:
+       kayıt tipi dropdown trigger ↔ kategori input, ikisi de
+       var(--control-height) (44px) — dikey padding sıfırlanır,
+       içerik flex/grid center ile ortalanır. */
+    .vault-form-row-two .vault-field {
+        align-content: start;
+    }
+    .vault-form-row-two .kasa-custom-select-trigger,
+    .vault-form-row-two .vault-field-input-wrap .kasa-field {
+        height: var(--control-height) !important;
+        min-height: var(--control-height) !important;
+        max-height: var(--control-height);
+        padding-top: 0.4rem !important;
+        padding-bottom: 0.4rem !important;
+        box-sizing: border-box !important;
+    }
+    .vault-form-row-two .kasa-custom-select-trigger {
+        display: grid;
+        align-items: center;
     }
 
     .vault-form-actions {
@@ -422,6 +672,11 @@ body.form-booted .vault-form-side {
 
     .vault-form-panel,
     .vault-form-actions {
+        padding: 1.15rem;
+    }
+    /* Side panel: aside tek cam surface, iç paneller şeffaf */
+    .vault-form-side .vault-form-panel,
+    .vault-form-side .vault-form-actions {
         padding: 1.15rem;
     }
 }
@@ -476,6 +731,22 @@ body.form-booted .vault-form-side {
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
     backdrop-filter: var(--glass-blur-sm);
     -webkit-backdrop-filter: var(--glass-blur-sm);
+}
+
+/* ── Opaklaşma fixi (çift render artefaktı) ─────────────────────────
+   Form grid'i içindeki input'larda backdrop-filter, tip geçişindeki
+   opacity animasyonlu flip'ler sırasında Chromium tarafından yere
+   düşürülüyor; element "cam karesi"ni kaybedip opak gözüküyor.
+   #expiry_date_display ile aynı çözüm: blur yerine aynı token'lardan
+   türetilmiş opak cam katmanı → artefakt kökten kaybolur. */
+.vault-form-grid .kasa-field {
+    background:
+        linear-gradient(145deg,
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.10)),
+            rgba(255,255,255, calc(var(--glass-veil-scale) * 0.05))),
+        var(--glass) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 .kasa-field:focus {
@@ -584,6 +855,14 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 /* Card expiry stepper — inherit settings-number-stepper look */
 .vault-field .settings-number-stepper {
     width: 100%;
+    /* Normal kasa-field ile birebir aynı zemin: gradient+glass yerine
+       tek katman rgba → ay/yıl alanları artık fazla parlak görünmez. */
+    background: rgba(255,255,255,0.065);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+[data-bs-theme="light"] .vault-field .settings-number-stepper {
+    background: rgba(255,255,255,0.78);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.30);
 }
 /* kasa-field radius/focus-ring kurallarını (background.css input.kasa-field
    !important dâhil) ezerek stepper görünümünü bozmasın: köşeler kare kalır,
@@ -835,7 +1114,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 
 .vault-generator-panel {
     overflow: hidden;
-    max-height: 460px;
+    max-height: 640px;
     opacity: 1;
     transform: translateY(0);
     border-color: rgba(var(--accent-rgb), 0.20);
@@ -991,12 +1270,14 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 
 .generator-length-range {
     --generator-range-progress: 33.333%;
-    height: 7px;
+    display: block;
+    height: 22px;
     border: 0;
     border-radius: 999px;
     outline: 0;
     appearance: none;
     -webkit-appearance: none;
+    touch-action: none;
     background:
         linear-gradient(
             90deg,
@@ -1087,16 +1368,363 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* ═══ Yan sütün: erken katman promosyonu ═══════════════════════════════════════════════
-   vaultPanelIn animasyonu form konteynırını gruplayarak yan sütun katmanlarını
-   geç promote ediyor → backdrop-filter ilk karelerde aktif olmuyor.
-   will-change: transform ile katmanlar sayfa yüklenmesinden itibaren hazır tutulur.
-   Backdrop-filter doğal akışından gelir (overlay → shared glass rule). */
-.vault-form-side .vault-form-panel,
-.vault-form-side .vault-form-actions {
-    will-change: transform;
-}
+   will-change: transform yalnızca aside (tek cam surface) seviyesinde.
+   İç paneller şeffaf container → backdrop-filter yok → promosyon gerekmez. */
 
 /* Vazgeç butonu kendi backdrop-filter'ını bağımsız kullanır */
 .vault-form-side .kasa-btn[data-btn-vivid="blur"] {
     will-change: transform;
+}
+
+/* ═══ Şifre Üretici v3: karakter pill'leri, analiz bandı, sparkle, shimmer, slide-in ═══ */
+
+.gen-options-label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.gen-options-label--mt { margin-top: 0.35rem; }
+
+.gen-value-badge {
+    min-width: 2rem;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.28);
+    border-radius: 999px;
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.12);
+    text-align: center;
+}
+
+.gen-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+.gen-toggle-pill {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    min-height: 46px;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        color 170ms ease,
+        border-color 170ms ease,
+        background 170ms ease,
+        box-shadow 170ms ease,
+        transform 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.gen-toggle-pill:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    color: var(--text);
+    transform: translateY(-1px);
+}
+.gen-toggle-pill.is-active {
+    color: var(--accent-2);
+    border-color: rgba(var(--accent-rgb), 0.42);
+    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.18), rgba(var(--accent-rgb), 0.08));
+    box-shadow:
+        inset 0 0 0 1px rgba(var(--accent-rgb), 0.15),
+        0 2px 10px rgba(0, 0, 0, 0.15);
+}
+.gen-pill-glyph {
+    min-width: 2.1rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+}
+
+.gen-ambiguous-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    transition: border-color 170ms ease;
+}
+.gen-ambiguous-row:hover { border-color: rgba(255, 255, 255, 0.14); }
+.gen-ambiguous-row .kasa-checkbox { margin-top: 0.08rem; }
+.gen-ambiguous-row b {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-soft);
+}
+.gen-ambiguous-row small { display: block; margin-top: 0.12rem; font-size: 0.7rem; }
+
+/* Analiz bandı (güç + entropi + kırılma) */
+.gen-analysis {
+    display: grid;
+    gap: 0.5rem;
+}
+.gen-band-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+.gen-band-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.32rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.gen-band-chip i,
+.gen-band-chip b {
+    color: var(--accent-2);
+    font-weight: 700;
+}
+.gen-band-chip b { font-family: var(--font-mono); }
+
+/* Üret butonu sparkle */
+.gen-spark { animation: genSparkPulse 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.gen-spark i { animation: genSparkRotate 0.42s linear both; }
+@keyframes genSparkPulse {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0.16), 0 8px 24px rgba(var(--accent-rgb), 0.3); }
+    100% { transform: scale(1); }
+}
+@keyframes genSparkRotate {
+    0%   { transform: rotate(0deg); }
+    42%  { transform: rotate(-120deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* Güç barı shimmer (modal + form sağlık kartı) */
+.strength-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+.strength-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%);
+    transform: translateX(-100%);
+    animation: genShimmer 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes genShimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Geçmiş slide-in (yalnızca en yeni kayıt) */
+.gen-history-in { animation: genHistoryIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes genHistoryIn {
+    0%   { opacity: 0; transform: translateX(-14px); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+
+[data-bs-theme="light"] .gen-toggle-pill {
+    background: rgba(31, 41, 55, 0.035);
+    border-color: rgba(31, 41, 55, 0.09);
+}
+[data-bs-theme="light"] .gen-toggle-pill:hover {
+    border-color: rgba(31, 41, 55, 0.16);
+    color: var(--text);
+}
+[data-bs-theme="light"] .gen-toggle-pill.is-active {
+    color: rgba(var(--accent-rgb), 1);
+    background: rgba(var(--accent-rgb), 0.1);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.3);
+}
+[data-bs-theme="light"] .gen-ambiguous-row {
+    background: rgba(31, 41, 55, 0.035);
+    border-color: rgba(31, 41, 55, 0.08);
+}
+[data-bs-theme="light"] .gen-ambiguous-row:hover { border-color: rgba(31, 41, 55, 0.16); }
+[data-bs-theme="light"] .gen-band-chip {
+    background: rgba(31, 41, 55, 0.035);
+    border-color: rgba(31, 41, 55, 0.08);
+}
+[data-bs-theme="light"] .strength-shimmer::after {
+    background: linear-gradient(105deg, transparent 35%, rgba(31, 41, 55, 0.35) 50%, transparent 65%);
+}
+
+/* Modal güç kartı boş durumu */
+.generator-strength-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.55rem 0 0;
+    padding-top: 0.55rem;
+    border-top: 1px dashed rgba(255, 255, 255, 0.09);
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+.generator-strength-empty i { color: var(--accent-2); }
+[data-bs-theme="light"] .generator-strength-empty { border-top-color: rgba(31, 41, 55, 0.14); }
+
+/* ════════════════════════════════════════════════════════════════
+   HERO ÜRETİCİ (görsel revize)
+   Şifre göstergesi ana öğe (hero): büyük + ortalanmış + accent aura.
+   Segmentli güç metresi + kontrollerde canlı hover/focus. ID/JS yok.
+   ════════════════════════════════════════════════════════════════ */
+
+.generator-hero { text-align: center; }
+
+.generator-hero .generator-output-kicker {
+    justify-self: center;
+    margin: 0.1rem 0 0.2rem;
+    padding: 0.3rem 0.85rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.26);
+    border-radius: 999px;
+    background: rgba(var(--accent-rgb), 0.10);
+    color: var(--accent-2);
+}
+
+.generator-hero .generator-output-row .kasa-field {
+    min-height: 72px;
+    padding: 0.3rem 1.05rem;
+    font-size: clamp(1.15rem, 2.1vw, 1.45rem);
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    border-color: rgba(var(--accent-rgb), 0.20);
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at 22% 0%, rgba(var(--accent-rgb), 0.10), transparent 56%),
+        rgba(7, 9, 20, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.06),
+        0 10px 26px rgba(0,0,0,0.16);
+    transition:
+        border-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+[data-bs-theme="light"] .generator-hero .generator-output-row .kasa-field {
+    border-color: rgba(var(--accent-rgb), 0.28);
+    background:
+        radial-gradient(circle at 22% 0%, rgba(var(--accent-rgb), 0.09), transparent 56%),
+        rgba(255,255,255,0.70);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.70),
+        0 10px 26px rgba(65,80,108,0.08);
+}
+
+.generator-generated #modal-generated-password-display {
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 0 0 4px rgba(var(--accent-rgb), 0.12),
+        0 16px 38px rgba(var(--accent-rgb), 0.16);
+}
+[data-bs-theme="light"] .generator-generated #modal-generated-password-display {
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.72),
+        0 0 0 4px rgba(var(--accent-rgb), 0.12),
+        0 16px 38px rgba(var(--accent-rgb), 0.12);
+}
+.generator-generated #page-password {
+    box-shadow:
+        0 0 0 4px rgba(var(--accent-rgb), 0.10),
+        0 12px 30px rgba(var(--accent-rgb), 0.12);
+}
+
+/* Segmentli güç metresi (ribbed fill) */
+.strength-meter-fill {
+    background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.20) 0 7px, transparent 7px 14px);
+}
+[data-bs-theme="light"] .strength-meter-fill {
+    background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.10) 0 7px, transparent 7px 14px);
+}
+
+/* Analiz bandı chip'leri accent tonu */
+.gen-band-chip {
+    background: rgba(var(--accent-rgb), 0.09);
+    border-color: rgba(var(--accent-rgb), 0.17);
+}
+[data-bs-theme="light"] .gen-band-chip {
+    background: rgba(var(--accent-rgb), 0.07);
+    border-color: rgba(var(--accent-rgb), 0.16);
+}
+
+/* Karakter tipi pill'leri canlı hover/focus */
+.gen-toggle-pill:hover {
+    box-shadow:
+        0 0 0 3px rgba(var(--accent-rgb), 0.12),
+        0 4px 14px rgba(0,0,0,0.12);
+}
+.gen-toggle-pill.is-active {
+    box-shadow:
+        inset 0 0 0 1px rgba(var(--accent-rgb), 0.18),
+        0 2px 12px rgba(var(--accent-rgb), 0.20);
+}
+.gen-toggle-pill:active { transform: translateY(0) scale(0.97); }
+.gen-toggle-pill:focus-visible {
+    outline: 2px solid rgba(var(--accent-rgb), 0.60);
+    outline-offset: 2px;
+}
+[data-bs-theme="light"] .gen-toggle-pill:hover {
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+[data-bs-theme="light"] .gen-toggle-pill:focus-visible { outline-color: rgba(var(--accent-rgb), 0.70); }
+
+/* Uzunluk slider'ı canlı hover */
+.generator-length-range::-webkit-slider-thumb {
+    transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.generator-length-range:hover::-webkit-slider-thumb {
+    transform: scale(1.14);
+    box-shadow:
+        0 0 0 5px rgba(var(--accent-rgb), 0.16),
+        0 3px 14px rgba(var(--accent-rgb), 0.50);
+}
+.generator-length-range:active::-webkit-slider-thumb {
+    transform: scale(1.18);
+    box-shadow:
+        0 0 0 6px rgba(var(--accent-rgb), 0.20),
+        0 3px 14px rgba(var(--accent-rgb), 0.55);
+}
+.generator-length-range:hover::-moz-range-thumb {
+    transform: scale(1.10);
+    box-shadow:
+        0 0 0 5px rgba(var(--accent-rgb), 0.16),
+        0 3px 14px rgba(var(--accent-rgb), 0.50);
+}
+
+/* Benzer karakteri dışla satırı canlı hover */
+.gen-ambiguous-row:hover {
+    border-color: rgba(var(--accent-rgb), 0.34);
+    background: rgba(var(--accent-rgb), 0.05);
+}
+.gen-ambiguous-row:hover .kasa-checkbox {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
+}
+
+/* "Yeni Üret" CTA vurgusu */
+.generator-modal-content .modal-footer #modal-gen-now {
+    box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.32);
+    transition:
+        transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 180ms ease,
+        filter 180ms ease;
+}
+.generator-modal-content .modal-footer #modal-gen-now:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 36px rgba(var(--accent-rgb), 0.45);
+    filter: saturate(1.12) brightness(1.04);
+}
+.generator-modal-content .modal-footer #modal-gen-now:active {
+    transform: translateY(0) scale(0.97);
 }

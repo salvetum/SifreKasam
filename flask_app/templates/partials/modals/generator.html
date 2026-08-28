@@ -12,7 +12,7 @@
             </div>
             <div class="modal-body generator-modal-body">
                 <div class="generator-layout">
-                    <section class="generator-output-card">
+                    <section class="generator-output-card generator-hero">
                         <div class="generator-output-kicker">
                             <i class="fa-solid fa-shield-halved"></i>
                             {{ _('Yeni Şifre') }}
@@ -25,39 +25,61 @@
                                 <i class="fa-solid fa-copy text-sm"></i>
                             </button>
                         </div>
-                        <div class="generator-strength-card">
-                            <div class="flex justify-between items-center mb-1">
-                                <small class="text-kasa-text-muted text-xs">{{ _('Şifre Gücü') }}</small>
-                                <small id="modal-strength-label" class="text-xs text-kasa-text-muted">—</small>
+
+                        <div class="generator-strength-card gen-analysis">
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <small class="text-kasa-text-muted text-xs">{{ _('Şifre Gücü') }}</small>
+                                    <small id="modal-strength-label" class="text-xs text-kasa-text-muted">—</small>
+                                </div>
+                                <div class="h-2 rounded-full bg-kasa-border-hi overflow-hidden">
+                                    <div id="modal-strength-bar" class="progress-bar strength-meter-fill h-full rounded-full transition-all duration-300"></div>
+                                </div>
                             </div>
-                            <div class="h-1.5 rounded-full bg-kasa-border-hi overflow-hidden">
-                                <div id="modal-strength-bar" class="progress-bar strength-meter-fill h-full rounded-full transition-all duration-300"></div>
+                            <div class="gen-band-chips">
+                                <span class="gen-band-chip"><i class="fa-solid fa-shield-halved"></i>{{ _('Entropi') }}: <b id="modal-entropy-bits">—</b> {{ _('bit') }}</span>
+                                <span class="gen-band-chip"><i class="fa-regular fa-clock"></i>{{ _('Kırılma') }}: <b id="modal-crack-time">—</b></span>
                             </div>
+                            <p id="modal-strength-empty" class="generator-strength-empty">
+                                <i class="fa-solid fa-shield-halved"></i>
+                                {{ _('Üretilen şifrenin güç analizi burada görünür.') }}
+                            </p>
                         </div>
                     </section>
 
                     <section id="passwordGeneratorModal_options" class="generator-panel generator-options-card">
+                        <small class="gen-options-label">{{ _('Seçenekler') }}</small>
+
                         <div class="flex justify-between items-center mb-2">
                             <small class="text-kasa-text-muted">{{ _('Uzunluk') }}</small>
-                            <span id="modal-length-display" class="font-bold text-sm">16</span>
+                            <span id="modal-length-display" class="gen-value-badge font-bold">16</span>
                         </div>
                         <label class="sr-only" for="modal-length">{{ _('Şifre Uzunluğu') }}</label>
-                        <input type="range" class="generator-length-range w-full mb-3" min="8" max="32" value="16" id="modal-length">
+                        <input type="range" class="generator-length-range w-full" min="8" max="32" value="16" id="modal-length">
 
-                        <div class="generator-option-grid generator-checkboxes">
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-uppercase">
-                                <input type="checkbox" id="modal-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük Harf') }}
-                            </label>
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-lowercase">
-                                <input type="checkbox" id="modal-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük Harf') }}
-                            </label>
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-numbers">
-                                <input type="checkbox" id="modal-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}
-                            </label>
-                            <label class="flex items-center gap-2 text-xs text-kasa-text-muted cursor-pointer" for="modal-include-symbols">
-                                <input type="checkbox" id="modal-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}
-                            </label>
+                        <small class="gen-options-label gen-options-label--mt">{{ _('Karakter Tipleri') }}</small>
+                        <div class="gen-toggle-grid" role="group" aria-label="{{ _('Karakter Tipleri') }}">
+                            <button type="button" class="gen-toggle-pill is-active" data-char-set="upper" aria-pressed="true">
+                                <span class="gen-pill-glyph">Ab</span><span>{{ _('Büyük') }}</span>
+                            </button>
+                            <button type="button" class="gen-toggle-pill is-active" data-char-set="lower" aria-pressed="true">
+                                <span class="gen-pill-glyph">ab</span><span>{{ _('Küçük') }}</span>
+                            </button>
+                            <button type="button" class="gen-toggle-pill is-active" data-char-set="numbers" aria-pressed="true">
+                                <span class="gen-pill-glyph">123</span><span>{{ _('Sayı') }}</span>
+                            </button>
+                            <button type="button" class="gen-toggle-pill is-active" data-char-set="symbols" aria-pressed="true">
+                                <span class="gen-pill-glyph">#&amp;!</span><span>{{ _('Sembol') }}</span>
+                            </button>
                         </div>
+
+                        <label class="gen-ambiguous-row" for="modal-exclude-ambiguous">
+                            <input type="checkbox" id="modal-exclude-ambiguous" class="kasa-checkbox">
+                            <span>
+                                <b>{{ _('Benzer karakteri dışla') }}</b>
+                                <small class="text-kasa-text-muted">{{ _('0/O · 1/l/I · 5/S · 2/Z') }}</small>
+                            </span>
+                        </label>
                     </section>
 
                     <section class="gen-history-section generator-history-card">
@@ -80,7 +102,7 @@
                         </div>
                     </section>
                 </div>
-                    </div>
+            </div>
 
             <div class="modal-footer">
                 <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('Kapat') }}</button>
@@ -94,4 +116,3 @@
         </div>
     </div>
 </div>
-
