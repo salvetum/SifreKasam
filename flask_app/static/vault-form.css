@@ -1510,7 +1510,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     100% { transform: rotate(0deg); }
 }
 
-/* Yeni Üret ikonu: simge değiştirilmez, mevcut rotate ikonu animasyonlanır */
+/* Yeni Üret ikonu: simge değiştirilmez, yalnızca tıklamada döner */
 #modal-gen-now i,
 #page-gen-now i {
     display: inline-flex;
@@ -1518,17 +1518,6 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     justify-content: center;
     width: 1.05em;
     height: 1.05em;
-    transition: transform var(--dur-base) var(--ease-spring);
-}
-#modal-gen-now:hover i,
-#modal-gen-now:focus-visible i,
-#page-gen-now:hover i,
-#page-gen-now:focus-visible i {
-    animation: genHoverSpin 1.15s linear infinite;
-}
-@keyframes genHoverSpin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
 }
 .gen-icon-spin i {
     animation: genIconSpin 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1;
@@ -1632,6 +1621,13 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .generator-hero .generator-strength-card {
     margin-top: auto;
+}
+.generator-hero .generator-copy-btn {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex-basis: 44px;
+    align-self: center;
 }
 @media (min-width: 700px) {
     .generator-hero .generator-output-row {

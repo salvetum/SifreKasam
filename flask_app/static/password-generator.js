@@ -114,6 +114,32 @@ export function initPasswordGenerator({
     return interval;
   };
 
+  // Şifre alanına sığdır: uzun şifrelerde font, 32 karakter dahi tamamı
+  // görünecek şekilde küçülür; kısa şifrelerde CSS clamp (max 1.45rem) geçerlidir.
+  const fitPasswordFont = (input) => {
+    if (!input || !input.classList.contains('generated-password-field')) return;
+    if (!String(input.value ?? '').trim() || !input.clientWidth) {
+      input.style.removeProperty('font-size');
+      return;
+    }
+    const MAX = 1.45;
+    const MIN = 0.6;
+    input.style.fontSize = `${MAX}rem`;
+    if (input.scrollWidth <= input.clientWidth + 2) return;
+    let from = MIN;
+    let to = MAX;
+    for (let i = 0; i < 8; i++) {
+      const mid = (from + to) / 2;
+      input.style.fontSize = `${mid}rem`;
+      if (input.scrollWidth <= input.clientWidth + 1) {
+        from = mid;
+      } else {
+        to = mid;
+      }
+    }
+    input.style.fontSize = `${Math.round(from * 100) / 100}rem`;
+  };
+
   function setupPasswordGenerator(containerId, prefixId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -229,6 +255,7 @@ export function initPasswordGenerator({
         if (targetInput) {
           targetInput.value = password;
           targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+          fitPasswordFont(targetInput);
         }
         if (isModal) {
           if (modalBar && modalLabel && typeof window.updateStrengthMeter === 'function')
