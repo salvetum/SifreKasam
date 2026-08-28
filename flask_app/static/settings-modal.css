@@ -603,6 +603,9 @@
             rgba(255, 255, 255, 0.14) 100%
         );
 }
+.settings-range-input:active {
+    transition-duration: 90ms;
+}
 
 .settings-range-input::-webkit-slider-runnable-track {
     height: 7px;

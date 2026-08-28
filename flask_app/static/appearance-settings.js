@@ -400,6 +400,7 @@ export function initAppearanceSettings({
     if (accentHueInput) accentHueInput.value = String(pickerColor.hue);
     if (accentSaturationInput) accentSaturationInput.value = String(pickerColor.saturation);
     if (accentBrightnessInput) accentBrightnessInput.value = String(pickerColor.brightness);
+    [accentHueInput, accentSaturationInput, accentBrightnessInput].forEach(syncGlassScaleProgress);
     if (accentHueValue) accentHueValue.value = `${pickerColor.hue}°`;
     if (accentSaturationValue) accentSaturationValue.value = `${pickerColor.saturation}%`;
     if (accentBrightnessValue) accentBrightnessValue.value = `${pickerColor.brightness}%`;
@@ -606,6 +607,7 @@ export function initAppearanceSettings({
     });
     [accentHueInput, accentSaturationInput, accentBrightnessInput].forEach(input => {
       input?.addEventListener('input', () => {
+        syncGlassScaleProgress(input);
         colorPickerState = {
           hue: Number(accentHueInput?.value || 0),
           saturation: Number(accentSaturationInput?.value || 0),

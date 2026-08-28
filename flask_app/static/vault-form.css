@@ -1288,6 +1288,9 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
             rgba(255, 255, 255, 0.14) 100%
         );
 }
+.generator-length-range:active {
+    transition-duration: 90ms;
+}
 
 .generator-length-range::-webkit-slider-runnable-track {
     height: 7px;
