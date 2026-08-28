@@ -953,6 +953,83 @@
       min-height: 96px;
     }
   }
+
+  /* ── Sağlık Skoru Halkası (görsel revize) ── */
+  .sr-score-layout {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+  .sr-score {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+  }
+  .sr-score-ring {
+    --sr-score: 0%;
+    position: relative;
+    width: 92px;
+    height: 92px;
+    flex: 0 0 92px;
+    border-radius: 50%;
+    background: conic-gradient(var(--sr-score-color, #2ecc71) calc(var(--sr-score) * 1%), rgba(255,255,255,0.09) 0);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.20);
+  }
+  .sr-score-inner {
+    position: absolute;
+    inset: 8px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(9,11,24,0.92);
+  }
+  .sr-score-pct {
+    font-family: var(--mono);
+    font-size: 1.2rem;
+    font-weight: 800;
+  }
+  .sr-score-copy strong {
+    display: block;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  .sr-distribution {
+    flex: 1;
+    min-width: 0;
+  }
+  .sr-distribution-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+  [data-bs-theme="light"] .sr-score-ring {
+    box-shadow: 0 12px 30px rgba(31,41,55,0.12);
+  }
+  [data-bs-theme="light"] .sr-score-inner {
+    background: rgba(255,255,255,0.94);
+  }
+  html[data-glass-effects="off"] .sr-score-inner {
+    background: rgba(19,21,39,0.96);
+  }
+  html[data-bs-theme="light"][data-glass-effects="off"] .sr-score-inner {
+    background: rgba(255,255,255,0.96);
+  }
+  @media (max-width: 560px) {
+    .sr-score-layout {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .sr-score-ring {
+      width: 80px;
+      height: 80px;
+      flex-basis: 80px;
+    }
+  }
 </style>
 
 <main class="sr-root" aria-labelledby="health-report-title">
@@ -993,32 +1070,46 @@
 
   <section class="sr-overview" aria-label="{{ _('Şifre dağılım oranları') }}">
     <div class="sr-overview-info">
-      <div class="sr-distribution-title">{{ _('Şifre Dağılım Oranları') }}</div>
-      <div class="sr-legend">
-        <div class="sr-legend-item">
-          <div class="sr-legend-dot sr-tone-red"></div>
-          <span class="sr-legend-name">{{ _('Zayıf Şifreler') }}</span>
-          <span class="sr-legend-val" id="leg-zayif">—</span>
+      <div class="sr-score-layout">
+        <div class="sr-score" role="img" aria-label="{{ _('Güvenli Şifre Oranı') }}">
+          <div class="sr-score-ring" id="health-score-ring">
+            <div class="sr-score-inner">
+              <span class="sr-score-pct" id="health-score-pct">—</span>
+            </div>
+          </div>
+          <div class="sr-score-copy">
+            <strong>{{ _('Güvenli Şifre Oranı') }}</strong>
+          </div>
         </div>
-        <div class="sr-legend-item">
-          <div class="sr-legend-dot sr-tone-amber"></div>
-          <span class="sr-legend-name">{{ _('Tekrar Eden') }}</span>
-          <span class="sr-legend-val" id="leg-tekrar">—</span>
-        </div>
-        <div class="sr-legend-item">
-          <div class="sr-legend-dot sr-tone-sky"></div>
-          <span class="sr-legend-name">{{ _('Eski Şifreler') }}</span>
-          <span class="sr-legend-val" id="leg-eski">—</span>
-        </div>
-        <div class="sr-legend-item">
-          <div class="sr-legend-dot sr-tone-rose"></div>
-          <span class="sr-legend-name">{{ _('Süresi Dolmuş') }}</span>
-          <span class="sr-legend-val" id="leg-expired">—</span>
-        </div>
-        <div class="sr-legend-item">
-          <div class="sr-legend-dot sr-tone-green"></div>
-          <span class="sr-legend-name">{{ _('Güvenli Şifre Oranı') }}</span>
-          <span class="sr-legend-val" id="leg-safe">—</span>
+        <div class="sr-distribution">
+          <div class="sr-distribution-title">{{ _('Şifre Dağılım Oranları') }}</div>
+          <div class="sr-legend">
+            <div class="sr-legend-item">
+              <div class="sr-legend-dot sr-tone-red"></div>
+              <span class="sr-legend-name">{{ _('Zayıf Şifreler') }}</span>
+              <span class="sr-legend-val" id="leg-zayif">—</span>
+            </div>
+            <div class="sr-legend-item">
+              <div class="sr-legend-dot sr-tone-amber"></div>
+              <span class="sr-legend-name">{{ _('Tekrar Eden') }}</span>
+              <span class="sr-legend-val" id="leg-tekrar">—</span>
+            </div>
+            <div class="sr-legend-item">
+              <div class="sr-legend-dot sr-tone-sky"></div>
+              <span class="sr-legend-name">{{ _('Eski Şifreler') }}</span>
+              <span class="sr-legend-val" id="leg-eski">—</span>
+            </div>
+            <div class="sr-legend-item">
+              <div class="sr-legend-dot sr-tone-rose"></div>
+              <span class="sr-legend-name">{{ _('Süresi Dolmuş') }}</span>
+              <span class="sr-legend-val" id="leg-expired">—</span>
+            </div>
+            <div class="sr-legend-item">
+              <div class="sr-legend-dot sr-tone-green"></div>
+              <span class="sr-legend-name">{{ _('Güvenli Şifre Oranı') }}</span>
+              <span class="sr-legend-val" id="leg-safe">—</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1170,6 +1261,19 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('leg-eski').textContent    = e + ' ' + _('kayıt');
   document.getElementById('leg-expired').textContent = x + ' ' + _('kayıt');
   document.getElementById('leg-safe').textContent    = pct(safe) + '%';
+
+  const scoreRing = document.getElementById('health-score-ring');
+  if (scoreRing) {
+    const tone = safe >= 75 ? '--green' : safe >= 50 ? '--sky' : safe >= 25 ? '--amber' : '--red';
+    const color = (getComputedStyle(document.documentElement).getPropertyValue(tone) || '#2ecc71').trim();
+    scoreRing.style.setProperty('--sr-score', safe + '%');
+    scoreRing.style.setProperty('--sr-score-color', color);
+    const scorePct = document.getElementById('health-score-pct');
+    if (scorePct) {
+      scorePct.textContent = safe + '%';
+      scorePct.style.color = color;
+    }
+  }
 });
 </script>
 
