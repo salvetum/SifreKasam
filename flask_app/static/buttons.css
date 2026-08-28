@@ -454,6 +454,18 @@
         transform: translateY(6px) scale(0.9);
     }
 }
+
+/* Kaydedilmemiş değişiklik varken birincil butonda accent nabzı */
+.kasa-btn-unsaved {
+    border-color: rgba(var(--accent-rgb), 0.6) !important;
+    animation: kasa-btn-unsaved-pulse 2s ease-out infinite;
+}
+@keyframes kasa-btn-unsaved-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.30), 0 8px 24px rgba(var(--accent-rgb), 0.16); }
+    60%  { box-shadow: 0 0 0 11px rgba(var(--accent-rgb), 0), 0 8px 24px rgba(var(--accent-rgb), 0.30); }
+    100% { box-shadow: 0 0 0 11px rgba(var(--accent-rgb), 0), 0 8px 24px rgba(var(--accent-rgb), 0.16); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     [data-kasa-pop] { transition: none; }
 }

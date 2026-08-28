@@ -1510,6 +1510,25 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     100% { transform: rotate(0deg); }
 }
 
+/* Yeni Üret ikonu: simge değiştirilmez, mevcut rotate ikonu animasyonlanır */
+#modal-gen-now i,
+#page-gen-now i {
+    transition: transform var(--dur-base) var(--ease-spring);
+}
+#modal-gen-now:hover i,
+#modal-gen-now:focus-visible i,
+#page-gen-now:hover i,
+#page-gen-now:focus-visible i {
+    transform: rotate(180deg);
+}
+.gen-icon-spin i {
+    animation: genIconSpin 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1;
+}
+@keyframes genIconSpin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 /* Güç barı shimmer (modal + form sağlık kartı) */
 .strength-shimmer {
     position: relative;

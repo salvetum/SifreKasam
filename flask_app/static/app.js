@@ -418,10 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     let baseline = snapshot();
+    const submitBtn = form.querySelector('button[type="submit"]');
     const refresh = () => {
       const dirty = snapshot() !== baseline;
       badge.hidden = !dirty;
       badge.setAttribute('aria-hidden', String(!dirty));
+      submitBtn?.classList.toggle('kasa-btn-unsaved', dirty);
     };
 
     form.addEventListener('input', refresh);
@@ -842,6 +844,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Kaydedilmemiş değişiklik rozeti.
     const settingsUnsavedBadge = document.getElementById('settings-unsaved-badge');
+    const settingsSaveBtn = settingsForm?.querySelector('.modal-footer button[type="submit"]');
     const APPEARANCE_AUTOSAVE_FIELDS = new Set([
       'accent_color', 'background_style', 'chroma_accent_enabled', 'chroma_accent_speed',
       'animated_backgrounds_enabled', 'interface_animations_enabled', 'gradients_enabled',
@@ -855,6 +858,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : getSettingsSnapshot() !== settingsFormSnapshot;
       settingsUnsavedBadge.hidden = !dirty;
       settingsUnsavedBadge.setAttribute('aria-hidden', String(!dirty));
+      settingsSaveBtn?.classList.toggle('kasa-btn-unsaved', dirty);
     };
     const settingsFormDirtyListen = () => {
       settingsForm.querySelectorAll('input[name], select[name], textarea[name]')
