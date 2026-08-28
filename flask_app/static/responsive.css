@@ -127,6 +127,13 @@
   }
 }
 
+/* 900px+ dikey alanlarda üretici modal iç scroll kutucu görünmesin */
+@media (min-height: 900px) {
+  .kasa-modal .modal-body.generator-modal-body {
+    max-height: min(82dvh, 860px);
+  }
+}
+
 /* 2560×1440 sınıfı ekranlar */
 @media (min-width: 2400px) and (min-height: 1200px) {
   .max-w-6xl {

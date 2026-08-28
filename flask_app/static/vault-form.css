@@ -1513,13 +1513,22 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Yeni Üret ikonu: simge değiştirilmez, mevcut rotate ikonu animasyonlanır */
 #modal-gen-now i,
 #page-gen-now i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05em;
+    height: 1.05em;
     transition: transform var(--dur-base) var(--ease-spring);
 }
 #modal-gen-now:hover i,
 #modal-gen-now:focus-visible i,
 #page-gen-now:hover i,
 #page-gen-now:focus-visible i {
-    transform: rotate(180deg);
+    animation: genHoverSpin 1.15s linear infinite;
+}
+@keyframes genHoverSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
 }
 .gen-icon-spin i {
     animation: genIconSpin 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1;
@@ -1600,16 +1609,34 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
    Segmentli güç metresi + kontrollerde canlı hover/focus. ID/JS yok.
    ════════════════════════════════════════════════════════════════ */
 
-.generator-hero { text-align: center; }
+.generator-hero {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+}
 
 .generator-hero .generator-output-kicker {
-    justify-self: center;
-    margin: 0.1rem 0 0.2rem;
+    margin-inline: auto;
+    margin-bottom: 0.2rem;
     padding: 0.3rem 0.85rem;
     border: 1px solid rgba(var(--accent-rgb), 0.26);
     border-radius: 999px;
     background: rgba(var(--accent-rgb), 0.10);
     color: var(--accent-2);
+}
+
+.generator-hero .generator-output-row {
+    flex: 1 1 auto;
+    justify-content: center;
+}
+
+.generator-hero .generator-strength-card {
+    margin-top: auto;
+}
+@media (min-width: 700px) {
+    .generator-hero .generator-output-row {
+        align-items: center;
+    }
 }
 
 .generator-hero .generator-output-row .kasa-field {
