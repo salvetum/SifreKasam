@@ -182,3 +182,12 @@ a {
 }
 a:hover { color: var(--accent-2); }
 
+
+@property --kasa-range-progress { syntax: <percentage>; initial-value: 50%; inherits: false; }
+@property --generator-range-progress { syntax: <percentage>; initial-value: 33.333%; inherits: false; }
+
+/* Slider thumb ortak nabız animasyonu */
+@keyframes kasa-slider-pulse {
+    from { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.45), 0 3px 12px rgba(var(--accent-rgb), 0.40); }
+    to   { box-shadow: 0 0 0 12px rgba(var(--accent-rgb), 0), 0 3px 12px rgba(var(--accent-rgb), 0.40); }
+}

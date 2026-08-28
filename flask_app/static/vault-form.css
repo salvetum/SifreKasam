@@ -1278,6 +1278,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     appearance: none;
     -webkit-appearance: none;
     touch-action: none;
+    transition: --generator-range-progress 280ms var(--ease-out);
     background:
         linear-gradient(
             90deg,
@@ -1308,6 +1309,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 }
 
 .generator-length-range:active::-webkit-slider-thumb {
+    animation: kasa-slider-pulse 700ms ease-out infinite;
     cursor: grabbing;
     transform: scale(1.08);
 }
@@ -1338,6 +1340,9 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     background: var(--accent);
     box-shadow: 0 3px 12px rgba(var(--accent-rgb), 0.38);
     cursor: grab;
+}
+.generator-length-range:active::-moz-range-thumb {
+    animation: kasa-slider-pulse 700ms ease-out infinite;
 }
 
 /* === Native Control Polish === */

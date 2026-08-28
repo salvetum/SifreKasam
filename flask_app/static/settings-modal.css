@@ -593,6 +593,7 @@
     appearance: none;
     -webkit-appearance: none;
     cursor: pointer;
+    transition: --kasa-range-progress 280ms var(--ease-out);
     background:
         linear-gradient(
             90deg,
@@ -619,10 +620,19 @@
     -webkit-appearance: none;
     background: var(--accent);
     box-shadow: 0 3px 12px rgba(var(--accent-rgb), 0.38);
+    transition: transform 160ms ease, box-shadow 160ms ease;
     cursor: grab;
 }
 
+.settings-range-input:hover::-webkit-slider-thumb {
+    transform: scale(1.12);
+    box-shadow:
+        0 0 0 5px rgba(var(--accent-rgb), 0.14),
+        0 3px 12px rgba(var(--accent-rgb), 0.50);
+}
+
 .settings-range-input:active::-webkit-slider-thumb {
+    animation: kasa-slider-pulse 700ms ease-out infinite;
     cursor: grabbing;
     transform: scale(1.08);
 }
@@ -652,7 +662,17 @@
     border-radius: 50%;
     background: var(--accent);
     box-shadow: 0 3px 12px rgba(var(--accent-rgb), 0.38);
+    transition: transform 160ms ease, box-shadow 160ms ease;
     cursor: grab;
+}
+.settings-range-input:hover::-moz-range-thumb {
+    transform: scale(1.12);
+    box-shadow:
+        0 0 0 5px rgba(var(--accent-rgb), 0.14),
+        0 3px 12px rgba(var(--accent-rgb), 0.50);
+}
+.settings-range-input:active::-moz-range-thumb {
+    animation: kasa-slider-pulse 700ms ease-out infinite;
 }
 
 .settings-range-output {
