@@ -593,7 +593,7 @@
     appearance: none;
     -webkit-appearance: none;
     cursor: pointer;
-    transition: --kasa-range-progress 280ms var(--ease-out);
+    transition: --kasa-range-progress 400ms var(--ease-swift);
     background:
         linear-gradient(
             90deg,

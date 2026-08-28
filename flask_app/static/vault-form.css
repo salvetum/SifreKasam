@@ -1278,7 +1278,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     appearance: none;
     -webkit-appearance: none;
     touch-action: none;
-    transition: --generator-range-progress 280ms var(--ease-out);
+    transition: --generator-range-progress 400ms var(--ease-swift);
     background:
         linear-gradient(
             90deg,
@@ -1296,9 +1296,9 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 }
 
 .generator-length-range::-webkit-slider-thumb {
-    width: 18px;
-    height: 18px;
-    margin-top: -5.5px;
+    width: 24px;
+    height: 24px;
+    margin-top: -8.5px;
     border: 2px solid rgba(255, 255, 255, 0.92);
     border-radius: 50%;
     appearance: none;
@@ -1333,8 +1333,8 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 }
 
 .generator-length-range::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     border: 2px solid rgba(255, 255, 255, 0.92);
     border-radius: 50%;
     background: var(--accent);
