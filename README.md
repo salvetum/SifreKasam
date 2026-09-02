@@ -59,6 +59,10 @@ karmaşıklığını aynı anda üstlenip motivasyon kaybına yol açabilir.
   efekti — CSS taklidi değil, gerçek shader tabanlı render
 - Windows ve Linux desteği _(Android için belki)_
 
+### Eklenme ihtimali çok düşük olan Özellikler
+
+- Web tarayıcıları için eklenti, 2FA doğrulama (e-mail / sms / usb keyler / authenticator uygulamaları)
+
 ### Neler v2'den devralınmayacak
 
 - Python/Flask backend
