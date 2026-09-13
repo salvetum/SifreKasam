@@ -94,7 +94,7 @@
         </div>
     </div>
 </div>
-<style>
+<style nonce="{{ csp_nonce }}">
     .privacy-body h4 {
         margin: 0.9rem 0 0.35rem;
         font-size: 0.9rem;
@@ -110,7 +110,7 @@
         border-color: var(--accent);
     }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
     (function () {
         var modal = document.getElementById('privacyPolicyModal');
         if (!modal) return;

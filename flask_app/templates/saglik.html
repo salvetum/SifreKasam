@@ -2664,7 +2664,7 @@
              data-pop-skor="{{ item.skor }}"
              data-pop-updated="{{ item.updated_at }}">
           <div class="sr-item-name">
-            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) | safe }}</span>
+            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) }}</span>
             <span>{{ item.title }}</span>
           </div>
           <span class="sr-score-badge" data-s="{{ item.skor }}">
@@ -2722,7 +2722,7 @@
                  data-pop-skor="{{ item.skor }}"
                  data-pop-updated="{{ item.updated_at }}">
               <span class="sr-reuse-name">
-                <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) | safe }}</span>
+                <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) }}</span>
                 <span class="sr-reuse-item-name">{{ item.title }}</span>
               </span>
               <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
@@ -2768,7 +2768,7 @@
              data-pop-skor="{{ item.skor }}"
              data-pop-updated="{{ item.updated_at }}">
           <div class="sr-item-name">
-            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) | safe }}</span>
+            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) }}</span>
             <span>{{ item.title }}</span>
           </div>
           <span class="sr-item-tag">{{ item.days }}g</span>
@@ -2807,7 +2807,7 @@
              data-pop-skor="{{ item.skor }}"
              data-pop-updated="{{ item.updated_at }}">
           <div class="sr-item-name">
-            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) | safe }}</span>
+            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) }}</span>
             <span>{{ item.title }}</span>
           </div>
           <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
@@ -2864,7 +2864,7 @@
              data-pop-skor="{{ item.skor }}"
              data-pop-updated="{{ item.updated_at }}">
           <div class="sr-item-name">
-            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) | safe }}</span>
+            <span class="sr-brand-icon">{{ getBrandIcon(item.title, item.url) }}</span>
             <span>{{ item.title }}</span>
           </div>
           <a href="{{ url_for('duzenle_sayfasi', kayit_id=item.id) }}" class="sr-edit-link">
@@ -3514,7 +3514,13 @@ document.addEventListener('DOMContentLoaded', function () {
           toggle.type = 'button';
           toggle.className = 'sr-dup-expand';
           toggle.setAttribute('aria-expanded', 'false');
-          toggle.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i><span>' + window._('Detay') + '</span>';
+          toggle.textContent = '';
+          const toggleIcon = document.createElement('i');
+          toggleIcon.className = 'fa-solid fa-chevron-down';
+          toggleIcon.setAttribute('aria-hidden', 'true');
+          const toggleLabel = document.createElement('span');
+          toggleLabel.textContent = window._('Detay');
+          toggle.append(toggleIcon, toggleLabel);
           toggle.addEventListener('click', () => {
             const open = !detail.hidden;
             detail.hidden = open;
@@ -3582,13 +3588,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 updateSummary();
               });
             }
-            more.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i><span>+ ' + remaining + ' ' + window._('grup daha') + '</span>';
+            more.textContent = '';
+            const moreIcon = document.createElement('i');
+            moreIcon.className = 'fa-solid fa-chevron-down';
+            moreIcon.setAttribute('aria-hidden', 'true');
+            const moreLabel = document.createElement('span');
+            moreLabel.textContent = '+ ' + remaining + ' ' + window._('grup daha');
+            more.append(moreIcon, moreLabel);
             if (!more.parentNode) list.appendChild(more);
           } else if (more) {
             more.remove();
           }
         };
-        list.innerHTML = '';
+        list.replaceChildren();
         const end = Math.min(duplicates.length, renderedCount + PAGE);
         for (; renderedCount < end; renderedCount++) {
           const g = duplicates[renderedCount];
@@ -3752,13 +3764,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 updateSummary();
               });
             }
-            more.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i><span>+ ' + remaining + ' ' + window._('kayıt daha') + '</span>';
+            more.textContent = '';
+            const moreIcon = document.createElement('i');
+            moreIcon.className = 'fa-solid fa-chevron-down';
+            moreIcon.setAttribute('aria-hidden', 'true');
+            const moreLabel = document.createElement('span');
+            moreLabel.textContent = '+ ' + remaining + ' ' + window._('kayıt daha');
+            more.append(moreIcon, moreLabel);
             if (!more.parentNode) list.appendChild(more);
           } else if (more) {
             more.remove();
           }
         };
-        list.innerHTML = '';
+        list.replaceChildren();
         const end = Math.min(records.length, renderedCount + PAGE);
         for (; renderedCount < end; renderedCount++) {
           list.appendChild(buildItem(records[renderedCount]));
@@ -4091,7 +4109,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const anyOpen = Array.from(document.querySelectorAll('.sr-card[id]'))
       .some(c => !c.classList.contains('is-collapsed'));
     const label = anyOpen ? window._('Tümünü Daralt') : window._('Genişlet');
-    collapseAllBtn.innerHTML = '<i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + label + '</span>';
+    collapseAllBtn.textContent = '';
+    collapseAllBtn.append((() => { const cIcon = document.createElement('i'); cIcon.className = 'fa-solid fa-up-down-left-right'; cIcon.setAttribute('aria-hidden', 'true'); return cIcon; })());
+    const collapseAllLabel = document.createElement('span');
+    collapseAllLabel.textContent = label;
+    collapseAllBtn.appendChild(collapseAllLabel);
     collapseAllBtn.setAttribute('aria-pressed', String(anyOpen));
   };
   document.querySelectorAll('.sr-card[id]').forEach(card => {
@@ -4101,7 +4123,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const collapse = document.createElement('button');
     collapse.type = 'button';
     collapse.className = 'sr-card-collapse';
-    collapse.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+    const collapseIcon = document.createElement('i');
+    collapseIcon.className = 'fa-solid fa-chevron-down';
+    collapseIcon.setAttribute('aria-hidden', 'true');
+    collapse.appendChild(collapseIcon);
     // İlk açılışta kartlar kapalı olsun: animasyonsuz (flaş yok, sistem yorulmaz)
     card.classList.add('is-collapsed');
     if (body) body.style.maxHeight = '0px';
@@ -4386,7 +4411,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (email) rows.push([window._('E-posta'), email]);
     if (kategori) rows.push([window._('Kategori'), kategori]);
     if (updated) rows.push([window._('Son güncelleme'), updated]);
-    pop.innerHTML = '';
+    pop.replaceChildren();
     const title = document.createElement('div');
     title.className = 'sr-pop-title';
     title.textContent = (el.querySelector('.sr-item-name span, .sr-reuse-item-name') || { textContent: '' }).textContent;

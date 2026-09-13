@@ -21,7 +21,7 @@
                                 <input type="checkbox" id="select-{{ kayit.id }}" class="select-item bulk-select-checkbox" value="{{ kayit.id }}">
                             </label>
                             <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm">
-                                {{ getBrandIcon(kayit.normalized.baslik, kayit.full_data.website_url, kayit.full_data.type) | safe }}
+                                {{ getBrandIcon(kayit.normalized.baslik, kayit.full_data.website_url, kayit.full_data.type) }}
                             </span>
                              <h2 id="record-title-{{ kayit.id }}" class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">
                                  {{ kayit.normalized.baslik }}

@@ -166,8 +166,8 @@ Bunlara ek olarak sertifikalar, özel anahtarlar, yedekler, geçici dosyalar ve 
 
 ## 💖 Özel teşekkürler
 
-Abdulkadir T. - Bug testi ve Öneriler için teşekkürler
-Yusuf K. D. - Bug testi ve Öneriler için teşekkürler
+- Abdulkadir T. - Bug testi ve Öneriler için teşekkürler
+- Yusuf K. D. - Bug testi ve Öneriler için teşekkürler
 
 ## 📜 Lisans
 
