@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
 import re
 import stat
@@ -19,6 +20,7 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -94,6 +96,17 @@ TRANSLATION_CALL = re.compile(
     re.DOTALL,
 )
 UNICODE_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+@contextmanager
+def _silence_logs() -> None:
+    """Beklenen hata yolu loglarının stderr'i kirletmesini engeller."""
+    previous = logging.root.manager.disable
+    try:
+        logging.disable(logging.CRITICAL)
+        yield
+    finally:
+        logging.disable(previous)
 
 EXPECTED_ROUTES = {
     "login": ("/login", {"GET", "POST"}),
@@ -837,7 +850,7 @@ class MetadataMigrationTests(unittest.TestCase):
 
         with patch.object(app_module, "backup_database"), \
                 patch.object(app_module, "encrypt_metadata", side_effect=fail_on_login):
-            with self.assertRaises(RuntimeError):
+            with _silence_logs(), self.assertRaises(RuntimeError):
                 app_module.migrate_plaintext_record_metadata(self.fernet)
 
         app_module.db.session.expire_all()
@@ -1791,12 +1804,13 @@ class LanAccessPasswordTests(unittest.TestCase):
         with app_module.app.app_context():
             old_key = app_module.derive_key(self.MASTER)
             new_key = app_module.derive_key('new-master-password-2')
-            app_module._refresh_lan_access_bindings(old_key, new_key)
-            self.assertEqual(app_module._unwrap_lan_vault_key(lan_password), new_key)
-            self.assertIsNone(app_module._get_lan_access_password(old_key))
-            self.assertEqual(
-                app_module._get_lan_access_password(new_key), lan_password,
-            )
+            with _silence_logs():
+                app_module._refresh_lan_access_bindings(old_key, new_key)
+                self.assertEqual(app_module._unwrap_lan_vault_key(lan_password), new_key)
+                self.assertIsNone(app_module._get_lan_access_password(old_key))
+                self.assertEqual(
+                    app_module._get_lan_access_password(new_key), lan_password,
+                )
 
 
 class HardwareAccelerationSettingsTests(unittest.TestCase):
