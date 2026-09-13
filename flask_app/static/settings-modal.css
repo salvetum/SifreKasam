@@ -247,7 +247,7 @@
     flex-direction: column;
     gap: 0.6rem;
     min-width: 0;
-    min-height: 60px;
+    min-height: 56px;
     padding: 0.7rem 0.85rem !important;
     border: var(--border-glass);
     border-color: rgba(var(--accent-rgb), 0.18);
@@ -880,6 +880,10 @@
         padding: 0.4rem;
     }
 
+    .auto-backup-list {
+        grid-template-columns: 1fr;
+    }
+
     .settings-nav-btn {
         grid-template-columns: minmax(0, 1fr);
         justify-items: center;
@@ -974,9 +978,9 @@
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.85rem;
-    min-height: 122px;
-    padding: 1rem;
+    gap: 1rem;
+    min-height: 124px;
+    padding: 1.1rem;
     border: 1px dashed rgba(var(--accent-rgb), 0.42);
     border-radius: 18px;
     color: var(--text);
@@ -1005,6 +1009,20 @@
 
 .import-drop-zone.is-dragging {
     transform: translateY(-2px) scale(1.008);
+}
+
+/* Dosya seçilmeden önce dosya-adı satırını gösterme (temiz boşluk ritmi) */
+.import-drop-zone:not(.has-file) .import-file-name {
+    display: none;
+}
+
+/* Dosya seçildi: başarı durumu net görünsün */
+.import-drop-zone.has-file {
+    border-color: rgba(34,197,94,0.45);
+    box-shadow: 0 12px 30px rgba(34,197,94,0.09);
+}
+.import-drop-zone.has-file .import-drop-copy small {
+    display: none;
 }
 
 .import-drop-icon {
@@ -1101,7 +1119,7 @@
     grid-template-columns: 42px minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.8rem;
-    min-height: 74px;
+    min-height: 70px;
     padding: 0.85rem;
     border: var(--border-glass);
     border-radius: 16px;
@@ -1200,6 +1218,11 @@
 }
 #content-protection-card .settings-card-body p {
     margin-inline: auto;
+}
+/* Gövdenin tek çocuğu gizliyse gövdeyi tamamen çökert: boş gövde +
+   kartın flex gap'i altta ölü boşluk bırakıyordu. */
+.settings-card-body:has(> [hidden]:only-child) {
+    display: none;
 }
 
 .settings-action-copy small {
@@ -1355,6 +1378,38 @@
 
 .export-warning-card p {
     color: rgba(254,202,202,0.94);
+}
+
+/* ── Şifreli Yedek (.kasaenc) tek-sunum akışı ── */
+.encrypted-export-reveal {
+    animation: settingsPanelIn 0.26s cubic-bezier(0.16,1,0.3,1) both;
+}
+.encrypted-export-password-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.encrypted-export-password {
+    display: inline-block;
+    max-width: calc(100% - 3.5rem);
+    overflow-wrap: anywhere;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.28);
+    border: 1px dashed rgba(124,111,247,0.4);
+    color: #e9e5ff;
+    font-family: var(--font-mono, ui-monospace, 'Cascadia Code', Consolas, monospace);
+    font-size: 0.9rem;
+    letter-spacing: 0.03em;
+    user-select: all;
+}
+.encrypted-export-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.import-password-wrap .kasa-field {
+    background: rgba(0,0,0,0.22);
 }
 
 .lan-info-grid {
@@ -1515,3 +1570,373 @@
     max-height: 120px;
 }
 
+/* ═══ PANEL OKUNABİLİRLİK İYİLEŞTİRMELERİ ═══════════════════════════════ */
+/* Sekme/panel yapısının okunabilirliği: başlıklar, satır aralığı,
+   açıklama satırları — tutarlı cam/glass görünümü korunarak. */
+
+/* Panel başlık metni: daha belirgin satır aralığı */
+.settings-section-heading h6,
+.settings-section-heading h3 {
+    letter-spacing: -0.01em;
+}
+
+/* Kart başlık metni: daha okunabilir satır aralığı */
+.settings-card-copy h4,
+.settings-card-copy h6 {
+    line-height: 1.35;
+}
+
+/* Kart açıklama metni: okunabilir satır aralığı */
+.settings-card-copy p {
+    letter-spacing: 0.005em;
+}
+
+/* Grup bazlı boş kart azaltma: hızlı eylemler grid'i */
+.settings-action-grid {
+    gap: 0.8rem;
+}
+
+/* Ayar kartı gövde içeriği: daha tutarlı dikey boşluk */
+.settings-card-body {
+    gap: 0.55rem;
+    padding-top: 0.15rem;
+}
+
+/* Anahtar kartlar (toggle): satır aralığı iyileştirmesi */
+.settings-card.settings-card-toggle .settings-card-copy p {
+    line-height: 1.35;
+}
+
+/* Daraltma/Küçültme (stepper)但他们: better vertical alignment */
+.settings-timeout-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+/* Ayarlar panelindeki grid boşluğu: section headings ile kartlar arası
+   daha tutarlı ve okunabilir dikey ritim. */
+.settings-panel > .settings-card + .settings-card,
+.settings-panel > .settings-action-grid + .settings-action-grid,
+.settings-panel > .settings-card + .settings-action-grid,
+.settings-panel > .settings-action-grid + .settings-card {
+    margin-top: 0;
+}
+
+/* Açık tema: kart açıklama metni kontrastı */
+[data-bs-theme="light"] .settings-card-copy p,
+[data-bs-theme="light"] .settings-section-heading p,
+[data-bs-theme="light"] .settings-action-copy small {
+    color: #5a6b8a;
+}
+
+
+/* ── Otomatik Yedekleme paneli ── */
+/* Tepsi kartı: tam genişlik, içinde yedek listesi + altta not */
+.settings-backup-tray {
+    grid-column: 1 / -1;
+}
+.settings-backup-tray .settings-help-note {
+    margin: 0;
+    padding: 0.75rem 0.1rem 0.1rem;
+    border-top: 1px solid rgba(148,163,184,0.14);
+    gap: 0.6rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text-muted, rgba(148,163,184,0.9));
+}
+.settings-backup-tray .settings-help-note i {
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 0.05rem;
+    border-radius: 7px;
+    font-size: 0.7rem;
+    color: #38bdf8;
+    background: rgba(56,189,248,0.12);
+}
+.settings-backup-tray #auto-backup-max-count {
+    color: var(--accent);
+}
+.settings-help-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: var(--text-muted, rgba(148,163,184,0.85));
+}
+.settings-help-note i {
+    margin-top: 0.1rem;
+    color: #38bdf8;
+}
+.settings-help-note-copy {
+    display: block;
+    min-width: 0;
+}
+.settings-help-note-line {
+    display: block;
+}
+#auto-backup-next {
+    margin-top: 0.2rem;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+}
+.auto-backup-last {
+    font-variant-numeric: tabular-nums;
+}
+.auto-backup-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-top: 0;
+}
+.auto-backup-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px dashed rgba(148,163,184,0.28);
+    border-radius: 12px;
+    color: var(--text-muted, rgba(148,163,184,0.85));
+    font-size: 0.85rem;
+    background: rgba(148,163,184,0.045);
+}
+.auto-backup-item {
+    position: relative;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.7rem 0.95rem;
+    border-radius: 12px;
+    background: rgba(148,163,184,0.06);
+    border: 1px solid rgba(148,163,184,0.12);
+    animation: backupItemIn var(--dur-base) var(--ease-out) backwards;
+    animation-delay: calc(var(--i, 0) * 35ms);
+    transition: transform var(--motion-fast) var(--ease-out),
+                border-color var(--motion-fast) ease,
+                background var(--motion-fast) ease,
+                box-shadow var(--motion-fast) ease;
+}
+.auto-backup-item + .auto-backup-item {
+    margin-top: 0;
+}
+.auto-backup-item:hover {
+    transform: translateY(-1px);
+    z-index: 5;
+    border-color: rgba(var(--accent-rgb), 0.24);
+    background: rgba(var(--accent-rgb), 0.07);
+    box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.06);
+}
+.auto-backup-item:hover .auto-backup-item-icon {
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.18);
+}
+.auto-backup-item-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    color: #a5b4fc;
+    background: rgba(124,111,247,0.14);
+    transition: color var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+.auto-backup-item-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.auto-backup-item-copy strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.auto-backup-item-copy small {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: 0.74rem;
+    color: var(--text-muted, rgba(148,163,184,0.8));
+}
+.auto-backup-item-actions {
+    display: flex;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+}
+.auto-backup-item-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,0.2);
+    background: rgba(148,163,184,0.08);
+    color: var(--text, #e2e8f0);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+                transform 0.12s ease;
+}
+.auto-backup-item-btn:hover {
+    transform: translateY(-1px);
+}
+.auto-backup-item-btn.is-restore {
+    color: #a5b4fc;
+    border-color: rgba(124,111,247,0.35);
+}
+.auto-backup-item-btn.is-restore:hover {
+    background: rgba(124,111,247,0.18);
+    border-color: rgba(124,111,247,0.55);
+}
+.auto-backup-item-btn.is-delete {
+    color: #fca5a5;
+    border-color: rgba(239,68,68,0.3);
+}
+.auto-backup-item-btn.is-delete:hover {
+    background: rgba(239,68,68,0.15);
+    border-color: rgba(239,68,68,0.55);
+}
+.auto-backup-item-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    transform: none;
+}
+.auto-backup-item-btn:active:not(:disabled) {
+    transform: scale(0.94);
+}
+.auto-backup-item-btn.is-restore:disabled i.fa-rotate-left {
+    animation: backupSpin 900ms linear infinite;
+}
+.auto-backup-now-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+.auto-backup-now-btn:disabled i.fa-cloud-arrow-down {
+    animation: backupSpin 900ms linear infinite;
+}
+.auto-backup-now-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.30);
+}
+.settings-card-head-divider {
+    border-top: 1px solid rgba(148,163,184,0.14);
+    padding-top: 0.65rem;
+    margin-top: 0.6rem;
+}
+.settings-card-divider-mt {
+    margin-top: 0.6rem;
+}
+
+/* ── Backup item giriş animasyonu ── */
+@keyframes backupItemIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes backupSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Reduced-motion / low-power / motion-off: backup animasyonlarını kapat ── */
+@media (prefers-reduced-motion: reduce) {
+    .auto-backup-item { animation: none; }
+    .auto-backup-now-btn:disabled i.fa-cloud-arrow-down,
+    .auto-backup-item-btn.is-restore:disabled i.fa-rotate-left { animation: none; }
+}
+html[data-kasa-motion="off"] .auto-backup-item { animation: none; }
+html[data-kasa-low-power="on"] .auto-backup-item { animation: none; }
+html[data-glass-effects="off"] .auto-backup-item { animation: none; }
+
+/* ── CSS Tooltip'ler (data-tooltip) ── */
+.auto-backup-item-btn[data-tooltip],
+.auto-backup-item-copy[data-tooltip] {
+    position: relative;
+}
+
+.auto-backup-item-btn[data-tooltip]::after,
+.auto-backup-item-copy[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 9px);
+    left: 50%;
+    transform: translateX(-50%) translateY(3px);
+    z-index: 100;
+    max-width: 260px;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 10px;
+    background: rgba(9,11,23,0.94);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+    color: #e2e8f0;
+    font: 600 0.72rem/1.35 var(--font-main);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity 0.15s var(--ease-out),
+        transform 0.15s var(--ease-out),
+        visibility 0s linear 0.15s;
+}
+
+.auto-backup-item-btn[data-tooltip]::before,
+.auto-backup-item-copy[data-tooltip]::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%) scaleX(0.4);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid rgba(9,11,23,0.94);
+    z-index: 99;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity 0.15s var(--ease-out),
+        transform 0.15s var(--ease-out);
+}
+
+.auto-backup-item-btn[data-tooltip]:hover::after,
+.auto-backup-item-btn[data-tooltip]:focus-visible::after,
+.auto-backup-item-btn[data-tooltip]:hover::before,
+.auto-backup-item-btn[data-tooltip]:focus-visible::before,
+.auto-backup-item-copy[data-tooltip]:hover::after,
+.auto-backup-item-copy[data-tooltip]:focus-visible::after,
+.auto-backup-item-copy[data-tooltip]:hover::before,
+.auto-backup-item-copy[data-tooltip]:focus-visible::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    transition:
+        opacity 0.15s var(--ease-out),
+        transform 0.15s var(--ease-out),
+        visibility 0s;
+}
+
+.auto-backup-item-copy[data-tooltip]:hover::before,
+.auto-backup-item-copy[data-tooltip]:focus-visible::before {
+    transform: translateX(-50%) scaleX(1);
+}

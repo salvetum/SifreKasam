@@ -40,11 +40,18 @@ export function initVaultIndex({
     let cardCache = [];
     const getCards = () => Array.from(document.querySelectorAll('.card-wrapper'));
 
+    // ── İstatistik filtresi durumu (zayıf / eski / süresi dolmuş) ──
+    const statsChips = document.querySelectorAll('#stats-bar .stats-filter-chip');
+    let statsFilter = null;
+    let vaultStats = { zayif_ids: [], eski_ids: [], expired_ids: [] };
+    let statsLoadPromise = null;
+
     const normalizeSearchText = (value) =>
       String(value || '').toLocaleLowerCase(window.LANG || 'tr').trim();
 
     const createCardCacheItem = (wrapper) => ({
       wrapper,
+      id: wrapper.dataset.id || '',
       searchText: normalizeSearchText(wrapper.textContent),
       type: wrapper.dataset.type || '',
       pinned: wrapper.dataset.pinned === 'true',
@@ -170,13 +177,19 @@ export function initVaultIndex({
       const term = normalizeSearchText(searchInput?.value || '');
       const activeBtn = document.querySelector('#category-filter button.active');
       const category  = activeBtn?.dataset.filter || 'all';
-      const matchedCards = cardCache.filter(({ searchText, type, pinned }) => {
+      const matchedCards = cardCache.filter(({ id, searchText, type, pinned }) => {
         const matchesSearch = !term || searchText.includes(term);
         const matchesCategory =
           category === 'all'       ? true :
           category === 'favorites' ? pinned :
                                      type === category;
-        return matchesSearch && matchesCategory;
+        const matchesStats = !statsFilter
+          ? true
+          : statsFilter === 'zayif'   ? vaultStats.zayif_ids.includes(id)
+          : statsFilter === 'eski'    ? vaultStats.eski_ids.includes(id)
+          : statsFilter === 'expired' ? vaultStats.expired_ids.includes(id)
+          : true;
+        return matchesSearch && matchesCategory && matchesStats;
       });
       const pageCount = Math.max(1, Math.ceil(matchedCards.length / CARD_PAGE_SIZE));
       currentCardPage = preservePage ? Math.min(currentCardPage, pageCount) : 1;
@@ -233,23 +246,148 @@ export function initVaultIndex({
       );
     };
 
-    rebuildCardCache();
-    filterCards({ preservePage: false, animate: false });
+    // ── İstatistik filtresi (zayıf / eski / süresi dolmuş id'leri) ──
+    const markWeakCards = () => {
+      const weakSet = new Set((vaultStats.zayif_ids || []).map(String));
+      getCards().forEach(w => {
+        const chip = w.querySelector('.card-weak-chip');
+        const isWeak = weakSet.has(String(w.dataset.id || ''));
+        if (chip) chip.hidden = !isWeak;
+        w.classList.toggle('card-is-weak', isWeak);
+      });
+    };
 
-    const revealOverlay = document.getElementById('card-reveal-overlay');
-
-    // DEĞİŞİKLİK 1: tüm kartlar DOM'da + kapak görselleri yüklenene dek
-    // giriş animasyonları duraklatılır; sonra topluca oynatılır.
-    const finishInitialReveal = () => {
-      document.documentElement.removeAttribute('data-cards-wait');
-      requestAnimationFrame(() => {
-        cardContainer.classList.remove('vault-card-curtain');
-        if (revealOverlay) {
-          requestAnimationFrame(() => { revealOverlay.classList.add('fade'); });
+    const refreshStatChips = () => {
+      const counts = {
+        zayif: (vaultStats.zayif_ids || []).length,
+        eski: (vaultStats.eski_ids || []).length,
+        expired: (vaultStats.expired_ids || []).length,
+      };
+      statsChips.forEach(chip => {
+        const filter = chip.dataset.statFilter;
+        if (filter === 'zayif' || filter === 'eski' || filter === 'expired') {
+          const isZero = counts[filter] === 0;
+          chip.classList.toggle('stats-chip-zero', isZero);
+          chip.setAttribute('aria-disabled', isZero ? 'true' : 'false');
         }
       });
     };
-    document.documentElement.setAttribute('data-cards-wait', '');
+
+    const ensureStats = (force = false) => {
+      if (statsLoadPromise && !force) return statsLoadPromise;
+      statsLoadPromise = apiJson('/api/stats')
+        .then(data => {
+          vaultStats = {
+            zayif_ids: (data && Array.isArray(data.zayif_ids)) ? data.zayif_ids : [],
+            eski_ids: (data && Array.isArray(data.eski_ids)) ? data.eski_ids : [],
+            expired_ids: (data && Array.isArray(data.expired_ids)) ? data.expired_ids : [],
+          };
+          markWeakCards();
+          refreshStatChips();
+        })
+        .catch(() => { statsLoadPromise = null; return undefined; });
+      return statsLoadPromise;
+    };
+
+    const clearStatsFilter = () => {
+      statsFilter = null;
+      statsChips.forEach(c => {
+        c.classList.remove('active');
+        c.setAttribute('aria-pressed', 'false');
+      });
+    };
+
+    const activateCategory = (filter) => {
+      categoryBtns.forEach(btn => {
+        const isActive = btn.dataset.filter === filter;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', String(isActive));
+      });
+    };
+
+    statsChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (chip.getAttribute('aria-disabled') === 'true') return;
+        const filter = chip.dataset.statFilter;
+        if (filter === 'all' || filter === 'favorites') {
+          clearStatsFilter();
+          activateCategory(filter);
+          filterCards({ preservePage: false, animate: false });
+          return;
+        }
+        const wasActive = chip.classList.contains('active');
+        clearStatsFilter();
+        activateCategory('all');
+        if (!wasActive) {
+          statsFilter = filter;
+          chip.classList.add('active');
+          chip.setAttribute('aria-pressed', 'true');
+        }
+        ensureStats().then(() => filterCards({ preservePage: false, animate: false }));
+      });
+    });
+
+    rebuildCardCache();
+    filterCards({ preservePage: false, animate: false });
+    ensureStats();
+
+    // Sağlık raporundaki "Tümünü İncele" → /?filtre=zayif|eski|expired
+    const deepFilter = new URLSearchParams(window.location.search).get('filtre');
+    if (deepFilter === 'zayif' || deepFilter === 'eski' || deepFilter === 'expired') {
+      const chip = Array.from(statsChips).find(c => c.dataset.statFilter === deepFilter);
+      if (chip && chip.getAttribute('aria-disabled') !== 'true') {
+        clearStatsFilter();
+        activateCategory('all');
+        statsFilter = deepFilter;
+        chip.classList.add('active');
+        chip.setAttribute('aria-pressed', 'true');
+        ensureStats().then(() => filterCards({ preservePage: false, animate: false }));
+      }
+    }
+
+    // DEĞİŞİKLİK 1: tüm kartlar DOM'da + kapak görselleri yüklenene dek
+    // giriş animasyonları duraklatılır; sonra topluca oynatılır.
+    // card-animated class'ı yalnızca ilk reveal'da verilir (şablonda kalıcı
+    // değildir) — böylece filtre/istatistik/pagination geçişlerinde
+    // display toggle animasyonu restart edip 'çift render' hissi yaratmaz.
+    const finishInitialReveal = () => {
+      const startReveal = () => {
+        requestAnimationFrame(() => {
+          // Curtain (visibility) kaldırma ve card-animated ekleme AYNI frame'de;
+          // animasyon ilk karesinden itibaren görünür oynar. Ayrıca card-animated
+          // yalnızca reveal'da eklendiği için pause/restart kırılganlığı yoktur.
+          cardContainer.classList.remove('vault-card-curtain');
+          cardCache.forEach(({ wrapper }) => wrapper.classList.add('card-animated'));
+          // En uzun stagger (280ms) + süre (220ms) sonrası class kaldırılır;
+          // gizli kartlarda animationend tetiklenmeyeceği için timeout kullanılır.
+          setTimeout(() => {
+            cardCache.forEach(({ wrapper }) => wrapper.classList.remove('card-animated'));
+          }, 650);
+        });
+      };
+      // Özel arkaplan decode gate'i (data-kasa-bg-wait) açıkken body opacity:0'dır;
+      // reveal bu sırada başlatılırsa animasyon ya görünmez ya da 650ms'lik temizlik
+      // animasyon oynamadan class'ı siler. Gate kalkana dek beklenir; güvenlik ağı
+      // 4s (prepaint toleransı 1500ms olduğundan pratikte asla tetiklenmez).
+      if (document.documentElement.hasAttribute('data-kasa-bg-wait')) {
+        const observer = new MutationObserver(() => {
+          if (!document.documentElement.hasAttribute('data-kasa-bg-wait')) {
+            observer.disconnect();
+            startReveal();
+          }
+        });
+        observer.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ['data-kasa-bg-wait'],
+        });
+        window.setTimeout(() => {
+          observer.disconnect();
+          startReveal();
+        }, 4000);
+        return;
+      }
+      startReveal();
+    };
     const cardImgs = Array.from(cardContainer.querySelectorAll('img'));
     const imgPromises = cardImgs.map(img => new Promise(resolve => {
       if (img.complete) return resolve();
@@ -293,6 +431,7 @@ export function initVaultIndex({
     categoryBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         if (btn.classList.contains('active')) return;
+        clearStatsFilter();
         categoryBtns.forEach(b => {
           b.classList.remove('active');
           b.setAttribute('aria-pressed', 'false');
@@ -439,6 +578,7 @@ export function initVaultIndex({
             filterCards({ preservePage: true, animate: true });
           }
           refreshStatsBar();
+          ensureStats(true);
           showToast({
             ...TOAST_BASE,
             text: window._('Kayıt başarıyla silindi.'),

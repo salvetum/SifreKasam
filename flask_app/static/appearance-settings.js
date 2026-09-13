@@ -7,6 +7,34 @@
  * ayarlar formu (bölüm 4) için gerekli referansları döndürür.
  */
 
+// Gerçek byte probe: yerel Blob üzerinde <video> ile metadata yüklemeyi dener.
+// canPlayType tek başına güvenilmez (HEVC/H.265 vb. duyurulmaz); demux gerçekten
+// yapılıp yapılamadığını buradan anlarız.
+const probeVideoPlayback = (file) => new Promise((resolve) => {
+  const url = URL.createObjectURL(file);
+  const probeEl = document.createElement('video');
+  let settled = false;
+  const finish = (supported) => {
+    if (settled) return;
+    settled = true;
+    URL.revokeObjectURL(url);
+    probeEl.removeAttribute('src');
+    probeEl.load();
+    resolve(supported);
+  };
+  probeEl.muted = true;
+  probeEl.playsInline = true;
+  probeEl.preload = 'metadata';
+  probeEl.addEventListener('loadedmetadata', () => {
+    // Desteklenmeyen codec'lerde (örn. HEVC) loadedmetadata/canplay yine de
+    // tetiklenir ama videoWidth/Height ``0`` kalır — gerçek decode sinyali
+    // video boyutlarının dolu gelmesidir.
+    finish(probeEl.videoWidth > 0 && probeEl.videoHeight > 0);
+  }, { once: true });
+  probeEl.addEventListener('error', () => finish(false), { once: true });
+  probeEl.src = url;
+});
+
 export function initAppearanceSettings({
   apiPost,
   apiFetch,
@@ -23,10 +51,8 @@ export function initAppearanceSettings({
   normalizeChromaSpeed,
   initialChromaAccentEnabled,
   initialChromaAccentSpeed,
-  showToast,
   showWarningToast,
   showSuccessToast,
-  TOAST_BASE,
 }) {
   let chromaAccentEnabled = initialChromaAccentEnabled;
   let chromaAccentSpeed = initialChromaAccentSpeed;
@@ -440,6 +466,10 @@ export function initAppearanceSettings({
       btn.classList.toggle('is-active', isActive);
       btn.setAttribute('aria-pressed', String(isActive));
     });
+    const customBgActiveHint = document.getElementById('custom-bg-active-hint');
+    if (customBgActiveHint) {
+      customBgActiveHint.classList.toggle('hidden', background !== 'custom');
+    }
     if (motionToggle) {
       const lockMotion = background === 'custom';
       motionToggle.disabled = lockMotion;
@@ -646,7 +676,7 @@ export function initAppearanceSettings({
       );
     });
     backgroundButtons.forEach(btn => {
-      if (btn.id === 'custom-bg-btn') return;
+      if (btn.id === 'custom-bg-option-btn') return;
       btn.addEventListener('click', () => {
         updateAppearance(
           accentInput?.value || currentAppearance.accent,
@@ -654,27 +684,27 @@ export function initAppearanceSettings({
           true,
           true
         );
-        refreshCustomBgGallery();
       });
     });
 
     // ── Özel Arka Plan Yükleme ──
-    const customBgBtn = document.getElementById('custom-bg-btn');
+    const customBgUploadBtn = document.getElementById('custom-bg-upload-btn');
+    const customBgOptionBtn = document.getElementById('custom-bg-option-btn');
     const customBgInput = document.getElementById('custom-bg-input');
-    if (customBgBtn && customBgInput) {
-      customBgBtn.addEventListener('click', () => customBgInput.click());
-      customBgInput.addEventListener('change', async () => {
-        const file = customBgInput.files?.[0];
-        if (!file) return;
+    if (customBgUploadBtn && customBgInput) {
+      const uploadCustomBg = async (file) => {
+        if (/^video\//.test(file.type || '')) {
+          const supported = await probeVideoPlayback(file);
+          if (!supported) {
+            showWarningToast(window._('Bu video codec türü desteklenmiyor. MP4 (H.264) veya WebM (VP8/VP9) yükleyin.'));
+            customBgInput.value = '';
+            return;
+          }
+        }
         const formData = new FormData();
         formData.append('file', file);
-        customBgBtn.disabled = true;
-  showToast({
-    ...TOAST_BASE,
-    text: window._('Yükleniyor...'),
-    duration: 30000,
-    className: 'kasa-toast kasa-toast-info',
-  });
+        customBgUploadBtn.classList.add('custom-bg-btn-loading');
+        customBgUploadBtn.disabled = true;
         try {
           const resp = await apiFetch('/api/background/upload', { method: 'POST', body: formData });
           if (!resp || !resp.ok) {
@@ -707,32 +737,135 @@ export function initAppearanceSettings({
         } catch {
           showWarningToast(window._('Yükleme başarısız oldu.'));
         } finally {
-          customBgBtn.disabled = false;
+          customBgUploadBtn.classList.remove('custom-bg-btn-loading');
+          customBgUploadBtn.disabled = false;
           customBgInput.value = '';
         }
+      };
+
+      customBgUploadBtn.addEventListener('click', () => customBgInput.click());
+      customBgInput.addEventListener('change', async () => {
+        const file = customBgInput.files?.[0];
+        if (!file) return;
+        await uploadCustomBg(file);
       });
+
+      // Sürükle-bırak ile yükleme (üst üye drop zone)
+      let dragCounter = 0;
+      customBgUploadBtn.addEventListener('dragenter', (event) => {
+        event.preventDefault();
+        dragCounter++;
+        customBgUploadBtn.classList.add('is-drop-target');
+      });
+      customBgUploadBtn.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      });
+      customBgUploadBtn.addEventListener('dragleave', (event) => {
+        event.preventDefault();
+        dragCounter--;
+        if (dragCounter <= 0) {
+          dragCounter = 0;
+          customBgUploadBtn.classList.remove('is-drop-target');
+        }
+      });
+      customBgUploadBtn.addEventListener('drop', (event) => {
+        event.preventDefault();
+        dragCounter = 0;
+        customBgUploadBtn.classList.remove('is-drop-target');
+        const file = event.dataTransfer.files?.[0];
+        if (!file) return;
+        if (!/^image\/|^video\//.test(file.type)) {
+          showWarningToast(window._('Desteklenmeyen dosya formatı.'));
+          return;
+        }
+        uploadCustomBg(file);
+      });
+    }
+
+    // "Özel" kutusu gerçek toggle: önce kayıtlı arkaplan aktifleştirilir,
+    // kayıtlı yoksa doğrudan yükleme akışı açılır.
+    const activateBackgroundEntry = async (entry) => {
+      const actResp = await apiFetch(
+        `/api/background/history/${encodeURIComponent(entry.id)}/activate`,
+        { method: 'POST' }
+      );
+      if (!actResp?.ok) {
+        showWarningToast(window._('Arkaplan aktifleştirilmedi.'));
+        return false;
+      }
+      const actData = await actResp.json();
+      const layer = document.getElementById('custom-bg-layer');
+      if (layer && actData.url) {
+        const applyActivated = () => {
+          layer.setAttribute('data-bg-url', actData.url);
+          layer.setAttribute('data-bg-type', actData.is_video ? 'video' : 'image');
+          if (actData.is_gif || actData.is_video) layer.setAttribute('data-animated', 'true');
+          else layer.removeAttribute('data-animated');
+          layer.classList.add('is-active');
+          updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+          showSuccessToast(window._('Arkaplan aktifleştirildi.'));
+          refreshCustomBgGallery();
+        };
+        const preloadImg = new Image();
+        preloadImg.onload = applyActivated;
+        preloadImg.onerror = applyActivated;
+        preloadImg.src = actData.url;
+      } else {
+        updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+        showSuccessToast(window._('Arkaplan aktifleştirildi.'));
+        refreshCustomBgGallery();
+      }
+      return true;
+    };
+
+    const toggleCustomBackground = async () => {
+      if (getCurrentBackground() === 'custom') return;
+      if (customBgEntries.length === 0) {
+        customBgInput?.click();
+        return;
+      }
+      const first = customBgEntries[0];
+      if (first.is_active) {
+        const layer = document.getElementById('custom-bg-layer');
+        if (layer) {
+          layer.setAttribute('data-bg-url', first.url);
+          layer.setAttribute('data-bg-type', first.is_video ? 'video' : 'image');
+          if (first.is_gif || first.is_video) layer.setAttribute('data-animated', 'true');
+          else layer.removeAttribute('data-animated');
+          layer.classList.add('is-active');
+        }
+        updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
+        showSuccessToast(window._('Arkaplan aktifleştirildi.'));
+      } else {
+        await activateBackgroundEntry(first);
+      }
+    };
+
+    if (customBgOptionBtn) {
+      customBgOptionBtn.addEventListener('click', toggleCustomBackground);
     }
 
     // ── Özel Arka Plan Galerisi ──
     const customBgGallery = document.getElementById('custom-bg-gallery');
     const customBgGalleryGrid = document.getElementById('custom-bg-gallery-grid');
     const customBgGalleryClear = document.getElementById('custom-bg-gallery-clear');
+    let customBgEntries = [];
 
     const refreshCustomBgGallery = async () => {
       if (!customBgGallery || !customBgGalleryGrid) return;
+      const galleryEmpty = document.getElementById('custom-bg-gallery-empty');
       const resp = await apiFetch('/api/background/history');
-      if (!resp?.ok) {
-        customBgGallery.classList.remove('is-visible');
-        return;
-      }
-      const data = await resp.json();
-      const entries = Array.isArray(data.entries) ? data.entries : [];
+      const data = resp?.ok ? await resp.json() : null;
+      const entries = Array.isArray(data?.entries) ? data.entries : [];
+      customBgEntries = entries;
 
       if (entries.length === 0) {
-        customBgGallery.classList.remove('is-visible');
+        customBgGalleryGrid.replaceChildren();
+        if (galleryEmpty) galleryEmpty.classList.remove('hidden');
         return;
       }
-      customBgGallery.classList.add('is-visible');
+      if (galleryEmpty) galleryEmpty.classList.add('hidden');
       customBgGalleryGrid.replaceChildren();
 
       const formatBytes = (bytes) => {
@@ -762,6 +895,21 @@ export function initAppearanceSettings({
           videoEl.playsInline = true;
           videoEl.preload = 'metadata';
           videoEl.setAttribute('aria-hidden', 'true');
+          // İlk kareyi göster: metadata yüklenince 0.1s'ye seek et ve durdur
+          // (aksi halde thumb siyah kare görünür).
+          videoEl.addEventListener('loadedmetadata', () => {
+            videoEl.currentTime = 0.1;
+          }, { once: true });
+          videoEl.addEventListener('seeked', () => {
+            videoEl.pause();
+          }, { once: true });
+          // Codec desteklenmiyorsa (örn. HEVC mp4) siyah kare yerine ikon göster.
+          videoEl.addEventListener('error', () => {
+            const fallback = document.createElement('i');
+            fallback.className = 'fa-solid fa-video-slash';
+            fallback.setAttribute('aria-hidden', 'true');
+            photo.replaceChildren(fallback);
+          }, { once: true });
           photo.appendChild(videoEl);
         } else {
           const img = document.createElement('img');
@@ -799,7 +947,7 @@ export function initAppearanceSettings({
         }
 
         if (item.is_active) {
-          const isCustomMode = document.documentElement.getAttribute('data-kasa-background') === 'custom';
+          const isCustomMode = getCurrentBackground() === 'custom';
           const badge = document.createElement('span');
           badge.className = 'custom-bg-thumb-badge' + (isCustomMode ? '' : ' custom-bg-thumb-badge-saved');
           badge.textContent = isCustomMode ? window._('Aktif') : window._('Kayıtlı');
@@ -817,36 +965,13 @@ export function initAppearanceSettings({
         photo.appendChild(del);
 
         const activate = async () => {
-          if (!item.is_active) {
-            const actResp = await apiFetch(
-              `/api/background/history/${encodeURIComponent(item.id)}/activate`,
-              { method: 'POST' }
-            );
-            if (!actResp?.ok) {
-              showWarningToast(window._('Arkaplan aktifleştirilmedi.'));
-              return;
-            }
-            const actData = await actResp.json();
-            const layer = document.getElementById('custom-bg-layer');
-            if (layer && actData.url) {
-              const applyActivated = () => {
-                layer.setAttribute('data-bg-url', actData.url);
-                layer.setAttribute('data-bg-type', actData.is_video ? 'video' : 'image');
-                if (actData.is_gif || actData.is_video) layer.setAttribute('data-animated', 'true');
-                else layer.removeAttribute('data-animated');
-                layer.classList.add('is-active');
-                updateAppearance(accentInput?.value || currentAppearance.accent, 'custom', true, true);
-                showSuccessToast(window._('Arkaplan aktifleştirildi.'));
-              };
-              const preloadImg = new Image();
-              preloadImg.onload = applyActivated;
-              preloadImg.onerror = applyActivated;
-              preloadImg.src = actData.url;
-            } else {
-              showSuccessToast(window._('Arkaplan aktifleştirildi.'));
-            }
+          if (item.is_active) {
+            // Zaten aktif: hafif vurgu animasyonu, API isteği yok.
+            wrap.classList.add('custom-bg-thumb-pulse');
+            setTimeout(() => wrap.classList.remove('custom-bg-thumb-pulse'), 600);
+            return;
           }
-          refreshCustomBgGallery();
+          await activateBackgroundEntry(item);
         };
 
         const remove = async () => {

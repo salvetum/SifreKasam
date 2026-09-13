@@ -185,7 +185,20 @@
                    ve cam kartların backdrop örneklemesi ilk kareden doğru olur. */
                 var preLayer = document.getElementById('custom-bg-layer');
                 var preUrl = preLayer ? preLayer.getAttribute('data-bg-url') : '';
-                if (preUrl && preLayer.getAttribute('data-bg-type') !== 'video') {
+                var preType = preLayer ? preLayer.getAttribute('data-bg-type') : '';
+                if (preUrl && preType === 'video') {
+                    /* Video arkaplan: devam noktasının son karesi (kasa-bg-frame)
+                       varsa ilk boyadan itibaren göster — GIF gibi "kaldığı yerden"
+                       hissi. Video hazır olup aynı kareye seek edilince app.js bu
+                       kuralı temizler. */
+                    try {
+                        var kasaFrame = JSON.parse(localStorage.getItem('kasa-bg-frame') || 'null');
+                        if (kasaFrame && kasaFrame.url === preUrl && kasaFrame.poster && Number(kasaFrame.t) > 1) {
+                            window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + kasaFrame.poster + '); }');
+                        }
+                    } catch (_e) { /* bozuk önbellek: yoksay, video yüklenince gelir */ }
+                }
+                if (preUrl && preType !== 'video') {
                     window.KASA_SET_RUNTIME_STYLE('custom-background', '#custom-bg-layer.is-active { background-image: url(' + preUrl + '); }');
 
                     /* Kart bölgesindeki açılış flası: ilk boya background-image'ın

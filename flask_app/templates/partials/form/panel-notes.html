@@ -9,7 +9,10 @@
 
             <div class="vault-field">
                 <label for="comment" id="comment_label">{{ _('Not (İsteğe Bağlı)') }}</label>
-                <textarea name="comment" id="comment" rows="4" placeholder="{{ _('Notlar…') }}"
-                    class="kasa-field resize-none">{{ kayit.full_data.Comment if kayit }}</textarea>
+                <div class="vault-field-input-wrap">
+                    <textarea name="comment" id="comment" rows="4" placeholder="{{ _('Notlar…') }}"
+                        class="kasa-field resize-none">{{ kayit.full_data.Comment if kayit }}</textarea>
+                    <span class="vault-field-resize-grip" aria-hidden="true"></span>
+                </div>
             </div>
         </section>

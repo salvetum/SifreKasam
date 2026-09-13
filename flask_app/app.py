@@ -15,7 +15,6 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from cryptography import x509
 from cryptography.fernet import Fernet
 import ipaddress
 from urllib.parse import urlparse
@@ -102,7 +101,6 @@ from kasa_core.import_export import (
 )
 from kasa_core.models import PasswordHistory, Record, Setting, User
 from kasa_core.paths import (
-    ensure_private_data_dir as _ensure_private_data_dir,
     get_backgrounds_dir,
     get_data_dir,
 )
@@ -119,21 +117,47 @@ from kasa_core.backgrounds import (
     background_state_lock as _background_state_lock,
     background_upload_allowed as _background_upload_allowed,
     clear_custom_background_history as _clear_custom_background_history,
+    current_background_filename as _current_root_filename,
+    file_sha256 as _file_sha256,
+    find_background_by_hash as _find_background_by_hash,
     find_custom_background as _find_custom_background,
     list_custom_background_history as _list_custom_background_history,
     move_current_to_history as _move_current_to_history,
     optimize_custom_background as _optimize_custom_background,
+    prune_custom_background_history as _prune_custom_background_history,
     remove_old_custom_backgrounds as _remove_old_custom_backgrounds,
     safe_background_filename as _safe_background_filename,
+    unlink_quiet as _unlink_quiet,
     validate_custom_background as _validate_custom_background,
     VIDEO_EXTS as _VIDEO_EXTS,
+    _compute_background_metadata,
     _custom_background_history_dir,
     _ensure_background_metadata,
     _load_custom_background_metadata,
     _save_custom_background_metadata,
 )
 from kasa_core import lan_access, login_lockout
-from kasa_core.time_utils import utc_iso_timestamp
+from kasa_core import network_policy
+from kasa_core.health_actions import (
+    find_duplicate_groups as _find_duplicate_groups,
+    generate_strong_password as _generate_strong_password,
+    weak_record_problems as _weak_record_problems,
+)
+from kasa_core.hibp import (
+    scan_passwords as _hibp_scan_passwords,
+    set_persistence_path as _hibp_set_persistence_path,
+    sha1_hex as _hibp_sha1_hex,
+)
+from kasa_core.encrypted_backup import (
+    build_encrypted_export_payload as _encrypted_export,
+    decrypt_encrypted_records as _decrypt_encrypted_records,
+    generate_backup_password as _generate_backup_password,
+    EncryptedBackupError as _EncryptedBackupError,
+    InvalidPasswordError as _InvalidPasswordError,
+    CorruptBackupError as _CorruptBackupError,
+)
+from kasa_core import backups as _backups
+from kasa_core.time_utils import utc_iso_timestamp, utc_now_naive
 from kasa_core.reports import (
     build_vault_report_payloads as _calculate_vault_report_payloads,
 )
@@ -144,6 +168,7 @@ from kasa_core.validation import (
     safe_float,
     safe_int,
 )
+from brand_icons import getBrandIcon  # noqa: F401 (Jinja global olarak kayitli)
 from kasa_core.versioning import (
     fetch_latest_release,
     is_newer_version as _is_newer_version,
@@ -190,6 +215,12 @@ CERT_FILE  = os.path.join(SSL_DIR, 'cert.pem')
 KEY_FILE   = os.path.join(SSL_DIR, 'key.pem')
 BACKGROUND_DIR = get_backgrounds_dir()
 LOGS_DIR    = os.path.join(DATA_DIR, 'logs')
+
+# Canlı sızıntı taraması sonuçları (k-anonim prefix → sonek kümesi) bu
+# dosyada kalıcılaştırılır; böylece uygulama yeniden başlatıldığında daha önce
+# taranan şifrelerin sızıntı durumu rapora yansımaya devam eder.
+HIBP_CACHE_FILE = os.path.join(DATA_DIR, 'hibp_cache.json')
+_hibp_set_persistence_path(HIBP_CACHE_FILE)
 
 os.makedirs(LOGS_DIR, exist_ok=True)
 _file_handler = logging.handlers.RotatingFileHandler(
@@ -630,6 +661,8 @@ def inject_globals():
         le           = _get_setting('lan_enabled')
         if le is not None:
             lan_enabled = le.lower() == 'true'
+        internet_kill_switch = network_policy.internet_kill_switch_enabled()
+        live_breach_scan = network_policy.live_breach_scan_enabled()
     except Exception:
         pass
     current_lang = get_saved_language()
@@ -669,11 +702,15 @@ def inject_globals():
         'HARDWARE_ACCELERATION_ENABLED': hardware_acceleration,
         'POWER_SAVE_ENABLED': power_save_enabled,
         'LAN_ENABLED':           lan_enabled,
+        'INTERNET_KILL_SWITCH_ENABLED': internet_kill_switch,
+        'LIVE_BREACH_SCAN_ENABLED': live_breach_scan,
+        'CAN_LIVE_SCAN': bool(internet_kill_switch is False and live_breach_scan),
         'CURRENT_LANG':          current_lang,
         'AVAILABLE_LANGS':       available_langs,
         'TRANSLATIONS':          lang_translations,
         'csp_nonce':             getattr(g, 'csp_nonce', ''),
         'csrf_token':            getattr(g, 'csrf_token', ''),
+        'getBrandIcon':          getBrandIcon,
         '_':                     _,
     }
 
@@ -700,12 +737,6 @@ def _lan_access_enabled() -> bool:
 # Kasa anahtarı sarma/çözme ve ayar yaşam döngüsü kasa_core/lan_access içinde;
 # burada yalnızca çalışma anındaki kasa anahtarı durumunu bağlayan sarmalayıcılar kalır.
 
-def _generate_lan_access_password() -> str:
-    return lan_access.generate_password()
-
-LAN_PASSWORD_ALPHABET = lan_access.LAN_PASSWORD_ALPHABET
-LAN_PASSWORD_LENGTH = lan_access.LAN_PASSWORD_LENGTH
-
 def _unwrap_lan_vault_key(lan_password: str) -> bytes | None:
     return lan_access.unwrap_vault_key(
         lan_password, _get_setting(lan_access.LAN_VAULT_WRAP_SETTING))
@@ -726,8 +757,6 @@ def _refresh_lan_access_bindings(old_key: bytes, new_key: bytes) -> None:
 # Üstel geri çekilme durumu kasa_core/login_lockout içinde; IP anahtarı isteğe
 # bağlı olduğu için yalnızca anahtar üretimi burada.
 
-_login_attempts = login_lockout._login_attempts
-_login_backoff_seconds = login_lockout.backoff_seconds
 _login_retry_after = login_lockout.retry_after
 _record_login_failure = login_lockout.record_failure
 _reset_login_failures = login_lockout.reset_failures
@@ -762,6 +791,7 @@ _VAULT_WRITE_LOCK_MESSAGE = "Ana \u015fifre de\u011fi\u015ftiriliyor, l\u00fctfe
 _VAULT_WRITE_ENDPOINTS = {
     'ekle_sayfasi', 'duzenle_sayfasi', 'sil_kayit', 'pin_kayit',
     'import_data', 'bulk_delete', 'bulk_category', 'change_password',
+    'health_duplicates_merge', 'health_rotate_weak', 'health_backup_now',
 }
 
 _vault_report_cache: dict[str, dict[str, tuple[float, Any]]] = {}
@@ -885,6 +915,17 @@ def check_token_and_auth():
                 'login.html',
                 error="LAN erişimi kapalıyken uzaktan erişim engellendi."
             ), 403
+        return
+
+    # Aktif arka plan medyası (video/görsel): login ekranında bile yüklenmeli.
+    # Yerel (localhost) istekler anonim ulaşabilir; LAN açıksa oturum zorunlu,
+    # LAN kapalıysa uzak erişim reddedilir.
+    if endpoint == 'serve_custom_background':
+        if not is_local:
+            if not lan_enabled:
+                abort(403)
+            if not current_user.is_authenticated:
+                return redirect(url_for('login'))
         return
 
     if not is_local and lan_enabled:
@@ -1357,6 +1398,553 @@ def saglik_raporu():
     _set_vault_report_cache('saglik', health)
     return render_template('saglik.html', **health)
 
+# ─── CANLI SIZINTI TARAMASI (HaveIBeenPwned) ─────────────────────────────
+# Tarama bir arka plan iş parçacığında yürür; üretilen sonuçlar HIBP önek
+# önbelleğine yazılır ve rapor üretimi bunu yalnızca önbellekten okur.
+# Kill-switch açıksa (veya tarama ayarı kapalıysa) hiçbir istek gönderilmez.
+_breach_scan_lock = threading.Lock()
+_breach_scan_state: dict[str, Any] = {}
+
+
+def _run_live_breach_scan(passwords: list[str]) -> None:
+    try:
+        # Arka plan iş parçacığında DB erişimi (network_policy → Setting.query)
+        # app context gerektirir; aksi halde RuntimeError ile tarama anında ölür.
+        with app.app_context():
+
+            def _on_progress(done: int, total: int, breached: int) -> None:
+                with _breach_scan_lock:
+                    _breach_scan_state.update(
+                        done=done, total=total, breached=breached,
+                    )
+
+            def _should_abort() -> bool:
+                return not network_policy.internet_allowed()
+
+            done, breached = _hibp_scan_passwords(
+                passwords, on_progress=_on_progress, should_abort=_should_abort,
+            )
+            cancelled = not network_policy.internet_allowed()
+            with _breach_scan_lock:
+                _breach_scan_state.update(
+                    running=False, finished=True, done=done, breached=breached,
+                    cancelled=cancelled, error=None,
+                )
+            if not cancelled:
+                # Başarılı tarama bitişi: hatırlatma zaman damgası.
+                _set_setting(LAST_BREACH_SCAN_SETTING, _now_iso())
+                db.session.commit()
+    except Exception:
+        log.exception("Canlı sızıntı taraması hatası")
+        with _breach_scan_lock:
+            _breach_scan_state.update(
+                running=False, finished=True,
+                error=_('Tarama sırasında hata oluştu.'),
+            )
+    finally:
+        # Taze rapor: canlı HIBP sonuçları sızıntı listesine birleşsin.
+        invalidate_vault_report_cache()
+        with app.app_context():
+            db.session.remove()
+
+
+def _collect_scan_passwords() -> list[str]:
+    """Canlı tarama için kasada depolanan şifreleri toplar.
+
+    Kasa anahtarı açık değilken 401 döner; aksi halde şifreler yalnızca
+    yerel olarak, tarama iş parçacığına verilir (ağa asla gönderilmez).
+    """
+    passwords: list[str] = []
+    encrypted_rows = Record.query.with_entities(
+        Record.encrypted_password,
+    ).all()
+    fernet = get_fernet()
+    for (encrypted,) in encrypted_rows:
+        password = safe_decrypt(fernet, encrypted)
+        if password:
+            passwords.append(password)
+    return passwords
+
+
+@app.route('/api/breach/scan', methods=['POST'])
+@login_required
+def breach_scan_start():
+    global _breach_scan_state
+    if network_policy.internet_kill_switch_enabled():
+        return jsonify({
+            'status': 'error', 'reason': 'kill-switch',
+            'message': _('İnternet kill-switch açık; canlı tarama çalıştırılamaz.'),
+        }), 403
+    if not network_policy.live_breach_scan_enabled():
+        return jsonify({
+            'status': 'error', 'reason': 'disabled',
+            'message': _('Canlı sızıntı taraması kapalı. Ayarlardan etkinleştirin.'),
+        }), 403
+    with _breach_scan_lock:
+        if _breach_scan_state.get('running'):
+            return jsonify({
+                'status': 'error', 'reason': 'running',
+                'message': _('Tarama zaten çalışıyor.'),
+            }), 409
+        # Tanımlanmamış olarak başlat; toplam yalnızca istek içinde bilinir.
+        if _breach_scan_state.get('finished'):
+            _breach_scan_state = {}
+        _breach_scan_state.update(
+            running=True, total=0, done=0, breached=0,
+            error=None, cancelled=False, finished=False,
+        )
+
+    passwords = _collect_scan_passwords()
+    total = len({_hibp_sha1_hex(password)[:5] for password in passwords})
+    with _breach_scan_lock:
+        _breach_scan_state['total'] = total
+    if total == 0:
+        with _breach_scan_lock:
+            _breach_scan_state.update(
+                running=False, finished=True, done=0, breached=0, cancelled=False,
+            )
+        return jsonify({'status': 'started', 'total': 0})
+
+    threading.Thread(target=_run_live_breach_scan, args=(passwords,),
+                     daemon=True).start()
+    return jsonify({'status': 'started', 'total': total})
+
+
+@app.route('/api/breach/scan')
+@login_required
+def breach_scan_status():
+    with _breach_scan_lock:
+        state = dict(_breach_scan_state)
+    return jsonify({
+        **state,
+        'internet_allowed': network_policy.internet_allowed(),
+        'live_scan_enabled': network_policy.live_breach_scan_enabled(),
+    })
+
+
+# ─── HATIRLATMA (REMINDER) ALTYAPISI ───────────────────────────────────────────
+# Kullanıcı "X gündür yedek alınmadı" / "X gündür sızıntı kontrolü yapılmadı"
+# bildirimlerini görebilsin diye son eylem zaman damgaları + eşik değerleri
+# Setting tablosunda tutulur. İnterval değerleri şimdilik varsayılan eşikle
+# kullanılır; ileride Ayarlar UI'ına bağlanabilir.
+
+BACKUP_REMINDER_DAYS_SETTING = 'backup_reminder_days'
+BREACH_REMINDER_DAYS_SETTING = 'breach_reminder_days'
+BACKUP_REMINDER_FREQUENCY_SETTING = 'backup_reminder_frequency'
+BREACH_REMINDER_FREQUENCY_SETTING = 'breach_reminder_frequency'
+LAST_BACKUP_SETTING = 'last_backup_at'
+LAST_BREACH_SCAN_SETTING = 'last_breach_scan_at'
+NOTIFICATION_DISMISSED_SETTING = 'notification_dismissed_ids'
+
+DEFAULT_BACKUP_REMINDER_DAYS = 7
+DEFAULT_BREACH_REMINDER_DAYS = 30
+REMINDER_FREQUENCIES = ('off', 'daily', 'weekly', 'monthly')
+
+_MAX_DISMISSED_IDS = 100
+
+
+def _now_iso() -> str:
+    return datetime.now().astimezone().isoformat(timespec='seconds')
+
+
+def _days_elapsed(iso_value: str | None) -> int | None:
+    if not iso_value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(iso_value).astimezone()
+    except (ValueError, TypeError):
+        return None
+    return max(0, int((datetime.now().astimezone() - parsed).total_seconds() // 86400))
+
+
+def _reminder_days(setting_key: str, default: int) -> int:
+    return safe_int(_get_setting(setting_key), default, 0, 730)
+
+
+_FREQUENCY_DAYS = {'daily': 1, 'weekly': 7, 'monthly': 30}
+
+
+def _reminder_frequency(setting_key: str, legacy_days_key: str,
+                        legacy_days_default: int) -> str:
+    """Frekans ayarını okur; eski *_days değeriyle uyumlu migrate eder."""
+    value = (_get_setting(setting_key) or '').strip().lower()
+    if value in REMINDER_FREQUENCIES:
+        return value
+    legacy_days = safe_int(_get_setting(legacy_days_key), legacy_days_default, 0, 730)
+    frequency = next(
+        (k for k, days in _FREQUENCY_DAYS.items() if days == legacy_days),
+        'weekly' if legacy_days > 0 else 'off',
+    )
+    _set_setting(setting_key, frequency)
+    return frequency
+
+
+def _write_reminder_frequency(setting_key: str, legacy_days_key: str,
+                              value: str) -> str:
+    value = (value or '').strip().lower()
+    if value not in REMINDER_FREQUENCIES:
+        value = 'off'
+    _set_setting(setting_key, value)
+    _set_setting(legacy_days_key, str(_FREQUENCY_DAYS.get(value, 0)))
+    return value
+
+
+def _reminder_days_total(frequency: str, legacy_days: int) -> int:
+    """Bildirim eşiği: frekans seçili değilse 0 (kapalı)."""
+    if frequency == 'off':
+        return 0
+    return _FREQUENCY_DAYS.get(frequency, legacy_days)
+
+
+# ─── BİLDİRİM DURUMU KALICILIĞI ─────────────────────────────────────────────
+# Susturulmuş (dismissed) bildirim ID'leri Setting tablosunda JSON array olarak
+# saklanır. Tek kullanıcılı mimariye uygun; cihaz/oturum bağımsız kalıcı durum.
+
+def _get_dismissed_notification_ids() -> list[str]:
+    """Setting tablosundan susturulmuş bildirim ID'lerini okur."""
+    raw = _get_setting(NOTIFICATION_DISMISSED_SETTING)
+    if not raw:
+        return []
+    try:
+        ids = json.loads(raw)
+        if isinstance(ids, list):
+            return [str(x) for x in ids if x]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
+def _set_dismissed_notification_ids(ids: list[str]) -> None:
+    """Bildirim susturma listesini kalıcı olarak kaydeder."""
+    unique: list[str] = []
+    seen: set[str] = set()
+    for item in ids:
+        sid = str(item).strip()
+        if sid and sid not in seen:
+            unique.append(sid)
+            seen.add(sid)
+    trimmed = unique[-_MAX_DISMISSED_IDS:]
+    _set_setting(NOTIFICATION_DISMISSED_SETTING, json.dumps(trimmed))
+
+
+def _reminder_period_bucket(frequency: str, now: datetime | None = None) -> str:
+    """Bildirim ID'sini döneme bağlar: sûsturma yalnızca o dönem için geçerli."""
+    now = now or datetime.now().astimezone()
+    if frequency == 'monthly':
+        return now.strftime('%Y-%m-01')
+    if frequency == 'weekly':
+        monday = now - timedelta(days=now.weekday())
+        return monday.strftime('%Y-%m-%d')
+    return now.strftime('%Y-%m-%d')
+
+
+def _compute_reminders() -> list[dict[str, Any]]:
+    """Mevcut hatırlatma bildirimlerini hesaplar (susturma filtresiz)."""
+    backup_frequency = _reminder_frequency(
+        BACKUP_REMINDER_FREQUENCY_SETTING, BACKUP_REMINDER_DAYS_SETTING,
+        DEFAULT_BACKUP_REMINDER_DAYS)
+    breach_frequency = _reminder_frequency(
+        BREACH_REMINDER_FREQUENCY_SETTING, BREACH_REMINDER_DAYS_SETTING,
+        DEFAULT_BREACH_REMINDER_DAYS)
+    backup_days_total = _reminder_days_total(
+        backup_frequency, _reminder_days(BACKUP_REMINDER_DAYS_SETTING,
+                                         DEFAULT_BACKUP_REMINDER_DAYS))
+    breach_days_total = _reminder_days_total(
+        breach_frequency, _reminder_days(BREACH_REMINDER_DAYS_SETTING,
+                                         DEFAULT_BREACH_REMINDER_DAYS))
+    last_backup = _get_setting(LAST_BACKUP_SETTING)
+    last_breach = _get_setting(LAST_BREACH_SCAN_SETTING)
+    reminders: list[dict[str, Any]] = []
+
+    if backup_days_total > 0:
+        elapsed = _days_elapsed(last_backup)
+        if elapsed is None or elapsed >= backup_days_total:
+            reminders.append({
+                'id': f"backup-{_reminder_period_bucket(backup_frequency)}",
+                'kind': 'backup',
+                'never': elapsed is None,
+                'days': elapsed,
+                'cta': {'action': 'settings', 'panel': 'data'},
+            })
+
+    if breach_days_total > 0 and network_policy.live_breach_scan_available():
+        elapsed = _days_elapsed(last_breach)
+        if elapsed is None or elapsed >= breach_days_total:
+            reminders.append({
+                'id': f"breach-{_reminder_period_bucket(breach_frequency)}",
+                'kind': 'breach',
+                'never': elapsed is None,
+                'days': elapsed,
+                'cta': {'action': 'navigate', 'url': url_for('saglik_raporu')},
+            })
+
+    return reminders
+
+
+@app.route('/api/notifications')
+@login_required
+def notifications_api():
+    reminders = _compute_reminders()
+    dismissed = _get_dismissed_notification_ids()
+    backup_days_total = _reminder_days_total(
+        _reminder_frequency(BACKUP_REMINDER_FREQUENCY_SETTING,
+                            BACKUP_REMINDER_DAYS_SETTING,
+                            DEFAULT_BACKUP_REMINDER_DAYS),
+        _reminder_days(BACKUP_REMINDER_DAYS_SETTING, DEFAULT_BACKUP_REMINDER_DAYS))
+    breach_days_total = _reminder_days_total(
+        _reminder_frequency(BREACH_REMINDER_FREQUENCY_SETTING,
+                            BREACH_REMINDER_DAYS_SETTING,
+                            DEFAULT_BREACH_REMINDER_DAYS),
+        _reminder_days(BREACH_REMINDER_DAYS_SETTING, DEFAULT_BREACH_REMINDER_DAYS))
+
+    return jsonify({
+        'reminders': reminders,
+        'dismissed': dismissed,
+        'last_backup': _get_setting(LAST_BACKUP_SETTING),
+        'last_breach_scan': _get_setting(LAST_BREACH_SCAN_SETTING),
+        'backup_reminder_days': backup_days_total,
+        'breach_reminder_days': breach_days_total,
+        'backup_reminder_frequency': _reminder_frequency(
+            BACKUP_REMINDER_FREQUENCY_SETTING, BACKUP_REMINDER_DAYS_SETTING,
+            DEFAULT_BACKUP_REMINDER_DAYS),
+        'breach_reminder_frequency': _reminder_frequency(
+            BREACH_REMINDER_FREQUENCY_SETTING, BREACH_REMINDER_DAYS_SETTING,
+            DEFAULT_BREACH_REMINDER_DAYS),
+    })
+
+
+@app.route('/api/notifications/dismiss', methods=['POST'])
+@login_required
+def notifications_dismiss():
+    """Tek veya toplu bildirim susturma — idempotent."""
+    data = request_json()
+    incoming: list[str] = []
+
+    single_id = data.get('id')
+    if isinstance(single_id, str) and single_id.strip():
+        incoming.append(single_id.strip())
+
+    ids_list = data.get('ids')
+    if isinstance(ids_list, list):
+        for item in ids_list:
+            if isinstance(item, str) and item.strip():
+                incoming.append(item.strip())
+
+    if not incoming:
+        return jsonify({'error': 'En az bir bildirim ID\'si gerekli.'}), 400
+
+    dismissed = _get_dismissed_notification_ids()
+    dismissed_set = set(dismissed)
+    for nid in incoming:
+        if nid not in dismissed_set:
+            dismissed.append(nid)
+            dismissed_set.add(nid)
+
+    _set_dismissed_notification_ids(dismissed)
+    db.session.commit()
+    return jsonify({
+        'status': 'ok',
+        'dismissed': _get_dismissed_notification_ids(),
+    })
+
+
+@app.route('/api/notifications/dismiss-all', methods=['POST'])
+@login_required
+def notifications_dismiss_all():
+    """Mevcut tüm bildirimleri sustur — idempotent."""
+    current_reminders = _compute_reminders()
+    dismissed = _get_dismissed_notification_ids()
+    dismissed_set = set(dismissed)
+
+    for r in current_reminders:
+        rid = str(r.get('id', '')).strip()
+        if rid and rid not in dismissed_set:
+            dismissed.append(rid)
+            dismissed_set.add(rid)
+
+    _set_dismissed_notification_ids(dismissed)
+    db.session.commit()
+    return jsonify({
+        'status': 'ok',
+        'dismissed': _get_dismissed_notification_ids(),
+    })
+
+
+@app.route('/api/notifications', methods=['DELETE'])
+@login_required
+def notifications_reset():
+    """Tüm susturma durumlarını sıfırla — bildirimler tekrar görünür olur."""
+    _set_dismissed_notification_ids([])
+    db.session.commit()
+    return jsonify({
+        'status': 'ok',
+        'dismissed': [],
+    })
+
+
+# ─── SAĞLIK HIZLI EYLEMLERİ ──────────────────────────────────────────────────
+# _RECORD_QUERY for duplicates/rotate/export üzerinde tutarlı kolon seti.
+_RECORD_QUERY_FIELDS = (
+    Record.id,
+    Record.title,
+    Record.website_url,
+    Record.login,
+    Record.email,
+    Record.encrypted_password,
+    Record.encrypted_comment,
+    Record.category,
+    Record.is_pinned,
+    Record.expiry_date,
+    Record.updated_at,
+)
+
+
+def _record_rows():
+    return Record.query.with_entities(*_RECORD_QUERY_FIELDS).all()
+
+
+def _all_record_objects():
+    return Record.query.all()
+
+
+@app.route('/api/health/duplicates/preview')
+@login_required
+def health_duplicates_preview():
+    fernet = get_fernet()
+    groups = _find_duplicate_groups(_record_rows(), fernet)
+    return jsonify({
+        'total': len(groups),
+        'deletable': sum(len(group['member_ids']) for group in groups),
+        'groups': groups,
+    })
+
+
+@app.route('/api/health/weak/count')
+@login_required
+def health_weak_count():
+    fernet = get_fernet()
+    problems = _weak_record_problems(_all_record_objects(), fernet, _score_password)
+    return jsonify({'count': len(problems)})
+
+
+@app.route('/api/health/weak/preview')
+@login_required
+def health_weak_preview():
+    fernet = get_fernet()
+    problems = _weak_record_problems(_all_record_objects(), fernet, _score_password)
+    rows = []
+    for record, _password in problems:
+        user_inputs = [
+            decrypt_metadata(fernet, record.title or ""),
+            decrypt_metadata(fernet, record.website_url or ""),
+            decrypt_metadata(fernet, record.login or ""),
+            decrypt_metadata(fernet, record.email or ""),
+        ]
+        score = _score_password(
+            safe_decrypt(fernet, record.encrypted_password) or "",
+            user_inputs,
+        )
+        rows.append({
+            'id': record.id,
+            'title': decrypt_metadata(fernet, record.title or ""),
+            'url': decrypt_metadata(fernet, record.website_url or ""),
+            'score': score,
+        })
+    return jsonify({'count': len(rows), 'records': rows})
+
+
+@app.route('/api/health/duplicates/merge', methods=['POST'])
+@login_required
+def health_duplicates_merge():
+    fernet = get_fernet()
+    groups = _find_duplicate_groups(_record_rows(), fernet)
+    body = request.get_json(silent=True) or {}
+    selected = body.get('ids')
+    if selected:
+        selected_keys = {str(x) for x in selected}
+        delete_ids = [
+            record_id
+            for group in groups
+            for record_id in group['member_ids']
+            if str(record_id) in selected_keys
+        ]
+    else:
+        delete_ids = [
+            record_id
+            for group in groups
+            for record_id in group['member_ids']
+        ]
+    if not delete_ids:
+        return jsonify({'status': 'ok', 'merged': 0, 'deleted': 0})
+
+    backup_database()
+    deleted = _delete_records_and_history(delete_ids)
+    db.session.commit()
+    invalidate_vault_report_cache()
+    merged_groups = sum(
+        1 for group in groups
+        if any(member in delete_ids for member in group['member_ids'])
+    )
+    log.info(
+        "Sağlık: %s çift grup birleştirildi, %s kayıt silindi.",
+        merged_groups, deleted,
+    )
+    return jsonify({'status': 'ok', 'merged': merged_groups, 'deleted': deleted})
+
+
+@app.route('/api/health/rotate-weak', methods=['POST'])
+@login_required
+def health_rotate_weak():
+    fernet = get_fernet()
+    problems = _weak_record_problems(_all_record_objects(), fernet, _score_password)
+    body = request.get_json(silent=True) or {}
+    selected = body.get('ids')
+    if selected:
+        selected_keys = {str(x) for x in selected}
+        problems = [
+            p for p in problems if str(p[0].id) in selected_keys
+        ]
+    if not problems:
+        return jsonify({'status': 'ok', 'rotated': 0})
+
+    backup_database()
+    rotated = 0
+    for record, _old_password in problems:
+        _append_password_history(
+            record.id, record.encrypted_password, fernet,
+        )
+        record.encrypted_password = safe_encrypt(
+            fernet, _generate_strong_password(),
+        )
+        record.updated_at = utc_now_naive()
+        rotated += 1
+    db.session.commit()
+    invalidate_vault_report_cache()
+    log.info("Sağlık: %s zayıf şifre yenilendi.", rotated)
+    return jsonify({'status': 'ok', 'rotated': rotated})
+
+
+@app.route('/api/health/backup', methods=['POST'])
+@login_required
+def health_backup_now():
+    backup_database()
+    _set_setting(LAST_BACKUP_SETTING, _now_iso())
+    db.session.commit()
+    return jsonify({'status': 'ok', 'backed_up': os.path.exists(DB_FILE)})
+
+
+@app.route('/api/health/export')
+@login_required
+def health_export():
+    get_fernet()
+    stats, health = _build_vault_report_payloads()
+    return jsonify({
+        'generated_at': utc_now_naive().isoformat(),
+        'stats': stats,
+        'health': health,
+    })
+
+
 @app.route('/save_settings', methods=['POST'])
 @login_required
 def save_settings():
@@ -1412,6 +2000,27 @@ def save_settings():
     elif lan_was_enabled:
         _clear_lan_access_settings()
     _set_setting('lan_enabled', 'true' if lan_now_enabled else 'false')
+    _set_setting(
+        network_policy.INTERNET_KILL_SWITCH_SETTING,
+        'true' if request.form.get('internet_kill_switch') else 'false',
+    )
+    _set_setting(
+        network_policy.LIVE_BREACH_SCAN_SETTING,
+        'true' if request.form.get('live_breach_scan') else 'false',
+    )
+    if 'backup_reminder_frequency' in request.form:
+        _write_reminder_frequency(
+            BACKUP_REMINDER_FREQUENCY_SETTING, BACKUP_REMINDER_DAYS_SETTING,
+            request.form.get('backup_reminder_frequency', ''))
+    if 'breach_reminder_frequency' in request.form:
+        _write_reminder_frequency(
+            BREACH_REMINDER_FREQUENCY_SETTING, BREACH_REMINDER_DAYS_SETTING,
+            request.form.get('breach_reminder_frequency', ''))
+    if 'auto_backup_interval' in request.form:
+        interval = request.form.get('auto_backup_interval', '').strip().lower()
+        if interval not in _backups.AUTO_BACKUP_INTERVAL_SECONDS_MAP and interval != 'off':
+            interval = _backups.AUTO_BACKUP_DEFAULT_INTERVAL
+        _set_setting(_backups.AUTO_BACKUP_INTERVAL_SETTING, interval)
     db.session.commit()
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
@@ -1434,9 +2043,191 @@ def save_settings():
             "hardware_acceleration_enabled": get_hardware_acceleration_enabled(),
             "power_save_enabled": get_power_save_enabled(),
             "lan_enabled": _lan_access_enabled(),
+            "internet_kill_switch_enabled": network_policy.internet_kill_switch_enabled(),
+            "live_breach_scan_enabled": network_policy.live_breach_scan_enabled(),
+            "can_live_scan": network_policy.live_breach_scan_available(),
             "restart_required": lan_now_enabled != lan_was_enabled,
         })
     return redirect(url_for('index'))
+
+
+# ─── OTOMATİK YEDEK SİSTEMİ ───────────────────────────────────────────────────
+# Uygulama açıkken periyodik olarak (varsayılan: en fazla günde bir) tüm kasa
+# kayıtlarını .kasaenc şifreli yedeğe alır ve eski kopyaları rotasyondan geçirir.
+# Dosyalar DATA_DIR/backups altında tutulur; anahtar kasa anahtarıyla sarılır.
+
+_bugün_otomatik_yedek_lock = threading.Lock()
+_AUTO_BACKUP_POLL_SECONDS = 15 * 60
+
+
+def _auto_backups_dir() -> str:
+    return str(_backups.backups_dir(DATA_DIR))
+
+
+def _last_auto_backup_age_seconds() -> float | None:
+    raw = _get_setting(_backups.LAST_AUTO_BACKUP_SETTING)
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw).astimezone()
+    except (ValueError, TypeError):
+        return None
+    return max(0.0, (datetime.now().astimezone() - parsed).total_seconds())
+
+
+def _auto_backup_interval_seconds() -> int | None:
+    """Ayarlı otomatik yedek aralığını saniyeye çevirir; 'off' → None."""
+    raw = (_get_setting(_backups.AUTO_BACKUP_INTERVAL_SETTING)
+           or _backups.AUTO_BACKUP_DEFAULT_INTERVAL).strip().lower()
+    if raw == 'off':
+        return None
+    return _backups.AUTO_BACKUP_INTERVAL_SECONDS_MAP.get(
+        raw,
+        _backups.AUTO_BACKUP_INTERVAL_SECONDS_MAP[_backups.AUTO_BACKUP_DEFAULT_INTERVAL])
+
+
+def _next_auto_backup_at() -> str | None:
+    """Son yedek zamanından aralık kadar ilerisini döner; bilinmiyorsa None."""
+    interval = _auto_backup_interval_seconds()
+    if interval is None:
+        return None
+    raw = _get_setting(_backups.LAST_AUTO_BACKUP_SETTING)
+    if not raw:
+        return None
+    try:
+        base = datetime.fromisoformat(raw)
+    except (ValueError, TypeError):
+        return None
+    if base.tzinfo is None:
+        base = base.astimezone()
+    return (base.astimezone() + timedelta(seconds=interval)).isoformat(timespec='seconds')
+
+
+def _create_rotating_backup(force: bool = False) -> dict | None:
+    """Kasa açıkken yedeği üretir. Kasa kilitliyse, aralık 'off' ise veya
+    aralık dolmamışsa None döner. force=True manuel 'Şimdi Yedek Al'da kullanılır."""
+    with _bugün_otomatik_yedek_lock:
+        try:
+            get_fernet()  # kilitliyse hata fırlatır
+        except Exception:
+            return None
+        interval = _auto_backup_interval_seconds()
+        if not force and interval is None:
+            return None
+        last_age = _last_auto_backup_age_seconds()
+        if not force and last_age is not None and last_age < interval:
+            return None
+        try:
+            fernet = get_fernet()
+            rows = Record.query.all()
+            data = _serialize_records(rows, fernet)
+            info = _backups.create_backup(data, fernet, DATA_DIR)
+        except Exception:
+            log.exception("Otomatik yedek olusturulamadi.")
+            return None
+        now = _now_iso()
+        _set_setting(_backups.LAST_AUTO_BACKUP_SETTING, now)
+        _set_setting(LAST_BACKUP_SETTING, now)
+        db.session.commit()
+        invalidate_vault_report_cache()
+        return info
+
+
+def _auto_backup_loop() -> None:
+    while True:
+        try:
+            time.sleep(_AUTO_BACKUP_POLL_SECONDS)
+        except Exception:
+            return
+        try:
+            with app.app_context():
+                _create_rotating_backup(force=False)
+        except Exception:
+            log.exception("Otomatik yedek dongusu hatasi.")
+
+
+@app.route('/api/backups')
+@login_required
+def api_backups_list():
+    get_fernet()
+    return jsonify({
+        'status': 'ok',
+        'backups': _backups.list_backups(DATA_DIR),
+        'max_count': _backups.AUTO_BACKUP_MAX_COUNT,
+        'last_auto_backup': _get_setting(_backups.LAST_AUTO_BACKUP_SETTING),
+        'last_backup': _get_setting(LAST_BACKUP_SETTING),
+        'auto_backup_interval': ((_get_setting(_backups.AUTO_BACKUP_INTERVAL_SETTING))
+                                 or _backups.AUTO_BACKUP_DEFAULT_INTERVAL),
+        'auto_backup_interval_seconds': _auto_backup_interval_seconds(),
+        'next_auto_backup_at': _next_auto_backup_at(),
+    })
+
+
+@app.route('/api/backups/create', methods=['POST'])
+@login_required
+def api_backups_create():
+    info = _create_rotating_backup(force=True)
+    if not info:
+        return jsonify({'status': 'error',
+                        'message': _('Yedek oluşturulamadı. Kasa kilitli olabilir.')}), 409
+    return jsonify({'status': 'ok', 'backup': info})
+
+
+@app.route('/api/backups/delete', methods=['POST'])
+@login_required
+def api_backups_delete():
+    data = request_json()
+    filename = normalize_text(data.get('filename'), max_length=255)
+    if not filename or '/' in filename or '\\' in filename or filename.startswith('.'):
+        return jsonify({'status': 'error', 'message': _('Geçersiz yedek dosyası.')}), 400
+    try:
+        removed = _backups.delete_backup(DATA_DIR, filename)
+    except ValueError:
+        return jsonify({'status': 'error', 'message': _('Geçersiz yedek dosyası.')}), 400
+    if not removed:
+        return jsonify({'status': 'error', 'message': _('Yedek silinemedi.')}), 500
+    return jsonify({'status': 'ok', 'deleted': filename})
+
+
+@app.route('/api/backups/restore', methods=['POST'])
+@login_required
+def api_backups_restore():
+    data = request_json()
+    filename = normalize_text(data.get('filename'), max_length=255)
+    confirm = data.get('confirm') is True
+    if not filename or '/' in filename or '\\' in filename or filename.startswith('.'):
+        return jsonify({'status': 'error', 'message': _('Geçersiz yedek dosyası.')}), 400
+    if not confirm:
+        return jsonify({'status': 'error',
+                        'message': _('Geri yükleme onay gerektirir.')}), 400
+    with _reencrypt_lock:
+        if _vault_write_locked.is_set():
+            return _vault_write_lock_response()
+        _vault_write_locked.set()
+    try:
+        fernet = get_fernet()
+        try:
+            blob = _backups.read_backup(DATA_DIR, filename)
+        except (ValueError, FileNotFoundError):
+            return jsonify({'status': 'error',
+                            'message': _('Yedek dosyası bulunamadı.')}), 404
+        try:
+            parsed = _decrypt_encrypted_records(
+                blob, _backups.backup_password(fernet))
+        except (_InvalidPasswordError, _CorruptBackupError, _EncryptedBackupError, ValueError):
+            return jsonify({'status': 'error',
+                            'message': _('Yedek dosyası açılamadı veya bozuk.')}), 400
+        backup_database()
+        Record.query.delete()
+        PasswordHistory.query.delete()
+        records = [_parse_import_record(item, fernet) for item in parsed]
+        db.session.add_all(records)
+        db.session.commit()
+        invalidate_vault_report_cache()
+        return jsonify({'status': 'ok', 'restored': len(records)})
+    finally:
+        _vault_write_locked.clear()
+
 
 @app.route('/export')
 @login_required
@@ -1445,21 +2236,104 @@ def export_data():
     rows   = Record.query.all()
     export_format = _requested_export_format()
 
+    _set_setting(LAST_BACKUP_SETTING, _now_iso())
+    db.session.commit()
     return _send_records_export(
         _serialize_records(rows, fernet),
         f"sifrekasam_yedek_{datetime.now().strftime('%Y%m%d')}",
         export_format,
     )
 
+
+# Tek kullanımlık şifreli dışa aktarma: parola yalnızca bellekte ve kısa ömürlü
+# tutulur; kalıcı hiçbir yere yazılmaz. Token iki adımlı akışı bağlar.
+_ENCRYPTED_EXPORT_TTL_SECONDS = 600  # 10 dk
+_encrypted_export_lock = threading.Lock()
+_encrypted_export_cache: dict[str, dict[str, Any]] = {}
+_pending_encrypted_exports: dict[str, tuple[float, str]] = {}
+
+
+@app.route('/api/export/encrypted', methods=['POST'])
+@login_required
+def encrypted_export_prepare():
+    """Şifreli yedek üretir: dosyayı bellekte hazırlar, tek-sunum parolası üretir.
+
+    Döner: {status: 'ok', token, password, filename, records}. Şifre yalnızca bu
+    yanıtta bulunur; bir dahaki adımda (download) şifre geri verilmez.
+    """
+    _purge_expired_encrypted_exports()
+    fernet = get_fernet()
+    rows = Record.query.all()
+    data = _serialize_records(rows, fernet)
+    password = _generate_backup_password()
+    try:
+        blob = _encrypted_export(data, password)
+    except (ValueError, TypeError):
+        return jsonify({'status': 'error',
+                        'message': _('Şifreli yedek oluşturulamadı.')}), 500
+
+    token = secrets.token_urlsafe(24)
+    now = time.time()
+    with _encrypted_export_lock:
+        _encrypted_export_cache[token] = {
+            'blob': blob,
+            'filename': f"sifrekasam_guvenli_yedek_{datetime.now().strftime('%Y%m%d')}.kasaenc",
+        }
+        _pending_encrypted_exports[token] = (now, password)
+
+    _set_setting(LAST_BACKUP_SETTING, _now_iso())
+    db.session.commit()
+    return jsonify({
+        'status': 'ok',
+        'token': token,
+        'password': password,
+        'filename': f"sifrekasam_guvenli_yedek_{datetime.now().strftime('%Y%m%d')}",
+        'records': len(data),
+    })
+
+
+@app.route('/export/encrypted/<token>')
+@login_required
+def encrypted_export_download(token):
+    """TTL bitmeden dosyayı indirir ve her iki cache'i de temizler (tek kullanımlık)."""
+    with _encrypted_export_lock:
+        entry = _encrypted_export_cache.pop(token, None)
+        _pending_encrypted_exports.pop(token, None)
+    if not entry:
+        return jsonify({'error': _('İndirme bağlantısı süresi doldu veya kullanıldı.'),
+                        'reason': 'expired'}), 410
+    return send_file(
+        io.BytesIO(entry['blob']),
+        mimetype='application/vnd.sifrekasam.encrypted-backup',
+        as_attachment=True,
+        download_name=entry['filename'],
+    )
+
+
+def _purge_expired_encrypted_exports() -> None:
+    now = time.time()
+    expired = [
+        token for token, (ts, _pw) in _pending_encrypted_exports.items()
+        if now - ts > _ENCRYPTED_EXPORT_TTL_SECONDS
+    ]
+    if expired:
+        with _encrypted_export_lock:
+            for token in expired:
+                _encrypted_export_cache.pop(token, None)
+                _pending_encrypted_exports.pop(token, None)
+
 def _requested_export_format() -> str:
     export_format = normalize_text(request.args.get('format', 'json')).lower()
-    return export_format if export_format in {'json', 'kasa', 'txt'} else 'json'
+    # Şifreli (kasaenc) dışa aktarım yalnızca /api/export/encrypted üzerinden
+    # yapılır; burada desteklenmez.
+    return export_format if export_format in {'json', 'txt'} else 'json'
 
 def _send_records_export(data: list[dict[str, Any]], base_name: str,
                          export_format: str = 'json'):
     payload, mimetype = build_export_payload(data, export_format)
+    suffix = export_format
     return send_file(io.BytesIO(payload), mimetype=mimetype, as_attachment=True,
-                     download_name=f'{base_name}.{export_format}')
+                     download_name=f'{base_name}.{suffix}')
 
 def _parse_import_record(item: dict, fernet: Fernet) -> Record:
     """Desteklenen yedek sözlüğünü yeni Record modeline çevirir."""
@@ -1477,9 +2351,24 @@ def import_data():
     fernet   = get_fernet()
     filename = file.filename.lower()
     try:
-        content = file.read().decode('utf-8-sig')
-        records = [_parse_import_record(item, fernet)
-                   for item in _parse_import_payload(filename, content)]
+        if filename.endswith('.kasaenc'):
+            file_password = (request.form.get('file_password') or '').strip()
+            if not file_password:
+                return "Şifreli yedek için dosya şifresi gerekli.", 400
+            raw = file.read()
+            try:
+                parsed = _decrypt_encrypted_records(raw, file_password)
+            except _InvalidPasswordError:
+                return "Hatalı dosya şifresi veya dosya bütünlüğü bozuk.", 400
+            except _CorruptBackupError:
+                return "Şifreli yedek dosyası geçersiz veya desteklenmiyor.", 400
+            except (_EncryptedBackupError, ValueError):
+                return "Şifreli yedek açılamadı.", 400
+            records = [_parse_import_record(item, fernet) for item in parsed]
+        else:
+            content = file.read().decode('utf-8-sig')
+            records = [_parse_import_record(item, fernet)
+                       for item in _parse_import_payload(filename, content)]
         if not records:
             return "İçe aktarılacak geçerli kayıt bulunamadı.", 400
         backup_database()
@@ -1582,6 +2471,12 @@ def settings_runtime():
 @app.route('/api/update-check')
 @login_required
 def update_check():
+    if not network_policy.internet_allowed():
+        return jsonify({
+            'status': 'disabled',
+            'current_version': _normalize_version(APP_VERSION),
+            'message': _('İnternet kill-switch açık; güncelleme kontrolü kapalı.'),
+        })
     try:
         latest = _fetch_latest_release()
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
@@ -1766,29 +2661,73 @@ def upload_custom_background():
         return jsonify({'error': error}), 400
 
     with _background_state_lock:
-        _move_current_to_history()
-        filename = f"{uuid.uuid4().hex}{ext}"
-        filepath = os.path.join(BACKGROUND_DIR, filename)
-        _optimize_custom_background(uploaded, filepath, ext)
+        # Önce geçici bir dosyaya yaz (yarım dosya kökte asla görünmesin),
+        # sonra içerik hash'ine göre tekrar yükleme (dedup) kontrolü yap.
+        tmp_name = f"{uuid.uuid4().hex}{ext}.tmp"
+        tmp_path = os.path.join(BACKGROUND_DIR, tmp_name)
+        try:
+            _optimize_custom_background(uploaded, tmp_path, ext)
+            digest = _file_sha256(tmp_path)
+            meta = _load_custom_background_metadata()
+            existing = _find_background_by_hash(meta, digest)
 
-    meta = _load_custom_background_metadata()
-    _ensure_background_metadata(meta, filename, filepath)
-    _save_custom_background_metadata(meta)
+            if existing:
+                # Aynı görsel zaten var: yeni dosyayı sil, mevcut öğeyi aktif yap.
+                _unlink_quiet(tmp_path)
+                current = _current_root_filename()
+                if existing != current:
+                    history_dir = _custom_background_history_dir()
+                    source = os.path.join(history_dir, existing)
+                    if os.path.isfile(source):
+                        # Hedef dosya budamadan önce köke taşınmalı; aksi halde
+                        # dolu history'de en eski kayıt (hedefin kendisi) silinir.
+                        _move_current_to_history(prune=False)
+                        shutil.move(source, os.path.join(BACKGROUND_DIR, existing))
+                        _prune_custom_background_history()
+                    else:
+                        # Meta'da kayıtlı ama dosyası silinmiş: yeni dosyayı bu
+                        # isimle köke al ve meta kaydını tazele.
+                        _move_current_to_history()
+                        os.replace(tmp_path, os.path.join(BACKGROUND_DIR, existing))
+                        info = _compute_background_metadata(
+                            os.path.join(BACKGROUND_DIR, existing), ext)
+                        info['sha256'] = digest
+                        meta[existing] = info
+                        _save_custom_background_metadata(meta)
+                active_name = existing
+            else:
+                _move_current_to_history()
+                filename = f"{uuid.uuid4().hex}{ext}"
+                filepath = os.path.join(BACKGROUND_DIR, filename)
+                os.replace(tmp_path, filepath)
+                info = _ensure_background_metadata(meta, filename, filepath)
+                info['sha256'] = digest
+                _save_custom_background_metadata(meta)
+                active_name = filename
+        except Exception:
+            _unlink_quiet(tmp_path)
+            return jsonify({'error': 'Yükleme başarısız oldu.'}), 500
 
     save_background_style('custom')
     db.session.commit()
 
-    is_gif = ext == '.gif'
+    active_path = os.path.join(BACKGROUND_DIR, active_name)
+    try:
+        active_mtime = os.path.getmtime(active_path)
+    except OSError:
+        active_mtime = 0
+    active_info = meta.get(active_name) or {}
+    version = _background_cache_version(active_info, active_mtime)
+    is_gif = active_name.endswith('.gif')
     return jsonify({
         'status': 'ok',
-        'url': url_for('serve_custom_background') + '?v=' + str(int(time.time())),
+        'url': url_for('serve_custom_background') + '?v=' + version,
         'is_gif': is_gif,
-        'is_video': ext in _VIDEO_EXTS,
+        'is_video': active_name.endswith(_VIDEO_EXTS),
     })
 
 
 @app.route('/api/background/current')
-@login_required
 def serve_custom_background():
     bg_path = _find_custom_background()
     if not bg_path:
@@ -1835,6 +2774,23 @@ def delete_custom_background_all():
     return jsonify({'status': 'ok', 'background_style': get_saved_background_style()})
 
 
+def _background_cache_version(info, mtime):
+    """Cache-bust version: içerik hash'i önceliklidir; legacy dosyalar için mtime.
+
+    Aynı saniye içinde yüklenen farklı dosyaların aynı ``?v=`` değerini alıp
+    tarayıcı HTTP cache'inden (max-age=86400) eski görselin servis edilmesini
+    önler. Aynı içerik yeniden aktifleştirilirse aynı ``?v=`` üretilir ve
+    gereksiz yeniden indirme olmaz.
+    """
+    if isinstance(info, dict):
+        digest = info.get('sha256')
+    else:
+        digest = info
+    if digest:
+        return str(digest)[:12]
+    return str(int(mtime))
+
+
 def _active_custom_background_entry():
     """Build the history entry for the currently active root background."""
     filepath = _find_custom_background()
@@ -1847,10 +2803,14 @@ def _active_custom_background_entry():
     except OSError:
         pass
     meta = _load_custom_background_metadata()
+    existed = filename in meta
     info = _ensure_background_metadata(meta, filename, filepath)
+    if not existed:
+        _save_custom_background_metadata(meta)
+    version = _background_cache_version(info, mtime)
     return {
         'id': filename,
-        'url': url_for('serve_custom_background') + '?v=' + str(int(mtime)),
+        'url': url_for('serve_custom_background') + '?v=' + version,
         'is_gif': filename.endswith('.gif'),
         'is_video': filename.endswith(_VIDEO_EXTS),
         'created_at': datetime.fromtimestamp(mtime).isoformat(),
@@ -1868,9 +2828,10 @@ def list_custom_background_history():
     entries = []
     for item in _list_custom_background_history():
         filename = item['filename']
+        version = _background_cache_version(item.get('sha256'), item['mtime'])
         entries.append({
             'id': filename,
-            'url': url_for('serve_history_background', filename=filename) + '?v=' + str(int(item['mtime'])),
+            'url': url_for('serve_history_background', filename=filename) + '?v=' + version,
             'is_gif': filename.endswith('.gif'),
             'is_video': filename.endswith(_VIDEO_EXTS),
             'created_at': datetime.fromtimestamp(item['mtime']).isoformat(),
@@ -1913,16 +2874,29 @@ def activate_history_background(id):
         if not os.path.isfile(source):
             return jsonify({'error': 'Arkaplan bulunamadı.'}), 404
 
-        _move_current_to_history()
-        shutil.move(source, os.path.join(BACKGROUND_DIR, name))
+        # Hedef dosya budamadan ÖNCE köke taşınmalı; aksi halde dolu history'de
+        # en eski kayıt (hedefin kendisi) prune tarafından silinebilir.
+        try:
+            _move_current_to_history(prune=False)
+            shutil.move(source, os.path.join(BACKGROUND_DIR, name))
+            _prune_custom_background_history()
+        except OSError:
+            return jsonify({'error': 'Arkaplan aktifleştirilmedi.'}), 500
 
     save_background_style('custom')
     db.session.commit()
 
+    meta = _load_custom_background_metadata()
+    info = meta.get(name) or {}
+    try:
+        mtime = os.path.getmtime(os.path.join(BACKGROUND_DIR, name))
+    except OSError:
+        mtime = 0
+    version = _background_cache_version(info, mtime)
     is_gif = name.endswith('.gif')
     return jsonify({
         'status': 'ok',
-        'url': url_for('serve_custom_background') + '?v=' + str(int(time.time())),
+        'url': url_for('serve_custom_background') + '?v=' + version,
         'is_gif': is_gif,
         'is_video': name.endswith(_VIDEO_EXTS),
     })
@@ -2015,6 +2989,8 @@ def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str,
                         _vault_keys[vault_sid] = (new_key, time.time())
             # Ana şifre değişince LAN şifresiyle kasa anahtarı sarmalını da yenile.
             _refresh_lan_access_bindings(old_key, new_key)
+            # Otomatik yedek anahtarı da yeni kasa anahtarıyla yeniden sarılır.
+            _backups.refresh_backup_key(old_fernet, new_fernet)
             log.info("Ana ?ifre ba?ar?yla de?i?tirildi.")
             with _reencrypt_lock:
                 _reencrypt_state[task_id] = {'progress': 100, 'total': total, 'done': True}
@@ -2157,6 +3133,8 @@ def _get_server_host() -> str:
 if __name__ == '__main__':
     flask_host = _get_server_host()
     flask_port = safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535)
+    _auto_backups_dir()  # yedek klasörünü başlangıçta hazırla
+    threading.Thread(target=_auto_backup_loop, name='auto-backup-loop', daemon=True).start()
     try:
         from cheroot.wsgi import Server as _CherootServer
         from cheroot.ssl.builtin import BuiltinSSLAdapter as _CherootSSLAdapter

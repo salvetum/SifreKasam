@@ -9,7 +9,7 @@
 import { showSuccessToast, showWarningToast } from './toast.js';
 
   const copyButtonStates = new WeakMap();
-  const COPY_ICON_RESET_MS = 850;
+  const COPY_ICON_RESET_MS = 1500;
 
   const getCopyButton = (iconEl) => iconEl?.closest?.('button') || iconEl;
 

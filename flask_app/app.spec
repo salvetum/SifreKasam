@@ -9,7 +9,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['numpy', 'numpy.*', 'scipy', 'PIL._avif'],
     noarchive=False,
     optimize=0,
 )

@@ -54,6 +54,13 @@ html[data-kasa-low-power="on"] *::after {
     will-change: auto !important;
 }
 
+/* Low-power'da .card-animated paused + backwards fill ile translateY(14px)'te
+   takılı kalıyordu (kartlar aşağı kaymış görünüyordu). Animasyonu tamamen
+   kapatıp kartların doğal konumunda (translateY(0)) görünmesini sağla. */
+html[data-kasa-low-power="on"] .card-animated {
+    animation: none !important;
+}
+
 html[data-kasa-low-power="on"] body::before,
 html[data-kasa-low-power="on"] body::after,
 html[data-kasa-low-power="on"] .blob-accent {
@@ -61,8 +68,7 @@ html[data-kasa-low-power="on"] .blob-accent {
 }
 
 html[data-kasa-low-power="on"] .kasa-panel,
-html[data-kasa-low-power="on"] .kasa-modal .modal-content,
-html[data-kasa-low-power="on"] .kasa-modal-content {
+html[data-kasa-low-power="on"] .kasa-modal .modal-content {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
@@ -204,14 +210,6 @@ body::after {
     background: radial-gradient(circle, rgba(34,197,94,0.10) 0%, transparent 70%);
 }
 
-/* ── GRADİYAN YAZI ───────────────────────────────────────────── */
-.gradient-text {
-    background: linear-gradient(110deg, var(--accent), var(--accent-2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
 /* ── ANİMASYONLAR ────────────────────────────────────────────── */
 /* animation-fill-mode: "both" KULLANILMAZ (wrapper transform composited
    layer → backdrop-filter buğusu kaybolur). "backwards" ise güvenlidir
@@ -225,30 +223,31 @@ body::after {
     /* v5 dersinin anasayfa uygulaması: cam kartların OPAKLIĞI
        animasyona girmez (gruplanma → bitişte ton snap'i). Yalnız
        transform ile kayar; backwards fill gecikme boyunca kartı
-       +14px ofsette TAM opak bekletir (kademeli dalga görünür). */
-    animation: cardSlideIn var(--dur-base) var(--ease-swift) backwards;
+       +18px ofsette TAM opak bekletir (kademeli dalga görünür). */
+    animation: cardSlideIn var(--dur-slow) var(--ease-out) backwards;
 }
 @keyframes cardSlideIn {
-    from { transform: translateY(14px); }
+    from { transform: translateY(18px); }
     to   { transform: translateY(0);    }
 }
+/* Sayfa içeriği girişi — index ana shell'i yüklenirken yumuşakça belirir.
+   login/ekle/saglik kendi shell animasyonlarını kullanır. */
 /* Özel arkaplan decode gate'i sürerken kart girişlerini dondur:
    bg ilk karesi GPU'ya oturmadan kartlar örnekleme yapmasın. */
 
 /* DEĞİŞİKLİK 1: vault kartları render+görsel yüklemesi bitene dek gizli.
-   vault-index.js data-cards-wait'i kaldırınca stagger'lı giriş başlar. */
-html[data-cards-wait] .vault-card-curtain > .card-animated {
-    animation-play-state: paused;
-}
+   Curtain (visibility:hidden) kartları saklar; vault-index.js reveal'da
+   card-animated'ı AYNI frame'de ekler → pause/restart kırılganlığı yok. */
 
 html[data-kasa-bg-wait] .card-animated {
     animation-play-state: paused;
 }
-/* Custom arkaplan canlı iken stagger kapat: boş slotlar canlı görseli
-   gösterip toplu dolum anında 'flash' okutuyor. */
-html[data-kasa-background='custom'] .vault-card-curtain > .card-animated {
-    animation-delay: 0ms !important;
-}
+/* Custom arkaplan + stagger: v5'ten beri kart animasyonu yalnız transform
+   (translateY) içeriyor — gecikme boyunca kart TAM opak beklediğinden boş
+   slot/canlı görsel flaşı oluşmaz. Eski opacity animasyonu döneminde konan
+   bu kural artık gereksiz; custom bg kullanıcıları da diğerleriyle aynı
+   kademeli girişi alır. (data-kasa-bg-wait gate'i ayrıca body'yi opacity:0
+   tutar; vault-index.js gate kalkana dek reveal'i bekletir.) */
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0);    }
@@ -300,17 +299,6 @@ html[data-kasa-background='custom'] .vault-card-curtain > .card-animated {
     from { opacity: 0; }
     to   { opacity: 1; }
 }
-
-.soft-pop {
-    animation: softPop 0.22s cubic-bezier(0.16,1,0.3,1) both;
-}
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0);  }
-    25%       { transform: translateX(-4px); }
-    75%       { transform: translateX(4px);  }
-}
-.shake { animation: shake 0.2s ease-in-out 0s 2; }
 
 @keyframes copyPop {
     0%   { transform: scale(0.82); opacity: 0.72; }

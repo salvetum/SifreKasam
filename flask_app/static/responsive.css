@@ -15,7 +15,7 @@
     gap: 0.75rem 1rem !important;
   }
 
-  #stats-bar > div {
+  #stats-bar > .stats-filter-chip {
     flex: 1 1 150px;
     justify-content: center;
     min-width: 0;
@@ -46,7 +46,7 @@
     padding: 0.85rem 1.35rem !important;
   }
 
-  #stats-bar > div {
+  #stats-bar > .stats-filter-chip {
     flex-basis: 170px;
   }
 
@@ -79,7 +79,7 @@
 /* 1280×720 ve benzeri kısa masaüstü ekranları */
 @media (min-width: 1024px) and (max-height: 800px) {
   .max-w-6xl {
-    padding-top: 1rem !important;
+    padding-top: 1.5rem !important;
     padding-bottom: 1.25rem !important;
   }
 
@@ -207,7 +207,7 @@
   .vault-detail-label { font-size: 0.68rem; }
   .vault-detail-value { font-size: 0.8rem; }
   .vault-detail-list { gap: 0.4rem; }
-  .vault-note-row { min-height: 52px; }
+  .vault-note-row { min-height: 32px; }
 
   .vault-card-header { margin-bottom: 0.5rem; }
   .vault-title-line .vault-card-title { font-size: 0.82rem; }
@@ -227,7 +227,10 @@
   .vault-card-shell .footer-action-btn { font-size: 0.74rem; }
   .vault-card-shell > .flex:last-child { padding: 0.5rem 0.7rem !important; gap: 0.6rem !important; flex-wrap: wrap !important; }
 
-  .card-animated { animation: none !important; }
+  /* NOT: .card-animated burada animation:none ile öldürülmez — dar pencerede
+     kart giriş animasyonu tamamen kayboluyordu ("animasyon yok" hissi).
+     Mobilde performans gerekiyorsa data-kasa-low-power="on" zaten base.css'te
+     animasyonları durdurur; bu kural kaldırıldı. */
 
   header.flex.mb-8 { margin-bottom: 1rem; }
   header .flex-wrap.gap-3 > div:first-child h1 { font-size: 1.4rem; }
@@ -280,10 +283,12 @@
   }
   .vault-detail-value {
     font-size: 0.85rem;
-    white-space: normal;
-    word-break: break-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: normal;
   }
-  .vault-note-row { min-height: 40px; }
+  .vault-note-row { min-height: 32px; }
   .vault-secret { letter-spacing: 0.06em; word-break: break-all; }
 
   .vault-card-body .card-icon-btn { width: 30px; height: 30px; font-size: 0.72rem; }

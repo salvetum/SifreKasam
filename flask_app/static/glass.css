@@ -877,3 +877,348 @@ html[data-bs-theme="light"][data-glass-quality="low"] .glass-sm {
 [data-bs-theme="light"] .text-kasa-text-muted {
     color: #3a4a6b;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   DROPDOWN (küresel) — proje cam (.glass) sistemiyle hizalı.
+   glass.css misc.css'ten sonra yüklendiği için bu kurallar cascade'de
+   üstündür; .glass'ın varsayılan position/background'ını ezer.
+   liquid-glass.js dropdown'a tier-tabanlı buğu (blur+saturate)
+   uygular (bkz. liquid-glass.js).
+   ════════════════════════════════════════════════════════════════ */
+
+/* Dropdown menüsü: absolute konumu koru (glass .relative'ı ezer), cam dili */
+.kasa-dropdown-menu.glass {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 240px;
+    border-radius: 16px;
+    border: 1px solid var(--glass-border-hi);
+    border-top: 1px solid rgba(var(--accent-rgb), 0.30);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.14),
+        0 12px 26px rgba(0,0,0,0.28),
+        0 28px 60px rgba(0,0,0,0.5);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+html:not([data-kasa-gradient="off"]) .kasa-dropdown-menu.glass {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05)),
+        var(--glass);
+}
+.kasa-navbar-left .kasa-dropdown-menu.glass {
+    left: 0;
+    right: auto;
+}
+[data-bs-theme="light"] .kasa-dropdown-menu.glass {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.95), rgba(255,255,255,0.78)),
+        var(--glass);
+}
+html[data-glass-effects="off"] .kasa-dropdown-menu.glass,
+html[data-glass-quality="low"] .kasa-dropdown-menu.glass,
+html[data-kasa-low-power="on"] .kasa-dropdown-menu.glass {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.05)),
+        rgba(24,27,48,0.98) !important;
+}
+
+/* ── NAVBAR BUTONLARI ───────────────────────────────────────────── */
+/* Danger (Kilitle, Şifre Sağlığı) ve Primary (Yeni Ekle) butonları
+   kendi renkli stillerini (buttons.css) korur — navbar içinde de kırmızı /
+   accent renkli anlaşılır kalır. Sadece muted (Üretici) ve dropdown
+   trigger'ları hafif cam yüzey alır. */
+.kasa-navbar-right .kasa-btn-kasa-btn-muted,
+.kasa-navbar-right .kasa-btn-muted,
+.kasa-navbar .kasa-dropdown-trigger {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.035)),
+        rgba(255, 255, 255, 0.04);
+    border-color: var(--glass-border);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+    color: var(--text-muted);
+}
+.kasa-navbar-right .kasa-btn-muted:hover,
+.kasa-navbar .kasa-dropdown-trigger:hover {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05)),
+        rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    border-color: var(--glass-border-hi);
+}
+
+/* ── NAVBAR İKON TRIGGER'LARI (bildirim + ayarlar): daha belirgin ──
+   Cam muted taban kalır; ikonlar parlak/accent vurgulu, hedef alanı
+   hafif büyütülür. Hover'da accent kenar + tint. */
+.kasa-navbar .kasa-dropdown-trigger {
+    min-height: 36px;
+    padding: 0.45rem 0.6rem;
+    border-color: rgba(var(--accent-rgb), 0.28);
+}
+.kasa-navbar .kasa-dropdown-trigger .fa-bell,
+.kasa-navbar .kasa-dropdown-trigger .fa-gear {
+    font-size: 1.02rem;
+    color: var(--text);
+    filter: drop-shadow(0 0 6px rgba(var(--accent-rgb), 0.45));
+    transition: color var(--speed) ease, filter var(--speed) ease;
+}
+.kasa-navbar .kasa-dropdown-trigger:hover .fa-bell,
+.kasa-navbar .kasa-dropdown-trigger:hover .fa-gear {
+    color: var(--accent);
+    filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.7));
+}
+.kasa-navbar .kasa-dropdown-trigger:hover {
+    border-color: rgba(var(--accent-rgb), 0.55);
+    background:
+        radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.14), transparent 75%),
+        linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05)),
+        rgba(255, 255, 255, 0.08);
+}
+[data-bs-theme="light"] .kasa-navbar .kasa-dropdown-trigger .fa-bell,
+[data-bs-theme="light"] .kasa-navbar .kasa-dropdown-trigger .fa-gear {
+    color: #3d4d7a;
+    filter: drop-shadow(0 0 5px rgba(124,111,247,0.35));
+}
+[data-bs-theme="light"] .kasa-navbar .kasa-dropdown-trigger:hover .fa-bell,
+[data-bs-theme="light"] .kasa-navbar .kasa-dropdown-trigger:hover .fa-gear {
+    color: #4636c4;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   BİLDİRİM MENÜSÜ ACCENT TİNT
+   Bildirim dropdown menüsüne accent renginden hafif ton/kaplama
+   ekler. Cam (glass) tabanını bozmaz; sadece radial gradient ile
+   sol-üst köşeden accent ışık sızması verir.
+   dark + light tema varyantları + efekt-kapalı fallback.
+   ════════════════════════════════════════════════════════════════ */
+/* Koyu tema: accent radial tint + glass gradyan */
+.kasa-notif-menu.glass {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.12), transparent 50%),
+        linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05)),
+        var(--glass);
+}
+/* Açık tema */
+[data-bs-theme="light"] .kasa-notif-menu.glass {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.08), transparent 50%),
+        linear-gradient(145deg, rgba(255,255,255,0.95), rgba(255,255,255,0.78)),
+        var(--glass);
+}
+/* Efekt kapalı / düşük kalite / güç tasarrufu — cam yok, katı accent yüzey */
+html[data-glass-effects="off"] .kasa-notif-menu.glass,
+html[data-glass-quality="low"] .kasa-notif-menu.glass,
+html[data-kasa-low-power="on"] .kasa-notif-menu.glass {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 50%),
+        rgba(24,27,48,0.98) !important;
+}
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-notif-menu.glass,
+html[data-bs-theme="light"][data-glass-quality="low"] .kasa-notif-menu.glass,
+html[data-bs-theme="light"][data-kasa-low-power="on"] .kasa-notif-menu.glass {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.07), transparent 50%),
+        rgba(255,255,255,0.96) !important;
+}
+/* ════════════════════════════════════════════════════════════════
+   BİLDİRİM MENÜSÜ — okunabilirlik revizyonu
+   Cam altındaki gri yazılar okunmuyordu. Menüye opak yüzey, kontrast
+   metinler ve hizalı (grid-area) düzen verildi. misc.css'teki notif
+   kurallarını ezer (glass.css en sonda yüklenir).
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Menü yüzeyi: okunaklı opak cam ───────────────────────────── */
+.kasa-dropdown-menu.kasa-notif-menu {
+    width: 340px;
+    max-width: min(88vw, 26rem);
+    padding: 0.45rem;
+    background:
+        linear-gradient(180deg, rgba(var(--accent-rgb), 0.13), rgba(var(--accent-rgb), 0.04)),
+        linear-gradient(160deg, rgba(30, 34, 54, 0.97), rgba(13, 16, 31, 0.97));
+    backdrop-filter: blur(20px) saturate(1.35);
+    -webkit-backdrop-filter: blur(20px) saturate(1.35);
+}
+[data-bs-theme="light"] .kasa-dropdown-menu.kasa-notif-menu {
+    background:
+        linear-gradient(180deg, rgba(var(--accent-rgb), 0.10), rgba(255, 255, 255, 0.05)),
+        linear-gradient(160deg, rgba(248, 249, 253, 0.99), rgba(232, 237, 248, 0.99));
+}
+html[data-glass-effects="off"] .kasa-dropdown-menu.kasa-notif-menu,
+html[data-glass-quality="low"] .kasa-dropdown-menu.kasa-notif-menu,
+html[data-kasa-low-power="on"] .kasa-dropdown-menu.kasa-notif-menu {
+    background: rgba(24, 27, 48, 0.99) !important;
+}
+[data-bs-theme="light"][data-glass-effects="off"] .kasa-dropdown-menu.kasa-notif-menu,
+[data-bs-theme="light"][data-glass-quality="low"] .kasa-dropdown-menu.kasa-notif-menu,
+[data-bs-theme="light"][data-kasa-low-power="on"] .kasa-dropdown-menu.kasa-notif-menu {
+    background: rgba(255, 255, 255, 0.99) !important;
+}
+
+/* ── Başlık ──────────────────────────────────────────────────── */
+.kasa-notif-head {
+    color: #f4f6ff;
+}
+.kasa-notif-head small {
+    color: #b9c1dd;
+}
+[data-bs-theme="light"] .kasa-notif-head { color: #1b2133; }
+[data-bs-theme="light"] .kasa-notif-head small { color: #55607a; }
+
+/* ── Aksiyon butonları ────────────────────────────────────────── */
+.kasa-notif-action-btn {
+    color: #b9c1dd;
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+}
+.kasa-notif-action-btn:hover {
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.18);
+    border-color: rgba(var(--accent-rgb), 0.40);
+}
+[data-bs-theme="light"] .kasa-notif-action-btn {
+    color: #4d5a7a;
+    border-color: rgba(31, 39, 66, 0.14);
+    background: rgba(31, 39, 66, 0.05);
+}
+
+/* ── Bildirim öğesi: hizalı grid ──────────────────────────────── */
+.kasa-notif-item {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 26px;
+    grid-template-areas:
+        "icon copy dismiss"
+        "cta  cta  cta";
+    align-items: center;
+    gap: 0.4rem 0.6rem;
+    padding: 0.55rem 0.6rem 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.kasa-notif-item:hover {
+    background: rgba(255, 255, 255, 0.085);
+    border-color: rgba(var(--accent-rgb), 0.28);
+}
+[data-bs-theme="light"] .kasa-notif-item {
+    background: rgba(31, 39, 66, 0.05);
+    border-color: rgba(31, 39, 66, 0.10);
+}
+[data-bs-theme="light"] .kasa-notif-item:hover {
+    background: rgba(31, 39, 66, 0.09);
+    border-color: rgba(var(--accent-rgb), 0.30);
+}
+
+.kasa-notif-item-icon {
+    grid-area: icon;
+    color: #fff;
+    background: linear-gradient(150deg, var(--accent), var(--accent-2));
+    box-shadow: 0 3px 10px rgba(var(--accent-rgb), 0.35);
+}
+
+.kasa-notif-item-copy {
+    grid-area: copy;
+    display: grid;
+    gap: 0.1rem;
+    align-content: center;
+}
+.kasa-notif-item-copy strong {
+    color: #f4f6ff;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.kasa-notif-item-copy span {
+    color: #b9c1dd;
+    font-size: 0.73rem;
+    line-height: 1.4;
+}
+[data-bs-theme="light"] .kasa-notif-item-copy strong { color: #1b2133; }
+[data-bs-theme="light"] .kasa-notif-item-copy span { color: #53607c; }
+
+/* ── CTA: tek satır, sağda ok — kenarlar düzgün ───────────────── */
+.kasa-notif-item .kasa-notif-cta {
+    grid-area: cta;
+    justify-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: rgba(var(--accent-rgb), 0.14);
+    border: 1px solid rgba(var(--accent-rgb), 0.28);
+    color: #dbe4ff;
+}
+.kasa-notif-item .kasa-notif-cta:hover {
+    background: rgba(var(--accent-rgb), 0.22);
+    border-color: rgba(var(--accent-rgb), 0.42);
+    color: #ffffff;
+}
+[data-bs-theme="light"] .kasa-notif-item .kasa-notif-cta {
+    color: #3a4dcf;
+    background: rgba(var(--accent-rgb), 0.10);
+}
+
+/* ── Gizle butonu ─────────────────────────────────────────────── */
+.kasa-notif-dismiss {
+    grid-area: dismiss;
+    color: #8f97b5;
+    opacity: 0.85;
+}
+.kasa-notif-item:hover .kasa-notif-dismiss { opacity: 1; }
+
+/* ── Boş durum ────────────────────────────────────────────────── */
+.kasa-notif-empty {
+    color: #b9c1dd;
+}
+.kasa-notif-empty i {
+    color: var(--success);
+}
+[data-bs-theme="light"] .kasa-notif-empty { color: #53607c; }
+/* ════════════════════════════════════════════════════════════════
+   BİLDİRİM MENÜSÜ v2 — başlık aksiyonları + ortalanmış boş durum
+   Aksiyon butonları başlığın EN SAĞINA taşındı (head-right).
+   Boş durum tik'i menü ortasında tam ortalı gösterilir.
+   ════════════════════════════════════════════════════════════════ */
+.kasa-notif-head-right {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+}
+.kasa-notif-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+}
+.kasa-notif-actions[hidden],
+.kasa-notif-head-right[hidden] {
+    display: none;
+}
+
+.kasa-notif-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 132px;
+    padding: 1.1rem 0.8rem;
+    text-align: center;
+}
+.kasa-notif-empty i {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    font-size: 1rem;
+    margin: 0;
+    color: #ffffff;
+    background: linear-gradient(150deg, var(--success), #23b37e);
+    box-shadow: 0 4px 14px rgba(46, 204, 113, 0.35);
+}
+

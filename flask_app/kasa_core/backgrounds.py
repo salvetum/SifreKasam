@@ -1,5 +1,6 @@
 """Özel arka plan dosya yönetimi: doğrulama, optimizasyon ve geçmiş."""
 
+import hashlib
 import json
 import os
 import re
@@ -112,18 +113,28 @@ def optimize_custom_background(file_storage, filepath, ext):
     formatında olduğu gibi kopyalanır. Arkaplan ``cover`` olarak gösterildiği
     için görünüm değişmez; yalnızca yükleme/servis hızı artar. Optimizasyon
     başarısız olursa orijinal dosya kaydedilir (işlev bozulmaz).
+
+    Dosya önce ``filepath + '.tmp'`` yoluna yazılır ve başarılı olursa
+    ``os.replace`` ile atomik olarak hedefe taşınır; böylece yarı yazılmış
+    bir dosya hedef yolda asla görünmez.
     """
-    if ext in ('.gif', '.webm', '.mp4'):
+    tmp_path = filepath + '.tmp'
+    try:
         file_storage.seek(0)
-        file_storage.save(filepath)
+        file_storage.save(tmp_path)
+    except Exception:
+        unlink_quiet(tmp_path)
+        raise
+
+    if ext in ('.gif', '.webm', '.mp4'):
+        os.replace(tmp_path, filepath)
         return
 
     from PIL import Image, ImageOps
     Image.MAX_IMAGE_PIXELS = CUSTOM_BACKGROUND_MAX_PIXELS
 
-    file_storage.seek(0)
     try:
-        with Image.open(file_storage.stream) as img:
+        with Image.open(tmp_path) as img:
             img = ImageOps.exif_transpose(img)
             if img.mode not in ('RGB', 'RGBA'):
                 has_alpha = 'A' in img.getbands() or (
@@ -137,13 +148,19 @@ def optimize_custom_background(file_storage, filepath, ext):
                 img.save(filepath, format='WEBP', quality=85, method=6)
             else:
                 img.convert('RGB').save(filepath, format='JPEG', quality=85, optimize=True, progressive=True)
+        unlink_quiet(tmp_path)
     except Exception:
-        file_storage.seek(0)
-        file_storage.save(filepath)
+        # Optimizasyon başarısız: orijinal dosyayı hedefe taşı (işlev bozulmaz).
+        unlink_quiet(filepath)
+        try:
+            os.replace(tmp_path, filepath)
+        except OSError:
+            unlink_quiet(tmp_path)
+            raise
 
 
 def remove_old_custom_backgrounds():
-    """Delete all files in the backgrounds directory (keep only the latest)."""
+    """Delete all files in the backgrounds directory (active root background)."""
     background_dir = get_backgrounds_dir()
     if not os.path.isdir(background_dir):
         return
@@ -157,11 +174,17 @@ def remove_old_custom_backgrounds():
 
 
 def find_custom_background():
-    """Return the path of the current custom background file, or None."""
+    """Return the path of the current custom background file, or None.
+
+    Yalnızca UUID biçimindeki arkaplan dosyaları dikkate alınır; yarım kalmış
+    ``.tmp`` dosyaları veya başka artıklar asla arkaplan olarak servis edilmez.
+    """
     background_dir = get_backgrounds_dir()
     if not os.path.isdir(background_dir):
         return None
     for name in os.listdir(background_dir):
+        if not safe_background_filename(name):
+            continue
         filepath = os.path.join(background_dir, name)
         if os.path.isfile(filepath):
             return filepath
@@ -184,6 +207,45 @@ def safe_background_filename(name):
     if base and _CUSTOM_BACKGROUND_NAME_RE.match(base):
         return base
     return None
+
+
+def file_sha256(filepath):
+    """Return the hex SHA-256 digest of a file, or None on read error."""
+    digest = hashlib.sha256()
+    try:
+        with open(filepath, 'rb') as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+def unlink_quiet(filepath):
+    """Best-effort file deletion (missing files are not an error)."""
+    try:
+        os.unlink(filepath)
+    except OSError:
+        pass
+
+
+def find_background_by_hash(meta, digest):
+    """Return the filename of an existing background with the same SHA-256 digest."""
+    if not digest:
+        return None
+    for name, info in meta.items():
+        if isinstance(info, dict) and info.get('sha256') == digest:
+            if safe_background_filename(name):
+                return name
+    return None
+
+
+def current_background_filename():
+    """Return the filename of the active root background, or None."""
+    path = find_custom_background()
+    if not path:
+        return None
+    return os.path.basename(path)
 
 
 def background_upload_allowed(client_key: str) -> bool:
@@ -269,13 +331,15 @@ def _ensure_background_metadata(meta, filename, filepath):
 
 
 def list_custom_background_history():
-    """Return history entries as [{filename, mtime, size, width, height, mime}]
+    """Return history entries as [{filename, mtime, size, width, height, mime, sha256}]
     sorted newest-first. Metadata is computed lazily for legacy files and
-    persisted back to the JSON index."""
+    persisted back to the JSON index. Dosyası artık var olmayan (harici silme
+    veya yarım kalmış işlem) meta kayıtları temizlenir."""
     history_dir = _custom_background_history_dir()
     meta = _load_custom_background_metadata()
     changed = False
     entries = []
+    seen = set()
     try:
         for name in os.listdir(history_dir):
             filename = safe_background_filename(name)
@@ -286,6 +350,7 @@ def list_custom_background_history():
                 mtime = os.path.getmtime(filepath)
             except OSError:
                 continue
+            seen.add(filename)
             existed = filename in meta
             info = _ensure_background_metadata(meta, filename, filepath)
             if not existed:
@@ -297,9 +362,22 @@ def list_custom_background_history():
                 'width': info.get('width'),
                 'height': info.get('height'),
                 'mime': info.get('mime'),
+                'sha256': info.get('sha256'),
             })
     except OSError:
         return []
+    # Orphan meta kayıtlarını temizle: dosya ne history'de ne de kökte yoksa
+    # kayıt geçersizdir (aktif kök dosyanın kaydı korunur).
+    root_dir = get_backgrounds_dir()
+    for name in list(meta.keys()):
+        if not safe_background_filename(name):
+            continue
+        if name in seen:
+            continue
+        if os.path.isfile(os.path.join(root_dir, name)):
+            continue  # aktif kök dosya
+        meta.pop(name, None)
+        changed = True
     entries.sort(key=lambda entry: entry['mtime'], reverse=True)
     if changed:
         _save_custom_background_metadata(meta)
@@ -324,8 +402,14 @@ def prune_custom_background_history():
         _save_custom_background_metadata(meta)
 
 
-def move_current_to_history():
-    """Move the current root background into history (if any) and prune."""
+def move_current_to_history(prune: bool = True):
+    """Move the current root background into history (if any).
+
+    ``prune=False`` verildiğinde budama yapılmaz; çağıran (ör. dedup/aktifleştirme
+    akışı) hedef dosyayı köke taşıdıktan sonra budamayı kendisi yapar. Taşıma
+    hatası sessizce yutulmaz: kökte iki dosya kalıp hangisinin "aktif" olduğu
+    belirsizleşmesin diye hata yukarı fırlatılır.
+    """
     background_dir = get_backgrounds_dir()
     if not os.path.isdir(background_dir):
         return
@@ -337,11 +421,9 @@ def move_current_to_history():
         source = os.path.join(background_dir, filename)
         if not os.path.isfile(source):
             continue
-        try:
-            shutil.move(source, os.path.join(history_dir, filename))
-        except OSError:
-            pass
-    prune_custom_background_history()
+        shutil.move(source, os.path.join(history_dir, filename))
+    if prune:
+        prune_custom_background_history()
 
 
 def clear_custom_background_history():
@@ -356,3 +438,4 @@ def clear_custom_background_history():
                 os.unlink(filepath)
             except OSError:
                 pass
+    unlink_quiet(os.path.join(history_dir, _BACKGROUND_METADATA_NAME))

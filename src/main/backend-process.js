@@ -26,6 +26,8 @@ const { createBackendNet } = require('./backend-net');
 const { getPinnedHttpsOptions, resetPinnedCertificateCache } = require('./certificates');
 const { showFriendlyFatalError } = require('./fatal-errors');
 const { loadBackendPage } = require('./page-loader');
+const { verifyQuickIntegritySync, verifyFullIntegrityAsync } = require('./integrity');
+const bench = require('./startup-timing');
 
 const PYTHON_COMMAND = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 
@@ -87,7 +89,20 @@ async function startFlaskServer(timeoutMs) {
       ? [resolvePath(path.join('backend', backendBinary)), []]
       : [PYTHON_COMMAND, [path.join(APP_ROOT, 'flask_app', 'app.py')]];
 
+    if (app.isPackaged) {
+      const quickIntegrity = verifyQuickIntegritySync();
+      if (quickIntegrity.status === 'tampered') {
+        console.error('[integrity] KRİTİK: ' + quickIntegrity.message);
+        reject(new Error(`Backend bütünlük doğrulaması BAŞARISIZ.\n${quickIntegrity.message}\n\nPaket değiştirilmiş olabilir. Kurulumu yenileyin veya orijinal paketi kullanın.`));
+        return;
+      }
+      if (quickIntegrity.status === 'ok') {
+        console.log('[integrity] Kritik backend dosyaları doğrulandı (imza + hash).');
+      }
+    }
+
     console.log(`Flask baslatiliyor: ${command} ${args.join(' ')} (${flaskHost}:${rt.PORT})`);
+    bench.mark('flask-spawn');
 
     const spawnedProcess = spawn(command, args, {
       env: { ...process.env, APP_TOKEN,
@@ -112,8 +127,27 @@ async function startFlaskServer(timeoutMs) {
       if (startupSettled) return;
       startupSettled = true;
       startupComplete = true;
+      bench.mark('flask-ready');
       resolve();
     };
+
+    if (app.isPackaged) {
+      // Tam ağaç bütünlük taraması spawn ile paralel ilerler; uyumsuzlukta arka
+      // plan süreci durdurulur (veriler çalıştırılmadan önce değil, hızlı yol).
+      verifyFullIntegrityAsync().then((result) => {
+        if (result.status !== 'tampered') return;
+        console.error('[integrity] Tam tarama uyumsuzlukları:', result.mismatches.slice(0, 20));
+        try { kill(spawnedProcess.pid, 'SIGKILL', () => {}); } catch (_) {}
+        if (rt.isQuiting) return;
+        setTimeout(() => {
+          showFriendlyFatalError(
+            'INT',
+            new Error((result.mismatches || []).slice(0, 8).join('\n')),
+            'ŞifreKasam bütünlük doğrulaması başarısız oldu — paket değiştirilmiş olabilir.'
+          );
+        }, 250);
+      });
+    }
 
     let stderrBuffer = '';
     spawnedProcess.stdout.on('data', () => {});

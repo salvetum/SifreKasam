@@ -166,12 +166,44 @@ html[data-glass-effects="off"] .history-entry {
 }
 [data-bs-theme="light"] .kasa-btn-primary * { color: #fff !important; }
 
+[data-bs-theme="light"] .kasa-btn-secondary {
+    color: #4636c4 !important;
+    background: linear-gradient(145deg, rgba(124,111,247,0.20), rgba(79,145,255,0.12)) !important;
+    border-color: rgba(124,111,247,0.35) !important;
+}
+[data-bs-theme="light"] .kasa-btn-secondary:hover {
+    color: #3627a8 !important;
+    background: linear-gradient(145deg, rgba(124,111,247,0.26), rgba(79,145,255,0.16)) !important;
+}
+[data-bs-theme="light"] .kasa-btn-ghost {
+    color: #59677e !important;
+    background: transparent !important;
+    border-color: rgba(31,41,55,0.14) !important;
+}
+[data-bs-theme="light"] .kasa-btn-ghost:hover {
+    color: #1d2940 !important;
+    background: rgba(31,41,55,0.06) !important;
+}
+
 [data-bs-theme="light"] .kasa-btn-danger         { color: #b42318 !important; background: rgba(239,68,68,0.08) !important; border-color: rgba(180,35,24,0.18) !important; }
 [data-bs-theme="light"] .kasa-btn-danger:hover   { color: #912018 !important; background: rgba(239,68,68,0.12) !important; }
 [data-bs-theme="light"] .kasa-alert-danger       { color: #b42318 !important; background: rgba(239,68,68,0.08) !important; }
 
 [data-bs-theme="light"] .filter-btn-active,
 [data-bs-theme="light"] .filter-btn.active { color: #5748d9 !important; background: linear-gradient(110deg, rgba(124,111,247,0.18), rgba(79,145,255,0.14)) !important; }
+
+/* Açık temada istatistik chip'leri + rozetler */
+[data-bs-theme="light"] .stats-filter-chip:hover,
+[data-bs-theme="light"] .stats-filter-chip:focus-visible { background: rgba(31,41,55,0.05); }
+[data-bs-theme="light"] .stats-filter-chip.active { background: linear-gradient(110deg, rgba(124,111,247,0.15), rgba(79,145,255,0.11)); box-shadow: inset 0 0 0 1px rgba(79,70,229,0.35); }
+[data-bs-theme="light"] .stats-filter-chip.active .font-semibold { color: #4f46e5; }
+[data-bs-theme="light"] .stats-filter-chip[data-stat-filter="zayif"].active,
+[data-bs-theme="light"] .stats-filter-chip[data-stat-filter="expired"].active { background: linear-gradient(110deg, rgba(239,68,68,0.16), rgba(249,115,22,0.10)); box-shadow: inset 0 0 0 1px rgba(220,38,38,0.4); }
+[data-bs-theme="light"] .stats-filter-chip[data-stat-filter="zayif"].active .font-semibold,
+[data-bs-theme="light"] .stats-filter-chip[data-stat-filter="expired"].active .font-semibold { color: #dc2626; }
+[data-bs-theme="light"] .stats-filter-chip[data-stat-filter="eski"].active { background: linear-gradient(110deg, rgba(14,165,233,0.13), rgba(79,70,229,0.10)); box-shadow: inset 0 0 0 1px rgba(2,132,199,0.35); }
+[data-bs-theme="light"] .stats-filter-chip[data-stat-filter="eski"].active .font-semibold { color: #0284c7; }
+[data-bs-theme="light"] .vault-detail-label i { color: #6b7280; }
 
 /* Açık temada buton vibrance (yalnızca butonlar) */
 [data-bs-theme="light"] .kasa-btn:not(.kasa-btn-primary),
@@ -200,6 +232,38 @@ html[data-glass-effects="off"] .history-entry {
 [data-bs-theme="light"] .text-red-400 { color: #b42318 !important; }
 
 [data-bs-theme="light"] .vault-type-icon  { background: rgba(255,255,255,0.72); border-color: rgba(31,41,55,0.10); }
+[data-bs-theme="light"] .vault-type-icon .brand-icon { color: #41506c; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="github"]    { --brand-c: #24292f; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="google"]    { --brand-c: #4285f4; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="youtube"]   { --brand-c: #cc0000; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="instagram"] { --brand-c: #c13584; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="discord"]   { --brand-c: #5865f2; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="huggingface"] { --brand-c: #d97706; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="steam"]     { --brand-c: #1a6da6; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="x"]         { --brand-c: #111418; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="twitter"]   { --brand-c: #1da1f2; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="linkedin"]  { --brand-c: #0a66c2; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="facebook"]  { --brand-c: #1877f2; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="reddit"]    { --brand-c: #ff4500; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="twitch"]    { --brand-c: #9146ff; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="telegram"]  { --brand-c: #26a5e4; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="whatsapp"]  { --brand-c: #25d366; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="spotify"]   { --brand-c: #1db954; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="netflix"]   { --brand-c: #e50914; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="amazon"]    { --brand-c: #c37a00; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="apple"]     { --brand-c: #444; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="microsoft"] { --brand-c: #00a4ef; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="slack"]     { --brand-c: #611f69; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="figma"]     { --brand-c: #e03c31; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="dropbox"]   { --brand-c: #0061ff; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="paypal"]    { --brand-c: #003087; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="gitlab"]    { --brand-c: #e24329; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="zoom"]      { --brand-c: #2d8cff; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="notion"]    { --brand-c: #37352f; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="pinterest"] { --brand-c: #bd081c; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="tiktok"]    { --brand-c: #111418; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="stackoverflow"] { --brand-c: #f48024; }
+[data-bs-theme="light"] .vault-type-icon .brand-icon[data-brand="default"]   { --brand-c: #4f46e5; }
 [data-bs-theme="light"] .vault-detail-row { background: rgba(255,255,255,0.58); border-color: rgba(31,41,55,0.09); }
 [data-bs-theme="light"] a:not(.kasa-btn):not(.footer-action-btn):not(.card-icon-btn)       { color: #4338ca; }
 [data-bs-theme="light"] a:not(.kasa-btn):not(.footer-action-btn):not(.card-icon-btn):hover  { color: #1d4ed8; }

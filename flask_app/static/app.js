@@ -10,10 +10,13 @@ import { initCustomControls } from './custom-controls.js';
 import { initLanSettings } from './lan-settings.js';
 import { initModalSystem } from './modal-system.js';
 import { initHeartbeat } from './heartbeat.js';
+import { initNotifications } from './notifications.js?v=9.3';
+import { initScanSession } from './scan-session.js';
 import { initAppearanceSettings } from './appearance-settings.js';
 import { initVaultIndex } from './vault-index.js';
 import { initVaultForm } from './vault-form.js';
 import { initFormCalendar } from './form-calendar.js';
+import { initDataPanel } from './data-panel.js';
 import {
   normalizeHexColor,
   hexToRgb,
@@ -153,6 +156,91 @@ document.addEventListener('DOMContentLoaded', () => {
     return wrapper;
   };
 
+  const KASA_BG_POS_KEY = 'kasa-bg-video-pos';
+  const readBgVideoPos = (url) => {
+    try {
+      const raw = localStorage.getItem(KASA_BG_POS_KEY);
+      if (!raw) return 0;
+      const saved = JSON.parse(raw);
+      if (!saved || saved.url !== url) return 0;
+      return Number(saved.t) || 0;
+    } catch (e) { return 0; }
+  };
+  const writeBgVideoPos = (url, t) => {
+    try {
+      localStorage.setItem(KASA_BG_POS_KEY, JSON.stringify({ url, t: Number(t) || 0 }));
+    } catch (e) { /* localStorage dolu/erişilemez */ }
+  };
+  const clearBgVideoPos = () => {
+    try { localStorage.removeItem(KASA_BG_POS_KEY); } catch (e) { /* yoksay */ }
+  };
+  const KASA_BG_FRAME_KEY = 'kasa-bg-frame';
+  const writeBgVideoFrame = (url, t, poster) => {
+    try {
+      localStorage.setItem(KASA_BG_FRAME_KEY, JSON.stringify({ url, t: Number(t) || 0, poster }));
+    } catch (e) { /* kota/ağ erişimi yok — yoksay */ }
+  };
+  const captureBgVideoFrame = (v, url, t) => {
+    try {
+      const w = v.videoWidth || 0;
+      const h = v.videoHeight || 0;
+      if (!w || !h || !v.currentTime || v.readyState < 2) return false;
+      const MAX_W = 1280;
+      const scale = Math.min(1, MAX_W / w);
+      const cw = Math.max(1, Math.round(w * scale));
+      const ch = Math.max(1, Math.round(h * scale));
+      const cv = document.createElement('canvas');
+      cv.width = cw;
+      cv.height = ch;
+      cv.getContext('2d').drawImage(v, 0, 0, cw, ch);
+      const poster = cv.toDataURL('image/jpeg', 0.7);
+      writeBgVideoFrame(url, typeof t === 'number' ? t : v.currentTime, poster);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+  const restoreBgFrame = (url) => {
+    try {
+      const raw = localStorage.getItem(KASA_BG_FRAME_KEY);
+      if (!raw) return null;
+      const saved = JSON.parse(raw);
+      if (!saved || saved.url !== url || !saved.poster || Number(saved.t) <= 1) return null;
+      return saved;
+    } catch (e) { return null; }
+  };
+  const installBgVideoPositionTracking = () => {
+    const activeVideoInfo = () => {
+      const layer = document.getElementById('custom-bg-layer');
+      const v = document.getElementById('custom-bg-video');
+      return { v, url: layer ? layer.getAttribute('data-bg-url') : null };
+    };
+    let lastWrite = 0;
+    let lastFrame = 0;
+    /* timeupdate yükselmez (bubble yok) → yakalamalı (capture) dinleyici. */
+    document.addEventListener('timeupdate', (e) => {
+      if (e.target !== document.getElementById('custom-bg-video')) return;
+      const { v, url } = activeVideoInfo();
+      if (!v || !url || v.paused || !v.classList.contains('is-active')) return;
+      const now = performance.now();
+      if (now - lastWrite < 2000) return;
+      lastWrite = now;
+      writeBgVideoPos(url, v.currentTime);
+      if (now - lastFrame < 20000) return;
+      lastFrame = now;
+      captureBgVideoFrame(v, url, v.currentTime);
+    }, true);
+    /* Son kare pagehide'da saklanır: pozisyon hızlı/yalnız oynarken yazılıp
+       kare (devam karesi) sonraki sayfanın ilk boyasına poster olur. */
+    window.addEventListener('pagehide', () => {
+      const { v, url } = activeVideoInfo();
+      if (!v || !url || !v.classList.contains('is-active')) return;
+      if (!v.paused) writeBgVideoPos(url, v.currentTime);
+      captureBgVideoFrame(v, url, v.currentTime);
+    });
+  };
+  installBgVideoPositionTracking();
+
   const applyAppearance = (accent, background) => {
     const normalizedAccent = normalizeHexColor(accent);
     const normalizedBackground = ['aurora', 'midnight', 'mesh', 'plain', 'custom'].includes(background)
@@ -166,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
       --accent-2-rgb: ${hexToRgb(accent2)};
     }`);
     document.documentElement.setAttribute('data-kasa-background', normalizedBackground);
+    const lowPowerMode = document.documentElement.getAttribute('data-kasa-low-power') === 'on';
     const customLayer = document.getElementById('custom-bg-layer');
     if (customLayer) {
       const bgUrl = customLayer.getAttribute('data-bg-url');
@@ -176,8 +265,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!isActive) {
         customLayer.classList.remove('is-loaded');
       }
+      const frameForVideo = isActive && isVideo ? restoreBgFrame(bgUrl) : null;
       window.KASA_SET_RUNTIME_STYLE?.('custom-background',
-        isActive && !isVideo ? `#custom-bg-layer.is-active { background-image: url(${bgUrl}); }` : ''
+        isActive && !isVideo ? `#custom-bg-layer.is-active { background-image: url(${bgUrl}); }`
+          : isActive && isVideo && frameForVideo ? `#custom-bg-layer.is-active { background-image: url(${frameForVideo.poster}); }`
+          : ''
       );
       if (isActive && !isVideo) {
         const probe = new Image();
@@ -188,11 +280,68 @@ document.addEventListener('DOMContentLoaded', () => {
       const bgVideo = document.getElementById('custom-bg-video');
       if (bgVideo) {
         if (isActive && isVideo) {
+          const markPlayed = () => {
+            if (bgVideo.dataset.kasaPosterCleared) return;
+            bgVideo.dataset.kasaPosterCleared = '1';
+            /* Poster karesi (devam karesiyle aynı) kullanılınca kuralı kaldır —
+               video artık canlı. */
+            window.KASA_SET_RUNTIME_STYLE?.('custom-background', '');
+            captureBgVideoFrame(bgVideo, bgUrl, bgVideo.currentTime);
+          };
           if (bgVideo.getAttribute('src') !== bgUrl) {
             bgVideo.setAttribute('src', bgUrl);
+            bgVideo.autoplay = !lowPowerMode;
+          }
+          const onVideoError = () => {
+            if (bgVideo.dataset.kasaErrorToast) return;
+            bgVideo.dataset.kasaErrorToast = '1';
+            showWarningToast(window._('Arka plan videosu oynatılamadı. Video codec türü desteklenmiyor olabilir.'));
+          };
+          const startVideo = () => {
+            if (bgVideo.dataset.kasaResumeDone) return;
+            bgVideo.dataset.kasaResumeDone = '1';
+            if (lowPowerMode) {
+              /* Güç tasarrufu: oynatmadan gerçek kareye al — statik poster
+                 (0'da bırakmak kara zemin üretiyordu). */
+              if (bgVideo.paused) {
+                try { bgVideo.currentTime = 0.05; } catch (e) { /* kare henüz yüklü değil */ }
+              }
+              captureBgVideoFrame(bgVideo, bgUrl, 0.05);
+              return;
+            }
+            const resumeAt = readBgVideoPos(bgUrl);
+            try {
+              if (resumeAt > 0.5 && Number.isFinite(bgVideo.duration) && resumeAt < bgVideo.duration - 0.75) {
+                bgVideo.currentTime = resumeAt;
+              }
+            } catch (e) { /* süre henüz bilinmiyor */ }
+            if (!bgVideo.dataset.kasaPosterHook) {
+              bgVideo.dataset.kasaPosterHook = '1';
+              /* Video devam karesine seek edilip oynayınca poster karesi
+                 (aynı kare — göze batmaz) temizlenir. */
+              bgVideo.addEventListener('seeked', markPlayed, { once: true });
+              bgVideo.addEventListener('playing', markPlayed, { once: true });
+            }
+            bgVideo.play?.().catch(() => {});
+          };
+          bgVideo.classList.add('is-active');
+          /* Oynat/durdur politikasını her seferinde uygula: aynı sayfada
+             tasarruf açılırsa video donsun (poster), kapatılırsa devam etsin. */
+          if (lowPowerMode) {
+            if (!bgVideo.paused) bgVideo.pause?.();
+          } else if (bgVideo.paused && bgVideo.readyState >= 2 && bgVideo.getAttribute('src')) {
             bgVideo.play?.().catch(() => {});
           }
-          bgVideo.classList.add('is-active');
+          bgVideo.removeEventListener('loadedmetadata', startVideo);
+          if (bgVideo.readyState >= 2) {
+            startVideo();
+          } else {
+            bgVideo.addEventListener('loadedmetadata', startVideo, { once: true });
+          }
+          bgVideo.removeEventListener('error', onVideoError);
+          bgVideo.addEventListener('error', onVideoError);
+          bgVideo.removeEventListener('loadeddata', markLoaded);
+          bgVideo.removeEventListener('error', markLoaded);
           if (bgVideo.readyState >= 2) {
             markLoaded();
           } else {
@@ -440,6 +589,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const link = e.target.closest('a');
     const href = link?.getAttribute('href');
     if (!href) return;
+    // Diğer dinleyiciler gezinmeyi iptal ettiyse (örn. sağlık ekranının
+    // navbar geri düğmesi detay kapatırken preventDefault yapar) overlay'i
+    // gösterme; aksi halde ekran sonsuz yükleme görünümünde kilitlenir.
+    if (e.defaultPrevented) return;
     const isDownload = link.hasAttribute('download')
       || link.target === '_blank'
       || link.hasAttribute('data-no-loading')
@@ -503,12 +656,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── 4a. TOAST SİSTEMİ (toast.js) ────────────────────────────────────
   initToastSystem({ apiFetch, triggerBlobDownload });
+  initNotifications({ apiFetch });
+  initScanSession({ apiFetch });
+  initDataPanel({ apiFetch });
 
   document.querySelectorAll('[data-export-format]').forEach(exportButton => {
     exportButton.addEventListener('click', async (event) => {
       event.preventDefault();
       const exportFormat = exportButton.dataset.exportFormat || 'json';
+      const exportKind = exportButton.dataset.exportKind || '';
       const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+      // Şifreli yedek: iki adımlı akış — PREPARE (şifre üret + dosya hazır),
+      // sonra kullanıcıya tek seferlik şifreyi göster.
+      if (exportKind === 'encrypted') {
+        const url = exportButton.dataset.exportUrl || '/api/export/encrypted';
+        try {
+          const prepareResp = await window.KASA_API_FETCH(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          });
+          if (!prepareResp || !prepareResp.ok) throw new Error('encrypted-prepare-failed');
+          const prepareData = await prepareResp.json().catch(() => null);
+          if (!prepareData || prepareData.status !== 'ok' || !prepareData.token) {
+            throw new Error('encrypted-prepare-invalid');
+          }
+
+          const reveal = document.getElementById('encrypted-export-reveal');
+          const pwdEl = document.getElementById('encrypted-export-password');
+          const dlBtn = document.getElementById('encrypted-export-download-btn');
+          if (reveal && pwdEl && dlBtn) {
+            pwdEl.textContent = prepareData.password || '';
+            reveal.hidden = false;
+            // İndirme butonuna token'ı bağla — tek kullanımlık.
+            dlBtn.dataset.downloadToken = prepareData.token;
+            dlBtn.dataset.downloadFilename =
+              (prepareData.filename || 'sifrekasam_guvenli_yedek') + '.kasaenc';
+            reveal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        } catch (err) {
+          console.error('Encrypted export prepare failed:', err);
+          showWarningToast(window._('Şifreli yedek oluşturulamadı.'));
+        }
+        return;
+      }
+
       exportButton.disabled = true;
       try {
         await downloadFromEndpoint(
@@ -525,6 +718,59 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // Şifreli yedek: şifreyi kopyala + dosyayı indir + vazgeç.
+  const bindEncryptedExportActions = () => {
+    const copyBtn = document.getElementById('encrypted-export-copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const pwdEl = document.getElementById('encrypted-export-password');
+        const pwd = pwdEl?.textContent || '';
+        if (!pwd) return;
+        try {
+          await navigator.clipboard.writeText(pwd);
+          showSuccessToast(window._('Şifre kopyalandı.'));
+        } catch {
+          showWarningToast(window._('Kopyalanamadı.'));
+        }
+      });
+    }
+
+    const dlBtn = document.getElementById('encrypted-export-download-btn');
+    if (dlBtn) {
+      dlBtn.addEventListener('click', async () => {
+        const token = dlBtn.dataset.downloadToken;
+        if (!token) return;
+        const filename = dlBtn.dataset.downloadFilename || 'sifrekasam_guvenli_yedek.kasaenc';
+        dlBtn.disabled = true;
+        try {
+          const resp = await window.KASA_API_FETCH(`/export/encrypted/${token}`);
+          if (!resp || !resp.ok) {
+            showWarningToast(window._('İndirme bağlantısı süresi doldu veya kullanıldı.'));
+            return;
+          }
+          const blob = await resp.blob();
+          window.KASA_TRIGGER_BLOB_DOWNLOAD?.(blob, filename);
+          window.kasaModalKapat?.('exportModal');
+          window.kasaModalKapat?.('settingsModal');
+        } catch (err) {
+          console.error('Encrypted export download failed:', err);
+          showWarningToast(window._('Dışa aktarma başarısız oldu.'));
+        } finally {
+          dlBtn.disabled = false;
+        }
+      });
+    }
+
+    const cancelBtn = document.getElementById('encrypted-export-cancel-btn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        const reveal = document.getElementById('encrypted-export-reveal');
+        if (reveal) reveal.hidden = true;
+      });
+    }
+  };
+  bindEncryptedExportActions();
 
   const validationMessageFor = (field) => {
     if (field.validity.valueMissing) return window._('Lütfen bu alanı doldurun.');
@@ -617,6 +863,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await apiJson('/api/update-check');
       const currentVersion = `v${data.current_version}`;
       const latestVersion = `v${data.latest_version}`;
+
+      if (data.status === 'disabled') {
+        if (updateCheckStatus) updateCheckStatus.textContent = window._('Güncelleme kontrolü kapalı.');
+        setUpdateCheckResult(
+          window._('İnternet Kill-Switch açık'),
+          window._('Güncelleme kontrolü çevrimdışı.'),
+          'is-current'
+        );
+        return;
+      }
 
       if (data.has_update) {
         if (updateCheckStatus) {
@@ -891,6 +1147,19 @@ document.addEventListener('DOMContentLoaded', () => {
       updateSettingsUnsavedBadge(settingsFormSnapshot);
     }, 0);
 
+    // İnternet Kill-Switch ve Canlı Sızıntı Taraması: durum notlarını
+    // toggle'a göre göster/gizle (ayar formundaki diğer kutularla aynı).
+    const killSwitchToggle = document.getElementById('internet-kill-switch-toggle');
+    const liveScanToggle = document.getElementById('live-breach-scan-toggle');
+    const syncNetworkPolicyNotes = () => {
+      const activeNote = document.getElementById('kill-switch-active-note');
+      if (activeNote) activeNote.hidden = !killSwitchToggle?.checked;
+      const conflictNote = document.getElementById('live-scan-kill-switch-note');
+      if (conflictNote) conflictNote.hidden = !(liveScanToggle?.checked && killSwitchToggle?.checked);
+    };
+    killSwitchToggle?.addEventListener('change', syncNetworkPolicyNotes);
+    liveScanToggle?.addEventListener('change', syncNetworkPolicyNotes);
+
     // LAN uyarısı: toggle açılırken gösterilir (kayıt anında değil).
     // "Bir daha gösterme" seçimi localStorage'da tutulur.
     const LAN_WARNING_DISMISS_KEY = 'kasa-lan-warning-dismissed';
@@ -967,8 +1236,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (dontShowAgain) {
           localStorage.setItem(LAN_WARNING_DISMISS_KEY, '1');
-          // Port her açılışta değiştiği için localStorage sıfırlanıyor; kalıcılık sunucuda.
-          apiPost('/settings/appearance', { lan_warning_acknowledged: true });
         }
         showPending();
       });
@@ -1087,6 +1354,13 @@ document.addEventListener('DOMContentLoaded', () => {
           lanToggle.checked = data.lan_enabled;
           if (data.lan_enabled) showActive(); else hide();
         }
+        if (typeof data.internet_kill_switch_enabled === 'boolean' && killSwitchToggle) {
+          killSwitchToggle.checked = data.internet_kill_switch_enabled;
+        }
+        if (typeof data.live_breach_scan_enabled === 'boolean' && liveScanToggle) {
+          liveScanToggle.checked = data.live_breach_scan_enabled;
+        }
+        syncNetworkPolicyNotes();
         settingsFormSnapshot = getSettingsSnapshot();
         updateSettingsUnsavedBadge(settingsFormSnapshot);
         showSuccessToast(window._('Ayarlar kaydedildi.'));
@@ -1110,12 +1384,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const importFileInput = document.getElementById('import-file');
   const importDropZone = document.getElementById('import-drop-zone');
   const importFileName = document.getElementById('import-file-name');
-  const supportedImportExtensions = new Set(['.json', '.kasa', '.txt']);
+  const importPasswordWrap = document.getElementById('import-password-wrap');
+  const importFilePassword = document.getElementById('import-file-password');
+  const supportedImportExtensions = new Set(['.json', '.kasaenc', '.txt']);
+
+  const setImportPasswordVisibility = (isEncrypted) => {
+    if (importPasswordWrap) importPasswordWrap.hidden = !isEncrypted;
+    if (isEncrypted && importFilePassword) {
+      importFilePassword.setAttribute('required', '');
+      importFilePassword.setAttribute('aria-required', 'true');
+    } else if (importFilePassword) {
+      importFilePassword.removeAttribute('required');
+      importFilePassword.removeAttribute('aria-required');
+      importFilePassword.value = '';
+    }
+  };
+  setImportPasswordVisibility(false);
 
   const resetImportFile = () => {
     if (importFileInput) importFileInput.value = '';
     if (importFileName) importFileName.textContent = window._('Dosya seçilmedi');
     importDropZone?.classList.remove('has-file');
+    setImportPasswordVisibility(false);
   };
 
   const useImportFile = (file) => {
@@ -1126,7 +1416,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!supportedImportExtensions.has(extension)) {
       resetImportFile();
-      showWarningToast(window._('Yalnızca .kasa, .json veya .txt dosyaları içe aktarılabilir.'));
+      showWarningToast(window._('Yalnızca .json, .kasaenc veya .txt dosyaları içe aktarılabilir.'));
       return false;
     }
     if (file.size > maxBytes) {
@@ -1153,6 +1443,7 @@ document.addEventListener('DOMContentLoaded', () => {
       importFileName.textContent = `${file.name} · ${fileSize}`;
     }
     importDropZone?.classList.add('has-file');
+    setImportPasswordVisibility(extension === '.kasaenc');
     return true;
   };
 
@@ -1213,22 +1504,88 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── 6b. BAŞLIK DROPDOWN (Ayarlar) ──────────────────────────────────────
   const headerDropdowns = Array.from(document.querySelectorAll('[data-kasa-dropdown]'));
 
+  /* Portal-aware menu bulucu: menü artık dropdown wrapper içinde olmayabilir
+     (navbar blur'den bağımsız cam için DOM'dan taşındı). aria-controls ile
+     ID üzerinden bulur; bulamazsa eski querySelector fallback'i çalışır. */
+  const findMenu = (dropdown) => {
+    const trigger = dropdown.querySelector('.kasa-dropdown-trigger');
+    const menuId = trigger?.getAttribute('aria-controls');
+    if (menuId) {
+      const el = document.getElementById(menuId);
+      if (el) return el;
+    }
+    return dropdown.querySelector('.kasa-dropdown-menu');
+  };
+
+  /* Portal dropdown konumlandırma: trigger'ın altına position:fixed ile yerleştirir.
+     Viewport taşması hemen (synchronous) kontrol edilir — rAF.flash önleme
+     için konum + overflow tek frame'de tamamlanır. */
+  const positionDropdownMenu = (trigger, menu) => {
+    const rect = trigger.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 8}px`;
+    menu.style.left = `${rect.left}px`;
+    const mRect = menu.getBoundingClientRect();
+    if (mRect.right > window.innerWidth - 8) {
+      menu.style.left = `${Math.max(8, window.innerWidth - mRect.width - 8)}px`;
+    }
+    if (mRect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${Math.max(8, rect.top - mRect.height - 8)}px`;
+    }
+  };
+
+  const resetDropdownMenuPosition = (menu) => {
+    menu.style.position = '';
+    menu.style.top = '';
+    menu.style.left = '';
+  };
+
+  /* ── Scroll/resize sırasında açık dropdown'ı trigger'a sabit tut ── */
+  let _activeDropdownTrigger = null;
+  let _activeDropdownMenu = null;
+
+  const _repositionOnScroll = () => {
+    if (_activeDropdownTrigger && _activeDropdownMenu && !_activeDropdownMenu.hidden) {
+      positionDropdownMenu(_activeDropdownTrigger, _activeDropdownMenu);
+    }
+  };
+
+  const _attachDropdownPositionListeners = (trigger, menu) => {
+    _detachDropdownPositionListeners();
+    _activeDropdownTrigger = trigger;
+    _activeDropdownMenu = menu;
+    window.addEventListener('scroll', _repositionOnScroll, { passive: true });
+    window.addEventListener('resize', _repositionOnScroll, { passive: true });
+  };
+
+  const _detachDropdownPositionListeners = () => {
+    window.removeEventListener('scroll', _repositionOnScroll);
+    window.removeEventListener('resize', _repositionOnScroll);
+    _activeDropdownTrigger = null;
+    _activeDropdownMenu = null;
+  };
+
   const closeHeaderDropdowns = (except) => {
     headerDropdowns.forEach(dropdown => {
       if (dropdown === except) return;
       const trigger = dropdown.querySelector('.kasa-dropdown-trigger');
-      const menu = dropdown.querySelector('.kasa-dropdown-menu');
+      const menu = findMenu(dropdown);
       if (!menu) return;
       menu.classList.remove('is-open');
       trigger?.setAttribute('aria-expanded', 'false');
       clearTimeout(dropdown._kasaMenuHideTimeout);
-      dropdown._kasaMenuHideTimeout = setTimeout(() => { menu.hidden = true; }, 120);
+      dropdown._kasaMenuHideTimeout = setTimeout(() => {
+        menu.hidden = true;
+        resetDropdownMenuPosition(menu);
+      }, 120);
     });
+    // Menü kapandığında scroll/resize listener'larını temizle
+    _detachDropdownPositionListeners();
   };
 
   headerDropdowns.forEach(dropdown => {
     const trigger = dropdown.querySelector('.kasa-dropdown-trigger');
-    const menu = dropdown.querySelector('.kasa-dropdown-menu');
+    const menu = findMenu(dropdown);
     if (!trigger || !menu) return;
 
     trigger.addEventListener('click', (event) => {
@@ -1238,8 +1595,15 @@ document.addEventListener('DOMContentLoaded', () => {
         closeHeaderDropdowns(dropdown);
         clearTimeout(dropdown._kasaMenuHideTimeout);
         menu.hidden = false;
-        requestAnimationFrame(() => menu.classList.add('is-open'));
         trigger.setAttribute('aria-expanded', 'true');
+        _attachDropdownPositionListeners(trigger, menu);
+        /* Flash'sız açılış: double-rAF ile konum hesaplanır, sonra is-open eklenir.
+           İlk rAF: layout hesaplanır + konum + overflow kontrolü.
+           İkinci rAF: is-open eklenir → opacity transition tetiklenir. */
+        requestAnimationFrame(() => {
+          positionDropdownMenu(trigger, menu);
+          requestAnimationFrame(() => menu.classList.add('is-open'));
+        });
       } else {
         closeHeaderDropdowns();
       }
@@ -1255,7 +1619,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('click', (event) => {
-    if (!event.target.closest('[data-kasa-dropdown]')) closeHeaderDropdowns();
+    if (!event.target.closest('[data-kasa-dropdown]') &&
+        !event.target.closest('.kasa-dropdown-menu')) closeHeaderDropdowns();
   });
 
   document.addEventListener('keydown', (event) => {
@@ -1263,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasVisibleModal = document.querySelector('.kasa-modal.is-visible:not(.is-closing)');
     if (hasVisibleModal) return;
     const openDropdown = headerDropdowns.find(dropdown => {
-      const menu = dropdown.querySelector('.kasa-dropdown-menu');
+      const menu = findMenu(dropdown);
       return menu && !menu.hidden;
     });
     if (openDropdown) {

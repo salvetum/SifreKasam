@@ -2,22 +2,21 @@
 
 {% block page_shell_class %}kasa-form-page-shell mx-auto px-4 py-8{% endblock %}
 
-{% block content %}
-<div class="vault-form-page card-animated">
-    <header class="vault-form-hero">
-        <div class="vault-form-title-wrap">
-            <span class="vault-form-icon"><i class="fa-solid fa-vault"></i></span>
-            <div>
-                <h1 id="vault-form-title" class="kasa-page-title">{{ title }}</h1>
-                <p>{{ _('Kayıt bilgilerini düzenleyin ve güvenli kasaya kaydedin.') }}</p>
-            </div>
-        </div>
-        <a href="{{ url_for('index') }}" class="kasa-btn kasa-btn-muted vault-form-back">
-            <i class="fa-solid fa-arrow-left text-xs"></i>{{ _('Geri') }}
-        </a>
-    </header>
+{% block navbar_crumb %}
+<span class="kasa-crumb-sep" aria-hidden="true">/</span>
+<span class="kasa-crumb-current"><i class="fa-solid fa-vault" aria-hidden="true"></i>{{ title }}</span>
+{% endblock %}
 
-    <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form data-unsaved-track aria-labelledby="vault-form-title">
+{% block navbar_after_lock %}
+<a href="{{ url_for('index') }}" class="kasa-crumb-back kasa-navbar-back" data-vazgec-back>
+    <i class="fa-solid fa-arrow-left text-xs"></i>{{ _('Geri') }}
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="vault-form-page">
+
+    <form method="POST" autocomplete="off" id="ekle-form" class="vault-form-grid" data-loading-form data-unsaved-track aria-label="{{ title }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         {% include 'partials/form/panel-main.html' %}
         {% include 'partials/form/panel-access.html' %}

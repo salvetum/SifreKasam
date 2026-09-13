@@ -133,7 +133,7 @@ function cleanupApplicationData(currentInstallRoot) {
     'sifrekasam-v2.3',
     'sifrekasam-v2.2',
     'SifrekasamV2.1',
-    'Kasa',
+    'Kasa', // todo; bunu silmek iyi olabilir. 
   ];
 
   const dataTargets = [
@@ -190,7 +190,7 @@ function removeKnownShortcuts(appData, userProfile, publicProfile) {
     'ŞifreKasam.lnk',
     'SifreKasam.lnk',
     'SifrekasamV2.1.lnk',
-    'Kasa.lnk',
+    'Kasa.lnk', // todo; bunu silmek iyi olabilir. 
   ];
 
   shortcutDirs.forEach(dir => {

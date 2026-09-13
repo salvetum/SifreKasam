@@ -16,7 +16,7 @@
                     <div class="mb-4">
                         <label for="import-file" class="block text-sm font-medium text-kasa-text-muted mb-2">{{ _('Dosya Seçin') }}</label>
                         <input type="file" class="import-file-input" id="import-file" name="file"
-                            accept=".json,.kasa,.txt" required>
+                            accept=".json,.txt,.kasaenc" required>
                         <label for="import-file" id="import-drop-zone" class="import-drop-zone" role="button"
                             tabindex="0" data-max-bytes="{{ config.get('MAX_CONTENT_LENGTH', 5242880) }}">
                             <span class="import-drop-icon" aria-hidden="true">
@@ -34,14 +34,27 @@
                                 {{ _('Dosya seçilmedi') }}
                             </span>
                         </label>
+                        <div id="import-password-wrap" class="mt-3 import-password-wrap" hidden>
+                            <label for="import-file-password" class="block text-sm font-medium text-kasa-text-muted mb-2">
+                                {{ _('Şifreli Yedek Şifresi') }}
+                            </label>
+                            <input type="password" id="import-file-password" name="file_password"
+                                class="kasa-field w-full" autocomplete="off"
+                                placeholder="••••••••••••"
+                                aria-describedby="import-password-hint">
+                            <p id="import-password-hint" class="text-xs text-kasa-text-muted mt-1">
+                                <i class="fa-solid fa-circle-info mr-1 text-[#38bdf8]"></i>
+                                {{ _('.kasaenc dosyaları için dışa aktarılırken gösterilen şifre gerekir.') }}
+                            </p>
+                        </div>
                         <div class="mt-3 p-3 kasa-panel-soft text-xs text-kasa-text-muted leading-loose">
                             <i class="fa-solid fa-circle-info mr-1 text-[#38bdf8]"></i>
-                            <strong class="text-kasa-text">.kasa</strong> — {{ _('ŞifreKasam formatı') }} &nbsp;·&nbsp;
+                            <strong class="text-kasa-text">.kasaenc</strong> — {{ _('şifreli yedek') }} &nbsp;·&nbsp;
                             <strong class="text-kasa-text">.json</strong> — {{ _('ham yedek') }} &nbsp;·&nbsp;
                             <strong class="text-kasa-text">.txt</strong> — {{ _('eski format') }}
                         </div>
                     </div>
-                    <button type="submit" id="import-submit" class="w-full kasa-btn kasa-btn-primary" aria-live="polite">
+                    <button type="submit" id="import-submit" class="mt-4 w-full kasa-btn kasa-btn-primary" aria-live="polite">
                         <i class="fa-solid fa-file-import mr-2"></i>{{ _('İçe Aktar') }}
                     </button>
                 </form>

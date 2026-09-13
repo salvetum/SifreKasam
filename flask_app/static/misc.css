@@ -106,43 +106,42 @@ html[data-kasa-gradient="off"] .filter-empty-state {
     box-shadow: var(--focus-ring);
 }
 
-.kasa-dropdown-trigger[aria-expanded="true"] .kasa-dropdown-caret {
-    transform: rotate(180deg);
-}
-
-.kasa-dropdown-caret {
-    transition: transform var(--motion-fast) ease;
-}
-
 .kasa-dropdown-menu {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    z-index: 120;
-    min-width: 220px;
+    z-index: 2000;
+    min-width: 250px;
     padding: 0.4rem;
-    border: var(--border-glass);
     border-radius: 16px;
-    background:
-        radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.16), transparent 42%),
-        radial-gradient(circle at 88% 100%, rgba(var(--accent-2-rgb), 0.14), transparent 40%),
-        linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.038)),
-        var(--glass);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), var(--shadow-modal);
-    backdrop-filter: var(--btn-vivid-blur);
-    -webkit-backdrop-filter: var(--btn-vivid-blur);
+    background: linear-gradient(160deg, rgba(var(--accent-rgb),0.18), rgba(12,14,28,0.82)) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: var(--border-glass) !important;
     opacity: 0;
+    visibility: hidden;
     transform: translateY(-4px);
     transition: opacity var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 
 .kasa-dropdown-menu.is-open {
     opacity: 1;
+    visibility: visible;
     transform: translateY(0);
 }
 
 .kasa-dropdown-menu[hidden] {
     display: none;
+}
+
+/* ── PORTAL DROPDOWN: body'de sabit konumlandırma ───────────────── */
+/* Bildirim menüsü (ve gelecekteki diğer portaledropdown'lar) navbar
+   DOM'undan ayrıdır; JS trigger.getBoundingClientRect() ile hesaplar.
+   CSS'te position:fixed varsayılır; top/left JS tarafından yazılır. */
+#kasa-portal-root .kasa-dropdown-menu {
+    position: fixed;
+    z-index: 2000;
+    /* top / left — JavaScript tarafından trigger konumuna göre hesaplanır */
 }
 
 .kasa-dropdown-item {
@@ -164,7 +163,7 @@ html[data-kasa-gradient="off"] .filter-empty-state {
 
 .kasa-dropdown-item:hover,
 .kasa-dropdown-item:focus-visible {
-    background: rgba(var(--accent-rgb), 0.12);
+    background: rgba(255,255,255,0.10);
     color: var(--text);
     outline: none;
 }
@@ -172,7 +171,7 @@ html[data-kasa-gradient="off"] .filter-empty-state {
 .kasa-dropdown-item > i:first-child {
     width: 16px;
     text-align: center;
-    color: var(--accent-2);
+    color: var(--text-muted);
 }
 
 .kasa-dropdown-item-copy {
@@ -195,4 +194,652 @@ html[data-glass-effects="off"] .kasa-dropdown-menu {
 
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-dropdown-menu {
     background: rgba(255, 255, 255, 0.98);
+}
+
+/* === Küresel yükleme çubuğu (KASA_PROGRESS) === */
+.kasa-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 20000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease;
+}
+.kasa-progress.is-active { opacity: 1; }
+.kasa-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.55);
+    border-radius: 0 3px 3px 0;
+    transition: width 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.kasa-progress.is-done .kasa-progress-fill { width: 100% !important; }
+html[data-kasa-animations="off"] .kasa-progress,
+html[data-kasa-low-power="on"] .kasa-progress { display: none; }
+
+/* === Bildirim zili & paneli === */
+.kasa-dropdown-trigger { position: relative; }
+.kasa-notif-badge {
+    position: absolute;
+    top: -3px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #f43f5e;
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 800;
+    line-height: 16px;
+    text-align: center;
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+}
+.kasa-notif-menu {
+    width: 320px;
+    max-width: min(82vw, 24rem);
+    padding: 0.4rem;
+    /* Cam telafisi: liquid-glass başarısız olursa bile backdrop-filter görünür */
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+/* Sol gruptaki dropdown'lar (bildirim) — sola taşmasın, sağa açılsın */
+.kasa-navbar-left .kasa-dropdown-menu {
+    left: 0;
+    right: auto;
+}
+.kasa-notif-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.55rem 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--text);
+}
+.kasa-notif-head small {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+/* ── Aksiyon butonları çubuğu ── */
+.kasa-notif-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    padding: 0 0.55rem 0.2rem;
+}
+.kasa-notif-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid rgba(var(--accent-rgb), 0.16);
+    border-radius: 8px;
+    background: rgba(var(--accent-rgb), 0.06);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    cursor: pointer;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+.kasa-notif-action-btn:hover {
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.14);
+    border-color: rgba(var(--accent-rgb), 0.30);
+}
+.kasa-notif-action-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+/* ── Bildirim listesi ── */
+.kasa-notif-list {
+    display: grid;
+    gap: 0.4rem;
+    max-height: 380px;
+    overflow-y: auto;
+}
+/* Özel scrollbar */
+.kasa-notif-list::-webkit-scrollbar {
+    width: 5px;
+}
+.kasa-notif-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.kasa-notif-list::-webkit-scrollbar-thumb {
+    background: rgba(var(--accent-rgb), 0.25);
+    border-radius: 999px;
+}
+.kasa-notif-list {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-rgb), 0.25) transparent;
+}
+/* ── Bildirim öğesi ── */
+.kasa-notif-item {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem;
+    border-radius: 12px;
+    background: rgba(var(--accent-rgb), 0.07);
+    border: 1px solid rgba(var(--accent-rgb), 0.14);
+    cursor: default;
+}
+.kasa-notif-item:hover {
+    background: rgba(var(--accent-rgb), 0.11);
+    border-color: rgba(var(--accent-rgb), 0.22);
+}
+.kasa-notif-item-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.14);
+}
+.kasa-notif-item-copy { min-width: 0; }
+.kasa-notif-item-copy strong { display: block; font-size: 0.78rem; color: var(--text); }
+.kasa-notif-item-copy span { display: block; font-size: 0.72rem; line-height: 1.35; color: var(--text-muted); }
+.kasa-notif-cta {
+    white-space: nowrap;
+    font-size: 0.68rem;
+    padding: 0.35rem 0.55rem;
+}
+/* ── Bildirimi gizle (sustur) butonu ── */
+.kasa-notif-dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
+}
+.kasa-notif-item:hover .kasa-notif-dismiss { opacity: 1; }
+.kasa-notif-dismiss:hover {
+    color: #f43f5e;
+    background: rgba(244, 63, 94, 0.12);
+}
+.kasa-notif-dismiss:focus-visible {
+    opacity: 1;
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+/* ── Boş durum ── */
+.kasa-notif-empty {
+    padding: 1rem 0.6rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+.kasa-notif-empty i {
+    display: block;
+    font-size: 1.1rem;
+    margin-bottom: 0.3rem;
+    color: var(--success);
+}
+/* Açık tema */
+html[data-bs-theme="light"] .kasa-notif-item {
+    background: rgba(124, 111, 247, 0.06);
+    border-color: rgba(124, 111, 247, 0.16);
+}
+html[data-bs-theme="light"] .kasa-notif-item:hover {
+    background: rgba(124, 111, 247, 0.10);
+    border-color: rgba(124, 111, 247, 0.22);
+}
+html[data-bs-theme="light"] .kasa-notif-action-btn {
+    background: rgba(124, 111, 247, 0.06);
+    border-color: rgba(124, 111, 247, 0.14);
+}
+html[data-bs-theme="light"] .kasa-notif-action-btn:hover {
+    background: rgba(124, 111, 247, 0.14);
+    border-color: rgba(124, 111, 247, 0.28);
+}
+html[data-bs-theme="light"] .kasa-notif-dismiss {
+    color: #6b7280;
+}
+html[data-bs-theme="light"] .kasa-notif-dismiss:hover {
+    color: #e11d48;
+    background: rgba(225, 29, 72, 0.08);
+}
+/* Efekt kapalı */
+html[data-glass-effects="off"] .kasa-notif-menu {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+/* Mobil: bildirim menüsü tam genişlik */
+@media (max-width: 400px) {
+    .kasa-notif-menu {
+        width: calc(100vw - 2rem);
+        max-width: none;
+    }
+}
+
+/* === Küresel navbar (tüm sayfalar) — PİLL görünüm === */
+.kasa-topbar-wrap {
+    max-width: 72rem;
+    margin: 0.75rem auto 0;
+    padding: 0 1rem;
+    position: relative;
+    z-index: 100;
+}
+/* Geniş ekranlarda SADECE navbar büyür; içerik kabuğu kendi sayfa genişliğini korur.
+   Kural tüm sayfalarda ortak (base.html topbar) olduğu için navbar her yerde aynı genişliktedir. */
+@media (min-width: 1440px) {
+    .kasa-topbar-wrap {
+        max-width: calc(100% - 3rem);
+    }
+}
+.kasa-navbar {
+    margin-bottom: 0;
+    position: relative;
+    z-index: 100;
+}
+.kasa-navbar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,calc(var(--glass-veil-scale) * 0.10)), rgba(255,255,255,calc(var(--glass-veil-scale) * 0.045))),
+        rgba(255, 255, 255, 0.04);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+html[data-bs-theme="light"] .kasa-navbar-inner {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.92), rgba(255,255,255,0.74)),
+        rgba(255, 255, 255, 0.6);
+    box-shadow: 0 6px 16px rgba(31, 41, 55, 0.08), inset 0 1px 0 rgba(255,255,255,0.7);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+html[data-glass-effects="off"] .kasa-navbar-inner,
+html[data-glass-quality="low"] .kasa-navbar-inner {
+    background: rgba(24, 27, 48, 0.96);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-navbar-inner,
+html[data-bs-theme="light"][data-glass-quality="low"] .kasa-navbar-inner {
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+/* Düşük güç: navbar blur'unu kaldır */
+html[data-kasa-low-power="on"] .kasa-navbar-inner {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+/* Sol grup: ŞifreKasam + bildirim/ayarlar yan yana, pakette kal */
+.kasa-navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.kasa-navbar-left-sep {
+    align-self: stretch;
+    width: 1px;
+    margin: 0.25rem 0.05rem;
+    background: var(--glass-border);
+    flex: 0 0 auto;
+}
+.kasa-navbar-brand {
+    text-decoration: none;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.32rem 0.8rem;
+    border: 1px solid var(--glass-border-hi);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    white-space: nowrap;
+    flex: 0 0 auto;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.kasa-navbar-brand:hover {
+    border-color: var(--glass-border-hi);
+    background: rgba(255, 255, 255, 0.10);
+    color: inherit;
+    transform: translateY(-1px);
+}
+.kasa-navbar-brand i {
+    font-size: 0.9rem;
+    color: var(--accent);
+}
+.kasa-navbar-brand-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.05;
+    margin: 0;
+    text-shadow: none;
+}
+/* breadcrumb: ŞifreKasam'ın yanında (alt sayfa başlığı) */
+.kasa-crumb-sep {
+    color: var(--text-muted);
+    font-weight: 700;
+    opacity: 0.75;
+    font-size: 1rem;
+}
+.kasa-crumb-current {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.28rem 0.7rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    line-height: 1.1;
+}
+.kasa-crumb-current i {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+/* Sağ grup: kilitle + aksiyonlar (geri en sağda) */
+.kasa-navbar-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    flex: 0 1 auto;
+}
+/* Navbar'daki butonlar: proje standardı radius; hinterline butonlar
+   (danger/primary) kendi renkli stilini buttons.css'ten korur. */
+.kasa-navbar-right .kasa-btn,
+.kasa-navbar-right .kasa-crumb-back {
+    border-radius: 10px;
+}
+/* Geri tuşu (alt sayfa) — en sağda, accent'siz */
+.kasa-crumb-back {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.kasa-crumb-back:hover {
+    border-color: var(--glass-border-hi);
+    background: rgba(255, 255, 255, 0.10);
+    color: var(--text);
+    transform: translateY(-1px);
+}
+
+/* ── NAVBAR ÜRETİCİ BUTONU — accent tonlu belirgin vurgu ──── */
+/* Şifre Oluşturucu (data-kasa-modal="passwordGeneratorModal") muted
+   yerine accent tonlu border + ikon rengi alır; primary/danger
+   kadar baskın değil ama silik de değil. */
+.kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"] {
+    color: var(--accent-2);
+    border-color: rgba(var(--accent-rgb), 0.32);
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.14), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.028)),
+        var(--glass);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 14px rgba(var(--accent-rgb), 0.08);
+}
+.kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"]:hover {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.50);
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.20), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04)),
+        var(--glass);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 22px rgba(var(--accent-rgb), 0.14);
+}
+.kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"] i {
+    color: var(--accent-2);
+}
+.kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"]:hover i {
+    color: var(--accent);
+}
+/* Açık tema: accent tonu çoğalt */
+html[data-bs-theme="light"] .kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"] {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.28);
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.08), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.60), 0 4px 14px rgba(var(--accent-rgb), 0.06);
+}
+html[data-bs-theme="light"] .kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"]:hover {
+    border-color: rgba(var(--accent-rgb), 0.44);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 8px 22px rgba(var(--accent-rgb), 0.12);
+}
+html[data-bs-theme="light"] .kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"] i {
+    color: var(--accent);
+}
+/* Efekt kapalı: cam yok, accent tonlu solid */
+html[data-glass-effects="off"] .kasa-navbar-right .kasa-btn[data-kasa-modal="passwordGeneratorModal"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* === Dashboard bar (yalnızca anasayfa) === */
+.kasa-dashboard-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    margin-top: 0.6rem;
+    margin-bottom: 1.1rem;
+}
+/* Ana sayfa kabuğu düzeni: navbar + dashboard bar üstte, kartlar altta */
+.kasa-page-shell-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* ── İSTATİSTİK ÇİPLERİ ───────────────────────────────────── */
+.stats-bar-layout {
+    flex-wrap: wrap;
+    align-items: center;
+    gap-y: 0.35rem;
+    padding: 0.45rem 0.85rem !important;
+}
+.stats-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color var(--motion-fast) ease, background var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+.stats-filter-chip:hover {
+    color: var(--text);
+    background: rgba(var(--accent-rgb), 0.10);
+    border-color: rgba(var(--accent-rgb), 0.16);
+}
+.stats-filter-chip[aria-pressed="true"] {
+    color: var(--text);
+    background: rgba(var(--accent-rgb), 0.14);
+    border-color: rgba(var(--accent-rgb), 0.30);
+    box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.08);
+}
+.stats-filter-chip:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+/* İkon rozetleri */
+.stats-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-width: 22px;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+.stats-icon i {
+    flex: 0 0 auto;
+    line-height: 1;
+}
+.stats-icon-accent {
+    color: var(--accent-2);
+    background: rgba(var(--accent-rgb), 0.14);
+}
+.stats-icon-warning {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.14);
+}
+.stats-icon-danger {
+    color: #fb7185;
+    background: rgba(244, 63, 94, 0.20);
+}
+.stats-icon-info {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.14);
+}
+/* Açık tema istatistik ikonları — daha koyu tonlar */
+html[data-bs-theme="light"] .stats-icon-accent {
+    background: rgba(var(--accent-rgb), 0.12);
+}
+html[data-bs-theme="light"] .stats-icon-warning {
+    background: rgba(245, 158, 11, 0.12);
+}
+html[data-bs-theme="light"] .stats-icon-danger {
+    color: #e11d48;
+    background: rgba(244, 63, 94, 0.14);
+}
+html[data-bs-theme="light"] .stats-icon-info {
+    color: #0284c7;
+    background: rgba(56, 189, 248, 0.12);
+}
+/* Ayraçlar (|): ince, şık, dikey çizgi */
+.stats-separator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1px;
+    height: 18px;
+    margin: 0 0.15rem;
+    background: rgba(var(--accent-rgb), 0.20);
+    border-radius: 999px;
+    flex-shrink: 0;
+    vertical-align: middle;
+    font-size: 0;
+    line-height: 0;
+}
+.stats-separator::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, transparent, rgba(var(--accent-rgb), 0.30), transparent);
+}
+/* Açık tema ayraçları */
+html[data-bs-theme="light"] .stats-separator {
+    background: rgba(var(--accent-rgb), 0.16);
+}
+html[data-bs-theme="light"] .stats-separator::after {
+    background: linear-gradient(180deg, transparent, rgba(var(--accent-rgb), 0.22), transparent);
+}
+/* Mobil: ayraçları gizle, çipleri sar */
+@media (max-width: 600px) {
+    .stats-separator {
+        display: none;
+    }
+    .stats-bar-layout {
+        gap: 0.3rem;
+    }
+    .stats-filter-chip {
+        padding: 0.25rem 0.45rem;
+        font-size: 0.72rem;
+    }
+    .stats-icon {
+        flex: none;
+        min-width: 18px;
+        width: 18px;
+        height: 18px;
+        font-size: 0.6rem;
+        border-radius: 5px;
+    }
+}
+
+/* ── FİLTRE BUTONLARI (active vurgusu) ────────────────────── */
+.filter-btn {
+    white-space: nowrap;
+}
+.filter-btn-active.active,
+.filter-btn[aria-pressed="true"] {
+    color: var(--text) !important;
+    background:
+        radial-gradient(circle at 8% 0%, rgba(var(--accent-rgb), 0.18), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,calc(var(--glass-veil-scale) * 0.09)), rgba(255,255,255,calc(var(--glass-veil-scale) * 0.04))),
+        var(--glass) !important;
+    border-color: rgba(var(--accent-rgb), 0.42) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.07),
+        0 6px 18px rgba(var(--accent-rgb), 0.10) !important;
+}
+html[data-bs-theme="light"] .filter-btn-active.active,
+html[data-bs-theme="light"] .filter-btn[aria-pressed="true"] {
+    color: var(--text) !important;
+    border-color: rgba(var(--accent-rgb), 0.38) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.60),
+        0 6px 18px rgba(var(--accent-rgb), 0.10) !important;
+}
+
+/* ── ARAMA & TOPLU SEÇ — mobil taşma koruması ─────────────── */
+#bulk-and-search-group {
+    min-width: 0;
+}
+.record-search-wrap {
+    min-width: 0;
+    flex: 1 1 120px;
+    max-width: 260px;
+}
+@media (max-width: 480px) {
+    .record-search-wrap {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+    #bulk-and-search-group {
+        width: 100%;
+    }
 }

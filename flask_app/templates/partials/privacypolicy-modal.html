@@ -1,0 +1,131 @@
+<!-- Gizlilik Politikası Modalı -->
+<div class="kasa-modal" id="privacyPolicyModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="privacy-modal-title">
+    <div class="modal-dialog settings-modal-dialog">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h2 id="privacy-modal-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-scale-balanced mr-2 modal-icon-accent"></i>{{ _('Gizlilik Politikası') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body privacy-body">
+                <div lang="tr" data-privacy-block="tr">
+                    <p><span class="font-semibold">ŞifreKasam</span> — By Salvetum · Son güncelleme: 2 Eylül 2026</p>
+                    <p>ŞifreKasam <span class="font-semibold">çevrimdışı öncelikli</span> bir şifre yöneticisidir.
+                    Kasa verilerinizin büyük çoğunluğu cihazınızda, şifreli ve yerel kalır.</p>
+                    <h4>1. Genel bakış</h4>
+                    <ul>
+                        <li>Varsayılan olarak otomatik ağ isteği yapılmaz.</li>
+                        <li>Telemetri, analiz, izleme veya reklam bileşeni yoktur.</li>
+                        <li>Kasa verileriniz üçüncü taraflarla <span class="font-semibold">asla paylaşılmaz ve satılmaz</span>.</li>
+                    </ul>
+                    <h4>2. Yerel saklama ve şifreleme</h4>
+                    <ul>
+                        <li>Tüm kayıtlarınız cihazda şifreli saklanır (Fernet simetrik şifreleme).</li>
+                        <li>Şifreleme anahtarı ana şifrenizden PBKDF2 ile türetilir; yalnızca oturum boyunca bellekte tutulur.</li>
+                        <li>Ana şifreniz doğrudan saklanmaz; yalnızca güvenli türevleri kullanılır.</li>
+                    </ul>
+                    <h4>3. Otomatik kilitleme ve oturum</h4>
+                    <p>Kilitlenen kasaya yeniden ana şifre olmadan erişilmez; şifreleme anahtarı oturum dışında tutulmaz.</p>
+                    <h4>4. Canlı sızıntı taraması (HaveIBeenPwned)</h4>
+                    <p>Bu özellik <span class="font-semibold">varsayılan olarak kapalıdır</span> ve Ayarlar'dan açılır.</p>
+                    <ul>
+                        <li>Şifrenizin <span class="font-semibold">tamamı asla gönderilmez</span>; yalnızca SHA-1 parmak izinin ilk 5 karakteri (k-anonimlik) HIBP'a gönderilir.</li>
+                        <li>Kullanıcı adı, e-posta veya başlık bu süreçte ağa çıkmaz; eşleşme karşılaştırması yerelde yapılır.</li>
+                        <li>Önek-sonek önbelleği düz şifre içermez; İnternet Kill-Switch açıkken istek gönderilmez.</li>
+                    </ul>
+                    <h4>5. Güncelleme kontrolü</h4>
+                    <p>Yeni sürümler GitHub Releases üzerinden denetlenir; IP adresiniz GitHub tarafından standart erişim günlüklerinde işlenebilir, kasa verisi bu istekle gönderilmez.</p>
+                    <h4>6. LAN erişimi (isteğe bağlı)</h4>
+                    <p>LAN modu kimlik doğrulama aşamasına etki eder; kasa verileri yine cihazda şifreli kalır.</p>
+                    <h4>7. Yedekleme ve dışa aktarma</h4>
+                    <p>Dışa aktarılan dosyalar <span class="font-semibold">şifresiz içerebilir</span>; bu dosyaların güvenli saklanması kullanıcının sorumluluğundadır. Uygulama kaldırılınca kasa verileri cihaz tarafındadır ve sunucuda tutulmaz.</p>
+                    <h4>8. Veri sahipliği ve haklarınız</h4>
+                    <p>Verilerinizin sahibi sizsiniz: Ayarlar → Veri ve Yedekleme bölümünden tüm verilerinizi dışa aktarabilir ve kendi kontrolünüzde tutabilirsiniz.</p>
+                    <h4>9. İletişim</h4>
+                    <p>Sorular için projenin GitHub sayfasındaki hata/özellik takip sistemini kullanabilirsiniz. ŞifreKasam, "By Salvetum" tarafından yayınlanır ve GitHub Releases üzerinden dağıtılır.</p>
+                </div>
+                <div lang="en" data-privacy-block="en" hidden>
+                    <p><span class="font-semibold">ŞifreKasam</span> — By Salvetum · Last updated: September 2, 2026</p>
+                    <p>ŞifreKasam is an <span class="font-semibold">offline-first</span> password manager.
+                    The vast majority of your vault data stays on your device, encrypted and local.</p>
+                    <h4>1. Overview</h4>
+                    <ul>
+                        <li>No automatic network requests by default.</li>
+                        <li>No telemetry, analytics, tracking, or advertising components.</li>
+                        <li>Your vault data is <span class="font-semibold">never shared with or sold to</span> third parties.</li>
+                    </ul>
+                    <h4>2. Local storage and encryption</h4>
+                    <ul>
+                        <li>All records are stored encrypted on your device (Fernet symmetric encryption).</li>
+                        <li>The encryption key is derived from your master password with PBKDF2 and kept in memory for the session only.</li>
+                        <li>Your master password is never stored directly; only securely derived forms are used.</li>
+                    </ul>
+                    <h4>3. Auto-lock and session</h4>
+                    <p>A locked vault cannot be accessed without the master password; the encryption key never leaves the session.</p>
+                    <h4>4. Live breach scan (HaveIBeenPwned)</h4>
+                    <p>This feature is <span class="font-semibold">disabled by default</span> and enabled from Settings.</p>
+                    <ul>
+                        <li>Your password's <span class="font-semibold">full value is never sent</span>; only the first 5 characters of its SHA-1 fingerprint (k-anonymity) are sent to HIBP.</li>
+                        <li>Username, email, or title never leave your device during this process; matching is done locally.</li>
+                        <li>The prefix/suffix cache contains no plaintext passwords; with the Internet Kill-Switch on, no request is sent.</li>
+                    </ul>
+                    <h4>5. Update checks</h4>
+                    <p>New versions are checked via GitHub Releases; your IP address may be processed in GitHub standard access logs, and no vault data is sent with this request.</p>
+                    <h4>6. LAN access (optional)</h4>
+                    <p>LAN mode only affects the authentication stage; vault data remains encrypted on your device.</p>
+                    <h4>7. Backups and export</h4>
+                    <p>Exported files <span class="font-semibold">may contain plaintext</span>; keeping them secure is your responsibility. Uninstalling removes your vault data from the device; nothing is stored on a server.</p>
+                    <h4>8. Data ownership and your rights</h4>
+                    <p>You own your data: from Settings → Data &amp; Backup you can export all of it and keep it under your own control.</p>
+                    <h4>9. Contact</h4>
+                    <p>For questions, use the issue tracker on the project's GitHub page. ŞifreKasam is published by "By Salvetum" and distributed via GitHub Releases.</p>
+                </div>
+            </div>
+            <div class="modal-footer flex justify-between items-center w-full">
+                <div class="flex gap-2">
+                    <button type="button" id="privacy-lang-tr" class="privacy-lang-btn kasa-btn kasa-btn-muted">Türkçe</button>
+                    <button type="button" id="privacy-lang-en" class="privacy-lang-btn kasa-btn kasa-btn-muted">English</button>
+                </div>
+                <button type="button" class="kasa-btn kasa-btn-primary" data-kasa-close>{{ _('Kapat') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+    .privacy-body h4 {
+        margin: 0.9rem 0 0.35rem;
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: var(--accent-2);
+    }
+    .privacy-body p { margin: 0.25rem 0; }
+    .privacy-body ul { margin: 0.25rem 0; padding-left: 1.1rem; }
+    .privacy-body li { margin: 0.15rem 0; }
+    .privacy-lang-btn.privacy-lang-active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+    }
+</style>
+<script>
+    (function () {
+        var modal = document.getElementById('privacyPolicyModal');
+        if (!modal) return;
+        var blocks = modal.querySelectorAll('[data-privacy-block]');
+        var btnTr = modal.querySelector('#privacy-lang-tr');
+        var btnEn = modal.querySelector('#privacy-lang-en');
+        function show(lang) {
+            blocks.forEach(function (blk) {
+                blk.hidden = blk.getAttribute('data-privacy-block') !== lang;
+            });
+            (lang === 'tr' ? btnTr : btnEn).classList.add('privacy-lang-active');
+            (lang === 'tr' ? btnEn : btnTr).classList.remove('privacy-lang-active');
+        }
+        show('{{ CURRENT_LANG | default("tr") }}' === 'tr' ? 'tr' : 'en');
+        btnTr.addEventListener('click', function () { show('tr'); });
+        btnEn.addEventListener('click', function () { show('en'); });
+    })();
+</script>

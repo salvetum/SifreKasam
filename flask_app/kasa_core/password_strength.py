@@ -30,8 +30,11 @@ def _context_variants(value: object) -> list[str]:
         return []
 
     variants = [text]
-    parsed = urlparse(text if "://" in text else f"//{text}")
-    if parsed.hostname:
+    try:
+        parsed = urlparse(text if "://" in text else f"//{text}")
+    except ValueError:
+        parsed = None
+    if parsed is not None and parsed.hostname:
         variants.append(parsed.hostname)
         variants.extend(parsed.hostname.split("."))
     if "@" in text:

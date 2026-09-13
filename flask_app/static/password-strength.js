@@ -8,19 +8,21 @@
 export function initPasswordStrength({ apiJson }) {
 
   const TIME_REPLACEMENTS = [
-    [/less than\s+/gi,    ''],
-    [/about\s+/gi,        'yaklaşık '],
-    [/almost\s+/gi,       'neredeyse '],
-    [/centuries?/gi,      'yüzyıl'],
-    [/years?/gi,          'yıl'],
-    [/months?/gi,         'ay'],
-    [/weeks?/gi,          'hafta'],
-    [/days?/gi,           'gün'],
-    [/hours?/gi,          'saat'],
-    [/minutes?/gi,        'dakika'],
-    [/seconds?/gi,        'saniye'],
-    [/instant(?:ly)?/gi,  'anında'],
-    [/forever/gi,         'çok uzun süre'],
+    [/less than a second/gi, '1 saniyeden az'],
+    [/less than\s+/gi,       ''],
+    [/\b(?:a|an)\s+/gi,      'bir '],
+    [/about\s+/gi,           'yaklaşık '],
+    [/almost\s+/gi,          'neredeyse '],
+    [/centuries?/gi,         'yüzyıl'],
+    [/years?/gi,             'yıl'],
+    [/months?/gi,            'ay'],
+    [/weeks?/gi,             'hafta'],
+    [/days?/gi,              'gün'],
+    [/hours?/gi,             'saat'],
+    [/minutes?/gi,           'dakika'],
+    [/seconds?/gi,           'saniye'],
+    [/instant(?:ly)?/gi,     'anında'],
+    [/forever/gi,            'çok uzun süre'],
   ];
 
   const translateTime = (str) =>

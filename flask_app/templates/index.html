@@ -1,18 +1,32 @@
 {% extends "base.html" %}
 
+{% block navbar_before_lock %}
+<button type="button" data-kasa-modal="passwordGeneratorModal" title="{{ _('Şifre Üret') }}"
+    aria-haspopup="dialog" aria-controls="passwordGeneratorModal"
+    class="kasa-btn kasa-btn-generator">
+    <i class="fa-solid fa-wand-magic-sparkles"></i> {{ _('Şifre Oluşturucu') }}
+</button>
+<a href="{{ url_for('saglik_raporu') }}" title="{{ _('Şifre Sağlık Raporu') }}"
+   class="kasa-btn kasa-btn-danger">
+    <i class="fa-solid fa-heart-pulse"></i> {{ _('Şifre Sağlığı') }}
+</a>
+{% endblock %}
+
+{% block navbar_after_lock %}
+<a href="{{ url_for('ekle_sayfasi') }}"
+   class="kasa-btn kasa-btn-primary">
+    <i class="fa-solid fa-plus text-xs"></i>{{ _('Kayıt Oluşturucu') }}
+</a>
+{% endblock %}
+
 {% block content %}
 
-{% include 'partials/header-bar.html' %}
+{% include 'partials/dashboard-bar.html' %}
 {% include 'partials/bulk-toolbar.html' %}
 {% include 'partials/card-grid.html' %}
-<!-- ─── MODALLER ─────────────────────────────────────────────── -->
+<!-- ─── MODALLER (index'e özel) ─────────────────────────────────── -->
 
 {% include 'partials/modals/generator.html' %}
-{% include 'partials/modals/import.html' %}
-{% include 'partials/modals/export.html' %}
 {% include 'partials/modals/history.html' %}
-{% include 'partials/settings-modal.html' %}
-{% include 'partials/modals/lock.html' %}
-{% include 'partials/modals/password-change.html' %}
 {% include 'partials/modals/bulk-category.html' %}
 {% endblock %}

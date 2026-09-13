@@ -29,6 +29,40 @@
                     </div>
                     <div class="settings-card settings-card-toggle">
                         <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-internet-kill-switch-title">{{ _('İnternet Kill-Switch') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold settings-dev-badge">{{ _('GELİŞTİRME') }}</span></h4>
+                                <p>{{ _('Açıkken uygulamanın dış ağa yönelik tüm istekleri (güncelleme kontrolü, canlı sızıntı taraması) engellenir. Kapalıyken (varsayılan) hiçbir otomatik ağ isteği yapılmaz; çevrimiçi özellikler ayrıca etkinleştirilir.') }}</p>
+                            </div>
+                            <div class="settings-card-control">
+                                <div class="settings-switch-control">
+                                    <input class="settings-switch-input" type="checkbox" name="internet_kill_switch" id="internet-kill-switch-toggle" {% if INTERNET_KILL_SWITCH_ENABLED %}checked{% endif %} aria-labelledby="setting-internet-kill-switch-title">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-card-body">
+                            <p class="soft-reveal text-xs text-amber-400 mb-0" id="kill-switch-active-note" {% if not INTERNET_KILL_SWITCH_ENABLED %}hidden{% endif %}>{{ _('Kill-switch açık: uygulama şu anda internete hiçbir istek gönderemez.') }}</p>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-burst" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-live-scan-title">{{ _('Canlı Sızıntı Taraması') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold settings-dev-badge">{{ _('GELİŞTİRME') }}</span></h4>
+                                <p>{{ _('Şifrelerinizin HaveIBeenPwned sızıntı veritabanında olup olmadığını kontrol eder. Güvenlik için şifre yerine yalnızca SHA-1 parmak izinin ilk 5 karakteri gönderilir (k-anonimlik); eşleşme karşılaştırması tamamen yerelde yapılır.') }}</p>
+                            </div>
+                            <div class="settings-card-control">
+                                <div class="settings-switch-control">
+                                    <input class="settings-switch-input" type="checkbox" name="live_breach_scan" id="live-breach-scan-toggle" {% if LIVE_BREACH_SCAN_ENABLED %}checked{% endif %} aria-labelledby="setting-live-scan-title">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-card-body">
+                            <p class="soft-reveal text-xs text-amber-400 mb-0" id="live-scan-kill-switch-note" {% if not (LIVE_BREACH_SCAN_ENABLED and INTERNET_KILL_SWITCH_ENABLED) %}hidden{% endif %}>{{ _('Not: İnternet Kill-Switch açıkken bu özellik çalışmaz.') }}</p>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-card-toggle">
+                        <div class="settings-card-head">
                             <span class="settings-card-icon"><i class="fa-solid fa-network-wired" aria-hidden="true"></i></span>
                             <div class="settings-card-copy">
                                 <h4 id="setting-lan-title">{{ _('LAN Erişimi') }} <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 font-semibold settings-dev-badge">{{ _('GELİŞTİRME') }}</span></h4>

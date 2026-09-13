@@ -13,12 +13,12 @@
             <div class="modal-body p-4">
                 <p class="text-sm text-kasa-text-muted mb-3">{{ _('Yedek dosyası formatını seçin.') }}</p>
                 <div class="settings-action-grid settings-action-grid-single">
-                    <button type="button" class="settings-action-card" data-export-format="kasa"
-                        data-export-url="{{ url_for('export_data', format='kasa') }}">
-                        <span class="settings-action-icon"><i class="fa-solid fa-vault"></i></span>
+                    <button type="button" class="settings-action-card" data-export-format="kasaenc"
+                        data-export-kind="encrypted" data-export-url="/api/export/encrypted">
+                        <span class="settings-action-icon settings-action-icon-success"><i class="fa-solid fa-lock"></i></span>
                         <span class="settings-action-copy">
-                            <strong>{{ _('ŞifreKasam Yedeği') }} (.kasa)</strong>
-                            <small>{{ _('Uygulamaya özel, yeniden içe aktarılabilir yedek.') }}</small>
+                            <strong>{{ _('Şifreli Yedek') }} (.kasaenc)</strong>
+                            <small>{{ _('AES-256 şifreli, tek-sunum parolalı taşınabilir yedek.') }}</small>
                         </span>
                         <i class="fa-solid fa-download settings-action-arrow"></i>
                     </button>
@@ -44,6 +44,27 @@
                 <div class="lan-warning-card export-warning-card mt-3">
                     <i class="fa-solid fa-triangle-exclamation"></i>
                     <p>{{ _('Dışa aktarılan yedek dosyası şifreleri düz metin içerebilir. Dosyayı güvenli bir yerde saklayın ve paylaşmayın.') }}</p>
+                </div>
+                <div id="encrypted-export-reveal" class="mt-3 encrypted-export-reveal" hidden>
+                    <div class="lan-warning-card">
+                        <i class="fa-solid fa-lock"></i>
+                        <p>{{ _('Şifreli yedek dosyanız bu şifreyle açılır. Şifre yalnızca bir kez gösterilir ve sunucuda saklanmaz; kaybolursa yedek kurtarılamaz.') }}</p>
+                    </div>
+                    <div class="encrypted-export-password-row mt-3">
+                        <code id="encrypted-export-password" class="encrypted-export-password"></code>
+                        <button type="button" id="encrypted-export-copy-btn" class="kasa-btn kasa-btn-ghost"
+                            title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="encrypted-export-actions mt-3">
+                        <button type="button" id="encrypted-export-download-btn" class="kasa-btn kasa-btn-primary">
+                            <i class="fa-solid fa-download mr-2"></i>{{ _('Dosyayı İndir') }}
+                        </button>
+                        <button type="button" id="encrypted-export-cancel-btn" class="kasa-btn kasa-btn-ghost">
+                            {{ _('Vazgeç') }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

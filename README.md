@@ -33,7 +33,9 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
 ---
 
 > [!WARNING]
-> ŞifreKasam V3, tamamen baştan sona Rust ile yapay zekâ desteği olmadan yeniden yazılacaktır. *(söz degil)*
+> ŞifreKasam V3, tamamen baştan sona Rust ile yapay zekâ desteği olmadan yeniden yazılacaktır. daha fazla bilgi için "v3" branch'ini kontrol edin.
+> ŞifreKasam V3, will be rewritten from ground up without any AI tools. for more information check the "v3" branch.
+
 
 ## ŞifreKasam Nedir?
 
@@ -47,7 +49,7 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
 
 ### Ana Sayfa - V2.6.1
 
-<img src="assets/anasayfa_TR.png" width="850" alt="ŞifreKasam ana sayfa">
+<img src="docs/screenshots/anasayfa_TR.png" width="850" alt="ŞifreKasam ana sayfa">
 
 <br><br>
 
@@ -56,12 +58,12 @@ Verilerinizi cihazınızda tutun ve ana şifrenizle şifreleyin.
     <td align="center" width="50%">
       <strong>Şifre Oluşturucu - V2.6.1</strong>
       <br><br>
-      <img src="assets/sifreolusturucu_TR.png" width="420" alt="ŞifreKasam şifre oluşturucu ekranı">
+      <img src="docs/screenshots/sifreolusturucu_TR.png" width="420" alt="ŞifreKasam şifre oluşturucu ekranı">
     </td>
     <td align="center" width="50%">
       <strong>Ayarlar Menüsü - V2.6.1</strong>
       <br><br>
-      <img src="assets/ayarlar_TR.png" width="420" alt="ŞifreKasam ayarlar menüsü">
+      <img src="docs/screenshots/ayarlar_TR.png" width="420" alt="ŞifreKasam ayarlar menüsü">
     </td>
   </tr>
 </table>
@@ -161,6 +163,11 @@ flask_app/*.db
 ```
 
 Bunlara ek olarak sertifikalar, özel anahtarlar, yedekler, geçici dosyalar ve kişisel veriler de repo dışında tutulur.
+
+## 💖 Özel teşekkürler
+
+Abdulkadir T. - Bug testi ve Öneriler için teşekkürler
+Yusuf K. D. - Bug testi ve Öneriler için teşekkürler
 
 ## 📜 Lisans
 

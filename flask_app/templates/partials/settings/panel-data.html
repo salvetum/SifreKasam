@@ -28,4 +28,114 @@
                             <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                         </button>
                     </div>
+                    <div class="settings-action-grid settings-action-grid-single">
+                        <button type="button" data-kasa-modal="privacyPolicyModal"
+                            class="settings-action-card">
+                            <span class="settings-action-icon"><i class="fa-solid fa-scale-balanced"></i></span>
+                            <span class="settings-action-copy">
+                                <strong>{{ _('Gizlilik Politikası') }}</strong>
+                                <small>{{ _('Verilerinizin nasıl işlendiği hakkında bilgi.') }}</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
+                        </button>
+                    </div>
+                    <!-- Otomatik Yedekleme -->
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-clock-rotate-left"></i></span>
+                        <div>
+                            <h3>{{ _('Otomatik Yedekleme') }}</h3>
+                            <p>{{ _('Şifreli yedekler bu cihazda, uygulama veri klasöründe saklanır.') }}</p>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon settings-card-icon-success"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-auto-backup-title">{{ _('Son Yedek') }}</h4>
+                                <p id="auto-backup-last" class="auto-backup-last">{{ _('Henüz yedek alınmadı') }}</p>
+                            </div>
+                            <div class="settings-card-control">
+                                <button type="button" id="auto-backup-now-btn" class="kasa-btn kasa-btn-primary auto-backup-now-btn"
+                                    aria-labelledby="setting-auto-backup-title">
+                                    <i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
+                                    <span>{{ _('Şimdi Yedek Al') }}</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="settings-card-head settings-card-head-divider">
+                            <span class="settings-card-icon"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-auto-backup-interval-title">{{ _('Otomatik Yedekleme Aralığı') }}</h4>
+                                <p>{{ _('Uygulama açıkken bu aralıkla otomatik yedek alınır.') }}</p>
+                            </div>
+                            <div class="settings-card-control">
+                                <select id="auto-backup-interval" name="auto_backup_interval"
+                                    class="kasa-field settings-inline-select"
+                                    aria-labelledby="setting-auto-backup-interval-title" data-custom-select>
+                                    <option value="off">{{ _('Kapalı') }}</option>
+                                    <option value="hourly">{{ _('Her Saat') }}</option>
+                                    <option value="daily">{{ _('Her Gün') }}</option>
+                                    <option value="weekly">{{ _('Her Hafta') }}</option>
+                                    <option value="monthly">{{ _('Her Ay') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card settings-backup-tray">
+                        <div id="auto-backup-list" class="auto-backup-list"
+                            aria-live="polite" aria-label="{{ _('Otomatik yedekler') }}"></div>
+                        <p class="settings-help-note">
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span class="settings-help-note-copy">
+                                <span class="settings-help-note-line">
+                                    {{ _('Yalnızca son') }} <span id="auto-backup-max-count" class="font-semibold">…</span> {{ _('yedek tutulur; eskiler otomatik silinir.') }}
+                                </span>
+                                <span id="auto-backup-next" class="settings-help-note-line" hidden></span>
+                            </span>
+                        </p>
+                    </div>
+                    <!-- Hatırlatma Sıklıkları -->
+                    <div class="settings-section-heading">
+                        <span><i class="fa-solid fa-bell"></i></span>
+                        <div>
+                            <h3>{{ _('Bildirim Hatırlatmaları') }}</h3>
+                            <p>{{ _('Yedek ve sızıntı kontrolü hatırlatma sıklığını seçin.') }}</p>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <div class="settings-card-head">
+                            <span class="settings-card-icon"><i class="fa-solid fa-database" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-backup-reminder-title">{{ _('Yedek Hatırlatma Sıklığı') }}</h4>
+                                <p>{{ _('Yedek almayı hatırlatma sıklığını seçin.') }}</p>
+                            </div>
+                            <div class="settings-card-control">
+                                <select id="backup-reminder-frequency" name="backup_reminder_frequency"
+                                    class="kasa-field settings-inline-select"
+                                    aria-labelledby="setting-backup-reminder-title" data-custom-select>
+                                    <option value="off">{{ _('Kapalı') }}</option>
+                                    <option value="daily">{{ _('Günlük') }}</option>
+                                    <option value="weekly">{{ _('Haftalık') }}</option>
+                                    <option value="monthly">{{ _('Aylık') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="settings-card-head settings-card-head-divider">
+                            <span class="settings-card-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+                            <div class="settings-card-copy">
+                                <h4 id="setting-breach-reminder-title">{{ _('Sızıntı Taraması Hatırlatma Sıklığı') }}</h4>
+                                <p>{{ _('Sızıntı kontrolü hatırlatma sıklığını seçin.') }}</p>
+                            </div>
+                            <div class="settings-card-control">
+                                <select id="breach-reminder-frequency" name="breach_reminder_frequency"
+                                    class="kasa-field settings-inline-select"
+                                    aria-labelledby="setting-breach-reminder-title" data-custom-select>
+                                    <option value="off">{{ _('Kapalı') }}</option>
+                                    <option value="daily">{{ _('Günlük') }}</option>
+                                    <option value="weekly">{{ _('Haftalık') }}</option>
+                                    <option value="monthly">{{ _('Aylık') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     </section>

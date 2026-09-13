@@ -21,6 +21,7 @@ export function initModalSystem({ customSelectStates, closeCustomSelect }) {
     modal.classList.add('is-visible');
     modal.setAttribute('aria-hidden', 'false');
     requestAnimationFrame(() => modal.classList.add('is-open'));
+    modal.dispatchEvent(new CustomEvent('kasa:modal-opened'));
   };
 
   window.kasaModalKapat = (modalId) => {

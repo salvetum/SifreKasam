@@ -9,23 +9,8 @@
     visibility: hidden;
 }
 
-/* Container overlay — curtain kaldırıldığında kartların üstünde durur,
-   fade-out ile kaybolur. Kart elementlerine dokunmaz, backdrop-filter
-   compositing'ini bozmaz. */
 #card-container {
     position: relative;
-}
-#card-reveal-overlay {
-    position: absolute;
-    inset: 0;
-    background: var(--bg);
-    z-index: 1;
-    pointer-events: none;
-    opacity: 1;
-    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-#card-reveal-overlay.fade {
-    opacity: 0;
 }
 
 .vault-card {
@@ -256,15 +241,111 @@ html[data-kasa-gradient="off"] .vault-card-shell::after {
 .vault-card-header { min-height: 34px; }
 .vault-title-line  { min-width: 0; }
 
+/* ── Eşit yükseklik (uniform grid) ─────────────────────────── */
+.card-wrapper         { display: flex; }
+.card-wrapper.vault-card { min-height: 0; } /* grid satırlarının eşit uzamasına izin ver */
+.vault-card-shell     { width: 100%; min-height: 100%; }
+
 .vault-type-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
     width: 30px;
     height: 30px;
     border-radius: 10px;
     background: rgba(255,255,255,0.07);
     border: 1px solid rgba(255,255,255,0.08);
+    overflow: hidden;
+}
+
+/* ── Yerel marka ikonları (getBrandIcon — sıfır ağ isteği) ────────── */
+.vault-type-icon .brand-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    color: rgba(232,234,242,0.9);
+    transition: color 0.18s ease;
+}
+.vault-type-icon .brand-icon svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+.vault-card:hover .vault-type-icon .brand-icon,
+.vault-card:focus-within .vault-type-icon .brand-icon {
+    color: var(--brand-c, currentColor);
+}
+.vault-type-icon .brand-icon[data-brand="github"]    { --brand-c: #e6edf3; }
+.vault-type-icon .brand-icon[data-brand="google"]    { --brand-c: #aecbfa; }
+.vault-type-icon .brand-icon[data-brand="youtube"]   { --brand-c: #ff6b6b; }
+.vault-type-icon .brand-icon[data-brand="instagram"] { --brand-c: #f98aa6; }
+.vault-type-icon .brand-icon[data-brand="discord"]   { --brand-c: #8b93ff; }
+.vault-type-icon .brand-icon[data-brand="huggingface"] { --brand-c: #ffb86b; }
+.vault-type-icon .brand-icon[data-brand="steam"]     { --brand-c: #8fd3f5; }
+.vault-type-icon .brand-icon[data-brand="x"]         { --brand-c: #c9cdd6; }
+.vault-type-icon .brand-icon[data-brand="twitter"]   { --brand-c: #7cc2f5; }
+.vault-type-icon .brand-icon[data-brand="linkedin"]  { --brand-c: #7fb5de; }
+.vault-type-icon .brand-icon[data-brand="facebook"]  { --brand-c: #7fb2f7; }
+.vault-type-icon .brand-icon[data-brand="reddit"]    { --brand-c: #ff8a5c; }
+.vault-type-icon .brand-icon[data-brand="twitch"]    { --brand-c: #b48aff; }
+.vault-type-icon .brand-icon[data-brand="telegram"]  { --brand-c: #7bc9ef; }
+.vault-type-icon .brand-icon[data-brand="whatsapp"]  { --brand-c: #7edda0; }
+.vault-type-icon .brand-icon[data-brand="spotify"]   { --brand-c: #66d68c; }
+.vault-type-icon .brand-icon[data-brand="netflix"]   { --brand-c: #f0605f; }
+.vault-type-icon .brand-icon[data-brand="amazon"]    { --brand-c: #ffb870; }
+.vault-type-icon .brand-icon[data-brand="apple"]     { --brand-c: #dfe3e6; }
+.vault-type-icon .brand-icon[data-brand="microsoft"] { --brand-c: #6ec6f7; }
+.vault-type-icon .brand-icon[data-brand="slack"]     { --brand-c: #e0a9de; }
+.vault-type-icon .brand-icon[data-brand="figma"]     { --brand-c: #ff8a66; }
+.vault-type-icon .brand-icon[data-brand="dropbox"]   { --brand-c: #7fb2f2; }
+.vault-type-icon .brand-icon[data-brand="paypal"]    { --brand-c: #8fb4d6; }
+.vault-type-icon .brand-icon[data-brand="gitlab"]    { --brand-c: #fda177; }
+.vault-type-icon .brand-icon[data-brand="zoom"]      { --brand-c: #7fb6ef; }
+.vault-type-icon .brand-icon[data-brand="notion"]    { --brand-c: #f2f3f5; }
+.vault-type-icon .brand-icon[data-brand="pinterest"] { --brand-c: #f77b6f; }
+.vault-type-icon .brand-icon[data-brand="tiktok"]    { --brand-c: #c9cdd6; }
+.vault-type-icon .brand-icon[data-brand="stackoverflow"] { --brand-c: #fab25f; }
+.vault-type-icon .brand-icon[data-brand="default"]   { --brand-c: #7c86ff; }
+
+/* ── Kategori rozeti (kart sağ üst) ─────────────────────────── */
+.card-category-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 10rem;
+    min-width: 0;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.63rem;
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    color: var(--accent-2);
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    white-space: nowrap;
+}
+
+/* ── Zayıf şifre uyarı chip'i (turuncu/kırmızı) ─────────────── */
+.card-weak-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.14rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #fff;
+    background: linear-gradient(135deg, #f97316, #ef4444);
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.4), 0 3px 10px rgba(239,68,68,0.28);
+    white-space: nowrap;
+}
+.card-weak-chip i { font-size: 0.72em; }
+.card-wrapper.card-is-weak .vault-card-shell {
+    border-color: rgba(248,113,113,0.6) !important;
 }
 
 .vault-detail-list { display: grid; gap: 0.5rem; align-content: start; }
@@ -295,6 +376,21 @@ html[data-kasa-gradient="off"] .vault-card-shell::after {
     font-size: 0.7rem;
     font-weight: 700;
     line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vault-detail-label i {
+    margin-right: 0.4em;
+    color: var(--text-muted);
+    font-size: 0.82em;
+}
+.vault-value-ellipsis {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .vault-detail-value {
     min-width: 0;
@@ -311,20 +407,18 @@ html[data-kasa-gradient="off"] .vault-card-shell::after {
 .vault-row-actions { display: flex; align-items: center; gap: 0.35rem; flex: 0 0 auto; }
 
 .vault-note-row {
-    grid-template-columns: minmax(0,1fr);
-    align-items: start;
-    gap: 0.35rem;
-    min-height: 64px;
+    grid-template-columns: minmax(92px,0.44fr) minmax(0,1fr);
+    align-items: center;
+    gap: 0.7rem;
+    min-height: 36px;
 }
 .vault-note-text {
-    display: -webkit-box;
+    display: block;
     overflow: hidden;
     font-weight: 500;
     line-height: 1.35;
-    white-space: normal;
-    line-clamp: 2;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 .vault-card-shell .footer-action-btn          { color: rgba(232,234,242,0.8); font-weight: 600; }
 .vault-card-shell .footer-action-btn.text-red-400 { color: #fca5a5 !important; }

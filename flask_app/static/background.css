@@ -251,12 +251,9 @@ html[data-kasa-background="custom"] .blob-accent {
     display: none !important;
 }
 
-html[data-kasa-low-power="on"] #custom-bg-layer[data-animated="true"] {
-    display: none !important;
-}
-
+html[data-kasa-low-power="on"] #custom-bg-layer[data-animated="true"],
 html[data-kasa-motion="off"] #custom-bg-layer[data-animated="true"] {
-    display: none !important;
+    opacity: 1;
 }
 
 /* ── OKUNABİLİRLİK (custom perde/arkaplanla aynı metin gölgeleri) ── */
@@ -308,18 +305,6 @@ h4 {
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px solid var(--border);
-    opacity: 0;
-    max-height: 0;
-    overflow: hidden;
-    padding-bottom: 0;
-    border-top-color: transparent;
-    transition: opacity 0.22s ease, max-height 0.28s ease, padding 0.22s ease, border-color 0.18s ease;
-}
-
-.custom-bg-gallery.is-visible {
-    opacity: 1;
-    max-height: 600px;
-    border-top-color: var(--border);
 }
 
 .custom-bg-gallery-head {
@@ -351,6 +336,154 @@ h4 {
     flex: 0 0 auto;
     color: var(--accent-2);
     font-size: 0.72rem;
+}
+
+/* ── ÖZEL ARKA PLAN YÜKLEME BÖLGESİ ──────────────────────────── */
+.custom-bg-upload-zone {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border: 1px dashed rgba(var(--accent-rgb), 0.42);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    transition:
+        border-color 180ms ease,
+        background 180ms ease,
+        box-shadow 180ms ease,
+        transform 180ms ease;
+}
+
+.custom-bg-upload-zone:hover {
+    border-color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.07);
+}
+
+.custom-bg-upload-zone > i {
+    flex: 0 0 auto;
+    font-size: 1.15rem;
+    color: var(--accent-2);
+}
+
+.custom-bg-upload-copy strong {
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 0.2rem;
+}
+
+.custom-bg-upload-copy small {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+
+/* "Özel" kutusu grid'den bağımsız üst bölge olduğu için drop target
+   artık bölge üzerinde değil, bölgenin kendisinde. */
+.custom-bg-upload-zone.is-drop-target {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.28);
+    transform: translateY(-1px);
+}
+
+/* Custom mod aktifken preset kartındaki ipucu şeridi. */
+.custom-bg-active-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.7rem 0 0;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid rgba(var(--accent-rgb), 0.32);
+    border-radius: 10px;
+    background: rgba(var(--accent-rgb), 0.07);
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.custom-bg-active-hint i {
+    flex: 0 0 auto;
+    color: var(--accent-2);
+    font-size: 0.75rem;
+}
+
+/* Tailwind'in .hidden'ı CSS display kuralıyla ezilmesin diye açık override. */
+.custom-bg-active-hint.hidden {
+    display: none;
+}
+
+/* ── ÖZEL ARKA PLAN YÜKLEME BUTONU (spinner + drop zone) ───────── */
+/* Yükleme sırasında buton içinde dönen spinner; 30 sn'lik "Yükleniyor..."
+   toast'ının yerine geçer (toast kapanmadan asılı kalıyordu). */
+.custom-bg-btn-loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.custom-bg-btn-loading strong,
+.custom-bg-btn-loading small {
+    opacity: 0.35;
+}
+
+.custom-bg-btn-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 2px solid rgba(var(--accent-rgb), 0.28);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: custom-bg-spin 0.65s linear infinite;
+}
+
+@keyframes custom-bg-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Sürükle-bırak hedefi görseli: dosya sürüklenirken buton vurgulanır. */
+
+/* Boş galeri durumu: custom mod aktifken "henüz özel arkaplan yok". */
+.custom-bg-gallery-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    margin: 0.35rem 0 0.15rem;
+    padding: 0.85rem 0.75rem;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.custom-bg-gallery-empty i {
+    color: var(--accent-2);
+    font-size: 0.8rem;
+}
+
+/* Tailwind'in .hidden'ı CSS display kuralıyla ezilmesin diye açık override. */
+.custom-bg-gallery-empty.hidden {
+    display: none;
+}
+
+/* Zaten aktif thumb'a tıklanınca hafif vurgu animasyonu. */
+.custom-bg-thumb-pulse {
+    animation: custom-bg-pulse 0.55s ease;
+}
+
+@keyframes custom-bg-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
 }
 
 .custom-bg-thumb {
@@ -403,6 +536,17 @@ h4 {
 
 .custom-bg-thumb video {
     background: rgba(0, 0, 0, 0.55);
+}
+
+/* Codec desteklenmeyen video thumb'lerinde (örn. HEVC mp4) ikon ortalanır. */
+.custom-bg-thumb-photo .fa-video-slash {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    opacity: 0.6;
 }
 
 .custom-bg-thumb-label {

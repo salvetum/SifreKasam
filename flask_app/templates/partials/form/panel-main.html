@@ -21,23 +21,32 @@
 
                 <div class="vault-field" id="kategori_group" data-collapse="height">
                     <label for="kategori">{{ _('Kategori') }}</label>
-                    <input type="text" name="kategori" id="kategori" placeholder="{{ _('Genel') }}"
-                        value="{{ kayit.full_data.Category if kayit else 'Genel' }}"
-                        class="kasa-field">
+                    <div class="vault-field-input-wrap">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-folder-open"></i></span>
+                        <input type="text" name="kategori" id="kategori" placeholder="{{ _('Genel') }}"
+                            value="{{ kayit.full_data.Category if kayit else 'Genel' }}"
+                            class="kasa-field">
+                    </div>
                 </div>
             </div>
 
             <div class="vault-field">
                 <label for="isim" id="isim_label">{{ _('İsim / Başlık') }}</label>
-                <input type="text" name="isim" id="isim" required placeholder="{{ _('Örn: Google, Netflix…') }}"
-                    value="{{ kayit.full_data['Website name'] or kayit.full_data['Application'] or kayit.full_data['Account name'] or kayit.full_data['CreditCard'] or kayit.full_data['SecureNote'] if kayit }}"
-                    class="kasa-field">
+                <div class="vault-field-input-wrap">
+                    <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-pen"></i></span>
+                    <input type="text" name="isim" id="isim" required placeholder="{{ _('Örn: Google, Netflix…') }}"
+                        value="{{ kayit.full_data['Website name'] or kayit.full_data['Application'] or kayit.full_data['Account name'] or kayit.full_data['CreditCard'] or kayit.full_data['SecureNote'] if kayit }}"
+                        class="kasa-field">
+                </div>
             </div>
 
             <div class="vault-field" id="website_url_group" data-collapse="height" hidden>
                 <label for="website_url">{{ _('Website URL') }}</label>
-                <input type="text" name="website_url" id="website_url" placeholder="https://…"
-                    value="{{ kayit.full_data['Website URL'] if kayit and 'Website URL' in kayit.full_data }}"
-                    class="kasa-field">
+                <div class="vault-field-input-wrap">
+                    <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-link"></i></span>
+                    <input type="text" name="website_url" id="website_url" placeholder="https://…"
+                        value="{{ kayit.full_data['Website URL'] if kayit and 'Website URL' in kayit.full_data }}"
+                        class="kasa-field">
+                </div>
             </div>
         </section>

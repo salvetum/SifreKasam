@@ -32,6 +32,7 @@ const {
 const { markLocalCertificateNoiseReported } = require('./certificates');
 const { showFriendlyFatalError, relaunchInSafeMode } = require('./fatal-errors');
 const { loadBackendPage, resolveLoadingPagePath } = require('./page-loader');
+const bench = require('./startup-timing');
 const {
   syncLanRuntimeState,
   applyContentProtection,
@@ -63,6 +64,7 @@ async function createWindow() {
   const showWindow = () => {
     if (windowShown || !rt.mainWindow || rt.mainWindow.isDestroyed()) return;
     windowShown = true;
+    bench.mark('window-shown');
     rt.mainWindow.show();
   };
   rt.mainWindow.once('ready-to-show', showWindow);
@@ -79,6 +81,7 @@ async function createWindow() {
       background:   getSavedBackgroundStyle(),
     },
   });
+  bench.mark('loading-file-loaded');
 
   // Harici linkleri sistem tarayıcısında aç
   rt.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -120,6 +123,10 @@ async function createWindow() {
 
   rt.mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (!isMainFrame || !validatedURL?.startsWith(`https://${HOST}:`)) return;
+    // Hızlı sayfa geçişlerinde (arka arkaya tıklama / çift tıklama) Chromium,
+    // devam eden navigasyonu yeni istekle iptal eder ve ERR_ABORTED (-3)
+    // tetiklenir. Bu normal bir durumdur; ölümcül bir yükleme hatası değildir.
+    if (errorCode === -3) return;
     const description = String(errorDescription || '');
     const isCertificateNoise = errorCode === -202
       || errorCode === -201

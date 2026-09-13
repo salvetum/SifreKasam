@@ -1,7 +1,7 @@
-/* Password generator */
+/* Password generator — tek sütun düzen: X ekseninde kompakt */
 .kasa-modal .modal-dialog.generator-modal-dialog {
-    width: min(96vw, 980px);
-    max-width: 980px;
+    width: min(96vw, 700px);
+    max-width: 700px;
 }
 .generator-modal-content {
     overflow: hidden;
@@ -16,9 +16,8 @@
     grid-template-columns: 1fr;
     grid-template-areas:
         "output"
-        "options"
-        "history";
-    gap: 0.9rem;
+        "options";
+    gap: 0.7rem;
 }
 .generator-output-card,
 .generator-options-card,
@@ -29,8 +28,8 @@
     grid-area: output;
     display: grid;
     align-content: start;
-    gap: 0.85rem;
-    padding: 1rem;
+    gap: 0.55rem;
+    padding: 0.8rem;
 }
 .generator-output-kicker {
     display: inline-flex;
@@ -61,7 +60,7 @@
     letter-spacing: 0.06em;
 }
 .generator-strength-card {
-    padding: 0.75rem;
+    padding: 0.5rem 0.6rem;
     border-radius: 14px;
     background: rgba(0,0,0,0.12);
     border: 1px solid rgba(255,255,255,0.055);
@@ -70,8 +69,8 @@
     grid-area: options;
     display: grid;
     align-content: start;
-    gap: 0.7rem;
-    padding: 1rem;
+    gap: 0.45rem;
+    padding: 0.8rem;
 }
 .generator-option-grid {
     display: grid;
@@ -89,33 +88,31 @@
         border-color 170ms ease,
         background 170ms ease;
 }
-.generator-history-card {
-    grid-area: history;
-    margin: 0 !important;
-    overflow: hidden;
-}
 
 @media (min-width: 700px) {
-    .generator-layout {
-        grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
-        grid-template-areas:
-            "output options"
-            "history history";
-    }
+        .generator-layout {
+            gap: 0.8rem;
+        }
 
-    .generator-output-row {
-        flex-direction: row;
-    }
+        .generator-output-row {
+            flex-direction: row;
+            justify-content: center;
+        }
 
-    .generator-output-row .generator-copy-btn {
-        width: 44px;
-        flex-basis: 44px;
-    }
+        .generator-output-row .generator-copy-btn {
+            width: 44px;
+            flex-basis: 44px;
+        }
 
-    .generator-option-grid {
-        grid-template-columns: var(--grid-2);
+.generator-output-row .kasa-field {
+            flex: 1 1 0%;
+            min-height: 52px;
+        }
+
+        .generator-option-grid {
+            grid-template-columns: var(--grid-2);
+        }
     }
-}
 
 /* === Vault Form Page === */
 .kasa-form-page-shell {
@@ -193,42 +190,6 @@
     gap: 1rem;
     padding: 1rem;
     border-radius: 20px;
-}
-
-/* ── A1: Yükseklik varlık motoru ────────────────────────────────────
-   data-collapse="height" alanları grid-rows 0fr↔1fr ile açılıp kapanır:
-   tip değişimlerindeki dikey sıçramalar (500px+) animasyona dönüşür.
-   Çocuklar .kasa-field-clip içinde taşınır (min-height:0 şart). */
-[data-collapse="height"].kasa-collapsible:not([hidden]) {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows var(--dur-slow) var(--ease-inout);
-}
-/* v5 iki-fazli motor: boyut fazinda JS bu class'i ekler — kisa lineer */
-[data-collapse="height"].kasa-collapsible.kasa-size-anim {
-    transition-duration: 110ms;
-    transition-timing-function: linear;
-}
-[data-collapse="height"].kasa-collapsible:not([hidden]).is-expanded {
-    grid-template-rows: 1fr;
-}
-.kasa-collapsible > .kasa-field-clip {
-    min-height: 0;
-    overflow: hidden;
-    /* Boyama yalnizca clip icinde: cam yeniden ornekleme maliyeti
-       cokme boyunca sabit kalir, son karede kasma olmaz. */
-    contain: layout paint style;
-}
-/* Bölüm seviyesindekiler (.vault-form-panel) zaten grid; kendi
-   padding'leri çökerken de küçülsün diye clip padding'i üstlenir. */
-.vault-form-panel.kasa-collapsible > .kasa-field-clip {
-    display: grid;
-    align-content: start;
-    gap: 1rem;
-    padding: 1rem;
-}
-.vault-form-panel.kasa-collapsible {
-    padding: 0;
 }
 
 /* ── Sayfa girişi: yüzeyler sırayla süzülerek gelir ────────────────
@@ -531,8 +492,9 @@ body.form-booted .vault-form-hero .vault-form-icon {
 
 .vault-generator-panel {
     display: grid;
-    gap: 0.85rem;
-    padding: 1rem;
+    gap: 1.05rem;
+    padding: 1.25rem;
+    margin-top: 0.85rem;
     border: 1px solid rgba(124,111,247,0.18);
     border-radius: 16px;
     background:
@@ -545,10 +507,18 @@ body.form-booted .vault-form-hero .vault-form-icon {
     -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
+.vault-generator-panel .page-generator-controls {
+    display: grid;
+    gap: 0.85rem;
+}
+.vault-generator-panel .page-generator-controls .mb-2 {
+    margin-bottom: 0;
+}
+
 .vault-generator-panel .page-generator-options {
     display: grid;
     grid-template-columns: var(--grid-2);
-    gap: 0.55rem;
+    gap: 0.7rem;
 }
 
 .vault-generator-panel .page-generator-options label {
@@ -919,6 +889,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 .ph-top {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.7rem;
     min-width: 0;
 }
@@ -936,11 +907,9 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     transition: background var(--dur-base) var(--ease-swift),
                 box-shadow var(--dur-base) ease;
 }
-/* Seviye renkleri: barEl (=.ph-segments) strength-level-N tasır */
-.ph-segments.strength-level-1 span:nth-child(-n+1),
-.ph-segments.strength-level-1 span:nth-child(2) { background: transparent; }
-.ph-segments.strength-level-0 span:nth-child(-n+1) { background: var(--strength-c0); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c0) 45%, transparent); }
-.ph-segments.strength-level-1 span:nth-child(1) { background: var(--strength-c1); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c1) 45%, transparent); }
+/* Seviye renkleri: barEl (=.ph-segments) strength-level-N tasır. */
+/* Seviye N, N segmenti yakar: 0→0, 1→1, 2→2, 3→3, 4→4 (dolu). */
+.ph-segments.strength-level-1 span:nth-child(-n+1) { background: var(--strength-c1); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c1) 45%, transparent); }
 .ph-segments.strength-level-2 span:nth-child(-n+2) { background: var(--strength-c2); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c2) 40%, transparent); }
 .ph-segments.strength-level-3 span:nth-child(-n+3) { background: var(--strength-c3); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c3) 40%, transparent); }
 .ph-segments.strength-level-4 span:nth-child(-n+4) { background: var(--strength-c4); box-shadow: 0 0 8px color-mix(in srgb, var(--strength-c4) 42%, transparent); }
@@ -977,18 +946,24 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 .ph-chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.32rem;
-    padding: 0.18rem 0.5rem;
+    gap: 0.45rem;
+    padding: 0.22rem 0.65rem;
     border-radius: 999px;
-    font-size: 0.66rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.3;
     color: var(--text-muted);
     border: 1px solid var(--border-glass);
     background: rgba(255,255,255, calc(var(--glass-veil-scale) * 0.04));
 }
 .ph-chip i { font-size: 0.58rem; }
 .ph-chip.ph-crack i { color: var(--accent-2); }
+/* Entropi barı, "tahmini süre" (kırılma dayanımı) ile aynı satırda:
+   bar solda, tahmini dayanım metni sağda yaslanır. */
+.ph-top .ph-crack {
+    margin-left: auto;
+    white-space: nowrap;
+}
 .ph-chip.ph-warn {
     color: var(--warning);
     border-color: color-mix(in srgb, var(--warning) 40%, transparent);
@@ -1028,7 +1003,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 
 .vault-password-input {
     width: 100%;
-    padding-right: calc(var(--control-height) + 1rem) !important;
+    padding-right: calc(var(--control-height) * 2 + 0.35rem + 0.85rem) !important;
 }
 
 .vault-form-access .vault-password-line .generator-copy-btn {
@@ -1051,10 +1026,38 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     transform: translateY(-50%) scale(0.97);
 }
 
+/* ── Şifre alanı üst satırı: başlık + üretici ayarları bağlantısı ───── */
+/* ── Şifre çizgisi: üretici ayarları düğmesi (kopyala/döndür arası) ─── */
+.vault-form-access .vault-password-line #page-generate-btn {
+    right: calc(0.35rem + 36px + 5px);
+    color: var(--text);
+}
+.vault-form-access .vault-password-line #page-generate-btn:hover {
+    color: var(--accent-2);
+}
+.vault-form-access .vault-password-line #page-generate-btn[aria-expanded="true"] {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.38);
+    background: rgba(var(--accent-rgb), 0.10);
+}
+/* Açılınca ikon wand → chevron-up olur: 200ms dönüş + hafif pop.
+   İkon cam yüzey değil → opacity/transform serbest. */
+.vault-form-access .vault-password-line #page-generate-btn i {
+    display: inline-block;
+}
+.vault-form-access .vault-password-line #page-generate-btn[aria-expanded="true"] i {
+    animation: genChevronIn 200ms var(--ease-out) both;
+}
+@keyframes genChevronIn {
+    0%   { transform: rotate(-90deg) scale(0.5); opacity: 0; }
+    60%  { transform: rotate(8deg) scale(1.08); opacity: 1; }
+    100% { transform: rotate(0deg) scale(1); opacity: 1; }
+}
+
 /* ── Üreticinin solunda, hover/odakla açılan kopyala düğmesi ─────── */
 .vault-form-access .vault-password-line .password-copy-btn {
     position: absolute !important;
-    right: calc(0.35rem + 36px + 5px);
+    right: calc(0.35rem + 36px + 5px + 36px + 5px);
     top: 50%;
     width: 36px;
     min-height: 36px;
@@ -1083,7 +1086,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 }
 .vault-form-access .vault-password-line:hover .vault-password-input,
 .vault-form-access .vault-password-line:focus-within .vault-password-input {
-    padding-right: calc(var(--control-height) + 1rem + 41px) !important;
+    padding-right: calc(var(--control-height) * 3 + 0.35rem + 0.85rem) !important;
 }
 
 /* ── Tip değişimi: üretici düğmesi display:none yerine yumuşakça çekilir ── */
@@ -1115,7 +1118,7 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
 .vault-generator-panel {
     overflow: hidden;
     max-height: 640px;
-    opacity: 1;
+    visibility: visible;
     transform: translateY(0);
     border-color: rgba(var(--accent-rgb), 0.20);
     background:
@@ -1124,24 +1127,74 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
             rgba(255,255,255, calc(var(--glass-veil-scale) * 0.09)),
             rgba(255,255,255, calc(var(--glass-veil-scale) * 0.05))),
         var(--glass);
+    /* CAM KURALI: panel cam yüzey (backdrop-filter) → kendi opacity'si
+       animate edilmez (bitişte "buğusuz→buğulu" flash). Açılış transform
+       (translateY) + visibility tabanlı; iç öğelerin stagger'ı opacity
+       kullanabilir çünkü onlar cam yüzey değil. */
     transition:
-        max-height 260ms cubic-bezier(0.16, 1, 0.3, 1),
-        opacity 210ms ease,
-        transform 230ms cubic-bezier(0.16, 1, 0.3, 1),
-        padding 230ms ease,
-        margin 230ms ease,
+        max-height 250ms var(--ease-out),
+        transform 250ms var(--ease-out),
+        visibility 0s linear 0s,
+        padding 250ms var(--ease-out),
+        margin 250ms var(--ease-out),
         border-color 230ms ease;
 }
 
 .vault-generator-panel.is-collapsed {
     max-height: 0;
-    opacity: 0;
-    margin-top: -0.5rem;
+    visibility: hidden;
+    margin-top: -0.85rem;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     border-color: transparent;
-    transform: translateY(-8px);
+    transform: translateY(-6px);
     pointer-events: none;
+    /* Kapanış daha hızlı: 160ms + visibility gizlenmesi kapanış sonuna ertelenir */
+    transition:
+        max-height 160ms var(--ease-inout),
+        transform 160ms var(--ease-inout),
+        visibility 0s linear 160ms,
+        padding 160ms var(--ease-inout),
+        margin 160ms var(--ease-inout),
+        border-color 160ms ease;
+}
+
+/* Panel açılırken iç öğelerde hafif kademeli giriş (stagger):
+   uzunluk satırı → slider → ambiguous → chips; pill'ler araya serpiştirilir.
+   İç öğeler cam yüzey DEĞİL → opacity + transform serbest. */
+.vault-generator-panel:not(.is-collapsed) .page-generator-controls > *:not(.sr-only),
+.vault-generator-panel:not(.is-collapsed) .gen-toggle-pill {
+    animation: vaultGenPanelIn 240ms var(--ease-out) both;
+}
+.vault-generator-panel:not(.is-collapsed) .generator-length-range { animation-delay: 30ms; }
+.vault-generator-panel:not(.is-collapsed) .gen-ambiguous-row { animation-delay: 60ms; }
+.vault-generator-panel:not(.is-collapsed) .gen-toggle-pill:nth-child(2) { animation-delay: 45ms; }
+.vault-generator-panel:not(.is-collapsed) .gen-toggle-pill:nth-child(3) { animation-delay: 70ms; }
+.vault-generator-panel:not(.is-collapsed) .gen-toggle-pill:nth-child(4) { animation-delay: 95ms; }
+@keyframes vaultGenPanelIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Animasyon kapalı / azaltılmış hareket: panel anında açılıp kapanır,
+   pill/chevron/parıltı mikro-animasyonları da durur. */
+html[data-kasa-animations="off"] .vault-generator-panel,
+html[data-kasa-animations="off"] .vault-generator-panel *,
+html[data-kasa-animations="off"] #page-generate-btn i,
+html[data-kasa-animations="off"] #page-regenerate-btn,
+html[data-kasa-animations="off"] #page-regenerate-btn i {
+    transition: none !important;
+    animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .vault-generator-panel,
+    .vault-generator-panel *,
+    #page-generate-btn i,
+    #page-regenerate-btn,
+    #page-regenerate-btn i {
+        transition: none !important;
+        animation: none !important;
+    }
 }
 
 .vault-generator-panel input[type="range"] {
@@ -1201,6 +1254,11 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     #modal-create-record-from-password {
         grid-column: 1 / -1;
         grid-row: 1;
+    }
+
+    /* Geçmiş (drawer) butonu: birincil CTA'nın altında tam genişlik */
+    #modal-open-generator-history {
+        grid-column: 1 / -1;
     }
 
 }
@@ -1394,7 +1452,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     text-transform: uppercase;
     color: var(--text-muted);
 }
-.gen-options-label--mt { margin-top: 0.35rem; }
+.gen-options-label--mt { margin-top: 0.12rem; }
 
 .gen-value-badge {
     min-width: 2rem;
@@ -1409,15 +1467,15 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 .gen-toggle-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 .gen-toggle-pill {
     display: flex;
     align-items: center;
     justify-content: flex-start;
     gap: 0.5rem;
-    min-height: 46px;
-    padding: 0.45rem 0.65rem;
+    min-height: 36px;
+    padding: 0.32rem 0.55rem;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.04);
@@ -1439,11 +1497,13 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 .gen-toggle-pill.is-active {
     color: var(--accent-2);
-    border-color: rgba(var(--accent-rgb), 0.42);
-    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.18), rgba(var(--accent-rgb), 0.08));
+    font-weight: 700;
+    border-color: rgba(var(--accent-rgb), 0.75);
+    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.30), rgba(var(--accent-rgb), 0.14));
     box-shadow:
-        inset 0 0 0 1px rgba(var(--accent-rgb), 0.15),
-        0 2px 10px rgba(0, 0, 0, 0.15);
+        inset 0 0 0 1px rgba(var(--accent-rgb), 0.28),
+        0 0 16px rgba(var(--accent-rgb), 0.18),
+        0 3px 12px rgba(0, 0, 0, 0.2);
 }
 .gen-pill-glyph {
     min-width: 2.1rem;
@@ -1457,8 +1517,8 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 .gen-ambiguous-row {
     display: flex;
     align-items: flex-start;
-    gap: 0.6rem;
-    padding: 0.6rem 0.7rem;
+    gap: 0.5rem;
+    padding: 0.4rem 0.55rem;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(255, 255, 255, 0.03);
@@ -1478,22 +1538,23 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Analiz bandı (güç + entropi + kırılma) */
 .gen-analysis {
     display: grid;
-    gap: 0.5rem;
+    gap: 0.3rem;
 }
 .gen-band-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.45rem;
+    gap: 0.35rem;
 }
 .gen-band-chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.32rem 0.7rem;
+    gap: 0.55rem;
+    padding: 0.24rem 0.7rem;
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    font-size: 0.74rem;
+    font-size: 0.7rem;
+    line-height: 1.3;
     color: var(--text-muted);
     white-space: nowrap;
 }
@@ -1520,7 +1581,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* Yeni Üret ikonu: simge değiştirilmez, yalnızca tıklamada döner */
 #modal-gen-now i,
-#page-gen-now i {
+#page-regenerate-btn i {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1533,6 +1594,26 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 @keyframes genIconSpin {
     0%   { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Sayfa "Yeni Üret" butonu: spin sırasında hafif neon parıltı.
+   gen-icon-spin sınıfına bağlı → JS'te remove/reflow/add döngüsü
+   (password-generator.js) animasyonu her tıkta temiz yeniden başlatır,
+   yığılma olmaz. scale bağımsız property → butonun translateY(-50%)
+   konumu bozulmaz. */
+@keyframes genRegenGlow {
+    0%   { scale: 1; filter: drop-shadow(0 0 0 rgba(var(--accent-rgb), 0)); }
+    40%  { scale: 1.07; filter: drop-shadow(0 0 9px rgba(var(--accent-rgb), 0.55)); }
+    100% { scale: 1; filter: drop-shadow(0 0 0 rgba(var(--accent-rgb), 0)); }
+}
+#page-regenerate-btn.gen-icon-spin {
+    animation: genRegenGlow 0.6s var(--ease-out) both;
+}
+/* Düşük güç / düşük cam kalitesi / efekt kapalı: parıltı filtresi kullanılmaz */
+html[data-kasa-low-power="on"] #page-regenerate-btn.gen-icon-spin,
+html[data-glass-quality="low"] #page-regenerate-btn.gen-icon-spin,
+html[data-glass-effects="off"] #page-regenerate-btn.gen-icon-spin {
+    animation: none;
 }
 
 /* Güç barı shimmer (modal + form sağlık kartı) */
@@ -1569,9 +1650,12 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     color: var(--text);
 }
 [data-bs-theme="light"] .gen-toggle-pill.is-active {
-    color: rgba(var(--accent-rgb), 1);
-    background: rgba(var(--accent-rgb), 0.1);
-    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.3);
+    color: #fff;
+    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.85), rgba(var(--accent-rgb), 0.60));
+    border-color: rgba(var(--accent-rgb), 1);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.30),
+        0 0 14px rgba(var(--accent-rgb), 0.35);
 }
 [data-bs-theme="light"] .gen-ambiguous-row {
     background: rgba(31, 41, 55, 0.035);
@@ -1591,8 +1675,8 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    margin: 0.55rem 0 0;
-    padding-top: 0.55rem;
+    margin: 0.4rem 0 0;
+    padding-top: 0.45rem;
     border-top: 1px dashed rgba(255, 255, 255, 0.09);
     font-size: 0.76rem;
     color: var(--text-muted);
@@ -1614,8 +1698,8 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .generator-hero .generator-output-kicker {
     margin-inline: auto;
-    margin-bottom: 0.2rem;
-    padding: 0.3rem 0.85rem;
+    margin-bottom: 0.15rem;
+    padding: 0.2rem 0.8rem;
     border: 1px solid rgba(var(--accent-rgb), 0.26);
     border-radius: 999px;
     background: rgba(var(--accent-rgb), 0.10);
@@ -1644,7 +1728,10 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .generator-hero .generator-output-row .kasa-field {
-    min-height: 72px;
+    /* Alan + kopya butonu containeri (output-row) x ekseninde tam doldurur;
+       buton sabit, alan kalanı esneyerek kaplar. */
+    flex: 1 1 0%;
+    min-height: 52px;
     padding: 0.3rem 1.05rem;
     font-size: clamp(1.15rem, 2.1vw, 1.45rem);
     font-weight: 600;
@@ -1719,7 +1806,16 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
         inset 0 0 0 1px rgba(var(--accent-rgb), 0.18),
         0 2px 12px rgba(var(--accent-rgb), 0.20);
 }
-.gen-toggle-pill:active { transform: translateY(0) scale(0.97); }
+.gen-toggle-pill:active { transform: translateY(0) scale(0.96); }
+/* Aktif pill glyph'inde hafif "tak" pop (is-active eklendiğinde oynar) */
+@keyframes genPillGlyphPop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.16); }
+    100% { transform: scale(1); }
+}
+.gen-toggle-pill.is-active .gen-pill-glyph {
+    animation: genPillGlyphPop 0.3s var(--ease-spring) both;
+}
 .gen-toggle-pill:focus-visible {
     outline: 2px solid rgba(var(--accent-rgb), 0.60);
     outline-offset: 2px;
@@ -1778,3 +1874,31 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
 .generator-modal-content .modal-footer #modal-gen-now:active {
     transform: translateY(0) scale(0.97);
 }
+
+/* Üretici modalı: Uzunluk başlık satırındaki fazla alt boşluk (utility mb-2) */
+.generator-options-card .mb-2 { margin-bottom: 0.28rem; }
+
+/* Üretici modalı footer: 501-700px (dar-orta pencere) tek satır flex —
+   ≤560px'teki 2-sütun grid override'ı burada geçersiz kalır. */
+@media (min-width: 501px) and (max-width: 700px) {
+  .generator-modal-content .modal-footer {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .generator-modal-content .modal-footer .kasa-btn {
+    width: auto;
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 501px) and (max-width: 640px) {
+  .generator-modal-content .modal-footer .kasa-btn {
+    font-size: 0.76rem;
+    padding: 0.45rem 0.7rem;
+  }
+}
+

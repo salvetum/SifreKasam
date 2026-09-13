@@ -37,6 +37,8 @@ const {
   verifyPackagedStartupResources,
 } = require('./src/main/page-loader');
 const { createWindow } = require('./src/main/window');
+const bench = require('./src/main/startup-timing');
+const { pruneUserCacheDirs } = require('./src/main/cache-hygiene');
 
 // ─── SQUIRREL KURULUM HANDLER (EN ÜSTTE OLMALI) ──────────────────────────────
 
@@ -44,6 +46,9 @@ if (process.platform === 'win32' && handleSquirrelEvent({ resolvePath })) proces
 
 app.commandLine.appendSwitch('disable-spell-checking');
 app.commandLine.appendSwitch('log-level', '3');
+// Kullanıcı data cache'ini sınırla: HTTP cache en fazla 32 MB (içerik zaten
+// yerel Flask sunucusundan gelir; büyük dalgalı cache gereksizdir).
+app.commandLine.appendSwitch('disk-cache-size', String(32 * 1024 * 1024));
 if (safeModeRequested || !getSavedHardwareAcceleration()) {
   app.disableHardwareAcceleration();
 }
@@ -78,8 +83,28 @@ if (!gotTheLock) {
 
 async function onAppReady() {
   try {
+    bench.mark('app-ready');
+    if (bench.enabled) {
+      console.log(`[bench] disk-cache-size=${app.commandLine.getSwitchValue('disk-cache-size')} (33554432 == 32MB aktif)`);
+    }
     verifyPackagedStartupResources();
+    bench.mark('resources-verified');
     rt.PORT = await findFreePort();
+    bench.mark('port-resolved');
+
+    const flaskTimeoutMs = isFirstRun() ? FLASK_TIMEOUT_FIRST_RUN_MS : FLASK_TIMEOUT_MS;
+
+    // Flask arka plan hizmetini pencere oluşturmayla PARALEL başlat (beklemeden).
+    // Böylece loading ekranı görünürken backend provalaması arka planda biter;
+    // pencere hazır olduğunda genellikle backend de hazır olur.
+    let flaskStartPromise = null;
+    const kickOffFlask = () => {
+      const promise = startFlaskServer(flaskTimeoutMs);
+      flaskStartPromise = promise;
+      promise.catch(() => {});
+    };
+    kickOffFlask();
+
     await createWindow();
     createTray();
 
@@ -102,8 +127,6 @@ async function onAppReady() {
       if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
     };
 
-    const flaskTimeoutMs = isFirstRun() ? FLASK_TIMEOUT_FIRST_RUN_MS : FLASK_TIMEOUT_MS;
-
     if (isRunningAsAdmin()) {
       await dialog.showMessageBox(rt.mainWindow, {
         type: 'warning',
@@ -118,7 +141,7 @@ async function onAppReady() {
 
     try {
       progressTimer = setTimeout(showProgressMessage, 12_000);
-      await startFlaskServer(flaskTimeoutMs);
+      await flaskStartPromise;
     } catch (firstErr) {
       clearProgressTimer();
 
@@ -140,7 +163,8 @@ async function onAppReady() {
 
       try {
         progressTimer = setTimeout(showProgressMessage, 12_000);
-        await startFlaskServer(flaskTimeoutMs);
+        kickOffFlask();
+        await flaskStartPromise;
       } catch (retryErr) {
         clearProgressTimer();
 
@@ -162,7 +186,8 @@ async function onAppReady() {
                 waitForBackendReady(resolve, reject);
               });
             } else {
-              await startFlaskServer(flaskTimeoutMs);
+              kickOffFlask();
+              await flaskStartPromise;
             }
           } catch (retryErr2) {
             clearProgressTimer();
@@ -195,10 +220,17 @@ async function onAppReady() {
       try {
         await rt.mainWindow.webContents.executeJavaScript('transitionToApp()');
       } catch (_) { /* loading.html henüz yüklenmemiş olabilir */ }
+      bench.mark('transition-done');
       rt.mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
       applyContentProtection();
       await loadBackendPage('/login?entry=loading');
+      bench.mark('app-page-loaded');
+      bench.dump('startup');
       startLanReconciliation();
+      // GPU/Dawn/Code cache eşiği aşarsa birkaç saniye sonra temizle
+      setTimeout(() => {
+        try { pruneUserCacheDirs(); } catch (_) {}
+      }, 8000);
     }
   } catch (err) {
     const isSquirrel = process.argv.some(arg => arg.startsWith('--squirrel-'));

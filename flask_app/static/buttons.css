@@ -60,6 +60,55 @@
 .kasa-btn-muted  { color: var(--text-muted); }
 .kasa-btn-icon   { width: 36px; height: 36px; min-height: 36px; padding: 0; }
 
+/* Şifre Oluşturucu (navbar) — muted değil; accent çerçeve + hafif tint ile
+   göze çarpar ama primary'yi ezmez. */
+.kasa-btn-generator {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.40);
+    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.16), rgba(var(--accent-rgb), 0.05));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 22px rgba(var(--accent-rgb), 0.12);
+}
+.kasa-btn-generator:hover {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.60);
+    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.22), rgba(var(--accent-rgb), 0.10));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 12px 26px rgba(var(--accent-rgb), 0.18);
+}
+.kasa-btn-generator .fa-wand-magic-sparkles {
+    font-size: 0.95em;
+}
+html[data-kasa-gradient="off"] .kasa-btn-generator {
+    background: rgba(var(--accent-rgb), 0.12);
+}
+html[data-kasa-gradient="off"] .kasa-btn-generator:hover {
+    background: rgba(var(--accent-rgb), 0.18);
+}
+
+.kasa-btn-secondary {
+    color: var(--accent-2);
+    border-color: rgba(var(--accent-rgb), 0.35);
+    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.20), rgba(var(--accent-rgb), 0.08)) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 22px rgba(var(--accent-rgb), 0.10);
+}
+.kasa-btn-secondary:hover {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.55);
+    background: linear-gradient(145deg, rgba(var(--accent-rgb), 0.26), rgba(var(--accent-rgb), 0.12)) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 12px 26px rgba(var(--accent-rgb), 0.16);
+}
+.kasa-btn-ghost {
+    color: var(--text-muted);
+    background: transparent !important;
+    border-color: rgba(255,255,255,0.10);
+    box-shadow: none;
+}
+.kasa-btn-ghost:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.16);
+    box-shadow: none;
+}
+
 .generator-copy-btn {
     width: 44px;
     min-height: 42px;

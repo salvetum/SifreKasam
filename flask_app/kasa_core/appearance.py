@@ -7,6 +7,8 @@ import time
 import uuid
 from typing import Any
 
+from flask import g, has_request_context
+
 from kasa_core.constants import (
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
     DEFAULT_CARD_DEPTH_ENABLED,
@@ -21,7 +23,6 @@ from kasa_core.constants import (
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
     DEFAULT_POWER_SAVE_ENABLED,
-    DEFAULT_LAN_WARNING_ACKNOWLEDGED,
 )
 from kasa_core.extensions import db
 from kasa_core.models import Setting
@@ -87,11 +88,26 @@ class AppearanceSettings:
 
     @staticmethod
     def get_setting(key: str) -> str | None:
+        # Tek istek içinde aynı ayar çok kez okunur (kart döngüleri, context
+        # processor). Her okuma SQL sorgusu demekti: 150 kayıtlık kasa sayfasında
+        # ~2470 sorgu. İstek başına g-cache'i bu maliyeti sıfıra indirir.
+        if has_request_context():
+            cache = g.setdefault('_appearance_settings_cache', {})
+            if key in cache:
+                return cache[key]
+            setting = Setting.query.filter_by(key=key).first()
+            value = setting.value if setting else None
+            cache[key] = value
+            return value
         setting = Setting.query.filter_by(key=key).first()
         return setting.value if setting else None
 
     @staticmethod
     def set_setting(key: str, value: str) -> None:
+        # Aynı istek içinde yazıp-okuma akışlarında bayat kalmaması için cache'i tazele.
+        if has_request_context():
+            cache = g.setdefault('_appearance_settings_cache', {})
+            cache[key] = value
         setting = Setting.query.filter_by(key=key).first()
         if setting:
             setting.value = value
@@ -444,27 +460,3 @@ class AppearanceSettings:
         self.set_setting("power_save_enabled", str(enabled).lower())
         self.save_file(power_save_enabled=enabled)
         return enabled
-
-    def get_lan_warning_acknowledged(self) -> bool:
-        try:
-            value = self.get_setting("lan_warning_acknowledged")
-            if value is not None:
-                return normalize_theme_option(
-                    value,
-                    DEFAULT_LAN_WARNING_ACKNOWLEDGED,
-                )
-        except Exception:
-            pass
-        return normalize_theme_option(
-            self.load_file().get("lan_warning_acknowledged"),
-            DEFAULT_LAN_WARNING_ACKNOWLEDGED,
-        )
-
-    def save_lan_warning_acknowledged(self, value: object) -> bool:
-        acknowledged = normalize_theme_option(
-            value,
-            DEFAULT_LAN_WARNING_ACKNOWLEDGED,
-        )
-        self.set_setting("lan_warning_acknowledged", str(acknowledged).lower())
-        self.save_file(lan_warning_acknowledged=acknowledged)
-        return acknowledged

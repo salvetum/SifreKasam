@@ -414,6 +414,13 @@ export function initPasswordGenerator({
         value: item.password,
       });
 
+      const dateEl = document.createElement('span');
+      dateEl.className = 'gen-history-date';
+      dateEl.append(createIcon('fa-regular fa-clock'), document.createTextNode(` ${dateStr}`));
+
+      pwRow.appendChild(pwInput);
+      info.append(pwRow, dateEl);
+
       const showBtn = createIconButton(
         window._('Göster/Gizle'),
         'fa-solid fa-eye',
@@ -444,18 +451,15 @@ export function initPasswordGenerator({
         renderGeneratorHistory();
       });
 
-      pwRow.append(pwInput, showBtn, copyBtn, delBtn);
-      info.appendChild(pwRow);
+      const actions = document.createElement('div');
+      actions.className = 'gen-history-actions';
 
-      const meta = document.createElement('div');
-      meta.className = 'gen-history-meta';
-      const dateMeta = document.createElement('span');
-      dateMeta.append(createIcon('fa-regular fa-clock'), ` ${dateStr}`);
-      const lengthMeta = document.createElement('span');
-      lengthMeta.textContent = `${item.length} ${window._('karakter')}`;
-      meta.append(dateMeta, lengthMeta);
+      const lengthEl = document.createElement('span');
+      lengthEl.className = 'gen-history-length';
+      lengthEl.textContent = `${item.length} ${window._('karakter')}`;
 
-      div.append(info, meta);
+      actions.append(lengthEl, showBtn, copyBtn, delBtn);
+      div.append(info, actions);
       list.appendChild(div);
     });
   };
@@ -474,7 +478,37 @@ export function initPasswordGenerator({
   });
 
   const modalGeneratePassword = setupPasswordGenerator('passwordGeneratorModal', 'modal-');
-  setupPasswordGenerator('pageGenerator', 'page-');
+
+  // ─── Sayfa (ekle/düzenle) satır içi üretici paneli ───
+  // Form içindeki #pageGenerator paneli; ayarlar (uzunluk, karakter tipleri,
+  // benzer karakter dışlama) panelden okunur. Panel kapalıyken varsayılan
+  // değerler (16 karakter, 4 tip, benzer karakter yok) geçerlidir.
+  const pageGeneratePassword = setupPasswordGenerator('pageGenerator', 'page-password-');
+
+  // ─── Sayfa (ekle/düzenle) hızlı "Yenile" butonu ───
+  // Şifre kutusundaki dönen ok, panel ayarlarını kullanarak yeni şifre üretir
+  // (slot animasyonu, nabız, geçmiş ve güç barı shimmer'ı setupPasswordGenerator
+  // içinde yönetilir; burada yalnızca butonun kendi spin'i tetiklenir).
+  const pageRegenerateBtn = document.getElementById('page-regenerate-btn');
+  if (pageRegenerateBtn) {
+    pageRegenerateBtn.addEventListener('click', () => {
+      const input = document.getElementById('page-password');
+      if (!input) return;
+      try {
+        pageRegenerateBtn.classList.remove('gen-icon-spin');
+        void pageRegenerateBtn.offsetWidth;
+        pageRegenerateBtn.classList.add('gen-icon-spin');
+        pageGeneratePassword?.();
+      } catch (err) {
+        console.error('Password generation failed:', err);
+        showWarningToast(window._('Güvenli rastgele üretici kullanılamıyor.'));
+      }
+    });
+
+    pageRegenerateBtn.addEventListener('animationend', (e) => {
+      if (e.animationName === 'genIconSpin') pageRegenerateBtn.classList.remove('gen-icon-spin');
+    });
+  }
 
   const pagePasswordInput = document.getElementById('page-password');
   if (pagePasswordInput) {
@@ -523,4 +557,8 @@ export function initPasswordGenerator({
       showWarningToast(window._('İşlem tamamlanamadı.'));
     }
   });
+
+  // Kayıt ekle/düzenle bağlamı kaldırıldı: üretici artık form içinde
+  // satır içi panel (pageGenerator) olarak çalışır; modal yalnızca index
+  // sayfasında "Bu Şifreyle Kayıt Oluştur" akışı için kalır.
 }

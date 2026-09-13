@@ -19,8 +19,13 @@
 import { copyToClipboard } from './reveal-copy.js';
 
 const TYPE_ORDER = ['Website', 'Application', 'CreditCard', 'SecureNote', 'Other'];
+const TYPE_ICONS = {
+  Website: 'fa-globe', Application: 'fa-desktop', CreditCard: 'fa-credit-card',
+  SecureNote: 'fa-note-sticky', Other: 'fa-folder',
+};
 const EASE_SWIFT = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const EASE_EXIT = 'cubic-bezier(0.4, 0, 0.2, 1)';
+const EASE_SPRING = 'cubic-bezier(0.2, 0.9, 0.25, 1.35)';
 
 export function initVaultForm() {
   const kayitTipiSelect = document.getElementById('kayit_tipi');
@@ -135,6 +140,11 @@ export function initVaultForm() {
         passwordInput.setAttribute('inputmode', 'numeric');
         passwordInput.setAttribute('pattern', '[0-9]*');
         passwordInput.placeholder = '000';
+        if (passwordInput.value && !/^\d{3}$/.test(passwordInput.value)) {
+          passwordInput.value = '';
+          passwordInput.classList.remove('generator-generated');
+          passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       } else {
         if (origMaxLength >= 0) passwordInput.maxLength = origMaxLength;
         else passwordInput.removeAttribute('maxlength');
@@ -155,8 +165,19 @@ export function initVaultForm() {
     }
     if (passwordLine) passwordLine.classList.toggle('has-no-generator', isCard);
 
+    // CreditCard: login row tam genişlik + label/hint güncelle
+    const loginRow = loginGroup?.closest('.vault-form-row-two');
+    if (loginRow) loginRow.classList.toggle('is-card-number', isCard);
+    if (loginLabel) {
+      loginLabel.textContent = isCard ? _t('Kart Numarası') : (config.login || _t('Kullanıcı Adı'));
+    }
+    const loginHint = el('login_hint');
+    if (loginHint) {
+      loginHint.hidden = !isCard;
+      if (isCard) loginHint.textContent = _t('boşluklar otomatik eklenir');
+    }
+
     if (isimLabel)     isimLabel.textContent    = config.isim;
-    if (loginLabel    && config.login)    loginLabel.textContent    = config.login;
     if (emailLabel    && config.email)    emailLabel.textContent    = config.email;
     if (passwordLabel && config.password) passwordLabel.textContent = config.password;
     if (commentLabel)  commentLabel.textContent  = config.comment;
@@ -238,6 +259,42 @@ export function initVaultForm() {
         { duration: 190, easing: EASE_SWIFT }
       ));
       liveAnims.push(...inAnims);
+
+      // Alan stagger: panel girişi bitince içindeki alanlar sırayla belirir
+      const staggerDelay = 40;
+      visibleIns.forEach(p => {
+        const fields = p.querySelectorAll('.vault-field:not([hidden])');
+        fields.forEach((f, i) => {
+          f.style.animation = `fieldStaggerIn 0.25s ${EASE_SWIFT} ${i * staggerDelay}ms both`;
+          // Temizlik: animasyon bitince inline style kaldır (sonraki geçişlerde CSS cascade bozulmasın)
+          const totalMs = i * staggerDelay + 250;
+          setTimeout(() => { f.style.animation = ''; }, totalMs);
+        });
+      });
+    }
+
+    // İkon flip: section ikonu yeni tipe göre pop + swap
+    if (!motionOff()) {
+      const mainIcon = mainPanel?.querySelector('.vault-section-head > span i');
+      if (mainIcon) {
+        const newIcon = TYPE_ICONS[type] || 'fa-layer-group';
+        const iconWrap = mainIcon.closest('.vault-section-head > span');
+        if (iconWrap) {
+          iconWrap.animate(
+            [
+              { transform: 'scale(1)', offset: 0 },
+              { transform: 'scale(0.75)', offset: 0.4 },
+              { transform: 'scale(0.75)', offset: 0.6 },
+              { transform: 'scale(1)', offset: 1 },
+            ],
+            { duration: 220, easing: EASE_SPRING }
+          ).finished.then(() => {
+            mainIcon.className = `fa-solid ${newIcon}`;
+          }).catch(() => { mainIcon.className = `fa-solid ${newIcon}`; });
+        } else {
+          mainIcon.className = `fa-solid ${newIcon}`;
+        }
+      }
     }
   };
 
@@ -257,19 +314,37 @@ export function initVaultForm() {
     markBooted();
   }
 
-  // ─── Üretici paneli ───
-  generateBtn?.addEventListener('click', () => {
-    const isVisible = pageGenerator && !pageGenerator.classList.contains('is-collapsed');
-    if (pageGenerator) {
-      pageGenerator.classList.toggle('is-collapsed', Boolean(isVisible));
-      pageGenerator.setAttribute('aria-hidden', String(Boolean(isVisible)));
-      generateBtn.setAttribute('aria-expanded', String(!isVisible));
-    }
-    const icon = generateBtn?.querySelector('i');
-    if (icon) icon.className = isVisible
-      ? 'fa-solid fa-wand-magic-sparkles fa-xs'
-      : 'fa-solid fa-xmark fa-xs';
-  });
+  // ─── Kart numarası auto-format (4-4-4-4) ───
+  const cardNumberInput = el('login');
+  if (cardNumberInput) {
+    const formatCardNumber = (value) => {
+      const digits = value.replace(/\D/g, '').slice(0, 16);
+      const groups = digits.match(/.{1,4}/g) || [];
+      return groups.join(' ');
+    };
+    cardNumberInput.addEventListener('input', (e) => {
+      if (currentType !== 'CreditCard') return; // yalnız kart numarası, username serbest
+      const cursorPos = e.target.selectionStart;
+      const oldValue = e.target.value;
+      const newValue = formatCardNumber(oldValue);
+      if (newValue !== oldValue) {
+        e.target.value = newValue;
+        // Kursor pozisyonunu koru (boşluk eklendiyse ileri taşı)
+        const diff = newValue.length - oldValue.length;
+        e.target.setSelectionRange(cursorPos + diff, cursorPos + diff);
+      }
+    });
+    // Paste koruması
+    cardNumberInput.addEventListener('paste', (e) => {
+      if (currentType !== 'CreditCard') return; // yalnız kart numarası, username serbest
+      e.preventDefault();
+      const pasteText = (e.clipboardData || window.clipboardData).getData('text');
+      const formatted = formatCardNumber(pasteText);
+      const cursorPos = e.target.selectionStart;
+      e.target.value = formatted;
+      e.target.setSelectionRange(cursorPos + formatted.length - pasteText.length, cursorPos + formatted.length - pasteText.length);
+    });
+  }
 
   // ─── Kopyala düğmesi ───
   const passwordCopyBtn = el('page-copy-btn');
@@ -293,5 +368,56 @@ export function initVaultForm() {
       saveBtnEl.disabled = true;
       saveBtnEl.classList.add('is-submitting');
     }
+  });
+
+  // ─── Üretici paneli aç/kapa (page-generate-btn) ─────────────────────
+  // Panel başlangıçta kapalıdır (is-collapsed); tıklamada açılır/kapanır.
+  // Kart tipinde applyTypeState paneli kapatır ve ikonu wand'a çevirir.
+  if (generateBtn && pageGenerator) {
+    generateBtn.addEventListener('click', () => {
+      const isCollapsed = pageGenerator.classList.toggle('is-collapsed');
+      pageGenerator.setAttribute('aria-hidden', String(isCollapsed));
+      generateBtn.setAttribute('aria-expanded', String(!isCollapsed));
+      const genIcon = generateBtn.querySelector('i');
+      if (genIcon) {
+        genIcon.className = isCollapsed
+          ? 'fa-solid fa-wand-magic-sparkles fa-xs'
+          : 'fa-solid fa-chevron-up fa-xs';
+      }
+    });
+  }
+
+  // ─── "Vazgeç" / "Geri": önceki sayfaya dön ─────────────────────────
+  // Ekle/düzenle sayfasındaki Vazgeç ve navbar Geri butonları, kullanıcının
+  // geldiği sayfaya (referrer) döner; referrer yoksa, aynı sayfaysa veya bir
+  // giriş/huni sayfasıysa anchor href'ine (index) düşer.
+  // window.history.back() KULLANILMAZ: Electron penceresinde geçmiş
+  // login/loading/yenileme girişleri içerebildiği için güvenilir değildir
+  // (bazen hiçbir yere dönmez, bazen yanlış sayfaya giderdi). Referrer
+  // deterministiktir ve yenilemede korunur → "bazen çalışıyor, bazen buglu"
+  // davranışı ortadan kalkar.
+  const RETURN_FUNNEL_PATHS = new Set(['/login', '/loading', '/lock', '/logout']);
+  document.querySelectorAll('[data-vazgec-back]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Hedef sayfa (index) Flask'ta tüm kayıtları çözüp render edene kadar
+      // bu sayfa donuk kalır; overlay'i anında göstererek kullanıcıya görsel
+      // geri bildirim ver (app.js'teki e.defaultPrevented guard'ı burada
+      // overlay'i otomatik göstermez — o yüzden manuel tetikliyoruz).
+      window.KASA_SET_PAGE_LOADING?.(true);
+      const fallback = btn.getAttribute('href') || '/';
+      try {
+        const ref = new URL(document.referrer || '', window.location.origin);
+        if (
+          ref.origin === window.location.origin
+          && ref.pathname !== window.location.pathname
+          && !RETURN_FUNNEL_PATHS.has(ref.pathname)
+        ) {
+          window.location.href = ref.pathname + ref.search + ref.hash;
+          return;
+        }
+      } catch (err) { /* yoksay */ }
+      window.location.href = fallback;
+    });
   });
 }

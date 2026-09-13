@@ -82,37 +82,57 @@
                         </label>
                     </section>
 
-                    <section class="gen-history-section generator-history-card">
-                        <div class="gen-history-header">
-                            <button type="button" class="gen-history-toggle" aria-expanded="true" aria-controls="generator-history-body">
-                                <span><i class="fa-regular fa-clock"></i> {{ _('Geçmiş') }}</span>
-                                <i class="fa-solid fa-chevron-down gen-history-chevron"></i>
-                            </button>
-                            <div class="gen-history-header-right">
-                                <button type="button" id="generator-history-clear" data-kasa-pop class="gen-history-clear-btn" title="{{ _('Geçmişi Temizle') }}" hidden>
-                                    <i class="fa-solid fa-trash-can"></i> {{ _('Geçmişi Temizle') }}
-                                </button>
-                            </div>
-                        </div>
-                        <div id="generator-history-body" class="gen-history-body">
-                            <div id="generator-history-empty" class="gen-history-empty">
-                                {{ _('Henüz geçmiş yok.') }}
-                            </div>
-                            <div id="generator-history-list"></div>
-                        </div>
-                    </section>
-                </div>
+                    </div>
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('Kapat') }}</button>
-                <button type="button" class="kasa-btn kasa-btn-muted" id="modal-create-record-from-password">
-                    <i class="fa-solid fa-file-circle-plus"></i>{{ _('Bu Şifreyle Kayıt Oluştur') }}
+                <button type="button" class="kasa-btn kasa-btn-ghost" id="modal-open-generator-history" data-drawer-open="generatorHistoryDrawer">
+                    <i class="fa-regular fa-clock"></i>{{ _('Geçmiş') }}
                 </button>
-                <button type="button" class="kasa-btn kasa-btn-primary" id="modal-gen-now">
+                <button type="button" class="kasa-btn kasa-btn-ghost" data-kasa-close>{{ _('Kapat') }}</button>
+                <button type="button" class="kasa-btn kasa-btn-secondary" id="modal-gen-now">
                     <i class="fa-solid fa-rotate mr-1"></i>{{ _('Yeni Üret') }}
+                </button>
+                <button type="button" class="kasa-btn kasa-btn-primary" id="modal-create-record-from-password">
+                    <i class="fa-solid fa-file-circle-plus"></i>{{ _('Bu Şifreyle Kayıt Oluştur') }}
                 </button>
             </div>
         </div>
     </div>
+</div>
+
+<!-- Şifre Üretici Geçmiş Drawer (sağdan süzülen panel) -->
+<div class="kasa-drawer" id="generatorHistoryDrawer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="generator-history-drawer-title">
+    <div class="kasa-drawer-scrim" data-drawer-close></div>
+    <aside class="kasa-drawer-panel glass" aria-label="{{ _('Geçmiş') }}">
+        <header class="kasa-drawer-header">
+            <h2 id="generator-history-drawer-title" class="kasa-drawer-title">
+                <i class="fa-regular fa-clock"></i> {{ _('Geçmiş') }}
+            </h2>
+            <button type="button" class="kasa-close-btn" data-drawer-close aria-label="{{ _('Kapat') }}">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </header>
+        <div class="kasa-drawer-body">
+            <section class="gen-history-section generator-history-card">
+                <div class="gen-history-header">
+                    <button type="button" class="gen-history-toggle" aria-expanded="true" aria-controls="generator-history-body">
+                        <span><i class="fa-regular fa-clock"></i> {{ _('Geçmiş') }}</span>
+                        <i class="fa-solid fa-chevron-down gen-history-chevron"></i>
+                    </button>
+                    <div class="gen-history-header-right">
+                        <button type="button" id="generator-history-clear" data-kasa-pop class="gen-history-clear-btn" title="{{ _('Geçmişi Temizle') }}" hidden>
+                            <i class="fa-solid fa-trash-can"></i> {{ _('Geçmişi Temizle') }}
+                        </button>
+                    </div>
+                </div>
+                <div id="generator-history-body" class="gen-history-body">
+                    <div id="generator-history-empty" class="gen-history-empty">
+                        {{ _('Henüz geçmiş yok.') }}
+                    </div>
+                    <div id="generator-history-list"></div>
+                </div>
+            </section>
+        </div>
+    </aside>
 </div>

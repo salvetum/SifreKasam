@@ -9,59 +9,76 @@
 
             <div class="vault-field" id="card_holder_group" data-collapse="height" hidden>
                 <label for="card_holder">{{ _('Kart Üzerindeki İsim') }}</label>
-                <input type="text" name="card_holder" id="card_holder" placeholder="ADI SOYADI"
-                    value="{{ kayit.full_data['Card holder'] if kayit and kayit.full_data.get('Card holder') }}"
-                    class="kasa-field" maxlength="120" autocomplete="off">
+                <div class="vault-field-input-wrap">
+                    <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+                    <input type="text" name="card_holder" id="card_holder" placeholder="ADI SOYADI"
+                        value="{{ kayit.full_data['Card holder'] if kayit and kayit.full_data.get('Card holder') }}"
+                        class="kasa-field" maxlength="120" autocomplete="off">
+                </div>
             </div>
 
             <div class="vault-form-row vault-form-row-two">
                 <div class="vault-field" id="login_group">
                     <label for="login" id="login_label">{{ _('Kullanıcı Adı') }}</label>
-                    <input type="text" name="login" id="login" placeholder="kullanici_adi"
-                        value="{{ kayit.full_data.Login if kayit }}"
-                        class="kasa-field">
+                    <div class="vault-field-input-wrap">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" name="login" id="login" placeholder="kullanici_adi"
+                            value="{{ kayit.full_data.Login if kayit }}"
+                            class="kasa-field" data-card-number>
+                        <span class="vault-field-hint vault-field-hint--right" id="login_hint" hidden></span>
+                    </div>
                 </div>
 
                 <div class="vault-field" id="email_group">
                     <label for="email" id="email_label">{{ _('E-posta') }}</label>
-                    <input type="text" name="email" id="email" placeholder="kullanici@mail.com"
-                        value="{{ kayit.full_data.Email if kayit }}"
-                        class="kasa-field">
+                    <div class="vault-field-input-wrap">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-envelope"></i></span>
+                        <input type="text" name="email" id="email" placeholder="kullanici@mail.com"
+                            value="{{ kayit.full_data.Email if kayit }}"
+                            class="kasa-field">
+                    </div>
                 </div>
             </div>
 
             <div id="card_triple_row" class="vault-form-card-triple">
                 <div class="vault-field" id="expiry_ay_field" hidden>
                     <label for="expiry_ay">{{ _('Ay') }}</label>
-                    <div class="settings-number-stepper" data-number-stepper>
-                        <input type="number" id="expiry_ay" min="1" max="12" inputmode="numeric"
-                            placeholder="AA" class="kasa-field settings-timeout-input" autocomplete="off">
-                        <button type="button" data-step-direction="up" aria-label="{{ _('Artır') }}">
-                            <i class="fa-solid fa-chevron-up"></i>
-                        </button>
-                        <button type="button" data-step-direction="down" aria-label="{{ _('Azalt') }}">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
+                    <div class="vault-field-input-wrap">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-calendar"></i></span>
+                        <div class="settings-number-stepper" data-number-stepper>
+                            <input type="number" id="expiry_ay" min="1" max="12" inputmode="numeric"
+                                placeholder="AA" class="kasa-field settings-timeout-input" autocomplete="off">
+                            <button type="button" data-step-direction="up" aria-label="{{ _('Artır') }}">
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                            <button type="button" data-step-direction="down" aria-label="{{ _('Azalt') }}">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="vault-field" id="expiry_yil_field" hidden>
                     <label for="expiry_yil">{{ _('Yıl') }}</label>
-                    <div class="settings-number-stepper" data-number-stepper>
-                        <input type="number" id="expiry_yil" min="2000" max="2100" inputmode="numeric"
-                            placeholder="YYYY" class="kasa-field settings-timeout-input" autocomplete="off">
-                        <button type="button" data-step-direction="up" aria-label="{{ _('Artır') }}">
-                            <i class="fa-solid fa-chevron-up"></i>
-                        </button>
-                        <button type="button" data-step-direction="down" aria-label="{{ _('Azalt') }}">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
+                    <div class="vault-field-input-wrap">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-calendar"></i></span>
+                        <div class="settings-number-stepper" data-number-stepper>
+                            <input type="number" id="expiry_yil" min="2000" max="2100" inputmode="numeric"
+                                placeholder="YYYY" class="kasa-field settings-timeout-input" autocomplete="off">
+                            <button type="button" data-step-direction="up" aria-label="{{ _('Artır') }}">
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                            <button type="button" data-step-direction="down" aria-label="{{ _('Azalt') }}">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="vault-field" id="password_group" data-collapse="height">
                     <label for="page-password" id="password_label">{{ _('Şifre') }}</label>
-                    <div class="vault-password-line">
+                    <div class="vault-field-input-wrap vault-password-line">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
                         <input type="text" name="password" id="page-password" placeholder="••••••••"
                             value="{{ kayit.full_data.Password if kayit }}"
                             class="kasa-field vault-password-input">
@@ -69,10 +86,15 @@
                             aria-label="{{ _('Kopyala') }}" class="kasa-btn kasa-btn-icon password-copy-btn">
                             <i class="fa-solid fa-copy text-xs"></i>
                         </button>
-                        <button type="button" id="page-generate-btn" title="{{ _('Şifre Üretici') }}"
-                            aria-label="{{ _('Şifre Üretici') }}" aria-controls="pageGenerator" aria-expanded="false"
+                        <button type="button" id="page-generate-btn"
+                            title="{{ _('Şifre Üretici Ayarları') }}" aria-label="{{ _('Şifre Üretici Ayarları') }}"
+                            aria-controls="pageGenerator" aria-expanded="false"
                             class="kasa-btn kasa-btn-icon generator-copy-btn">
                             <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                        </button>
+                        <button type="button" id="page-regenerate-btn" title="{{ _('Yeni Şifre Oluştur') }}"
+                            aria-label="{{ _('Yeni Şifre Oluştur') }}" class="kasa-btn kasa-btn-icon generator-copy-btn">
+                            <i class="fa-solid fa-rotate text-xs"></i>
                         </button>
                     </div>
                 </div>
@@ -83,12 +105,12 @@
                         <span></span><span></span><span></span><span></span>
                     </div>
                     <span class="ph-badge" id="password-strength-text"></span>
-                </div>
-                <div class="ph-chips">
                     <span class="ph-chip ph-crack" id="ph-crack" hidden>
                         <i class="fa-regular fa-clock" aria-hidden="true"></i>
                         <span id="ph-crack-text"></span>
                     </span>
+                </div>
+                <div class="ph-chips">
                     <span id="ph-miss-wrap" class="ph-miss-wrap"></span>
                     <span class="ph-chip ph-warn" id="ph-context" hidden>
                         <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
@@ -97,23 +119,35 @@
                 </div>
             </div>
 
-            <div id="pageGenerator" class="vault-generator-panel is-collapsed" aria-hidden="true">
+            <div id="pageGenerator" class="vault-generator-panel is-collapsed" aria-hidden="true" data-target-input="page-password">
                 <div class="page-generator-controls">
                     <div class="flex justify-between items-center mb-2 text-sm">
                         <span class="text-kasa-text-muted">{{ _('Uzunluk') }}</span>
-                        <span id="page-length-display" class="font-bold text-kasa-text">16</span>
+                        <span id="page-password-length-display" class="font-bold text-kasa-text">16</span>
                     </div>
-                    <label class="sr-only" for="page-length">{{ _('Şifre Uzunluğu') }}</label>
-                    <input type="range" class="w-full" min="8" max="32" value="16" id="page-length">
+                    <label class="sr-only" for="page-password-length">{{ _('Şifre Uzunluğu') }}</label>
+                    <input type="range" class="generator-length-range w-full" min="8" max="32" value="16" id="page-password-length">
+                    <label class="gen-ambiguous-row" for="page-password-exclude-ambiguous">
+                        <input type="checkbox" id="page-password-exclude-ambiguous" class="kasa-checkbox">
+                        <span>
+                            <b>{{ _('Benzer karakteri dışla') }}</b>
+                            <small class="text-kasa-text-muted">{{ _('0/O · 1/l/I · 5/S · 2/Z') }}</small>
+                        </span>
+                    </label>
                 </div>
-                <div class="page-generator-options generator-checkboxes">
-                    <label for="page-include-uppercase"><input type="checkbox" id="page-include-uppercase" checked class="kasa-checkbox">{{ _('Büyük') }}</label>
-                    <label for="page-include-lowercase"><input type="checkbox" id="page-include-lowercase" checked class="kasa-checkbox">{{ _('Küçük') }}</label>
-                    <label for="page-include-numbers"><input type="checkbox" id="page-include-numbers" checked class="kasa-checkbox">{{ _('Sayı') }}</label>
-                    <label for="page-include-symbols"><input type="checkbox" id="page-include-symbols" checked class="kasa-checkbox">{{ _('Sembol') }}</label>
+                <div class="page-generator-options" role="group" aria-label="{{ _('Karakter Tipleri') }}">
+                    <button type="button" class="gen-toggle-pill is-active" data-char-set="upper" aria-pressed="true">
+                        <span class="gen-pill-glyph">Ab</span><span>{{ _('Büyük') }}</span>
+                    </button>
+                    <button type="button" class="gen-toggle-pill is-active" data-char-set="lower" aria-pressed="true">
+                        <span class="gen-pill-glyph">ab</span><span>{{ _('Küçük') }}</span>
+                    </button>
+                    <button type="button" class="gen-toggle-pill is-active" data-char-set="numbers" aria-pressed="true">
+                        <span class="gen-pill-glyph">123</span><span>{{ _('Sayı') }}</span>
+                    </button>
+                    <button type="button" class="gen-toggle-pill is-active" data-char-set="symbols" aria-pressed="true">
+                        <span class="gen-pill-glyph">#&amp;!</span><span>{{ _('Sembol') }}</span>
+                    </button>
                 </div>
-                <button type="button" id="page-gen-now" class="page-generator-action kasa-btn kasa-btn-primary">
-                    <i class="fa-solid fa-rotate mr-2"></i>{{ _('Yeni Şifre Oluştur') }}
-                </button>
             </div>
         </section>

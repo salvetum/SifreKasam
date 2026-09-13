@@ -1,12 +1,11 @@
 <!-- ── KART IZGARASI ─────────────────────────────────────────── -->
 <main aria-labelledby="dashboard-title">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 vault-card-curtain" id="card-container">
-        <div id="card-reveal-overlay"></div>
-
         {% for kayit in kayit_listesi %}
         <article class="card-wrapper vault-card card-delay-{{ [loop.index0, 8]|min }}"
              {% if loop.index0 >= card_page_size %}hidden{% endif %}
              aria-labelledby="record-title-{{ kayit.id }}"
+             data-id="{{ kayit.id }}"
              data-type="{{ kayit.full_data.type }}"
              data-pinned="{{ 'true' if kayit.full_data.is_pinned else 'false' }}">
 
@@ -22,11 +21,7 @@
                                 <input type="checkbox" id="select-{{ kayit.id }}" class="select-item bulk-select-checkbox" value="{{ kayit.id }}">
                             </label>
                             <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm">
-                                {% if kayit.full_data.type == 'Website' %}<i class="fa-solid fa-globe"></i>
-                                {% elif kayit.full_data.type == 'Application' %}<i class="fa-solid fa-desktop"></i>
-                                {% elif kayit.full_data.type == 'CreditCard' %}<i class="fa-solid fa-credit-card"></i>
-                                {% elif kayit.full_data.type == 'SecureNote' %}<i class="fa-solid fa-note-sticky"></i>
-                                {% else %}<i class="fa-solid fa-folder"></i>{% endif %}
+                                {{ getBrandIcon(kayit.normalized.baslik, kayit.full_data.website_url, kayit.full_data.type) | safe }}
                             </span>
                              <h2 id="record-title-{{ kayit.id }}" class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">
                                  {{ kayit.normalized.baslik }}
@@ -35,15 +30,23 @@
                             <span class="expiry-badge" data-expiry="{{ kayit.full_data.expiry_date }}"></span>
                             {% endif %}
                         </div>
-                        <!-- Favori Butonu -->
-                        <form action="{{ url_for('pin_kayit', kayit_id=kayit.id) }}" method="POST"
-                              class="flex-shrink-0 pin-form m-0 p-0">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="card-star-btn" title="{{ _('Favorile') }}" aria-label="{{ _('Favorile') }}"
-                                    aria-pressed="{{ 'true' if kayit.full_data.is_pinned else 'false' }}">
-                                <i class="fa-{{ 'solid' if kayit.full_data.is_pinned else 'regular' }} fa-star card-star-icon{{ ' is-pinned' if kayit.full_data.is_pinned else ' card-star-unpinned' }}"></i>
-                            </button>
-                        </form>
+                        <!-- Sağ üst: Kategori rozeti + Favori Butonu -->
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            {% if kayit.full_data.category %}
+                            <span class="card-category-badge" title="{{ kayit.full_data.category }}">
+                                <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                                <span class="truncate">{{ kayit.full_data.category }}</span>
+                            </span>
+                            {% endif %}
+                            <form action="{{ url_for('pin_kayit', kayit_id=kayit.id) }}" method="POST"
+                                  class="flex-shrink-0 pin-form m-0 p-0">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="card-star-btn" title="{{ _('Favorile') }}" aria-label="{{ _('Favorile') }}"
+                                        aria-pressed="{{ 'true' if kayit.full_data.is_pinned else 'false' }}">
+                                    <i class="fa-{{ 'solid' if kayit.full_data.is_pinned else 'regular' }} fa-star card-star-icon{{ ' is-pinned' if kayit.full_data.is_pinned else ' card-star-unpinned' }}"></i>
+                                </button>
+                            </form>
+                        </div>
                     </div>
 
                     <!-- Detaylar -->
@@ -53,12 +56,16 @@
                         {% if anahtar == 'Şifre' or anahtar == 'CVV / Şifre' %}
                         <div class="vault-detail-row vault-detail-row-action password-row">
                             <p class="vault-detail-main m-0">
-                                <span class="vault-detail-label">{{ anahtar }}</span>
+                                <span class="vault-detail-label"><i class="fa-solid fa-key" aria-hidden="true"></i>{{ anahtar }}</span>
                                 <span class="password-field vault-detail-value vault-secret font-mono tracking-wide" data-id="{{ kayit.id }}" data-visible="false">
                                     ••••••••
                                 </span>
                             </p>
                             <div class="vault-row-actions">
+                                <span class="card-weak-chip" hidden>
+                                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                                    <span>{{ _('Zayıf') }}</span>
+                                </span>
                                 <button type="button" class="card-icon-btn toggle-password" title="{{ _('Göster/Gizle') }}" aria-label="{{ _('Göster/Gizle') }}"><i class="fa-solid fa-eye text-xs"></i></button>
                                 <button type="button" class="card-icon-btn copy-password" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}"><i class="fa-solid fa-copy text-xs"></i></button>
                             </div>
@@ -68,9 +75,9 @@
                         {% set url = deger if deger.startswith('http') else 'https://' + deger %}
                         <div class="vault-detail-row vault-detail-row-action vault-url-row">
                             <p class="vault-detail-main m-0">
-                                <span class="vault-detail-label">{{ anahtar }}</span>
+                                <span class="vault-detail-label"><i class="fa-solid fa-globe" aria-hidden="true"></i>{{ anahtar }}</span>
                                 <a href="{{ url }}" target="_blank" rel="noopener noreferrer"
-                                   class="vault-detail-value vault-link text-[#4f91ff] hover:text-[#7c6ff7] transition-colors duration-150 no-underline">
+                                   class="vault-detail-value vault-link text-[#4f91ff] hover:text-[#7c6ff7] transition-colors duration-150 no-underline vault-value-ellipsis">
                                     {{ deger }}
                                 </a>
                             </p>
@@ -82,8 +89,13 @@
                         {% elif anahtar == 'Kullanıcı Adı' or anahtar == 'E-posta' or anahtar == 'Kart Numarası' %}
                         <div class="vault-detail-row vault-detail-row-action password-row">
                             <p class="vault-detail-main m-0">
-                                <span class="vault-detail-label">{{ anahtar }}</span>
-                                <span class="vault-detail-value">{{ deger }}</span>
+                                <span class="vault-detail-label">
+                                    {% if anahtar == 'Kullanıcı Adı' %}<i class="fa-solid fa-user" aria-hidden="true"></i>
+                                    {% elif anahtar == 'E-posta' %}<i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                                    {% else %}<i class="fa-solid fa-credit-card" aria-hidden="true"></i>{% endif %}
+                                    {{ anahtar }}
+                                </span>
+                                <span class="vault-detail-value vault-value-ellipsis">{{ deger }}</span>
                             </p>
                             <button type="button" class="card-icon-btn copy-username flex-shrink-0" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}"
                                     data-username="{{ deger }}">
@@ -93,9 +105,12 @@
 
                         {% elif anahtar == 'Not' %}
                         <div class="vault-detail-row vault-note-row">
-                            <span class="vault-detail-label">{{ anahtar }}</span>
+                            <span class="vault-detail-label"><i class="fa-solid fa-note-sticky" aria-hidden="true"></i>{{ anahtar }}</span>
                             <span class="vault-detail-value vault-note-text">{{ deger }}</span>
                         </div>
+
+                        {% elif anahtar == 'Kategori' %}
+                        {# Kategori satırı gizli — başlık satırında rozet olarak gösterilir #}
 
                         {% else %}
                         <div class="vault-detail-row">

@@ -47,7 +47,7 @@ Keep your data on your device and protect it using a master password.
 
 ### Main Page - V2.6.1
 
-<img src="assets/anasayfa_EN.png" width="850" alt="ŞifreKasam main page">
+<img src="docs/screenshots/anasayfa_EN.png" width="850" alt="ŞifreKasam main page">
 
 <br><br>
 
@@ -56,12 +56,12 @@ Keep your data on your device and protect it using a master password.
     <td align="center" width="50%">
       <strong>Password Generator - V2.6.1</strong>
       <br><br>
-      <img src="assets/sifreolusturucu_EN.png" width="420" alt="ŞifreKasam password generator screen">
+      <img src="docs/screenshots/sifreolusturucu_EN.png" width="420" alt="ŞifreKasam password generator screen">
     </td>
     <td align="center" width="50%">
       <strong>Settings Menu - V2.6.1</strong>
       <br><br>
-      <img src="assets/ayarlar_EN.png" width="420" alt="ŞifreKasam settings menu">
+      <img src="docs/screenshots/ayarlar_EN.png" width="420" alt="ŞifreKasam settings menu">
     </td>
   </tr>
 </table>

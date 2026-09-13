@@ -14,16 +14,16 @@ terms must also be followed.
 
 | Component | Version | License | Project |
 | --- | ---: | --- | --- |
-| Electron | 42.6.1 | MIT | <https://github.com/electron/electron> |
+| Electron | 44.3.0 | MIT | <https://github.com/electron/electron> |
 | Chromium, Node.js, V8, FFmpeg and other Electron runtime components | Bundled with Electron | Multiple open-source licenses | Included Electron distributions contain `LICENSE` and `LICENSES.chromium.html` with the complete notices. |
 
 ## Node.js Runtime Packages
 
 | Component | Version | License | Project |
 | --- | ---: | --- | --- |
-| electron-squirrel-startup | 1.0.1 | Apache-2.0 | <https://www.npmjs.com/package/electron-squirrel-startup> |
-| debug | 2.6.9 | MIT | <https://www.npmjs.com/package/debug> |
-| ms | 2.0.0 | MIT | <https://www.npmjs.com/package/ms> |
+| electron-squirrel-startup | ~~1.0.1~~ (kaldırıldı — 2.7.0-beta.3 sonrası) | Apache-2.0 | <https://www.npmjs.com/package/electron-squirrel-startup> |
+| debug | ~~2.6.9~~ (kaldırıldı — 2.7.0-beta.3 sonrası) | MIT | <https://www.npmjs.com/package/debug> |
+| ms | ~~2.0.0~~ (kaldırıldı — 2.7.0-beta.3 sonrası) | MIT | <https://www.npmjs.com/package/ms> |
 | tree-kill | 1.2.2 | MIT | <https://www.npmjs.com/package/tree-kill> |
 
 ## Python Runtime Packages

@@ -284,8 +284,13 @@ export function initCustomControls({ createIcon }) {
     if (!input) return;
 
     const clampInput = () => {
+      const raw = String(input.value).trim();
       const min = Number(input.min);
       const max = Number(input.max);
+      // Yıl kısaltması koruması: 1-2 haneli değer (örn. "34") min>=1000
+      // alanlarda (yıl stepper) clamp edilmez → blur'da 2034'e genişler.
+      // Ay/saat gibi düşük min'li alanlarda clamp devam eder.
+      if (/^\d{1,2}$/.test(raw) && Number.isFinite(min) && min >= 1000) return;
       const fallback = Number.isFinite(min) ? min : 0;
       const value = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : fallback;
       input.value = String(Math.min(Number.isFinite(max) ? max : value, Math.max(fallback, value)));
