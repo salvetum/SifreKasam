@@ -886,7 +886,8 @@ def check_token_and_auth():
     # X-App-Token yalnızca stateless API uçları için enjekte edilir; state-changing
     # istekler X-CSRF-Token ile korunur. Token taşıyan istekler CSRF'den muaftır.
     if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
-        if token == APP_TOKEN or current_user.is_authenticated:
+        if (token == APP_TOKEN or current_user.is_authenticated
+                or request.endpoint == 'login'):
             if not _csrf_authorized():
                 return jsonify({
                     'error': _('Güvenlik doğrulaması başarısız. Lütfen sayfayı yenileyip tekrar deneyin.'),
