@@ -3,6 +3,8 @@
 > **Durum:** Planlama / Erken Öğrenme Aşaması / V2 sürümünün tamamlanması bekleniyor
 > 
 > **Yapay Zeka Politikası:** Bu projede hiçbir satır yapay zeka tarafından yazılmayacaktır.
+>
+> **Rust branch'i Kriterlerime uyunca main branch olarak değiştirilecektir, Asıl branch(v2/main) ise ayrı bir branche ayrılacaktır.**
 
 ---
 
