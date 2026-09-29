@@ -12,6 +12,7 @@ const {
 const os = require('os');
 const crypto = require('crypto');
 const path = require('path');
+const { resolvePythonCommand } = require('../src/main/python-command');
 
 const projectRoot = path.resolve(__dirname, '..');
 
@@ -27,15 +28,20 @@ const flaskAppDir = path.join(projectRoot, 'flask_app');
 const sourceDir = path.join(flaskAppDir, 'dist', 'SifreKasam');
 const sourceExecutable = path.join(sourceDir, process.platform === 'win32' ? 'SifreKasam.exe' : 'SifreKasam');
 const targetDir = path.join(projectRoot, 'backend');
-const pythonCommand = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
-
+// Aynı çözümleyiciyi geliştirme sunucusu kullanıyor: `python` PATH'te yoksa
+// `py -3.12` gibi bir adaya düşer, PYTHON override'ı boşluklara ayrıştırılır.
+const python = resolvePythonCommand();
 const build = spawnSync(
-  pythonCommand,
-  ['-m', 'PyInstaller', 'app.spec', '--clean', '-y'],
+  python.cmd,
+  [...python.args, '-m', 'PyInstaller', 'app.spec', '--clean', '-y'],
   { cwd: flaskAppDir, stdio: 'inherit' }
 );
 
-if (build.error) throw build.error;
+if (build.error) {
+  throw new Error(
+    `PyInstaller calistirilamadi (${[python.cmd, ...python.args].join(' ')}): ${build.error.message}`
+  );
+}
 if (build.status !== 0) process.exit(build.status || 1);
 if (!existsSync(sourceExecutable)) {
   throw new Error(`Backend executable was not produced: ${sourceExecutable}`);

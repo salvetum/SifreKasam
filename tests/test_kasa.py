@@ -65,6 +65,7 @@ from kasa_core.encrypted_backup import (  # noqa: E402
     InvalidPasswordError,
     build_encrypted_export_payload,
     decrypt_encrypted_records,
+    decrypt_encrypted_records_report,
     decrypt_payload,
     encrypt_payload,
     generate_backup_password,
@@ -280,6 +281,33 @@ class EncryptedBackupTests(unittest.TestCase):
         parsed = decrypt_encrypted_records(blob, self.PASSWORD)
         self.assertEqual(len(parsed), len(records))
         self.assertLess(len(records), MAX_IMPORT_RECORDS)
+        self.assertEqual(parsed, records)
+
+    def test_encrypted_import_report_exposes_dropped_count(self) -> None:
+        """Raporlayan sürüm, atlanan kayıt sayısını çağırana verir.
+
+        Çağıran (import/restore) bu sayıyı kullanıcıya gösterir; aksi halde
+        sınır aşan bir yedek sessizce eksik yüklenmiş gibi görünür.
+        """
+        from kasa_core.constants import MAX_IMPORT_RECORDS
+
+        records = [
+            {"type": "Website", "title": f"Kayit-{i}", "password": f"p{i}"}
+            for i in range(MAX_IMPORT_RECORDS + 100)
+        ]
+        blob = build_encrypted_export_payload(records, self.PASSWORD)
+        parsed, dropped = decrypt_encrypted_records_report(blob, self.PASSWORD)
+        self.assertEqual(len(parsed), MAX_IMPORT_RECORDS)
+        self.assertEqual(dropped, 100)
+        # Geriye dönük uyum: eski sadece-liste sürümü aynı listeyi döner.
+        self.assertEqual(decrypt_encrypted_records(blob, self.PASSWORD), parsed)
+
+    def test_encrypted_import_report_zero_dropped_within_limit(self) -> None:
+        """Sınır altında atlanan kayıt yok (dropped == 0), arayüz uyarı göstermez."""
+        records = [{"type": "Website", "title": f"K{i}"} for i in range(4)]
+        blob = build_encrypted_export_payload(records, self.PASSWORD)
+        parsed, dropped = decrypt_encrypted_records_report(blob, self.PASSWORD)
+        self.assertEqual(dropped, 0)
         self.assertEqual(parsed, records)
 
     def test_generated_password_is_strong_and_unique(self) -> None:
@@ -2535,8 +2563,8 @@ class CardAndStatsUiTemplateTests(unittest.TestCase):
         self.assertIn("utilities.css') }}?v=75", base)
         self.assertIn("app.js') }}?v=9.47", base)
         sw = (FLASK_APP_DIR / "templates" / "sw.js").read_text(encoding="utf-8")
-        self.assertIn("assets-v203", sw)
-        self.assertIn("assets-v203", self._read("scripts/sw-register.html"))
+        self.assertIn("assets-v204", sw)
+        self.assertIn("assets-v204", self._read("scripts/sw-register.html"))
 
     def test_username_input_not_blocked_by_card_number_formatter(self) -> None:
         # Bug #1: kart numarası formatlama Kullanıcı Adı alanına şartsız
@@ -4138,6 +4166,52 @@ class AutomaticBackupApiTests(unittest.TestCase):
             }
         self.assertEqual(count, 2)
         self.assertEqual(passwords, {self.STRONG})
+
+    def test_restore_reports_truncated_record_count(self) -> None:
+        """Sınır aşan yedekte atlanan kayıt sayısı arayüze bildirilir.
+
+        Arayüz (data-panel.js) `truncated` alanını görüp uyarı toast'u gösterir;
+        alan yoksa kullanıcı sessizce eksik yükleme yaptığını sanar.
+        """
+        with patch.object(app_module, "get_fernet",
+                          return_value=self.fernet):
+            with app_module.app.app_context():
+                app_module.db.session.add(
+                    self._fixture("tr-a", password=self.STRONG))
+                app_module.db.session.commit()
+            created = self.client.post(
+                "/api/backups/create", headers=self._headers()).get_json()
+            filename = created["backup"]["filename"]
+            with patch.object(app_module, "_decrypt_encrypted_records_report",
+                              return_value=([{"type": "Website",
+                                               "title": "tr-b",
+                                               "password": self.STRONG}], 7)):
+                response = self.client.post(
+                    "/api/backups/restore",
+                    json={"filename": filename, "confirm": True},
+                    headers=self._headers())
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["restored"], 1)
+        self.assertEqual(body["truncated"], 7)
+
+    def test_restore_reports_zero_truncated_for_normal_backup(self) -> None:
+        """Sınır altındaki yedekte `truncated` 0 olur → arayüz uyarı göstermez."""
+        with patch.object(app_module, "get_fernet",
+                          return_value=self.fernet):
+            with app_module.app.app_context():
+                app_module.db.session.add(
+                    self._fixture("tr-c", password=self.STRONG))
+                app_module.db.session.commit()
+            created = self.client.post(
+                "/api/backups/create", headers=self._headers()).get_json()
+            filename = created["backup"]["filename"]
+            response = self.client.post(
+                "/api/backups/restore",
+                json={"filename": filename, "confirm": True},
+                headers=self._headers())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["truncated"], 0)
 
     def test_restore_rejects_invalid_filename(self) -> None:
         response = self.client.post(

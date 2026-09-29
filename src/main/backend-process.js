@@ -13,6 +13,7 @@ const rt = require('./runtime-state');
 const {
   APP_ROOT,
   APP_TOKEN,
+  FLASK_SECRET_KEY,
   HOST,
   FLASK_TIMEOUT_MS,
   RETRY_INTERVAL_MS,
@@ -28,44 +29,7 @@ const { showFriendlyFatalError } = require('./fatal-errors');
 const { loadBackendPage } = require('./page-loader');
 const { verifyQuickIntegritySync, verifyFullIntegrityAsync } = require('./integrity');
 const bench = require('./startup-timing');
-
-function parsePythonOverride(value) {
-  const parts = String(value).trim().split(/[ \t]+/);
-  return { cmd: parts[0], args: parts.slice(1) };
-}
-
-function resolvePythonCommand() {
-  if (process.env.PYTHON) {
-    return parsePythonOverride(process.env.PYTHON);
-  }
-  const isWin = process.platform === 'win32';
-  const candidates = isWin
-    ? [
-        { cmd: 'python', args: [] },
-        { cmd: 'py', args: ['-3.12'] },
-        { cmd: 'py', args: ['-3.11'] },
-        { cmd: 'py', args: ['-3.10'] },
-        { cmd: 'py', args: ['-3'] },
-        { cmd: 'py', args: [] },
-      ]
-    : [
-        { cmd: 'python3', args: [] },
-        { cmd: 'python', args: [] },
-      ];
-  for (const candidate of candidates) {
-    try {
-      const probe = spawnSync(candidate.cmd, [...candidate.args, '--version'], {
-        timeout: 4000,
-        windowsHide: true,
-      });
-      if (probe.status === 0 && probe.error == null) {
-        console.log(`Python secildi: ${candidate.cmd} ${candidate.args.join(' ')}`.trim());
-        return candidate;
-      }
-    } catch (_) {}
-  }
-  return candidates[0];
-}
+const { resolvePythonCommand } = require('./python-command');
 
 const PYTHON = resolvePythonCommand();
 
@@ -144,7 +108,7 @@ async function startFlaskServer(timeoutMs) {
 
     const spawnedProcess = spawn(command, args, {
       env: { ...process.env, APP_TOKEN,
-             FLASK_SECRET_KEY: APP_TOKEN,
+             FLASK_SECRET_KEY,
              APP_VERSION: app.getVersion(),
              FLASK_HOST: flaskHost,
              FLASK_PORT: String(rt.PORT), PORT: String(rt.PORT),

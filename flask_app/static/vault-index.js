@@ -355,6 +355,20 @@ export function initVaultIndex({
       }
     }
 
+    // /import → kayıt sınırı aşıldıysa yönlendirme ?import_dropped=N ile gelir.
+    // Sessizce eksik yükleme olmasın: uyarı göster, parametreyi adresten temizle.
+    const importDropped = Number.parseInt(
+      new URLSearchParams(window.location.search).get('import_dropped') || '', 10);
+    if (Number.isInteger(importDropped) && importDropped > 0) {
+      showWarningToast(
+        window._('{count} kayıt yüklenmedi: yedek kayıt sınırını aşıyor. Yedeği bölerek tekrar deneyin.')
+          .replace('{count}', String(importDropped))
+      );
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('import_dropped');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    }
+
     // DEĞİŞİKLİK 1: tüm kartlar DOM'da + kapak görselleri yüklenene dek
     // giriş animasyonları duraklatılır; sonra topluca oynatılır.
     // card-animated class'ı yalnızca ilk reveal'da verilir (şablonda kalıcı

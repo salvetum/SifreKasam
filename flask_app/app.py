@@ -156,6 +156,7 @@ from kasa_core.hibp import (
 from kasa_core.encrypted_backup import (
     build_encrypted_export_payload as _encrypted_export,
     decrypt_encrypted_records as _decrypt_encrypted_records,
+    decrypt_encrypted_records_report as _decrypt_encrypted_records_report,
     generate_backup_password as _generate_backup_password,
     EncryptedBackupError as _EncryptedBackupError,
     InvalidPasswordError as _InvalidPasswordError,
@@ -2423,7 +2424,7 @@ def api_backups_restore():
             return jsonify({'status': 'error',
                             'message': _('Yedek dosyası bulunamadı.')}), 404
         try:
-            parsed = _decrypt_encrypted_records(
+            parsed, dropped = _decrypt_encrypted_records_report(
                 blob, _backups.backup_password(fernet))
         except (_InvalidPasswordError, _CorruptBackupError, _EncryptedBackupError, ValueError):
             return jsonify({'status': 'error',
@@ -2435,7 +2436,9 @@ def api_backups_restore():
         db.session.add_all(records)
         db.session.commit()
         invalidate_vault_report_cache()
-        return jsonify({'status': 'ok', 'restored': len(records)})
+        # dropped > 0 → kayıt sınırı aşıldı, kullanıcıya görünür uyarı gitsin
+        # (arayüz toast ile gösterir; sessizce eksik yükleme olmasın).
+        return jsonify({'status': 'ok', 'restored': len(records), 'truncated': dropped})
     finally:
         _vault_write_locked.clear()
 
@@ -2567,8 +2570,9 @@ def import_data():
             if not file_password:
                 return "Şifreli yedek için dosya şifresi gerekli.", 400
             raw = file.read()
+            dropped = 0
             try:
-                parsed = _decrypt_encrypted_records(raw, file_password)
+                parsed, dropped = _decrypt_encrypted_records_report(raw, file_password)
             except _InvalidPasswordError:
                 return "Hatalı dosya şifresi veya dosya bütünlüğü bozuk.", 400
             except _CorruptBackupError:
@@ -2586,6 +2590,10 @@ def import_data():
         db.session.add_all(records)
         db.session.commit()
         invalidate_vault_report_cache()
+        if dropped:
+            # Kayıt sınırı aşıldı: ana sayfa bir uyarı toast'u göstersin
+            # (vault-index.js `?import_dropped=` parametresini okur).
+            return redirect(url_for('index', import_dropped=dropped))
         return redirect(url_for('index'))
     except UnicodeDecodeError:
         return "Dosya UTF-8 olarak okunamadı.", 400

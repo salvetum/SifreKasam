@@ -1,6 +1,7 @@
 {
   ".kasaenc dosyaları için dışa aktarılırken gösterilen şifre gerekir.": ".kasaenc dosyaları için dışa aktarılırken gösterilen şifre gerekir.",
   "{count} kayıt geri yüklendi.": "{count} kayıt geri yüklendi.",
+  "{count} kayıt yüklenmedi: yedek kayıt sınırını aşıyor. Yedeği bölerek tekrar deneyin.": "{count} kayıt yüklenmedi: yedek kayıt sınırını aşıyor. Yedeği bölerek tekrar deneyin.",
   "{days} gündür şifre sızıntı kontrolü yapılmadı.": "{days} gündür şifre sızıntı kontrolü yapılmadı.",
   "{days} gündür yedek alınmadı.": "{days} gündür yedek alınmadı.",
   "0/O · 1/l/I · 5/S · 2/Z": "0/O · 1/l/I · 5/S · 2/Z",

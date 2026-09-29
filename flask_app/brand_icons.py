@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlsplit
 
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 # ── Yerel ikon dizini (__file__ üzerinden çözülür → PyInstaller bundle dahil) ──
 _ICON_DIR = Path(__file__).resolve().parent / "static" / "brand-icons"
@@ -323,10 +323,15 @@ def getBrandIcon(title: str = "", domain: str = "", record_type: str = "") -> Ma
             viewbox = "0 0 24 24"
 
     svg = (
-        f'<svg viewBox="{viewbox}" '
+        f'<svg viewBox="{escape(viewbox)}" '
         f'width="1em" height="1em" fill="currentColor" '
         f'aria-hidden="true" focusable="false">{content}</svg>'
     )
+    # brand/viewbox her zaman sabit bir kümeden geliyor (marka anahtarları,
+    # "type:<kayıt tipi>" veya "default"); yine de kaçışsızMarkup'a girmesinler.
+    # Ölçüldü: mevcut 61 değerin hiçbiri escape() ile değişmiyor, yani çıktı
+    # birebir aynı kalıyor — bu satır savunma derinliği, davranış değişikliği değil.
     return Markup(
-        f'<span class="brand-icon" data-brand="{brand}" aria-hidden="true">{svg}</span>'
+        f'<span class="brand-icon" data-brand="{escape(brand)}" '
+        f'aria-hidden="true">{svg}</span>'
     )

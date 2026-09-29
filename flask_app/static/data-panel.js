@@ -202,12 +202,20 @@ export function initDataPanel({ apiFetch }) {
       if (!response?.ok) throw new Error('restore-failed');
       const data = await response.json().catch(() => null);
       const count = data?.restored;
+      const dropped = data?.truncated;
       window.dispatchEvent(new CustomEvent('kasa:dirty-vault'));
       showSuccessToast(
         count != null
           ? window._('{count} kayıt geri yüklendi.').replace('{count}', String(count))
           : window._('Yedek geri yüklendi.')
       );
+      // Kayıt sınırı aşıldıysa sessizce eksik yükleme olmasın: uyarı göster.
+      if (Number.isInteger(dropped) && dropped > 0) {
+        showWarningToast(
+          window._('{count} kayıt yüklenmedi: yedek kayıt sınırını aşıyor. Yedeği bölerek tekrar deneyin.')
+            .replace('{count}', String(dropped))
+        );
+      }
       refreshBackups();
     } catch {
       showWarningToast(window._('Yedek geri yüklenemedi.'));

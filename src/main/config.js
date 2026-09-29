@@ -16,6 +16,13 @@ function resolvePath(...segments) {
 }
 
 const APP_TOKEN        = crypto.randomBytes(32).toString('hex');
+// Flask oturum çerezini imzalayan anahtar BİLEREK APP_TOKEN'DAN AYRIDIR.
+// APP_TOKEN yalnızca ana süreç→backend iç kanalında kullanılır; bir yerde
+// ele geçirilse (örn. ilk açılışta sertifika sabitlemesi olmadan yerel
+// süreç araya girerse) saldırgan oturum çerezi imzalayamaz, yani tam kasa
+// erişimi kazanamaz. İkisi de süreç ömürlüktür: uygulama yeniden başlayınca
+// oturumlar zaten düşüyordu, davranış değişmiyor.
+const FLASK_SECRET_KEY = crypto.randomBytes(32).toString('hex');
 const HOST             = '127.0.0.1';
 const FLASK_TIMEOUT_MS = 60_000;
 const FLASK_TIMEOUT_FIRST_RUN_MS = 90_000;
@@ -45,6 +52,7 @@ module.exports = {
   APP_ROOT,
   resolvePath,
   APP_TOKEN,
+  FLASK_SECRET_KEY,
   HOST,
   FLASK_TIMEOUT_MS,
   FLASK_TIMEOUT_FIRST_RUN_MS,

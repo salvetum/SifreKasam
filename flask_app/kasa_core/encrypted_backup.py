@@ -199,7 +199,15 @@ def build_encrypted_export_payload(
 def decrypt_encrypted_records(
     blob: bytes, password: str
 ) -> list[dict[str, Any]]:
-    """Şifreli .kasaenc içeriğini JSON kayıt listesine çözer.
+    """Şifreli .kasaenc içeriğini JSON kayıt listesine çözer (yalnız liste)."""
+    records, _dropped = decrypt_encrypted_records_report(blob, password)
+    return records
+
+
+def decrypt_encrypted_records_report(
+    blob: bytes, password: str
+) -> tuple[list[dict[str, Any]], int]:
+    """Şifreli .kasaenc içeriğini çözer ve ``(kayıtlar, atlanan_sayı)`` döner.
 
     DoS sınırı: dönen kayıt listesi ``MAX_IMPORT_RECORDS`` ile kırpılır.
     Uygulama gövde boyutunu (``MAX_CONTENT_LENGTH``, 64 MB) sınırlar ama bu
@@ -209,8 +217,9 @@ def decrypt_encrypted_records(
     dondurabilir/çökertirdi. Aynı sınır düz (JSON/txt) import'ta zaten
     ``import_export.parse_import_payload`` içinde uygulanmaktadır.
 
-    Kırpma sessizce yapılmaz: atlanan kayıt sayısı ``log.warning`` ile
-    kaydedilir, aksi halde kullanıcı eksik veri yüklendiğini sanardı.
+    Kırpma sessizce yapılmaz: ``log.warning`` ile kaydedilir VE çağırana
+    ``dropped`` sayısı döner, böylece çağıran kullanıcıya görünür uyarı
+    gösterebilir. Aksi halde kullanıcı eksik veri yüklediğini sanardı.
     """
     plaintext = decrypt_payload(blob, password)
     try:
@@ -220,14 +229,16 @@ def decrypt_encrypted_records(
     if not isinstance(data, list):
         raise CorruptBackupError("invalid-import-payload")
     records = [item for item in data if isinstance(item, dict)]
+    dropped = 0
     if len(records) > MAX_IMPORT_RECORDS:
+        dropped = len(records) - MAX_IMPORT_RECORDS
         log.warning(
             "Şifreli yedek kayıt sınırı aştı: %d kayıttan %d tanesi atlandı.",
             len(records),
-            len(records) - MAX_IMPORT_RECORDS,
+            dropped,
         )
         records = records[:MAX_IMPORT_RECORDS]
-    return records
+    return records, dropped
 
 
 def generate_backup_password() -> str:
