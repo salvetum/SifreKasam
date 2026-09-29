@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 — Ekle/Düzenle takvim + son kullanma modülü (v2)
+ * ŞifreKasam v2.7.0-beta.4 — Ekle/Düzenle takvim + son kullanma modülü (v2)
  *
  * Takvim popup, hidden↔display input senkronu, kart ay/yıl steppers,
  * yıl kısaltması genişletme ve klavye navigasyonu.
@@ -13,8 +13,16 @@ export function initFormCalendar() {
   const hiddenInput = document.getElementById('expiry_date');
   if (!hiddenInput) return;
 
-  const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-  const WEEKDAYS  = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+  function localeFormatter(options) {
+    const tag = (document.documentElement.lang || 'tr').trim() || 'tr';
+    try { return new Intl.DateTimeFormat(tag, options); }
+    catch (_) { return new Intl.DateTimeFormat('tr', options); }
+  }
+
+  const monthFmt   = localeFormatter({ month: 'long' });
+  const weekdayFmt = localeFormatter({ weekday: 'short' });
+  const MONTHS = Array.from({ length: 12 }, (_, m) => monthFmt.format(new Date(2000, m, 1)));
+  const WEEKDAYS = Array.from({ length: 7 }, (_, d) => weekdayFmt.format(new Date(2021, 0, 4 + d)));
 
   const displayInput   = document.getElementById('expiry_date_display');
   const wrapper        = document.getElementById('expiry-calendar-wrapper');
@@ -94,7 +102,7 @@ export function initFormCalendar() {
   /* ── Takvim render ────────────────────────────────────────────── */
 
   function render() {
-    titleEl.textContent = MONTHS_TR[viewMonth] + ' ' + viewYear;
+    titleEl.textContent = MONTHS[viewMonth] + ' ' + viewYear;
     titleEl.classList.remove('kasa-calendar-title-anim');
     void titleEl.offsetWidth;
     titleEl.classList.add('kasa-calendar-title-anim');
@@ -159,6 +167,16 @@ export function initFormCalendar() {
     if (target) {
       target.tabIndex = 0;
       target.focus();
+    }
+
+    /* Mobil: popup sağdan taşmasın — wrapper sağına hizala */
+    const wrapRect = wrapper.getBoundingClientRect();
+    if (wrapRect.left + popup.offsetWidth > window.innerWidth - 8) {
+      popup.style.left = 'auto';
+      popup.style.right = '0';
+    } else {
+      popup.style.left = '0';
+      popup.style.right = '';
     }
   }
 

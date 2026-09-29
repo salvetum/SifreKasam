@@ -671,7 +671,6 @@ html[data-kasa-gradient="off"] .blob-accent {
 
 html[data-kasa-gradient="off"] .kasa-panel,
 html[data-kasa-gradient="off"] .kasa-panel-soft,
-html[data-kasa-gradient="off"] .vault-form-hero,
 html[data-kasa-gradient="off"] .vault-form-panel,
 html[data-kasa-gradient="off"] .vault-form-actions,
 html[data-kasa-gradient="off"] .generator-output-card,
@@ -708,7 +707,6 @@ html[data-bs-theme="light"][data-kasa-gradient="off"] .kasa-btn-primary {
 
 .kasa-panel,
 .kasa-panel-soft,
-.vault-form-hero,
 .vault-form-panel,
 .vault-form-actions,
 .generator-output-card,

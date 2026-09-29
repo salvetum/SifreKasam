@@ -5,9 +5,20 @@
 // DIŞINDA (SIFREKASAM_SIGN_KEY_PATH veya ~/.sifrekasam/sign_key.pem) tutulur.
 //
 // Politika:
-//   - manifest YOKSA  -> imzasız/geliştirme paketi; doğrulama atlanır.
-//   - manifest VAR     -> imza zorunludur; imza geçersiz = kurcalanmış.
-//   - imza geçerli     -> hash'ler doğrulanır; uymayan dosya = kurcalanmış.
+//   - paketlenmemiş (geliştirme) + manifest YOK -> imzasız; doğrulama atlanır.
+//   - paketli + manifest YOK                  -> KURCALMA (aşağıda açıklandığı gibi).
+//   - manifest VAR                            -> imza zorunludur; imza geçersiz
+//                                                = kurcalanmış.
+//   - imza geçerli                            -> hash'ler doğrulanır; uymayan
+//                                                dosya = kurcalanmış.
+//
+// Paketli modda manifest yokluğu neden "imzasız" sayılmıyor: Squirrel kurulumu
+// %LOCALAPPDATA% (kullanıcının KENDİSİNİN yazabildiği dizin) altına açılır.
+// Aynı kullanıcı bağlamında çalışan bir süreç backend_integrity.json'u siler
+// (veya yerine imzasız boş bir dosya koyarsa status 'unsigned' olur) ve tüm
+// doğrulama sessizce atlanır. Bu yüzden paketli modda manifest yokluğu
+// "kurcalanmış" olarak reddedilir; geliştirme akışı (app.isPackaged === false)
+// 'unsigned' olarak davranmaya devam eder.
 //
 // Hız: spawn ÖNCESİ yalnızca kritik alt küme (exe + python + rust pyd) eşzamanlı
 // doğrulanır (~100ms); tam ağaç eşzamansız tamamlanır, hata olursa süreç durdurulur.
@@ -15,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { app } = require('electron');
 
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAUcIKX9M1NjuVR2pdnx5ZtvRXugrFrh97UT9mqbiJTc0=
@@ -36,6 +48,24 @@ const CRITICAL_CANDIDATES = [
   path.join('_internal', 'cryptography', 'hazmat', 'bindings', '_rust.pyd'),
 ];
 
+function isPackagedRuntime() {
+  // Electron ana sürecinde her zaman tanımlıdır; düz Node bağlamında (ör. lint /
+  // test) require('electron') yol dizesi döndürür, bu yüzden savunmacı yazıldı.
+  return Boolean(app && app.isPackaged);
+}
+
+// Manifest hiç yokken verilecek sonuç. Paketli modda bu artık bir hata:
+// doğrulama sessizce atlanmasın, kullanıcı bilgilendirilsin.
+function missingManifestResult() {
+  if (isPackagedRuntime()) {
+    return {
+      status: 'tampered',
+      message: 'bütünlük manifesti eksik — paket imzasız ya da değiştirilmiş olabilir',
+    };
+  }
+  return { status: 'unsigned' };
+}
+
 function publicKeyObject() {
   return crypto.createPublicKey({ key: PUBLIC_KEY_PEM, format: 'pem', type: 'spki' });
 }
@@ -51,7 +81,6 @@ function sha256File(filePath) {
 }
 
 function loadManifest() {
-  if (!process.resourcesPath) return null;
   const backendDir = path.join(process.resourcesPath, 'backend');
   const manifestPath = path.join(backendDir, MANIFEST_FILE);
   if (!fs.existsSync(manifestPath)) return null;
@@ -94,7 +123,7 @@ function verifySignature(manifestPath, signatureFile) {
 function verifyQuickIntegritySync() {
   const loaded = loadManifest();
   if (!loaded) {
-    return { status: 'unsigned' };
+    return missingManifestResult();
   }
   if (loaded.status === 'tampered') {
     return loaded;
@@ -134,7 +163,14 @@ function verifyQuickIntegritySync() {
 // Spawn SONRASI: manifestteki tüm dosyaları eşzamansız hash'ler; uyumsuz liste döner.
 async function verifyFullIntegrityAsync() {
   const loaded = loadManifest();
-  if (!loaded) return { status: 'unsigned', mismatches: [] };
+  if (!loaded) {
+    // Sessiz 'unsigned' dönmek spawn'ı doğrulamasız sürdürürdü; paketli modda
+    // aynı durum spawn ÖNCESİ zaten reddedildiği için burada da tutarlı olalım.
+    const missing = missingManifestResult();
+    return missing.status === 'tampered'
+      ? { status: 'tampered', mismatches: [missing.message] }
+      : { status: 'unsigned', mismatches: [] };
+  }
   if (loaded.status === 'tampered') return { status: 'tampered', mismatches: [loaded.message] };
 
   const { manifest, signatureFile, manifestPath, backendDir } = loaded;

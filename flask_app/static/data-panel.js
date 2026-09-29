@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Veri ve Yedekleme paneli modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Veri ve Yedekleme paneli modülü (ES Module)
  *
  * Otomatik yedek listesini yükler, "Şimdi Yedek Al" / geri yükle / sil
  * eylemlerini bağlar ve hatırlatma sıklığı seçicilerini backend değerleriyle
@@ -176,6 +176,14 @@ export function initDataPanel({ apiFetch }) {
     });
   };
 
+  /* Kasa yazma kilidi (409/423) kontrolü.
+     `apiFetch` (app.js) bu durumda `kasa:vault-write-locked` olayını TEK
+     yerden zaten fırlatır ve kullanıcıya uyarı gösterir; buradaki
+     görev yalnızca "hata yoluna düşme, sessizce çık" demek.
+     Aynı olayı ikinci kez fırlatmak ÇİFT toast üretiyordu. */
+  const isVaultLocked = (response) =>
+    response?.status === 409 || response?.status === 423;
+
   const restoreBackup = async (backup, btn) => {
     const { isConfirmed } = await confirmDialog(
       window._('Yedeği Geri Yükle'),
@@ -190,15 +198,7 @@ export function initDataPanel({ apiFetch }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: backup.filename, confirm: true }),
       });
-      if (response?.status === 423 || response?.status === 409) {
-        let message = '';
-        const data = await response.json().catch(() => null);
-        if (data?.message) message = data.message;
-        window.dispatchEvent(new CustomEvent('kasa:vault-write-locked', {
-          detail: { message },
-        }));
-        return;
-      }
+      if (isVaultLocked(response)) return;
       if (!response?.ok) throw new Error('restore-failed');
       const data = await response.json().catch(() => null);
       const count = data?.restored;
@@ -230,13 +230,7 @@ export function initDataPanel({ apiFetch }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: backup.filename }),
       });
-      if (response?.status === 423 || response?.status === 409) {
-        const data = await response.json().catch(() => null);
-        window.dispatchEvent(new CustomEvent('kasa:vault-write-locked', {
-          detail: { message: data?.message || '' },
-        }));
-        return;
-      }
+      if (isVaultLocked(response)) return;
       if (!response?.ok) throw new Error('delete-failed');
       showSuccessToast(window._('Yedek silindi.'));
       refreshBackups();
@@ -255,11 +249,7 @@ export function initDataPanel({ apiFetch }) {
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       });
-      if (response?.status === 423 || response?.status === 409) {
-        const data = await response.json().catch(() => null);
-        if (data?.message) showWarningToast(data.message);
-        return;
-      }
+      if (isVaultLocked(response)) return;
       if (!response?.ok) throw new Error('backup-create-failed');
       showSuccessToast(window._('Yedek oluşturuldu.'));
       refreshBackups();

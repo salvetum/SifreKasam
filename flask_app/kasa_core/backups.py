@@ -9,6 +9,7 @@ yüklenebilir (kasa açıkken) ve ana şifre değişikliğinde yeniden sarmalan�
 """
 
 import base64
+import json
 import logging
 import os
 import secrets
@@ -18,7 +19,9 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 
 from kasa_core.encrypted_backup import encrypt_payload
-from kasa_core.models import Setting
+from kasa_core.extensions import db
+from kasa_core.settings_store import get_setting as _get_setting
+from kasa_core.settings_store import set_setting as _set_setting
 
 log = logging.getLogger(__name__)
 
@@ -38,20 +41,6 @@ AUTO_BACKUP_INTERVAL_SECONDS_MAP = {
 AUTO_BACKUP_PREFIX = 'sifrekasam_otomatik_'
 AUTO_BACKUP_MAX_COUNT = 8
 BACKUP_DIR_NAME = 'backups'
-
-
-def _get_setting(key: str) -> str | None:
-    setting = Setting.query.filter_by(key=key).first()
-    return setting.value if setting else None
-
-
-def _set_setting(key: str, value: str) -> None:
-    setting = Setting.query.filter_by(key=key).first()
-    if setting:
-        setting.value = value
-    else:
-        from kasa_core.extensions import db
-        db.session.add(Setting(key=key, value=value))
 
 
 def _backup_key_to_password(key_bytes: bytes) -> str:
@@ -85,10 +74,8 @@ def refresh_backup_key(old_fernet: Fernet, new_fernet: Fernet) -> None:
     try:
         raw_key = old_fernet.decrypt(wrap.encode())
         _set_setting(BACKUP_KEY_WRAP_SETTING, new_fernet.encrypt(raw_key).decode())
-        from kasa_core.extensions import db
         db.session.commit()
     except Exception:
-        from kasa_core.extensions import db
         db.session.rollback()
         log.exception('Otomatik yedek anahtari yeniden sarmalanamadi.')
 
@@ -111,7 +98,7 @@ def create_backup(records: list[dict], fernet: Fernet, base_dir: str | os.PathLi
     """
     password = backup_password(fernet)
     blob = encrypt_payload(
-        __import__('json').dumps(records, ensure_ascii=False).encode('utf-8'),
+        json.dumps(records, ensure_ascii=False).encode('utf-8'),
         password,
     )
     stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -180,10 +167,26 @@ def read_backup(base_dir: str | os.PathLike, filename: str) -> bytes:
 
 
 def delete_backup(base_dir: str | os.PathLike, filename: str) -> bool:
+    """Yönetimli bir yedeği siler; yol dışı geçişi (path traversal) reddeder.
+
+    Savunma derinliği: HTTP katmanı (``/api/backups/delete``) zaten 400 döndürüyor,
+    yani dışarıdan sömürülemez. Ancak çekirdek katmanı hiçbir çağıranın
+    (ileride gelecek bir route/script/iç kullanım) doğrulamayı atlamasına
+    güvenmemek için ``read_backup`` ile birebir aynı iki katmanlı kontrolü
+    yapar: ``_is_managed`` ön eki + çözümlenmiş yolun yedek klasörü içinde
+    kalması. ``_is_managed`` tek başına yeterli değildir; örn.
+    ``sifrekasam_otomatik_/../../x.kasaenc`` ön eki/uzantı kontrolünden geçer
+    ama çözümlendiğinde yedek klasörünün dışına düşer ve silinirse kullanıcıya
+    ait rastgele bir dosya silinmiş olur.
+    """
     if not _is_managed(filename):
         raise ValueError('invalid-backup-filename')
+    folder = backups_dir(base_dir).resolve()
+    target = (folder / filename).resolve()
+    if not target.is_relative_to(folder):
+        raise ValueError('invalid-backup-filename')
     try:
-        (backups_dir(base_dir) / filename).unlink(missing_ok=True)
+        target.unlink(missing_ok=True)
         return True
     except OSError:
         log.warning('Yedek silinenemedi: %s', filename)

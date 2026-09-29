@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import stat
 import sys
 import tempfile
@@ -26,7 +27,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
-from flask import Flask
+from flask import Flask, session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FLASK_APP_DIR = PROJECT_ROOT / "flask_app"
@@ -248,6 +249,38 @@ class EncryptedBackupTests(unittest.TestCase):
         blob = encrypt_payload(b"bu-json-degil", self.PASSWORD)
         with self.assertRaises(CorruptBackupError):
             decrypt_encrypted_records(blob, self.PASSWORD)
+
+    def test_encrypted_import_respects_max_import_records(self) -> None:
+        """DoS sınırı: şifreli içerik amplifikasyonu MAX_IMPORT_RECORDS ile kırpılır.
+
+        MAX_CONTENT_LENGTH (64 MB) yalnızca ham gövde boyutunu sınırlar; JSON
+        kayıt iç içe nesnelere dönüştüğünde liste ~10-20x büyür. Restore yolu
+        bu çözülmüş listeyi `Record.query.delete()` SONRASINDA işlediği için
+        sınırsız liste uygulamayı dondurabilir/çökertirdi.
+        """
+        from kasa_core.constants import MAX_IMPORT_RECORDS
+
+        records = [
+            {"type": "Website", "title": f"Kayit-{i}", "password": f"p{i}"}
+            for i in range(MAX_IMPORT_RECORDS + 100)
+        ]
+        blob = build_encrypted_export_payload(records, self.PASSWORD)
+        parsed = decrypt_encrypted_records(blob, self.PASSWORD)
+        self.assertEqual(len(parsed), MAX_IMPORT_RECORDS)
+        # Kırpma sessiz değil: ilk kayıtlar korunur, fazlası atlanır.
+        self.assertEqual(parsed[0], records[0])
+        self.assertEqual(parsed[-1], records[MAX_IMPORT_RECORDS - 1])
+
+    def test_encrypted_import_at_limit_keeps_every_record(self) -> None:
+        """Sınırın tam altındaki yedeklerde mevcut davranış değişmez (kırpma yok)."""
+        from kasa_core.constants import MAX_IMPORT_RECORDS
+
+        records = [{"type": "Website", "title": f"K{i}"} for i in range(5)]
+        blob = build_encrypted_export_payload(records, self.PASSWORD)
+        parsed = decrypt_encrypted_records(blob, self.PASSWORD)
+        self.assertEqual(len(parsed), len(records))
+        self.assertLess(len(records), MAX_IMPORT_RECORDS)
+        self.assertEqual(parsed, records)
 
     def test_generated_password_is_strong_and_unique(self) -> None:
         first = generate_backup_password()
@@ -629,6 +662,62 @@ class RouteContractTests(unittest.TestCase):
         self.assertEqual(response.get_json(), {"status": "ok", "deleted": 1})
         self.assertIsNone(response.location)
 
+    def test_settings_onboarding_endpoint_persists_flag(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+        initial = self.client.get(
+            '/settings/onboarding',
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        )
+        self.assertEqual(initial.status_code, 200)
+        self.assertIn('done', initial.get_json())
+
+        response = self.client.post(
+            '/settings/onboarding',
+            json={'done': True},
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()['done'])
+        with app_module.app.app_context():
+            self.assertEqual(app_module._get_setting('onboarding_done'), '1')
+
+        after = self.client.get(
+            '/settings/onboarding',
+            headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        self.assertTrue(after['done'])
+
+    def test_onboarding_marker_renders_only_for_empty_new_vault(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+
+        fake_query = type("FakeQuery", (), {
+            "order_by": lambda self, *args, **kwargs: type(
+                "FakeSelection", (), {"all": lambda self: []}
+            )(),
+        })()
+        fernet = Fernet(Fernet.generate_key())
+
+        with app_module.app.app_context():
+            with patch.object(app_module, "get_fernet", return_value=fernet), \
+                    patch.object(app_module.Record, "query", fake_query), \
+                    patch.object(app_module, "_get_setting", return_value=None):
+                page = self.client.get('/', headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b'data-kasa-onboarding="true"', page.data)
+
+        with app_module.app.app_context():
+            with patch.object(app_module, "get_fernet", return_value=fernet), \
+                    patch.object(app_module.Record, "query", fake_query), \
+                    patch.object(app_module, "_get_setting", return_value="1"):
+                page = self.client.get('/', headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b'data-kasa-onboarding="false"', page.data)
+
     def test_password_strength_endpoint_uses_authenticated_backend_engine(self) -> None:
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
@@ -748,6 +837,47 @@ class SecurityUnitTests(unittest.TestCase):
             self.assertTrue(path.is_dir())
             if os.name != "nt":
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o700)
+
+    def test_storage_status_detects_insufficient_free_space(self) -> None:
+        import shutil
+        from collections import namedtuple
+
+        import kasa_core.paths as kasa_paths
+
+        usage_type = namedtuple('usage', 'total used free')
+        free = 1024
+        total = 100 * 1024 * 1024 * 1024
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(
+                shutil, "disk_usage", return_value=usage_type(total, total - free, free)
+            ):
+                status = kasa_paths.get_storage_status(temp_dir)
+        self.assertTrue(status["space_known"])
+        self.assertFalse(status["has_space"])
+        self.assertTrue(status["low_space"])
+        self.assertEqual(status["free_bytes"], free)
+
+    def test_storage_status_marks_space_unknown_when_measurement_fails(self) -> None:
+        import shutil
+
+        import kasa_core.paths as kasa_paths
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(shutil, "disk_usage", side_effect=OSError("erişilemiyor")):
+                status = kasa_paths.get_storage_status(temp_dir)
+        # Alan ölçülemiyorsa yazma izni dışında engel üretilmemeli.
+        self.assertFalse(status["space_known"])
+        self.assertFalse(status["has_space"])
+        self.assertTrue(status["writable"])
+
+    def test_storage_status_detects_readonly_directory(self) -> None:
+        import kasa_core.paths as kasa_paths
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(kasa_paths, "_probe_writable", return_value=(False, "permission")):
+                status = kasa_paths.get_storage_status(temp_dir)
+        self.assertFalse(status["writable"])
+        self.assertEqual(status["error_kind"], "permission")
 
 
 class MetadataMigrationTests(unittest.TestCase):
@@ -1609,6 +1739,137 @@ class CsrfAndPasswordStrengthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('eşleşmiyor', response.get_data(as_text=True))
 
+    def _first_setup_post(self, password: str, password2: str):
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False):
+            token = self._extract_csrf_token(
+                self.client.get('/login').get_data(as_text=True)
+            )
+            return self.client.post('/login', data={
+                'master_password': password,
+                'master_password_confirm': password2,
+                'csrf_token': token,
+            })
+
+    @staticmethod
+    def _storage_stub(**overrides):
+        status = {
+            'path': 'C:/kasa',
+            'exists': True,
+            'writable': True,
+            'free_bytes': 5 * 1024 * 1024 * 1024,
+            'total_bytes': 100 * 1024 * 1024 * 1024,
+            'space_known': True,
+            'has_space': True,
+            'low_space': False,
+            'error_kind': '',
+        }
+        status.update(overrides)
+        return status
+
+    def test_first_setup_blocked_when_storage_not_writable(self) -> None:
+        with patch.object(
+            app_module,
+            "get_storage_status",
+            return_value=self._storage_stub(writable=False, error_kind='permission'),
+        ):
+            response = self._first_setup_post('1234567890123456', '1234567890123456')
+        self.assertEqual(response.status_code, 403)
+        self.assertIn('yazma izni yok', response.get_data(as_text=True))
+
+    def test_first_setup_blocked_when_free_space_insufficient(self) -> None:
+        with patch.object(
+            app_module,
+            "get_storage_status",
+            return_value=self._storage_stub(free_bytes=1024, has_space=False, low_space=True),
+        ):
+            response = self._first_setup_post('1234567890123456', '1234567890123456')
+        self.assertEqual(response.status_code, 507)
+        self.assertIn('Boş disk alanı yetersiz', response.get_data(as_text=True))
+
+    def test_first_setup_not_blocked_when_space_cannot_be_measured(self) -> None:
+        # disk_usage başarısızsa alan bilinmiyor demektir; ölçülemeyen bilgi
+        # kurulumu engellememeli.
+        with patch.object(
+            app_module,
+            "get_storage_status",
+            return_value=self._storage_stub(space_known=False, has_space=False, free_bytes=0),
+        ):
+            response = self._first_setup_post('1234567890123457', '1234567890123457')
+        self.assertEqual(response.status_code, 302)
+        with app_module.app.app_context():
+            app_module.Setting.query.filter_by(key='master_hash').delete()
+            app_module.Setting.query.filter_by(key='pbkdf2_salt_b64').delete()
+            app_module.Setting.query.filter_by(key='record_metadata_encryption_v1').delete()
+            app_module.Setting.query.filter_by(key='vault_initialized').delete()
+            app_module.db.session.commit()
+        if os.path.exists(app_module.VAULT_INIT_FILE):
+            os.remove(app_module.VAULT_INIT_FILE)
+
+    def test_first_setup_page_shows_storage_information(self) -> None:
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False), \
+                patch.object(
+                    app_module,
+                    "get_storage_status",
+                    return_value=self._storage_stub(low_space=True),
+                ):
+            page = self.client.get('/login').get_data(as_text=True)
+        self.assertIn('id="setup-storage-info"', page)
+        self.assertIn('Kullanılacak klasör', page)
+        self.assertIn('Boş alan', page)
+        self.assertNotIn('Kurulumu başlatmak için önce', page)
+
+    def test_first_setup_page_locks_button_when_blocked(self) -> None:
+        with patch.object(app_module, "_vault_initialized", return_value=False), \
+                patch.object(app_module, "_has_existing_vault_data", return_value=False), \
+                patch.object(
+                    app_module,
+                    "get_storage_status",
+                    return_value=self._storage_stub(free_bytes=1024, has_space=False, low_space=True),
+                ):
+            page = self.client.get('/login').get_data(as_text=True)
+        self.assertIn('disabled aria-disabled="true"', page)
+        self.assertIn('Kurulumu başlatmak için önce', page)
+
+    def test_rollback_first_setup_removes_files_created_by_attempt(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_file = os.path.join(tmp, 'sifreler.db')
+            init_file = os.path.join(tmp, 'vault.initialized')
+            created_names = [
+                db_file,
+                db_file + '-journal',
+                db_file + '-wal',
+                db_file + '-shm',
+                init_file,
+                init_file + '.tmp',
+            ]
+            with patch.object(app_module, "DB_FILE", db_file), \
+                    patch.object(app_module, "VAULT_INIT_FILE", init_file), \
+                    app_module.app.app_context():
+                app_module._rollback_first_setup(True)
+                for name in created_names:
+                    self.assertFalse(os.path.exists(name), name)
+                for name in created_names:
+                    with open(name, 'w', encoding='utf-8') as handle:
+                        handle.write('x')
+                # Mevcut kasa varsa dosyalar korunur.
+                app_module._rollback_first_setup(False)
+                for name in created_names:
+                    self.assertTrue(os.path.exists(name), name)
+
+    def test_setup_failure_message_explains_cause(self) -> None:
+        permission_message = app_module._setup_failure_message(
+            PermissionError('attempt to write a readonly database')
+        )
+        self.assertIn('izin', permission_message)
+        space_message = app_module._setup_failure_message(OSError('database or disk is full'))
+        self.assertIn('Disk alanı doldu', space_message)
+        generic_message = app_module._setup_failure_message(RuntimeError('bilinmeyen'))
+        self.assertIn('İlk kurulum tamamlanamadı', generic_message)
+
     def test_change_password_rejects_weak_new_password(self) -> None:
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
@@ -1751,6 +2012,19 @@ class LanAccessPasswordTests(unittest.TestCase):
         ).get_json()
         self.assertTrue(data['lan_access_configured'])
         self.assertNotIn('lan_password', data)
+
+    def test_lan_info_forbidden_from_remote(self) -> None:
+        self._seed_vault()
+        self._local_login()
+        self._enable_lan()
+
+        lan_password = self._lan_password()
+        lan_client, _ = self._lan_login(lan_password, remote='192.168.1.70')
+
+        response = lan_client.get(
+            '/api/lan-info', environ_base={'REMOTE_ADDR': '192.168.1.70'},
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_disabling_lan_clears_access_and_reenabling_rotates(self) -> None:
         self._seed_vault()
@@ -2256,13 +2530,13 @@ class CardAndStatsUiTemplateTests(unittest.TestCase):
 
     def test_asset_versions_bumped(self) -> None:
         base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
-        self.assertIn("cards.css') }}?v=76", base)
+        self.assertIn("cards.css') }}?v=79", base)
         self.assertIn("theme-states.css') }}?v=74", base)
-        self.assertIn("utilities.css') }}?v=72", base)
-        self.assertIn("app.js') }}?v=9.38", base)
+        self.assertIn("utilities.css') }}?v=75", base)
+        self.assertIn("app.js') }}?v=9.47", base)
         sw = (FLASK_APP_DIR / "templates" / "sw.js").read_text(encoding="utf-8")
-        self.assertIn("assets-v193", sw)
-        self.assertIn("assets-v193", self._read("scripts/sw-register.html"))
+        self.assertIn("assets-v203", sw)
+        self.assertIn("assets-v203", self._read("scripts/sw-register.html"))
 
     def test_username_input_not_blocked_by_card_number_formatter(self) -> None:
         # Bug #1: kart numarası formatlama Kullanıcı Adı alanına şartsız
@@ -2776,7 +3050,8 @@ class BreachScanRouteTests(unittest.TestCase):
         self.assertTrue(data["internet_kill_switch_enabled"])
         self.assertFalse(data["can_live_scan"])
 
-        # Boş kayıt her ikisini de varsayılana (kontrol) çevirir.
+        # Yerel tam form davranışı korunur: onay kutusu gönderilmediyse kapalı
+        # yazılır, böylece kullanıcı ayarı kapatabilir.
         response = self.client.post("/save_settings", data={}, headers=headers)
         data = response.get_json()
         self.assertFalse(data["internet_kill_switch_enabled"])
@@ -3649,6 +3924,23 @@ class BackupsModuleTests(unittest.TestCase):
             files = self._managed_files()
             self.assertEqual(files, [])
 
+    def test_delete_backup_rejects_traversal(self) -> None:
+        """Savunma derinliği: _is_managed ön eki tek başına yetmez.
+
+        `sifrekasam_otomatik_/../../kanari.kasaenc` ön eki/uzantı kontrolünden
+        geçer; ancak çözümlenen yol yedek klasörünün dışına düşer. HTTP
+        katmanı zaten 400 döndürdüğü için bu dışarıdan sömürülemez, fakat
+        çekirdek katmanı da (read_backup ile aynı desen) reddetmelidir.
+        """
+        with app_module.app.app_context():
+            canary = Path(self.tmpdir) / "kanari.kasaenc"
+            canary.write_text("silinmemeli")
+            with self.assertRaises(ValueError):
+                app_module._backups.delete_backup(
+                    self.tmpdir, "sifrekasam_otomatik_/../../kanari.kasaenc")
+            self.assertTrue(canary.exists(), "Klasör dışı dosya silinmemeli")
+            canary.unlink()
+
 
 class AutomaticBackupApiTests(unittest.TestCase):
     """Otomatik yedek API yüzeyleri: list/create/delete/restore + güvenlik."""
@@ -3991,6 +4283,213 @@ class ReminderFrequencyTests(unittest.TestCase):
         payload = response.get_json()
         self.assertIn("backup_reminder_frequency", payload)
         self.assertIn("breach_reminder_frequency", payload)
+
+
+class SecurityHardeningTests(unittest.TestCase):
+    """Güvenlik sertleştirmesi regresyon testleri (beta4 güvenlik turu)."""
+
+    MASTER = 'test-master-password'
+    NEW_MASTER = 'test-master-password-new'
+
+    def setUp(self) -> None:
+        self.client = app_module.app.test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized'):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key='master_hash',
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key='pbkdf2_salt_b64', value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key='vault_initialized', value='true'))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> str:
+        token = self._csrf(self.client.get('/login').get_data(as_text=True))
+        response = self.client.post('/login', data={
+            'master_password': self.MASTER, 'csrf_token': token,
+        })
+        self.assertEqual(response.status_code, 302)
+        return self.client.get('/login').headers.get('Set-Cookie') or ''
+
+    def _session_csrf(self) -> str:
+        page = self.client.get('/').get_data(as_text=True)
+        match = re.search(r'window\.KASA_CSRF_TOKEN\s*=\s*"([^"]+)"', page)
+        assert match is not None, 'csrf token sayfada bulunamadı'
+        return match.group(1)
+
+    # ── Oturum çerezinin SameSite=Strict olduğu için yalnızca GET/HEAD dışı
+    # isteklerde Origin zorunluluğu ölçülür.
+
+    def test_settings_tray_post_requires_csrf_token(self) -> None:
+        self._seed_vault()
+        self._login()
+        response = self.client.post('/settings/tray', json={'minimize_to_tray': True})
+        self.assertEqual(response.status_code, 400)
+
+    def test_settings_tray_is_not_csrf_exempt(self) -> None:
+        self.assertNotIn('settings_tray', app_module._TOKEN_ENDPOINTS)
+        self.assertIn('settings_tray', app_module._TOKEN_READ_ENDPOINTS)
+
+    def test_settings_tray_readable_with_app_token(self) -> None:
+        response = self.client.get(
+            '/settings/tray', headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('minimize_to_tray', response.get_json())
+
+    def test_content_protection_readable_with_app_token(self) -> None:
+        # Önceden ana süreç bu uçta 302 alıyordu ve özellik sessizce ölüydü.
+        response = self.client.get(
+            '/settings/content-protection',
+            headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('content_protection_enabled', response.get_json())
+
+    def test_content_protection_post_requires_session(self) -> None:
+        response = self.client.post(
+            '/settings/content-protection',
+            json={'content_protection_enabled': True},
+            headers={'X-App-Token': app_module.APP_TOKEN})
+        self.assertEqual(response.status_code, 302)
+
+    def test_settings_language_rejected_for_anonymous_remote(self) -> None:
+        response = self.client.post(
+            '/settings/language', json={'language': 'en'},
+            environ_base={'REMOTE_ADDR': '192.168.1.77'})
+        self.assertEqual(response.status_code, 403)
+
+    def test_settings_language_allowed_locally_without_session(self) -> None:
+        # Dil seçici giriş/kilit/yükleme ekranlarında oturumsuz da çalışmalı.
+        response = self.client.post('/settings/language', json={'language': 'en'})
+        self.assertEqual(response.status_code, 200)
+
+    def test_state_change_from_foreign_origin_rejected(self) -> None:
+        response = self.client.post(
+            '/settings/language', json={'language': 'en'},
+            headers={'Origin': 'https://evil.example'})
+        self.assertEqual(response.status_code, 403)
+
+    def test_state_change_rejected_when_browser_signalled_without_origin(self) -> None:
+        response = self.client.post(
+            '/settings/language', json={'language': 'en'},
+            headers={'Sec-Fetch-Site': 'cross-site'})
+        self.assertEqual(response.status_code, 403)
+
+    def test_state_change_with_same_origin_allowed(self) -> None:
+        response = self.client.post(
+            '/settings/language', json={'language': 'en'},
+            headers={'Origin': 'http://localhost'})
+        self.assertEqual(response.status_code, 200)
+
+    def test_remote_client_cannot_change_critical_settings(self) -> None:
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module.db.session.commit()
+        for field in ('auto_lock_enabled', 'lan_enabled', 'internet_kill_switch'):
+            with self.subTest(field=field):
+                response = self.client.post(
+                    '/save_settings', data={field: '1'},
+                    headers={'X-CSRF-Token': self._session_csrf()},
+                    environ_base={'REMOTE_ADDR': '192.168.1.77'})
+                self.assertEqual(response.status_code, 403)
+
+    def test_remote_partial_form_does_not_reset_flags(self) -> None:
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            # Uzak istemci yalnızca LAN açıkken erişebilir.
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting('power_save_enabled', 'true')
+            app_module._set_setting('card_sheen_enabled', 'true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/save_settings', data={'auto_lock_timeout': '9'},
+            headers={'X-CSRF-Token': self._session_csrf()},
+            environ_base={'REMOTE_ADDR': '192.168.1.77'})
+        self.assertEqual(response.status_code, 302)
+        with app_module.app.app_context():
+            self.assertEqual(app_module.get_power_save_enabled(), True)
+            self.assertEqual(app_module.get_card_sheen_enabled(), True)
+
+    def test_local_form_can_still_turn_flags_off(self) -> None:
+        # Onay kutusu gönderilmediyse ayar "kapalı" yazılır (UI davranışı korunur).
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module.save_power_save('true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/save_settings', data={'auto_lock_timeout': '5'},
+            headers={'X-CSRF-Token': self._session_csrf()})
+        self.assertEqual(response.status_code, 302)
+        with app_module.app.app_context():
+            self.assertEqual(app_module.get_power_save_enabled(), False)
+
+    def test_password_change_invalidates_other_sessions(self) -> None:
+        # Ana şifre değişince tetikleyen dışındaki oturumların anahtarı düşer;
+        # aksi halde eski anahtarla yazılan kayıt kalıcı çözülemez.
+        self._seed_vault()
+        with app_module.app.app_context():
+            old_key = app_module.derive_key(self.MASTER)
+            new_key = app_module.derive_key(self.NEW_MASTER)
+        with app_module.app.test_request_context('/'):
+            app_module._set_vault_key_bytes(old_key)
+            session_a = session['vault_session_id']
+        with app_module.app.test_request_context('/'):
+            app_module._set_vault_key_bytes(old_key)
+            session_b = session['vault_session_id']
+        with app_module.app.app_context():
+            self.assertIsNotNone(app_module._get_vault_key_for(session_b))
+            app_module._reencrypt_task(
+                'test-task', old_key, new_key,
+                app_module.hash_master_password(self.NEW_MASTER), session_a)
+        with app_module.app.app_context():
+            self.assertIsNone(app_module._get_vault_key_for(session_b),
+                             'Eski oturum anahtarı düşürülmeliydi.')
+            self.assertEqual(app_module._get_vault_key_for(session_a), new_key)
+            self.assertIsNotNone(app_module._get_vault_key_for(session_a))
+
+    def test_import_internal_error_returns_500(self) -> None:
+        self._seed_vault()
+        self._login()
+        with patch.object(app_module.db.session, 'commit',
+                          side_effect=sqlite3.OperationalError('database is locked')):
+            response = self.client.post(
+                '/import',
+                data={'file': (io.BytesIO(
+                    json.dumps([{'title': 'T', 'password': 'p',
+                                 'type': 'Website'}]).encode()), 'x.json')},
+                headers={'X-CSRF-Token': self._session_csrf()},
+                content_type='multipart/form-data')
+        self.assertEqual(response.status_code, 500)
 
 
 if __name__ == "__main__":

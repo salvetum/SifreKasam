@@ -1,0 +1,110 @@
+<!-- İlk Açılış Karşılaması (Onboarding) — yalnızca boş kasa + onboarding_done set edilmemişse görünür -->
+{% set onb_accent_presets = [('#7c6ff7', 'purple'), ('#38bdf8', 'blue'), ('#22c55e', 'green'), ('#f59e0b', 'amber'), ('#f43f5e', 'rose'), ('#14b8a6', 'teal'), ('#6366f1', 'indigo'), ('#84cc16', 'lime')] %}
+<div class="kasa-modal" id="onboardingModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true"
+     aria-labelledby="onboarding-modal-title" data-kasa-onboarding="{{ 'true' if show_onboarding else 'false' }}">
+    <div class="modal-dialog onboarding-modal-dialog">
+        <div class="modal-content onboarding-modal-content">
+            <div class="modal-header">
+                <h2 id="onboarding-modal-title" class="modal-title modal-title-display font-bold">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                    {{ _('Hoş geldiniz') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body onboarding-modal-body">
+                <ol class="onb-steps" aria-label="{{ _('Karşılama adımları') }}">
+                    <li class="onb-step" data-onb-step-dot="1"><span>1</span></li>
+                    <li class="onb-step" data-onb-step-dot="2"><span>2</span></li>
+                    <li class="onb-step" data-onb-step-dot="3"><span>3</span></li>
+                </ol>
+
+                <section class="onb-panel is-active" data-onb-step="1">
+                    <div class="onb-hero">
+                        <div class="onb-hero-mark" aria-hidden="true"><i class="fa-solid fa-vault"></i></div>
+                        <h3 class="onb-hero-title">{{ _('ŞifreKasam’a hoş geldiniz') }}</h3>
+                        <p class="onb-hero-copy">{{ _('Kasanızı görünüşünüze göre biçimlendirelim. Birkaç saniye sürer.') }}</p>
+                    </div>
+                    <div class="onb-field">
+                        <label for="onb-language" class="onb-field-label">
+                            <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                            {{ _('Arayüz Dili') }}
+                        </label>
+                        <select id="onb-language" name="onb-language" class="kasa-field" data-onb-lang>
+                            {% for lang in AVAILABLE_LANGS %}
+                            <option value="{{ lang.code }}" {% if lang.code == CURRENT_LANG %}selected{% endif %}>{{ lang.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </section>
+
+                <section class="onb-panel" data-onb-step="2" hidden>
+                    <div class="onb-subtitle">{{ _('Tema ve Vurgu Rengi') }}</div>
+                    <div class="onb-control">
+                        <span class="onb-control-label">{{ _('Tema') }}</span>
+                        <div class="onb-segmented" role="group" aria-label="{{ _('Tema') }}">
+                            <button type="button" class="onb-seg" data-onb-theme="light" aria-pressed="false"><i class="fa-solid fa-sun" aria-hidden="true"></i>{{ _('Açık') }}</button>
+                            <button type="button" class="onb-seg" data-onb-theme="dark" aria-pressed="false"><i class="fa-solid fa-moon" aria-hidden="true"></i>{{ _('Koyu') }}</button>
+                            <button type="button" class="onb-seg" data-onb-theme="system" aria-pressed="false"><i class="fa-solid fa-desktop" aria-hidden="true"></i>{{ _('Sistem') }}</button>
+                        </div>
+                    </div>
+                    <div class="onb-control">
+                        <span class="onb-control-label">{{ _('Vurgu Rengi') }}</span>
+                        <div class="onb-accents" role="group" aria-label="{{ _('Vurgu Rengi') }}">
+                            {% for preset, preset_class in onb_accent_presets %}
+                            <button type="button" class="onb-accent onb-accent-{{ preset_class }}" data-onb-accent="{{ preset }}"
+                                aria-pressed="false" aria-label="{{ _('Vurgu rengi seç') }}: {{ preset }}"></button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="onb-preview" aria-hidden="true">
+                        <div class="onb-preview-title">{{ _('Örnek Kayıt') }}</div>
+                        <div class="onb-preview-row"><span class="onb-preview-key">{{ _('Kullanıcı Adı') }}</span><span class="onb-preview-val">demo@kasa.app</span></div>
+                        <div class="onb-preview-row"><span class="onb-preview-key">{{ _('Şifre') }}</span><span class="onb-preview-val onb-preview-secret">••••••••</span></div>
+                    </div>
+                </section>
+
+                <section class="onb-panel" data-onb-step="3" hidden>
+                    <div class="onb-subtitle">{{ _('Cam Efektleri') }}</div>
+                    <div class="onb-control onb-control-inline">
+                        <span class="onb-control-label">{{ _('Cam Efektleri') }}</span>
+                        <label class="onb-switch">
+                            <input type="checkbox" id="onb-glass-toggle" data-onb-glass-toggle aria-label="{{ _('Cam Efektleri') }}">
+                            <span class="onb-switch-track" aria-hidden="true"></span>
+                        </label>
+                    </div>
+                    <div class="onb-control">
+                        <span class="onb-control-label">{{ _('Cam Kalitesi') }}</span>
+                        <div class="onb-segmented" role="group" aria-label="{{ _('Cam Kalitesi') }}">
+                            <button type="button" class="onb-seg" data-onb-quality="low" aria-pressed="false">{{ _('Düşük') }}</button>
+                            <button type="button" class="onb-seg" data-onb-quality="normal" aria-pressed="false">{{ _('Normal') }}</button>
+                            <button type="button" class="onb-seg" data-onb-quality="high" aria-pressed="false">{{ _('Yüksek') }}</button>
+                        </div>
+                    </div>
+                    <div class="onb-glass-stage">
+                        <span class="onb-blob onb-blob-a" aria-hidden="true"></span>
+                        <span class="onb-blob onb-blob-b" aria-hidden="true"></span>
+                        <span class="onb-blob onb-blob-c" aria-hidden="true"></span>
+                        <div class="onb-glass-tile">
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span class="onb-glass-state" data-onb-glass-state>{{ _('Normal') }}</span>
+                        </div>
+                    </div>
+                    <p class="onb-glass-caption">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        <span>{{ _('Yukarıdaki kart, seçtiğinizi canlı gösterir.') }}</span>
+                    </p>
+                </section>
+            </div>
+            <div class="modal-footer onboarding-modal-footer">
+                <button type="button" class="kasa-btn kasa-btn-muted" data-onb-skip>{{ _('Atla') }}</button>
+                <div class="onb-nav-group">
+                    <button type="button" class="kasa-btn kasa-btn-muted" data-onb-nav="prev" hidden>{{ _('Geri') }}</button>
+                    <button type="button" class="kasa-btn kasa-btn-primary" data-onb-nav="next">{{ _('İleri') }}</button>
+                    <button type="button" class="kasa-btn kasa-btn-primary" data-onb-finish hidden>{{ _('Bitti') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

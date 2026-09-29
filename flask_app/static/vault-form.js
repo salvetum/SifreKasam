@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Ekle / Düzenle Formu modülü — v6
+ * ŞifreKasam v2.7.0-beta.4 - Ekle / Düzenle Formu modülü — v6
  *
  * MİMARİ (blank-swap): Tip değişiminde alanlar TEK TEK animasyonlanmaz.
  * Üç cam panel hızla söner (110 ms) → içerik tamamen görünmezken tüm form

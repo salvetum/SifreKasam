@@ -9,6 +9,7 @@ import re
 import secrets
 import shutil
 import socket
+import sqlite3
 import threading
 import time
 import uuid
@@ -36,13 +37,10 @@ from kasa_core.constants import (
     CARD_PAGE_SIZE,
     CUSTOM_BACKGROUND_HISTORY_LIMIT,
     CUSTOM_BACKGROUND_CACHE_SECONDS,
-    CUSTOM_BACKGROUND_MAX_DIM,
-    CUSTOM_BACKGROUND_MAX_DIMENSION,
-    CUSTOM_BACKGROUND_MAX_GIF_BYTES,
-    CUSTOM_BACKGROUND_MAX_IMAGE_BYTES,
-    CUSTOM_BACKGROUND_MAX_PIXELS,
-    CUSTOM_BACKGROUND_MAX_VIDEO_BYTES,
-    CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW,
+    # app.py gövdesinde kullanılmaz; tests/test_kasa.py bu adı app_module
+    # üzerinden okuyor (sözleşme). Silme.
+    CUSTOM_BACKGROUND_MAX_IMAGE_BYTES,  # noqa: F401
+    CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW,  # noqa: F401
     CUSTOM_BACKGROUND_UPLOAD_WINDOW_SECONDS,
     DEFAULT_ACCENT_COLOR,
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
@@ -56,6 +54,7 @@ from kasa_core.constants import (
     DEFAULT_CATEGORY,
     DEFAULT_CONTENT_PROTECTION_ENABLED,
     DEFAULT_GLASS_BLUR,
+    DEFAULT_GLASS_FROST,
     DEFAULT_GLASS_QUALITY,
     DEFAULT_GLASS_VEIL,
     DEFAULT_GRADIENTS_ENABLED,
@@ -67,9 +66,13 @@ from kasa_core.constants import (
     MAX_BULK_IDS,
     PBKDF2_SALT_SETTING,
     RECORD_METADATA_FIELDS,
-    RECORD_METADATA_PREFIX,
+    # app.py gövdesinde kullanılmaz; tests/test_kasa.py bu adı app_module
+    # üzerinden okuyor (sözleşme). Silme.
+    RECORD_METADATA_PREFIX,  # noqa: F401
     RECORD_METADATA_SETTING,
     SECRET_PLACEHOLDER,
+    SETUP_MIN_FREE_BYTES,
+    SETUP_RECOMMENDED_FREE_BYTES,
     UPDATE_RELEASE_API,
     UPDATE_REPOSITORY,
 )
@@ -103,6 +106,7 @@ from kasa_core.models import PasswordHistory, Record, Setting, User
 from kasa_core.paths import (
     get_backgrounds_dir,
     get_data_dir,
+    get_storage_status,
 )
 from kasa_core.password_strength import (
     analyze_password,
@@ -113,6 +117,7 @@ from kasa_core.records import (
     append_password_history as _append_password_history,
     delete_records_and_history as _delete_records_and_history,
 )
+from kasa_core.settings_store import get_setting, set_setting
 from kasa_core.backgrounds import (
     background_state_lock as _background_state_lock,
     background_upload_allowed as _background_upload_allowed,
@@ -241,8 +246,11 @@ login_manager.login_view = 'login'
 
 _appearance_settings = AppearanceSettings(THEME_FILE)
 _save_appearance_file = _appearance_settings.save_file
-_get_setting = _appearance_settings.get_setting
-_set_setting = _appearance_settings.set_setting
+# Ayar okuma/yazmanın TEK uygulaması; istek önbellekli (kasa_core/settings_store).
+# Modül düzeyinde adlandırıldi ki hem testler hem de arka plan iş parçacıkları
+# (app context dışında, önbelleksiz) aynı yardımcıları kullansın.
+_get_setting = get_setting
+_set_setting = set_setting
 get_saved_theme = _appearance_settings.get_saved_theme
 get_glass_effects_enabled = _appearance_settings.get_glass_effects_enabled
 get_saved_accent_color = _appearance_settings.get_saved_accent_color
@@ -252,6 +260,7 @@ get_chroma_accent_speed = _appearance_settings.get_chroma_accent_speed
 get_glass_quality = _appearance_settings.get_glass_quality
 get_glass_blur = _appearance_settings.get_glass_blur
 get_glass_veil = _appearance_settings.get_glass_veil
+get_glass_frost = _appearance_settings.get_glass_frost
 get_animated_backgrounds_enabled = _appearance_settings.get_animated_backgrounds_enabled
 get_interface_animations_enabled = _appearance_settings.get_interface_animations_enabled
 get_gradients_enabled = _appearance_settings.get_gradients_enabled
@@ -271,6 +280,7 @@ save_chroma_accent_speed = _appearance_settings.save_chroma_accent_speed
 save_glass_quality = _appearance_settings.save_glass_quality
 save_glass_blur = _appearance_settings.save_glass_blur
 save_glass_veil = _appearance_settings.save_glass_veil
+save_glass_frost = _appearance_settings.save_glass_frost
 save_animated_backgrounds = _appearance_settings.save_animated_backgrounds
 save_interface_animations = _appearance_settings.save_interface_animations
 save_gradients = _appearance_settings.save_gradients
@@ -345,10 +355,13 @@ def _check_heartbeat():
             with app.app_context():
                 lan = _get_setting('lan_enabled')
         except Exception:
-            pass
+            # LAN durumu okunamıyorsa belirsizlikte kapatma yapılmaz.
+            log.warning("Heartbeat kontrolü: LAN durumu okunamadı, varsayılan korunuyor.")
+            continue
         if lan == 'true':
             continue  # LAN açıkken heartbeat sunucuyu kapatmasın
         if time.time() - _last_heartbeat > HEARTBEAT_TIMEOUT_SECONDS:
+            log.info("Heartbeat kesildi; arka plan hizmeti kapatılıyor.")
             os._exit(0)
 
 threading.Thread(target=_check_heartbeat, daemon=True).start()
@@ -382,17 +395,21 @@ def _clear_vault_password():
             _vault_keys.pop(sid, None)
         _remove_vault_report_cache(sid)
 
+def _get_vault_key_for(sid: str | None) -> bytes | None:
+    """Verilen oturum kimliğinin kasa anahtarını döndürür (süresi dolarsa siler)."""
+    if not sid:
+        return None
+    with _vault_keys_lock:
+        entry = _vault_keys.get(sid)
+        if entry is None:
+            return None
+        if time.time() - entry[1] > _VAULT_KEY_TTL:
+            _vault_keys.pop(sid, None)
+            return None
+        return entry[0]
+
 def _get_vault_key() -> bytes | None:
-    sid = session.get('vault_session_id')
-    if sid:
-        with _vault_keys_lock:
-            entry = _vault_keys.get(sid)
-            if entry is not None:
-                if time.time() - entry[1] > _VAULT_KEY_TTL:
-                    _vault_keys.pop(sid, None)
-                    return None
-                return entry[0]
-    return None
+    return _get_vault_key_for(session.get('vault_session_id'))
 
 def _cleanup_vault_keys() -> None:
     """Süresi dolmuş kasa anahtarlarını temizler; arka plan daemon thread'i çağırır."""
@@ -435,6 +452,13 @@ def get_fernet() -> Fernet:
         abort(401)
     return Fernet(key)
 
+_undecryptable_card_holder_count = 0
+
+def _note_undecryptable_card_holder() -> None:
+    """Eski anahtarla şifrelenmiş, bu nedenle çözülemeyen kart adı sayacını artırır."""
+    global _undecryptable_card_holder_count
+    _undecryptable_card_holder_count += 1
+
 def _reencrypt_record(record: Record, old_fernet: Fernet, new_fernet: Fernet,
                       allow_legacy_prefix: bool = False) -> None:
     record.encrypted_password = safe_encrypt(
@@ -450,7 +474,15 @@ def _reencrypt_record(record: Record, old_fernet: Fernet, new_fernet: Fernet,
         if allow_legacy_prefix:
             plaintext, _ = _metadata_value_for_migration(old_fernet, encrypted_value)
         else:
-            plaintext = strict_decrypt_metadata(old_fernet, encrypted_value)
+            try:
+                plaintext = strict_decrypt_metadata(old_fernet, encrypted_value)
+            except Exception:
+                if field != 'card_holder':
+                    raise
+                # Eski sürümden kalan kart adı eski anahtarla şifrelenmiş olabilir;
+                # tüm ana şifre değişimini engellemek yerine alan olduğu gibi bırakılır.
+                _note_undecryptable_card_holder()
+                continue
         setattr(record, field, encrypt_metadata(new_fernet, plaintext))
 
 def _vault_initialized() -> bool:
@@ -527,6 +559,12 @@ def migrate_legacy_pbkdf2_salt(master_password: str) -> bool:
         _set_setting(PBKDF2_SALT_SETTING, base64.b64encode(new_salt).decode())
         db.session.commit()
         _refresh_database_backup()
+        if _undecryptable_card_holder_count:
+            log.warning(
+                "Legacy PBKDF2 salt migrasyonu: %d kaydın kart adı çözülemediği "
+                "için yeniden yazılmadı.",
+                _undecryptable_card_holder_count,
+            )
         log.info("Legacy PBKDF2 salt migrasyonu tamamlandı.")
         return True
     except Exception:
@@ -622,6 +660,7 @@ def inject_globals():
     glass_quality      = DEFAULT_GLASS_QUALITY
     glass_blur         = DEFAULT_GLASS_BLUR
     glass_veil         = DEFAULT_GLASS_VEIL
+    glass_frost        = DEFAULT_GLASS_FROST
     animated_backgrounds = DEFAULT_ANIMATED_BACKGROUNDS_ENABLED
     interface_animations = DEFAULT_INTERFACE_ANIMATIONS_ENABLED
     gradients_enabled  = DEFAULT_GRADIENTS_ENABLED
@@ -649,6 +688,7 @@ def inject_globals():
         glass_quality = get_glass_quality()
         glass_blur = get_glass_blur()
         glass_veil = get_glass_veil()
+        glass_frost = get_glass_frost()
         animated_backgrounds = get_animated_backgrounds_enabled()
         interface_animations = get_interface_animations_enabled()
         gradients_enabled = get_gradients_enabled()
@@ -692,6 +732,7 @@ def inject_globals():
         'GLASS_QUALITY':         glass_quality,
         'GLASS_BLUR':            glass_blur,
         'GLASS_VEIL':            glass_veil,
+        'GLASS_FROST':           glass_frost,
         'ANIMATED_BACKGROUNDS_ENABLED': animated_backgrounds,
         'INTERFACE_ANIMATIONS_ENABLED': interface_animations,
         'GRADIENTS_ENABLED':     gradients_enabled,
@@ -702,6 +743,7 @@ def inject_globals():
         'HARDWARE_ACCELERATION_ENABLED': hardware_acceleration,
         'POWER_SAVE_ENABLED': power_save_enabled,
         'LAN_ENABLED':           lan_enabled,
+        'IS_LOCAL':              _is_local_request(),
         'INTERNET_KILL_SWITCH_ENABLED': internet_kill_switch,
         'LIVE_BREACH_SCAN_ENABLED': live_breach_scan,
         'CAN_LIVE_SCAN': bool(internet_kill_switch is False and live_breach_scan),
@@ -718,7 +760,10 @@ def inject_globals():
 
 _PUBLIC_ENDPOINTS = {'login', 'static', 'loading_page', 'manifest_json', 'sw',
                      'settings_language'}
-_TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'lan_info', 'settings_runtime', 'settings_tray'}
+_TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'lan_info', 'settings_runtime'}
+# Ana sürecin yalnızca OKUMA yapabildiği uçlar: CSRF muafiyeti YOK, token erişimi
+# sadece GET/HEAD ile. POST tarafı oturum + X-CSRF-Token ister.
+_TOKEN_READ_ENDPOINTS = {'settings_tray', 'settings_content_protection'}
 
 def _is_local_request() -> bool:
     remote = request.remote_addr or '127.0.0.1'
@@ -787,7 +832,7 @@ def overwrite_and_delete(path: str) -> None:
     os.remove(path)
 
 _vault_write_locked = threading.Event()
-_VAULT_WRITE_LOCK_MESSAGE = "Ana \u015fifre de\u011fi\u015ftiriliyor, l\u00fctfen bekleyin."
+_VAULT_WRITE_LOCK_MESSAGE = "Ana şifre değiştiriliyor, lütfen bekleyin."
 _VAULT_WRITE_ENDPOINTS = {
     'ekle_sayfasi', 'duzenle_sayfasi', 'sil_kayit', 'pin_kayit',
     'import_data', 'bulk_delete', 'bulk_category', 'change_password',
@@ -842,12 +887,29 @@ def invalidate_vault_report_cache() -> None:
         with _vault_report_cache_lock:
             _vault_report_cache.clear()
 
+def _app_token_valid() -> bool:
+    """Ana süreç imzasını (X-App-Token) sabit zamanlı olarak doğrular."""
+    token = request.headers.get('X-App-Token')
+    if not token:
+        return False
+    return secrets.compare_digest(token, APP_TOKEN)
+
 def _same_origin_state_change() -> bool:
     if request.method not in {'POST', 'PUT', 'PATCH', 'DELETE'}:
         return True
-    origin = request.headers.get('Origin') or request.headers.get('Referer')
-    if not origin:
+    # Ana süreç imzası taşıyan istekler tarayıcı kaynaklı değildir; Origin/Referer
+    # göndermezler ve zaten CSRF muafiyetindedir.
+    if _app_token_valid():
         return True
+    origin = request.headers.get('Origin') or request.headers.get('Referer')
+    fetch_site = request.headers.get('Sec-Fetch-Site')
+    if not origin:
+        # Tarayıcı göstergesi (Sec-Fetch-Site) varsa bu bir tarayıcı isteğidir ve
+        # kaynak başlığı eksiktir (proxy/gizlilik aracı) -> reddet. Hiçbir tarayıcı
+        # göstergesi yoksa (ana süreç, CLI, test istemcisi) esnek davranış korunur.
+        return not fetch_site
+    if fetch_site and fetch_site not in {'same-origin', 'same-site', 'none'}:
+        return False
     parsed = urlparse(origin)
     return parsed.netloc == request.host and parsed.scheme == request.scheme
 
@@ -865,7 +927,7 @@ def _csrf_authorized() -> bool:
     # Ana süreç imzası (X-App-Token) başka bir kaynaktan öğrenilemez; bu istekler
     # CSRF saldırısına karşı bağışıktır. Belirteç yalnızca ana süreçte üretilir ve
     # yalnızca ana süreç isteklerine eklenir.
-    if request.headers.get('X-App-Token') == APP_TOKEN:
+    if _app_token_valid():
         return True
     if request.endpoint in _TOKEN_ENDPOINTS:
         return True
@@ -876,7 +938,7 @@ def _csrf_authorized() -> bool:
 def check_token_and_auth():
     # Her yanıt için ayrı nonce kullanarak yalnızca onaylı inline blokları çalıştır.
     g.csp_nonce = secrets.token_urlsafe()
-    token = request.headers.get('X-App-Token')
+    token_ok = _app_token_valid()
     endpoint = request.endpoint
 
     if not _same_origin_state_change():
@@ -886,7 +948,7 @@ def check_token_and_auth():
     # X-App-Token yalnızca stateless API uçları için enjekte edilir; state-changing
     # istekler X-CSRF-Token ile korunur. Token taşıyan istekler CSRF'den muaftır.
     if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
-        if (token == APP_TOKEN or current_user.is_authenticated
+        if (token_ok or current_user.is_authenticated
                 or request.endpoint == 'login'):
             if not _csrf_authorized():
                 return jsonify({
@@ -903,8 +965,10 @@ def check_token_and_auth():
     is_local = _is_local_request()
     lan_enabled = _lan_access_enabled()
 
-    if token == APP_TOKEN:
+    if token_ok:
         if endpoint in _PUBLIC_ENDPOINTS or endpoint in _TOKEN_ENDPOINTS:
+            return
+        if endpoint in _TOKEN_READ_ENDPOINTS and request.method in {'GET', 'HEAD'}:
             return
         if not current_user.is_authenticated:
             return redirect(url_for('login'))
@@ -1037,11 +1101,114 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+def _setup_storage_status():
+    """İlk kurulum ekranı için depolama ön kontrolü.
+
+    Ölçüm başarısız olursa kurulumu kilitlemek yerine güvenli tarafta
+    kalınır: yalnızca yazma izni doğrulanamıyorsa kurulum engellenir.
+    """
+    try:
+        return get_storage_status(DATA_DIR)
+    except Exception:
+        log.exception("Kurulum ön kontrolü başarısız oldu.")
+        return {
+            'path': DATA_DIR, 'exists': os.path.isdir(DATA_DIR), 'writable': False,
+            'free_bytes': 0, 'total_bytes': 0, 'space_known': False,
+            'has_space': False, 'low_space': False, 'error_kind': 'unknown',
+        }
+
+
+def _setup_block_reason(storage):
+    """Kurulumu engelleyen maddeyi döner; engel yoksa None."""
+    if not storage.get('writable'):
+        return (
+            _('Veri klasörüne yazma izni yok. Klasör izinlerini düzeltip '
+              'sayfayı yenileyin.'),
+            403,
+        )
+    # Disk ölçülemediyse eksik alan hükmü verilmez, yalnızca yazma izmi esastır.
+    if storage.get('space_known') and not storage.get('has_space'):
+        return (
+            _('Boş disk alanı yetersiz. Yeterli boş alan bırakıp tekrar deneyin.'),
+            507,
+        )
+    if storage.get('error_kind') == 'space':
+        return (
+            _('Disk alanına erişilemiyor. Yeterli boş alan bırakıp tekrar deneyin.'),
+            507,
+        )
+    return None
+
+
+def _setup_failure_message(exc):
+    """Kurulum yazma hatasını kullanıcıya anlaşılır mesaja çevirir.
+
+    İstisna detayı (yol, SQL, traceback) log'a yazılır, mesaja sızmaz.
+    """
+    text = str(exc).lower()
+    if isinstance(exc, PermissionError) or isinstance(exc, sqlite3.OperationalError):
+        if isinstance(exc, PermissionError) or any(
+            marker in text for marker in
+            ('permission', 'readonly', 'read-only', 'attempt to write', 'access is denied')
+        ):
+            return _('Veri klasörüne yazma izni yok. Klasör izinlerini düzeltip '
+                     'sayfayı yenileyin.')
+    if any(marker in text for marker in ('disk', 'full', 'no space', 'quota')):
+        return _('Disk alanı doldu. Boş alan açıp kurulumu tekrar deneyin.')
+    return _('İlk kurulum tamamlanamadı. Boş disk alanını ve klasör izinlerini '
+             'kontrol edip tekrar deneyin.')
+
+
+def _rollback_first_setup(created_db):
+    """Başarısız ilk kurulumun bıraktığı dosyaları temizler.
+
+    Veritabanı bu denemede oluşturulduysa tamamen silinir; daha önce
+    var olan bir kasa varsa hiçbir şeye dokunulmaz.
+    """
+    db.session.rollback()
+    if not created_db:
+        return
+    stale = [
+        DB_FILE,
+        DB_FILE + '-journal',
+        DB_FILE + '-wal',
+        DB_FILE + '-shm',
+        VAULT_INIT_FILE,
+        VAULT_INIT_FILE + '.tmp',
+    ]
+    for path in stale:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            log.warning("Kurulum geri alma: %s silinemedi: %s", path, exc)
+    log.info("Başarısız ilk kurulum geri alındı; oluşturulan dosyalar temizlendi.")
+
+
+def _first_setup_render(**kwargs):
+    """İlk kurulum ekranını depolama ön kontrolü bilgisiyle render eder."""
+    kwargs.setdefault('first_setup', True)
+    kwargs.setdefault('is_lan_client', False)
+    if _is_local_request():
+        # Veri klasörünün mutlak yolu Windows kullanıcı adını içerir; uzak LAN
+        # istemcilere bu bilgi (ve depolama durumu) gösterilmez.
+        kwargs['setup_status'] = _setup_storage_status()
+        kwargs['setup_min_mb'] = SETUP_MIN_FREE_BYTES // (1024 * 1024)
+        kwargs['setup_recommended_mb'] = SETUP_RECOMMENDED_FREE_BYTES // (1024 * 1024)
+    else:
+        kwargs['setup_status'] = None
+        kwargs['setup_min_mb'] = 0
+        kwargs['setup_recommended_mb'] = 0
+    return render_template('login.html', **kwargs)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     first_setup = _is_first_setup()
     is_lan_client = not _is_local_request()
     if request.method != 'POST':
+        if first_setup:
+            return _first_setup_render(is_lan_client=is_lan_client)
         return render_template('login.html', first_setup=first_setup,
                                is_lan_client=is_lan_client)
 
@@ -1156,30 +1323,42 @@ def login():
         log.info("İlk kurulum: Ana şifre belirleniyor...")
         mp_confirm = request.form.get('master_password_confirm', '').strip()
         if mp_confirm != mp:
-            return render_template(
-                'login.html',
+            return _first_setup_render(
                 error=_('Ana şifreler eşleşmiyor. Lütfen tekrar deneyin.'),
-                first_setup=True,
             ), 400
-        Setting.query.filter_by(key='master_hash').delete()
-        db.session.add(Setting(key='master_hash', value=hash_master_password(mp)))
-        _create_pbkdf2_salt()
-        # Yeni kasalarda metadata ilk kayıttan itibaren şifreli yazılır.
-        _set_setting(RECORD_METADATA_SETTING, 'true')
-        _mark_vault_initialized()
+        storage = _setup_storage_status()
+        blocked = _setup_block_reason(storage)
+        if blocked:
+            reason, status_code = blocked
+            log.error("İlk kurulum engellendi: %s", reason)
+            return _first_setup_render(error=reason), status_code
+        # Bu denemeden önce veritabanı yoktuysa hata halinde tamamen silinir.
+        created_db = not os.path.exists(DB_FILE)
         try:
+            Setting.query.filter_by(key='master_hash').delete()
+            db.session.add(Setting(key='master_hash', value=hash_master_password(mp)))
+            _create_pbkdf2_salt()
+            # Yeni kasalarda metadata ilk kayıttan itibaren şifreli yazılır.
+            _set_setting(RECORD_METADATA_SETTING, 'true')
+            _mark_vault_initialized()
             db.session.commit()
-        except Exception:
-            db.session.rollback()
+        except Exception as exc:
             log.exception("İlk kasa kurulumu tamamlanamadı.")
-            return render_template(
-                'login.html',
-                error="İlk kurulum tamamlanamadı. Lütfen tekrar deneyin.",
-                first_setup=True,
+            _rollback_first_setup(created_db)
+            return _first_setup_render(
+                error=_setup_failure_message(exc),
             ), 500
         _write_vault_initialized_marker()
         if os.path.exists(TXT_FILE):
-            migrate_txt_to_db(mp)
+            try:
+                migrate_txt_to_db(mp)
+            except Exception:
+                # Kasa kuruldu; eski metin taşınamazsa kasa bozulmaz.
+                db.session.rollback()
+                log.exception("Eski metin kasyaya taşınamadı.")
+                return _first_setup_render(
+                    error=_('Kurulum tamamlandı ancak eski kayıtlar taşınamadı.'),
+                ), 500
 
     _reset_login_failures(attempt_key)
     session.permanent = True
@@ -1235,7 +1414,15 @@ def index():
             },
         })
 
-    return render_template('index.html', kayit_listesi=kasa_verileri, card_page_size=CARD_PAGE_SIZE)
+    show_onboarding = (
+        _get_setting('onboarding_done') is None and not kasa_verileri
+    )
+    return render_template(
+        'index.html',
+        kayit_listesi=kasa_verileri,
+        card_page_size=CARD_PAGE_SIZE,
+        show_onboarding=show_onboarding,
+    )
 
 def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str, Any]:
     """Form verilerini okuyup (id, Record alanları) döner."""
@@ -1548,6 +1735,19 @@ def _now_iso() -> str:
     return datetime.now().astimezone().isoformat(timespec='seconds')
 
 
+def _touch_last_backup(iso_value: str | None = None) -> str:
+    """'Son yedek zaman damgası' ayarını tazeler ve değeri döndürür.
+
+    Çağıranlar (sağlık paneli, otomatik yedek, düz dışa aktarım) aynı zaman
+    damgasını tek satırda yazıyordu; tek noktaya toplandı. DİKKAT: dışa aktarma
+    yolları da bu damgayı yazıyor — yani "yedek alınmadı" hatırlatması bir export
+    ile susuyor. Bu davranım bilinçli olarak DEĞİŞTİRİLMEDİ (kullanıcı kararı).
+    """
+    stamp = iso_value or _now_iso()
+    _set_setting(LAST_BACKUP_SETTING, stamp)
+    return stamp
+
+
 def _days_elapsed(iso_value: str | None) -> int | None:
     if not iso_value:
         return None
@@ -1629,7 +1829,7 @@ def _set_dismissed_notification_ids(ids: list[str]) -> None:
 
 
 def _reminder_period_bucket(frequency: str, now: datetime | None = None) -> str:
-    """Bildirim ID'sini döneme bağlar: sûsturma yalnızca o dönem için geçerli."""
+    """Bildirim ID'sini döneme bağlar: susturma yalnızca o dönem için geçerli."""
     now = now or datetime.now().astimezone()
     if frequency == 'monthly':
         return now.strftime('%Y-%m-01')
@@ -1639,8 +1839,13 @@ def _reminder_period_bucket(frequency: str, now: datetime | None = None) -> str:
     return now.strftime('%Y-%m-%d')
 
 
-def _compute_reminders() -> list[dict[str, Any]]:
-    """Mevcut hatırlatma bildirimlerini hesaplar (susturma filtresiz)."""
+def _compute_reminders() -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Mevcut hatırlatma bildirimlerini hesaplar (susturma filtresiz).
+
+    Dönüş: (reminders, eşikler). Frekans/eşik hesabı tek yerde yapılır; eşikler
+    ikinci değerde döner, böylece çağıranlar aynı ayarları ikinci kez okumak
+    zorunda kalmaz (her okuma bir SQL sorgusuydu).
+    """
     backup_frequency = _reminder_frequency(
         BACKUP_REMINDER_FREQUENCY_SETTING, BACKUP_REMINDER_DAYS_SETTING,
         DEFAULT_BACKUP_REMINDER_DAYS)
@@ -1679,38 +1884,26 @@ def _compute_reminders() -> list[dict[str, Any]]:
                 'cta': {'action': 'navigate', 'url': url_for('saglik_raporu')},
             })
 
-    return reminders
+    return reminders, {
+        'backup_reminder_days': backup_days_total,
+        'breach_reminder_days': breach_days_total,
+        'backup_reminder_frequency': backup_frequency,
+        'breach_reminder_frequency': breach_frequency,
+    }
 
 
 @app.route('/api/notifications')
 @login_required
 def notifications_api():
-    reminders = _compute_reminders()
+    reminders, thresholds = _compute_reminders()
     dismissed = _get_dismissed_notification_ids()
-    backup_days_total = _reminder_days_total(
-        _reminder_frequency(BACKUP_REMINDER_FREQUENCY_SETTING,
-                            BACKUP_REMINDER_DAYS_SETTING,
-                            DEFAULT_BACKUP_REMINDER_DAYS),
-        _reminder_days(BACKUP_REMINDER_DAYS_SETTING, DEFAULT_BACKUP_REMINDER_DAYS))
-    breach_days_total = _reminder_days_total(
-        _reminder_frequency(BREACH_REMINDER_FREQUENCY_SETTING,
-                            BREACH_REMINDER_DAYS_SETTING,
-                            DEFAULT_BREACH_REMINDER_DAYS),
-        _reminder_days(BREACH_REMINDER_DAYS_SETTING, DEFAULT_BREACH_REMINDER_DAYS))
 
     return jsonify({
         'reminders': reminders,
         'dismissed': dismissed,
         'last_backup': _get_setting(LAST_BACKUP_SETTING),
         'last_breach_scan': _get_setting(LAST_BREACH_SCAN_SETTING),
-        'backup_reminder_days': backup_days_total,
-        'breach_reminder_days': breach_days_total,
-        'backup_reminder_frequency': _reminder_frequency(
-            BACKUP_REMINDER_FREQUENCY_SETTING, BACKUP_REMINDER_DAYS_SETTING,
-            DEFAULT_BACKUP_REMINDER_DAYS),
-        'breach_reminder_frequency': _reminder_frequency(
-            BREACH_REMINDER_FREQUENCY_SETTING, BREACH_REMINDER_DAYS_SETTING,
-            DEFAULT_BREACH_REMINDER_DAYS),
+        **thresholds,
     })
 
 
@@ -1753,7 +1946,7 @@ def notifications_dismiss():
 @login_required
 def notifications_dismiss_all():
     """Mevcut tüm bildirimleri sustur — idempotent."""
-    current_reminders = _compute_reminders()
+    current_reminders, _thresholds = _compute_reminders()
     dismissed = _get_dismissed_notification_ids()
     dismissed_set = set(dismissed)
 
@@ -1929,7 +2122,7 @@ def health_rotate_weak():
 @login_required
 def health_backup_now():
     backup_database()
-    _set_setting(LAST_BACKUP_SETTING, _now_iso())
+    _touch_last_backup()
     db.session.commit()
     return jsonify({'status': 'ok', 'backed_up': os.path.exists(DB_FILE)})
 
@@ -1946,21 +2139,42 @@ def health_export():
     })
 
 
+# Güvenlik açısından kritik ayarlar yalnızca bu bilgisayarın ekranından
+# yönetilebilir; arayüz de LAN kartını uzak oturumlarda gizliyor.
+_LOCAL_ONLY_SETTING_FIELDS = {
+    'lan_enabled', 'internet_kill_switch', 'live_breach_scan', 'auto_lock_enabled',
+}
+
+def _reject_remote_critical_settings() -> None:
+    if _is_local_request():
+        return
+    if _LOCAL_ONLY_SETTING_FIELDS & set(request.form):
+        abort(403)
+
 @app.route('/save_settings', methods=['POST'])
 @login_required
 def save_settings():
-    auto_lock_timeout = safe_int(request.form.get('auto_lock_timeout'), 5, 1, 240)
-    _set_setting('auto_lock_enabled',
-                 'true' if request.form.get('auto_lock_enabled') else 'false')
-    _set_setting('auto_lock_timeout', str(auto_lock_timeout))
-    save_glass_effects(
-        'true' if request.form.get('glass_effects_enabled') else 'false')
+    _reject_remote_critical_settings()
+    # Yerel istekte form davranışı AYNEN korunur: onay kutusu gönderilmediyse
+    # "kapalı" yazılır (kullanıcı ayarı kapatabilmelidir).
+    # Uzak istekte ise yalnızca gönderilen alanlar uygulanır; aksi halde kısmi bir
+    # istek, hiç gönderilmemiş tüm bayrakları sessizce sıfırlardı.
+    full_form = _is_local_request()
+
+    def _save_flag(name, saver):
+        if full_form or name in request.form:
+            saver('true' if request.form.get(name) else 'false')
+
+    if 'auto_lock_timeout' in request.form:
+        auto_lock_timeout = safe_int(request.form.get('auto_lock_timeout'), 5, 1, 240)
+        _set_setting('auto_lock_timeout', str(auto_lock_timeout))
+    _save_flag('auto_lock_enabled', lambda v: _set_setting('auto_lock_enabled', v))
+    _save_flag('glass_effects_enabled', save_glass_effects)
     if 'accent_color' in request.form:
         save_accent_color(request.form.get('accent_color'))
     if 'background_style' in request.form:
         save_background_style(request.form.get('background_style'))
-    save_chroma_accent_enabled(
-        'true' if request.form.get('chroma_accent_enabled') else 'false')
+    _save_flag('chroma_accent_enabled', save_chroma_accent_enabled)
     if 'chroma_accent_speed' in request.form:
         save_chroma_accent_speed(request.form.get('chroma_accent_speed'))
     if 'glass_quality' in request.form:
@@ -1969,46 +2183,41 @@ def save_settings():
         save_glass_blur(safe_float(request.form.get('glass_blur'), 100.0) / 100.0)
     if 'glass_veil' in request.form:
         save_glass_veil(safe_float(request.form.get('glass_veil'), 100.0) / 100.0)
-    save_animated_backgrounds(
-        'true' if request.form.get('animated_backgrounds_enabled') else 'false')
-    save_interface_animations(
-        'true' if request.form.get('interface_animations_enabled') else 'false')
-    save_gradients(
-        'true' if request.form.get('gradients_enabled') else 'false')
-    save_card_sheen(
-        'true' if request.form.get('card_sheen_enabled') else 'false')
-    save_card_frame(
-        'true' if request.form.get('card_frame_enabled') else 'false')
-    save_card_depth(
-        'true' if request.form.get('card_depth_enabled') else 'false')
-    save_vault_accent(
-        'true' if request.form.get('vault_accent_enabled') else 'false')
-    save_hardware_acceleration(
-        'true' if request.form.get('hardware_acceleration_enabled') else 'false')
-    save_power_save(
-        'true' if request.form.get('power_save_enabled') else 'false')
-    lan_now_enabled = bool(request.form.get('lan_enabled'))
+    if 'glass_frost' in request.form:
+        save_glass_frost(request.form.get('glass_frost'))
+    _save_flag('animated_backgrounds_enabled', save_animated_backgrounds)
+    _save_flag('interface_animations_enabled', save_interface_animations)
+    _save_flag('gradients_enabled', save_gradients)
+    _save_flag('card_sheen_enabled', save_card_sheen)
+    _save_flag('card_frame_enabled', save_card_frame)
+    _save_flag('card_depth_enabled', save_card_depth)
+    _save_flag('vault_accent_enabled', save_vault_accent)
+    _save_flag('hardware_acceleration_enabled', save_hardware_acceleration)
+    _save_flag('power_save_enabled', save_power_save)
+    # Formda LAN alanı yoksa mevcut durum korunur; yanıttaki restart_required
+    # bilgisi yine de doğru kalmalı.
     lan_was_enabled = _lan_access_enabled()
-    if lan_now_enabled and not lan_was_enabled:
-        # LAN yeni açılıyor: eski şifreyi sıfırlayıp yeni LAN erişim şifresi üret.
-        _clear_lan_access_settings()
-        lan_password, generated = _ensure_lan_access_setup()
-        if not lan_password and not generated:
-            log.warning("LAN erişim şifresi oluşturulamadı; oturum anahtarı bulunamadı.")
-    elif lan_now_enabled:
-        # Zaten açık: eksik parça (örn. anahtar sarmalı) varsa tamamla.
-        _ensure_lan_access_setup()
-    elif lan_was_enabled:
-        _clear_lan_access_settings()
-    _set_setting('lan_enabled', 'true' if lan_now_enabled else 'false')
-    _set_setting(
-        network_policy.INTERNET_KILL_SWITCH_SETTING,
-        'true' if request.form.get('internet_kill_switch') else 'false',
-    )
-    _set_setting(
-        network_policy.LIVE_BREACH_SCAN_SETTING,
-        'true' if request.form.get('live_breach_scan') else 'false',
-    )
+    if 'lan_enabled' in request.form or full_form:
+        lan_now_enabled = bool(request.form.get('lan_enabled'))
+        if lan_now_enabled and not lan_was_enabled:
+            # LAN yeni açılıyor: eski şifreyi sıfırlayıp yeni LAN erişim şifresi üret.
+            _clear_lan_access_settings()
+            lan_password, generated = _ensure_lan_access_setup()
+            if not lan_password and not generated:
+                log.warning("LAN erişim şifresi oluşturulamadı; oturum anahtarı bulunamadı.")
+        elif lan_now_enabled:
+            # Zaten açık: eksik parça (örn. anahtar sarmalı) varsa tamamla.
+            _ensure_lan_access_setup()
+        elif lan_was_enabled:
+            _clear_lan_access_settings()
+        _set_setting('lan_enabled', 'true' if lan_now_enabled else 'false')
+    else:
+        # Uzak istek LAN alanını göndermedi: LAN durumuna dokunulmaz.
+        lan_now_enabled = lan_was_enabled
+    _save_flag('internet_kill_switch', lambda v: _set_setting(
+        network_policy.INTERNET_KILL_SWITCH_SETTING, v))
+    _save_flag('live_breach_scan', lambda v: _set_setting(
+        network_policy.LIVE_BREACH_SCAN_SETTING, v))
     if 'backup_reminder_frequency' in request.form:
         _write_reminder_frequency(
             BACKUP_REMINDER_FREQUENCY_SETTING, BACKUP_REMINDER_DAYS_SETTING,
@@ -2034,6 +2243,7 @@ def save_settings():
             "glass_quality": get_glass_quality(),
             "glass_blur": get_glass_blur(),
             "glass_veil": get_glass_veil(),
+            "glass_frost": get_glass_frost(),
             "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
             "interface_animations_enabled": get_interface_animations_enabled(),
             "gradients_enabled": get_gradients_enabled(),
@@ -2057,7 +2267,7 @@ def save_settings():
 # kayıtlarını .kasaenc şifreli yedeğe alır ve eski kopyaları rotasyondan geçirir.
 # Dosyalar DATA_DIR/backups altında tutulur; anahtar kasa anahtarıyla sarılır.
 
-_bugün_otomatik_yedek_lock = threading.Lock()
+_auto_backup_lock = threading.Lock()
 _AUTO_BACKUP_POLL_SECONDS = 15 * 60
 
 
@@ -2107,7 +2317,7 @@ def _next_auto_backup_at() -> str | None:
 def _create_rotating_backup(force: bool = False) -> dict | None:
     """Kasa açıkken yedeği üretir. Kasa kilitliyse, aralık 'off' ise veya
     aralık dolmamışsa None döner. force=True manuel 'Şimdi Yedek Al'da kullanılır."""
-    with _bugün_otomatik_yedek_lock:
+    with _auto_backup_lock:
         try:
             get_fernet()  # kilitliyse hata fırlatır
         except Exception:
@@ -2128,7 +2338,7 @@ def _create_rotating_backup(force: bool = False) -> dict | None:
             return None
         now = _now_iso()
         _set_setting(_backups.LAST_AUTO_BACKUP_SETTING, now)
-        _set_setting(LAST_BACKUP_SETTING, now)
+        _touch_last_backup(now)
         db.session.commit()
         invalidate_vault_report_cache()
         return info
@@ -2237,7 +2447,7 @@ def export_data():
     rows   = Record.query.all()
     export_format = _requested_export_format()
 
-    _set_setting(LAST_BACKUP_SETTING, _now_iso())
+    _touch_last_backup()
     db.session.commit()
     return _send_records_export(
         _serialize_records(rows, fernet),
@@ -2282,7 +2492,7 @@ def encrypted_export_prepare():
         }
         _pending_encrypted_exports[token] = (now, password)
 
-    _set_setting(LAST_BACKUP_SETTING, _now_iso())
+    _touch_last_backup()
     db.session.commit()
     return jsonify({
         'status': 'ok',
@@ -2383,10 +2593,12 @@ def import_data():
         db.session.rollback()
         log.warning(f"Import validation error: {e}")
         return "Geçersiz veya desteklenmeyen yedek dosyası.", 400
-    except Exception as e:
+    except Exception:
+        # Sunucu tarafı hataları (disk dolması, veritabanı kilitlenmesi) "geçersiz
+        # dosya" diye yorumlanmasın; ayrıntı yalnızca loga yazılır.
         db.session.rollback()
-        log.error(f"Import Error: {e}")
-        return "İçe aktarma sırasında hata oluştu.", 400
+        log.exception("İçe aktarma sırasında beklenmeyen hata.")
+        return "İçe aktarma sırasında hata oluştu. Lütfen tekrar deneyin.", 500
 
 @app.route('/api/bulk/delete', methods=['POST'])
 @login_required
@@ -2429,9 +2641,19 @@ def bulk_export():
         _requested_export_format(),
     )
 
+def _settings_write_allowed() -> bool:
+    """Durum değiştiren ayar uçları için kimlik kontrolü.
+
+    Oturum ya da ana süreç imzası gerekir. `@login_required` bilerek kullanılmaz:
+    ana süreç oturum çerezi taşımadığı için bu uçların GET okumasını engellerdi.
+    """
+    return bool(current_user.is_authenticated or _app_token_valid())
+
 @app.route('/settings/tray', methods=['GET', 'POST'])
 def settings_tray():
     if request.method == 'POST':
+        if not _settings_write_allowed():
+            abort(403)
         val = request_json().get('minimize_to_tray')
         _set_setting('minimize_to_tray', str(val).lower())
         db.session.commit()
@@ -2443,6 +2665,8 @@ def settings_tray():
 @app.route('/settings/content-protection', methods=['GET', 'POST'])
 def settings_content_protection():
     if request.method == 'POST':
+        if not _settings_write_allowed():
+            abort(403)
         val = request_json().get('content_protection_enabled')
         _set_setting('content_protection_enabled', str(val).lower())
         db.session.commit()
@@ -2454,6 +2678,8 @@ def settings_content_protection():
 @app.route('/settings/hardware-acceleration', methods=['GET', 'POST'])
 def settings_hardware_acceleration():
     if request.method == 'POST':
+        if not _settings_write_allowed():
+            abort(403)
         val = request_json().get('hardware_acceleration_enabled')
         save_hardware_acceleration('true' if val else 'false')
         db.session.commit()
@@ -2499,6 +2725,10 @@ def update_check():
 
 @app.route('/api/lan-info')
 def lan_info():
+    # LAN bilgileri (IP'ler, port ve düz metin LAN şifresi) yalnızca bu
+    # bilgisayara özeldir; uzak/oturum açmış LAN istemcilerine açılmaz.
+    if not _is_local_request():
+        abort(403)
     payload = {
         'hostname': socket.gethostname(),
         'ips': detect_lan_ips(),
@@ -2528,6 +2758,12 @@ def settings_theme_mode():
 @app.route('/settings/language', methods=['GET', 'POST'])
 def settings_language():
     if request.method == 'POST':
+        # Dil seçici giriş, kilit ve yükleme ekranlarında da (oturumsuz olarak)
+        # çalışabilmelidir; bu yüzden kimlik yerine yerel erişim şartı konur.
+        # Uzak bir LAN istemcisi yalnızca oturumu varsa dili değiştirebilir.
+        if not (current_user.is_authenticated or _app_token_valid()
+                or _is_local_request()):
+            abort(403)
         lang = request_json().get('language', 'tr')
         lang = save_language(lang)
         db.session.commit()
@@ -2536,6 +2772,17 @@ def settings_language():
         "current": get_saved_language(),
         "available": get_available_languages(),
     })
+
+@app.route('/settings/onboarding', methods=['GET', 'POST'])
+@login_required
+def settings_onboarding():
+    if request.method == 'POST':
+        done = bool(request_json().get('done'))
+        if done:
+            _set_setting('onboarding_done', '1')
+        db.session.commit()
+        return jsonify({"status": "ok", "done": done})
+    return jsonify({"done": _get_setting('onboarding_done') is not None})
 
 @app.route('/settings/glass-effects', methods=['GET', 'POST'])
 @login_required
@@ -2566,6 +2813,7 @@ def settings_appearance():
         glass_quality = save_glass_quality(data.get('glass_quality')) if 'glass_quality' in data else get_glass_quality()
         glass_blur = save_glass_blur(data.get('glass_blur')) if 'glass_blur' in data else get_glass_blur()
         glass_veil = save_glass_veil(data.get('glass_veil')) if 'glass_veil' in data else get_glass_veil()
+        glass_frost = save_glass_frost(data.get('glass_frost')) if 'glass_frost' in data else get_glass_frost()
         animated_backgrounds = (
             save_animated_backgrounds(data.get('animated_backgrounds_enabled'))
             if 'animated_backgrounds_enabled' in data
@@ -2616,6 +2864,7 @@ def settings_appearance():
             "glass_quality": glass_quality,
             "glass_blur": glass_blur,
             "glass_veil": glass_veil,
+            "glass_frost": glass_frost,
             "animated_backgrounds_enabled": animated_backgrounds,
             "interface_animations_enabled": interface_animations,
             "gradients_enabled": gradients,
@@ -2634,6 +2883,7 @@ def settings_appearance():
         "glass_quality": get_glass_quality(),
         "glass_blur": get_glass_blur(),
         "glass_veil": get_glass_veil(),
+        "glass_frost": get_glass_frost(),
         "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
         "interface_animations_enabled": get_interface_animations_enabled(),
         "gradients_enabled": get_gradients_enabled(),
@@ -2974,6 +3224,13 @@ def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str,
                 done += 1
                 _update_progress()
 
+            if _undecryptable_card_holder_count:
+                log.warning(
+                    "Ana şifre değişikliği: %d kaydın kart adı eski anahtarla "
+                    "şifrelenmiş olduğu için çözülemedi ve yeniden yazılmadı.",
+                    _undecryptable_card_holder_count,
+                )
+
             for h in hist_rows:
                 h.encrypted_password = safe_encrypt(new_fernet, strict_decrypt(old_fernet, h.encrypted_password))
                 done += 1
@@ -2984,15 +3241,25 @@ def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str,
                 setting.value = new_hash
             db.session.commit()
             invalidate_vault_report_cache()
+            # Ana şifre değişti: tetikleyen dışındaki TÜM oturumların kasa anahtarı
+            # eski anahtarla bağlı kalmasına izin verilmez. Ölü anahtarla yazılan bir
+            # kayıt yeni ana anahtarla kalıcı olarak çözülemez, bu yüzden o oturumlar
+            # düşürülür ve yeniden giriş yapmaları gerekir (get_fernet() artık
+            # anahtar bulamayınca 401 döner). Tetikleyen oturum yeni anahtarla
+            # yeniden bağlanır.
             if vault_sid:
+                now = time.time()
                 with _vault_keys_lock:
-                    if vault_sid in _vault_keys:
-                        _vault_keys[vault_sid] = (new_key, time.time())
+                    stale_sids = [sid for sid in _vault_keys if sid != vault_sid]
+                    _vault_keys.clear()
+                    _vault_keys[vault_sid] = (new_key, now)
+                for sid in stale_sids:
+                    _remove_vault_report_cache(sid)
             # Ana şifre değişince LAN şifresiyle kasa anahtarı sarmalını da yenile.
             _refresh_lan_access_bindings(old_key, new_key)
             # Otomatik yedek anahtarı da yeni kasa anahtarıyla yeniden sarılır.
             _backups.refresh_backup_key(old_fernet, new_fernet)
-            log.info("Ana ?ifre ba?ar?yla de?i?tirildi.")
+            log.info("Ana şifre başarıyla değiştirildi.")
             with _reencrypt_lock:
                 _reencrypt_state[task_id] = {'progress': 100, 'total': total, 'done': True}
 
@@ -3119,8 +3386,7 @@ def _ensure_self_signed_cert():
 
 _ensure_self_signed_cert()
 
-_normalize_pem_files = lambda: normalize_pem_file(CERT_FILE, log)
-_normalize_pem_files()
+normalize_pem_file(CERT_FILE, log)
 
 # ─── BAŞLATMA ─────────────────────────────────────────────────────────────────
 

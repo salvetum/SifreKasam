@@ -322,7 +322,5 @@
   .kasa-panel .kasa-btn { font-size: 0.78rem; min-height: 36px; padding: 0.4rem 0.7rem; }
   .kasa-panel .text-sm { font-size: 0.72rem; }
   .generator-panel.p-4 { padding: 0.75rem !important; }
-  .generator-checkboxes { gap: 0.4rem; }
-  .generator-checkboxes label { font-size: 0.7rem; }
 }
 

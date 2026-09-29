@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Main JavaScript
+ * ŞifreKasam v2.7.0-beta.4 - Main JavaScript
  */
 
 import { initPasswordGenerator } from './password-generator.js';
@@ -112,9 +112,15 @@ document.addEventListener('DOMContentLoaded', () => {
     triggerBlobDownload(blob, filename);
   };
 
+  /* /api/stats için TEK istek noktası: hem istatistik barını boyar hem
+     de veriyi çağırana döner (vault-index.js `ensureStats` bunu kullanır —
+     aynı endpoint için ikinci bir fetch yok). Aynı anda yapılan çağrılar
+     uçuşta olan isteği paylaşır (silme sonrası refresh + ensureStats gibi).
+     Hata durumu eskidenki gibi yutulur ve `null` döner. */
+  let statsBarRequest = null;
   const refreshStatsBar = () => {
-    fetch('/api/stats')
-      .then(r => r.json())
+    if (statsBarRequest) return statsBarRequest;
+    statsBarRequest = apiJson('/api/stats')
       .then(data => {
         const el = (id, val) => {
           const node = document.getElementById(id);
@@ -125,8 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
         el('stat-zayif', data.zayif);
         el('stat-eski', data.eski);
         el('stat-expired', data.expired);
+        return data;
       })
-      .catch(() => {});
+      .catch(() => null)
+      .finally(() => { statsBarRequest = null; });
+    return statsBarRequest;
   };
 
   const createIcon = (className) => {
@@ -289,13 +298,20 @@ document.addEventListener('DOMContentLoaded', () => {
             captureBgVideoFrame(bgVideo, bgUrl, bgVideo.currentTime);
           };
           if (bgVideo.getAttribute('src') !== bgUrl) {
+            delete bgVideo.dataset.kasaErrorToast;
             bgVideo.setAttribute('src', bgUrl);
             bgVideo.autoplay = !lowPowerMode;
           }
           const onVideoError = () => {
             if (bgVideo.dataset.kasaErrorToast) return;
-            bgVideo.dataset.kasaErrorToast = '1';
-            showWarningToast(window._('Arka plan videosu oynatılamadı. Video codec türü desteklenmiyor olabilir.'));
+            const code = bgVideo.error?.code;
+            /* 2=ABORTED (iptal) ve 4=NETWORK/SRC: ağ hatası — codec değil,
+               sessiz geç. 3=DECODE veya gerçek kare üretilemiyorsa codec
+               sorunudur; yalnız o zaman uyarı göster. */
+            if (code === 3 || (code == null && !bgVideo.videoWidth)) {
+              bgVideo.dataset.kasaErrorToast = '1';
+              showWarningToast(window._('Arka plan videosu oynatılamadı. Video codec türü desteklenmiyor olabilir.'));
+            }
           };
           const startVideo = () => {
             if (bgVideo.dataset.kasaResumeDone) return;
@@ -332,16 +348,28 @@ document.addEventListener('DOMContentLoaded', () => {
           } else if (bgVideo.paused && bgVideo.readyState >= 2 && bgVideo.getAttribute('src')) {
             bgVideo.play?.().catch(() => {});
           }
+          /* Dinleyici sızıntı koruması: applyAppearance her çağrıda bu arrow
+             fonksiyonları yeniden yaratır; önceki turun referanslarını element
+             üzerinde saklarız ki removeEventListener gerçek eşleşsin. */
+          if (bgVideo._kasaStartVideoPrev) {
+            bgVideo.removeEventListener('loadedmetadata', bgVideo._kasaStartVideoPrev);
+          }
+          if (bgVideo._kasaErrorHandlerPrev) {
+            bgVideo.removeEventListener('error', bgVideo._kasaErrorHandlerPrev);
+          }
+          if (bgVideo._kasaMarkLoadedPrev) {
+            bgVideo.removeEventListener('loadeddata', bgVideo._kasaMarkLoadedPrev);
+            bgVideo.removeEventListener('error', bgVideo._kasaMarkLoadedPrev);
+          }
+          bgVideo._kasaStartVideoPrev = startVideo;
+          bgVideo._kasaErrorHandlerPrev = onVideoError;
+          bgVideo._kasaMarkLoadedPrev = markLoaded;
           bgVideo.removeEventListener('loadedmetadata', startVideo);
           if (bgVideo.readyState >= 2) {
             startVideo();
           } else {
             bgVideo.addEventListener('loadedmetadata', startVideo, { once: true });
           }
-          bgVideo.removeEventListener('error', onVideoError);
-          bgVideo.addEventListener('error', onVideoError);
-          bgVideo.removeEventListener('loadeddata', markLoaded);
-          bgVideo.removeEventListener('error', markLoaded);
           if (bgVideo.readyState >= 2) {
             markLoaded();
           } else {
@@ -353,6 +381,20 @@ document.addEventListener('DOMContentLoaded', () => {
           if (bgVideo.getAttribute('src')) {
             bgVideo.removeAttribute('src');
             bgVideo.load();
+          }
+          /* Videodan çıkıldı: önceki turun dinleyicilerini temizle. */
+          if (bgVideo._kasaErrorHandlerPrev) {
+            bgVideo.removeEventListener('error', bgVideo._kasaErrorHandlerPrev);
+            bgVideo._kasaErrorHandlerPrev = null;
+          }
+          if (bgVideo._kasaMarkLoadedPrev) {
+            bgVideo.removeEventListener('loadeddata', bgVideo._kasaMarkLoadedPrev);
+            bgVideo.removeEventListener('error', bgVideo._kasaMarkLoadedPrev);
+            bgVideo._kasaMarkLoadedPrev = null;
+          }
+          if (bgVideo._kasaStartVideoPrev) {
+            bgVideo.removeEventListener('loadedmetadata', bgVideo._kasaStartVideoPrev);
+            bgVideo._kasaStartVideoPrev = null;
           }
         }
       }
@@ -491,6 +533,24 @@ document.addEventListener('DOMContentLoaded', () => {
     return value;
   };
 
+  /* Ayar formu kaydından sonra tema özelliklerini geri senkronlamak için
+     TEK tablo. `attribute: null` olanlar yalnız `.checked` yazar
+     (applyThemeFeature çalıştırmaz — DOM'da karşılığı olmayan ayar).
+     Dizi sırası, applyThemeFeature'in tetiklediği MutationObserver'ların
+     (data-kasa-animations, data-kasa-power-save) sırasını korur.
+     appearance-settings.js:setupThemeFeatureToggle ile 1:1 aynı eşleme. */
+  const THEME_FEATURE_SYNC = [
+    { dataKey: 'animated_backgrounds_enabled',    toggle: () => motionToggle,                 attribute: 'data-kasa-motion',       storageKey: 'kasa-animated-backgrounds' },
+    { dataKey: 'interface_animations_enabled',   toggle: () => interfaceAnimationsToggle,    attribute: 'data-kasa-animations',   storageKey: 'kasa-interface-animations' },
+    { dataKey: 'gradients_enabled',              toggle: () => gradientsToggle,             attribute: 'data-kasa-gradient',      storageKey: 'kasa-gradients' },
+    { dataKey: 'card_sheen_enabled',             toggle: () => cardSheenToggle,              attribute: 'data-kasa-card-sheen',    storageKey: 'kasa-card-sheen' },
+    { dataKey: 'card_frame_enabled',             toggle: () => cardFrameToggle,              attribute: 'data-kasa-card-frame',    storageKey: 'kasa-card-frame' },
+    { dataKey: 'card_depth_enabled',             toggle: () => cardDepthToggle,              attribute: 'data-kasa-card-depth',    storageKey: 'kasa-card-depth' },
+    { dataKey: 'vault_accent_enabled',           toggle: () => vaultAccentToggle,            attribute: 'data-kasa-vault-accent',  storageKey: 'kasa-vault-accent' },
+    { dataKey: 'hardware_acceleration_enabled',  toggle: () => hardwareAccelerationToggle,   attribute: null,                      storageKey: null },
+    { dataKey: 'power_save_enabled',             toggle: () => powerSaveToggle,              attribute: 'data-kasa-power-save',    storageKey: 'kasa-power-save' },
+  ];
+
   const themeFeatureEnabled = (attribute) =>
     document.documentElement.getAttribute(attribute) !== 'off';
 
@@ -503,6 +563,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.setAttribute('data-glass-quality', normalizedQuality);
     localStorage.setItem('kasa-glass-quality', normalizedQuality);
     return normalizedQuality;
+  };
+
+  const GLASS_FROST_OPTIONS = new Set(['off', 'low', 'med', 'high']);
+  const normalizeGlassFrost = (level) =>
+    GLASS_FROST_OPTIONS.has(level) ? level : 'off';
+
+  const applyGlassFrost = (level) => {
+    const normalizedFrost = normalizeGlassFrost(level);
+    document.documentElement.setAttribute('data-glass-frost', normalizedFrost);
+    localStorage.setItem('kasa-glass-frost', normalizedFrost);
+    return normalizedFrost;
   };
 
   const pageLoadingOverlay = document.querySelector('.page-loading-overlay');
@@ -616,6 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
     glassToggle,
     syncGlassQualityVisibility,
     glassQualitySelect,
+    glassFrostSelect,
     motionToggle,
     interfaceAnimationsToggle,
     gradientsToggle,
@@ -634,6 +706,8 @@ document.addEventListener('DOMContentLoaded', () => {
     applyThemeFeature,
     normalizeGlassQuality,
     applyGlassQuality,
+    normalizeGlassFrost,
+    applyGlassFrost,
     normalizeHexColor,
     hexToRgb,
     hexToHsv,
@@ -1288,6 +1362,10 @@ document.addEventListener('DOMContentLoaded', () => {
           glassQualitySelect.value = applyGlassQuality(data.glass_quality);
           glassQualitySelect.kasaSyncCustomSelect?.();
         }
+        if (data.glass_frost && glassFrostSelect) {
+          glassFrostSelect.value = applyGlassFrost(data.glass_frost);
+          glassFrostSelect.kasaSyncCustomSelect?.();
+        }
         if (typeof data.glass_blur === 'number' || typeof data.glass_veil === 'number') {
           const blur = typeof data.glass_blur === 'number'
             ? Math.min(1.5, Math.max(0, data.glass_blur)) : null;
@@ -1315,41 +1393,14 @@ document.addEventListener('DOMContentLoaded', () => {
           localStorage.setItem('kasa-glass-veil', String(veil ?? 1));
           document.dispatchEvent(new CustomEvent('kasa:glass-refresh'));
         }
-        if (typeof data.animated_backgrounds_enabled === 'boolean' && motionToggle) {
-          motionToggle.checked = data.animated_backgrounds_enabled;
-          applyThemeFeature('data-kasa-motion', 'kasa-animated-backgrounds', data.animated_backgrounds_enabled);
-        }
-        if (typeof data.interface_animations_enabled === 'boolean' && interfaceAnimationsToggle) {
-          interfaceAnimationsToggle.checked = data.interface_animations_enabled;
-          applyThemeFeature('data-kasa-animations', 'kasa-interface-animations', data.interface_animations_enabled);
-        }
-        if (typeof data.gradients_enabled === 'boolean' && gradientsToggle) {
-          gradientsToggle.checked = data.gradients_enabled;
-          applyThemeFeature('data-kasa-gradient', 'kasa-gradients', data.gradients_enabled);
-        }
-        if (typeof data.card_sheen_enabled === 'boolean' && cardSheenToggle) {
-          cardSheenToggle.checked = data.card_sheen_enabled;
-          applyThemeFeature('data-kasa-card-sheen', 'kasa-card-sheen', data.card_sheen_enabled);
-        }
-        if (typeof data.card_frame_enabled === 'boolean' && cardFrameToggle) {
-          cardFrameToggle.checked = data.card_frame_enabled;
-          applyThemeFeature('data-kasa-card-frame', 'kasa-card-frame', data.card_frame_enabled);
-        }
-        if (typeof data.card_depth_enabled === 'boolean' && cardDepthToggle) {
-          cardDepthToggle.checked = data.card_depth_enabled;
-          applyThemeFeature('data-kasa-card-depth', 'kasa-card-depth', data.card_depth_enabled);
-        }
-        if (typeof data.vault_accent_enabled === 'boolean' && vaultAccentToggle) {
-          vaultAccentToggle.checked = data.vault_accent_enabled;
-          applyThemeFeature('data-kasa-vault-accent', 'kasa-vault-accent', data.vault_accent_enabled);
-        }
-        if (typeof data.hardware_acceleration_enabled === 'boolean' && hardwareAccelerationToggle) {
-          hardwareAccelerationToggle.checked = data.hardware_acceleration_enabled;
-        }
-        if (typeof data.power_save_enabled === 'boolean' && powerSaveToggle) {
-          powerSaveToggle.checked = data.power_save_enabled;
-          applyThemeFeature('data-kasa-power-save', 'kasa-power-save', data.power_save_enabled);
-        }
+        THEME_FEATURE_SYNC.forEach(({ dataKey, toggle, attribute, storageKey }) => {
+          const enabled = data[dataKey];
+          if (typeof enabled !== 'boolean') return;
+          const input = toggle();
+          if (!input) return;
+          input.checked = enabled;
+          if (attribute) applyThemeFeature(attribute, storageKey, enabled);
+        });
         if (typeof data.lan_enabled === 'boolean' && lanToggle && lanInfoBox) {
           lanToggle.checked = data.lan_enabled;
           if (data.lan_enabled) showActive(); else hide();
@@ -1501,6 +1552,56 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── 6. MODAL SİSTEMİ (modal-system.js) ─────────────────────────────────
   initModalSystem({ customSelectStates, closeCustomSelect });
 
+  // ─── 6a. MODAL SCROLLBAR TELAFİSİ (body scrollbar'ı kilitlenince kayma yok)
+  {
+    const kasaCachedModalScrollbar = (() => {
+      const probe = document.createElement('div');
+      probe.style.position = 'absolute';
+      probe.style.top = '-100000px';
+      probe.style.left = '0';
+      probe.style.width = '100px';
+      probe.style.height = '100px';
+      probe.style.overflow = 'scroll';
+      probe.style.visibility = 'hidden';
+      document.body.appendChild(probe);
+      const width = probe.offsetWidth - probe.clientWidth;
+      probe.remove();
+      return width > 0 ? `${width}px` : '0px';
+    })();
+    const kasaSyncModalScrollLock = (open) => {
+      if (open) {
+        const hasPageScroll = document.body.scrollHeight > window.innerHeight;
+        document.body.style.setProperty('--kasa-modal-scrollbar-pad', hasPageScroll ? kasaCachedModalScrollbar : '0px');
+      } else {
+        document.body.style.removeProperty('--kasa-modal-scrollbar-pad');
+      }
+    };
+    /* Kapanış gecikmesi iptali: 210ms pencerede başka bir modal AÇILIRSA
+       açılış handler'ı bekleyen temizliği iptal eder; aksi halde açık modal
+       varken telafi kaldırılır ve sayfa kayar. */
+    let kasaPendingModalCloseTimer = 0;
+    const kasaCancelPendingModalClose = () => {
+      if (!kasaPendingModalCloseTimer) return;
+      clearTimeout(kasaPendingModalCloseTimer);
+      kasaPendingModalCloseTimer = 0;
+    };
+    document.querySelectorAll('.kasa-modal').forEach((modalEl) => {
+      modalEl.addEventListener('kasa:modal-opened', () => {
+        kasaCancelPendingModalClose();
+        kasaSyncModalScrollLock(true);
+      });
+      modalEl.addEventListener('kasa:modal-closing', (event) => {
+        kasaCancelPendingModalClose();
+        // Açık modal kalıyorsa telafi KORUNUR (sorgu gerekmez).
+        if ((event.detail?.remainingModalCount ?? 0) > 0) return;
+        kasaPendingModalCloseTimer = setTimeout(() => {
+          kasaPendingModalCloseTimer = 0;
+          kasaSyncModalScrollLock(false);
+        }, 210);
+      });
+    });
+  }
+
   // ─── 6b. BAŞLIK DROPDOWN (Ayarlar) ──────────────────────────────────────
   const headerDropdowns = Array.from(document.querySelectorAll('[data-kasa-dropdown]'));
 
@@ -1638,6 +1739,220 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // ─── 6c. TASARIM TOOLTIP SİSTEMİ ──────────────────────────────────────
+  /* Yerel tarayıcı tooltip'i (native HTML title) yerine kasanın cam
+     tasarım dilindeki balonu gösterir. Balon kart DOM'unun DIŞINDA render
+     edilir (#kasa-portal-root içinde, position:fixed) — kartlar
+     overflow:hidden olduğundan DOM içine gömülü bir tooltip kırpılırdı.
+     Mouse: native title geçici boşaltılır (native tooltip tetiklenmez),
+     mouseout'ta geri konur. Klavye (focus): title KORUNUR, balon yine
+     gösterilir → ekran okuyucu/bilgi kaybı olmaz. */
+  const initTooltips = () => {
+    let bubble = document.getElementById('kasa-tooltip');
+    if (!bubble) {
+      bubble = document.createElement('div');
+      bubble.id = 'kasa-tooltip';
+      bubble.className = 'kasa-tooltip';
+      bubble.setAttribute('role', 'tooltip');
+      bubble.hidden = true;
+      const portal = document.getElementById('kasa-portal-root') || document.body;
+      portal.appendChild(bubble);
+    }
+
+    let _ttTarget = null;
+    let _ttPending = null;
+    let _ttTimer = null;
+    let _ttHideTimer = null;
+    let _ttShown = false;
+
+    /* Metin düğümlerinin Range'i: yalnızca gerçek metin alınır (<i> ikonu vb.
+       satır içi öğeler hesaba katılmaz) → konum/kesinti, metnin kendisine
+       göre hesaplanır. */
+    const getTextRange = (el) => {
+      const kids = Array.from(el.childNodes);
+      let first = null;
+      for (const n of kids) {
+        if (n.nodeType === 3 && n.data.trim() !== '') { first = n; break; }
+      }
+      let last = null;
+      for (let i = kids.length - 1; i >= 0; i -= 1) {
+        const n = kids[i];
+        if (n.nodeType === 3 && n.data.trim() !== '') { last = n; break; }
+      }
+      if (!first || !last) return null;
+      const range = document.createRange();
+      range.setStart(first, 0);
+      range.setEnd(last, last.data.length);
+      return range;
+    };
+
+    /* Kesinti kontrolü: metnin yerleşim kutusu (Range) elemanın görünür
+       kutusunu AŞARSA içerik kesiliyor demektir (ellipsis / line-clamp).
+       Metin sığdıysa tooltip gerekmez → gösterilmez. */
+    const isTruncated = (el) => {
+      const rect = el.getBoundingClientRect();
+      if (!rect.width || !rect.height) return false;
+      const range = getTextRange(el);
+      if (!range || !range.getClientRects().length) return false;
+      const r = range.getClientRects();
+      const first = r[0];
+      const last = r[r.length - 1];
+      const textW = last.right - first.left;
+      const textH = last.bottom - first.top;
+      return textW > rect.width + 1 || textH > rect.height + 1;
+    };
+
+    /* Etkileşimli denetimler (butonlar vb.): etiketleri kısa olduğundan
+       "kesilmiyor" der; bunlarda HER ZAMAN tooltip gösterilir (içerik
+       kontrolü yapılmaz — normal hover etiketi davranışı korunur). */
+    const isControl = (el) => el.matches && el.matches(
+      'button, input, select, textarea, [role="button"], ' +
+      'a.card-icon-btn, a.footer-action-btn, a.kasa-btn'
+    );
+
+    /* Balon konumu: hedef elemanın KUTUSUNUN ortası değil, METNİN görünür
+       ortası kullanılır → kısa değerlerde balon metnin yakınında çıkar,
+       boş geniş kutunun ortasında yüzen bir balon olmaz. */
+    const textAnchorX = (el) => {
+      const rect = el.getBoundingClientRect();
+      const range = getTextRange(el);
+      if (range) {
+        const r = range.getClientRects();
+        if (r.length) {
+          const first = r[0];
+          const last = r[r.length - 1];
+          const visStart = Math.max(first.left, rect.left);
+          const visEnd = Math.min(last.right, rect.right);
+          if (visEnd > visStart) return (visStart + visEnd) / 2;
+        }
+      }
+      return rect.left + rect.width / 2;
+    };
+
+    const restoreTitle = (node) => {
+      if (node && node.title === '' && node._kasaOrigTitle) {
+        node.setAttribute('title', node._kasaOrigTitle);
+      }
+      if (node) delete node._kasaOrigTitle;
+    };
+
+    const hide = () => {
+      if (_ttTimer) { clearTimeout(_ttTimer); _ttTimer = null; }
+      _ttPending = null;
+      if (_ttTarget) {
+        _ttTarget.removeAttribute('aria-describedby');
+        _ttTarget = null;
+      }
+      _ttShown = false;
+      clearTimeout(_ttHideTimer);
+      if (bubble.classList.contains('is-visible')) {
+        bubble.classList.remove('is-visible');
+        _ttHideTimer = setTimeout(() => {
+          if (!bubble.classList.contains('is-visible')) bubble.hidden = true;
+        }, 170);
+      } else {
+        bubble.hidden = true;
+      }
+    };
+
+    const position = () => {
+      const target = _ttTarget;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      if (!rect.width || !rect.height) { hide(); return; }
+      const margin = 8;
+      bubble.classList.toggle('kasa-tooltip--below', false);
+      bubble.hidden = false;
+      const w = bubble.offsetWidth;
+      const h = bubble.offsetHeight;
+      let left = Math.max(8, Math.min(textAnchorX(target) - w / 2, window.innerWidth - w - 8));
+      let top = rect.top - h - margin;
+      let below = false;
+      if (top < 8) {
+        top = rect.bottom + margin;
+        below = true;
+      }
+      if (top + h > window.innerHeight - 8) {
+        top = Math.max(8, window.innerHeight - h - 8);
+      }
+      bubble.classList.toggle('kasa-tooltip--below', below);
+      bubble.style.left = `${left}px`;
+      bubble.style.top = `${top}px`;
+    };
+
+    const show = (target, text) => {
+      if (!text) text = target.getAttribute('title') ? target.getAttribute('title').trim() : '';
+      if (!text) return;
+      const rect = target.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      hide();
+      _ttTarget = target;
+      _ttShown = true;
+      clearTimeout(_ttHideTimer);
+      bubble.textContent = text;
+      target.setAttribute('aria-describedby', 'kasa-tooltip');
+      bubble.hidden = false;
+      /* Flash'sız açılış: önce konum + taşma kontrolü, sonra is-visible →
+         fade/scale transition'ı (dropdown'larla aynı double-rAF deseni). */
+      requestAnimationFrame(() => {
+        position();
+        requestAnimationFrame(() => bubble.classList.add('is-visible'));
+      });
+    };
+
+    document.addEventListener('mouseover', (event) => {
+      const node = event.target instanceof Element ? event.target.closest('[title]') : null;
+      if (!node) return;
+      const text = node.getAttribute('title') ? node.getAttribute('title').trim() : '';
+      if (!text) return;
+      // Native tooltip'i bastır (davranış tamamen bizim kontrolümüzde)
+      if (node.title) {
+        node._kasaOrigTitle = node.getAttribute('title');
+        node.setAttribute('title', '');
+      }
+      // Akıllı gösterim: denetimler her zaman; metin elemanları yalnızca
+      // içerik taşıyorsa (kesiliyorsa) tooltip gösterir.
+      if (!isControl(node) && !isTruncated(node)) return;
+      _ttPending = node;
+      if (_ttTimer) clearTimeout(_ttTimer);
+      _ttTimer = setTimeout(() => {
+        _ttTimer = null;
+        if (_ttPending === node) { _ttPending = null; show(node, text); }
+      }, 160);
+    });
+
+    document.addEventListener('mouseout', (event) => {
+      const from = event.target instanceof Element ? event.target.closest('[title]') : null;
+      if (!from) return;
+      const to = event.relatedTarget instanceof Element ? event.relatedTarget.closest('[title]') : null;
+      if (to === from) return;
+      restoreTitle(from);
+      if (_ttPending === from) _ttPending = null;
+      hide();
+    });
+
+    document.addEventListener('focusin', (event) => {
+      const node = event.target instanceof Element ? event.target.closest('[title]') : null;
+      if (!node || !node.title) return;
+      if (!isControl(node) && !isTruncated(node)) return;
+      show(node, (node.getAttribute('title') || '').trim());
+    });
+
+    document.addEventListener('focusout', () => hide());
+
+    const onScrollOrResize = () => {
+      if (_ttTarget && _ttShown) position();
+      else if (_ttPending) hide();
+    };
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') hide();
+    });
+  };
+  initTooltips();
+
   // ─── 7. ŞİFRE GÜCÜ (password-strength.js) ─────────────────────────────
   initPasswordStrength({ apiJson });
 
@@ -1663,6 +1978,9 @@ document.addEventListener('DOMContentLoaded', () => {
     copyToClipboard,
     kasaModalAc,
     refreshStatsBar,
+    applyAppearance,
+    applyGlassQuality,
+    getCurrentBackground,
   });
 
   // ─── 10. EKLE / DÜZENLE SAYFASI (vault-form.js) ───────────────────────────

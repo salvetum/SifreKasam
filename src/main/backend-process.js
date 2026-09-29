@@ -29,7 +29,45 @@ const { loadBackendPage } = require('./page-loader');
 const { verifyQuickIntegritySync, verifyFullIntegrityAsync } = require('./integrity');
 const bench = require('./startup-timing');
 
-const PYTHON_COMMAND = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+function parsePythonOverride(value) {
+  const parts = String(value).trim().split(/[ \t]+/);
+  return { cmd: parts[0], args: parts.slice(1) };
+}
+
+function resolvePythonCommand() {
+  if (process.env.PYTHON) {
+    return parsePythonOverride(process.env.PYTHON);
+  }
+  const isWin = process.platform === 'win32';
+  const candidates = isWin
+    ? [
+        { cmd: 'python', args: [] },
+        { cmd: 'py', args: ['-3.12'] },
+        { cmd: 'py', args: ['-3.11'] },
+        { cmd: 'py', args: ['-3.10'] },
+        { cmd: 'py', args: ['-3'] },
+        { cmd: 'py', args: [] },
+      ]
+    : [
+        { cmd: 'python3', args: [] },
+        { cmd: 'python', args: [] },
+      ];
+  for (const candidate of candidates) {
+    try {
+      const probe = spawnSync(candidate.cmd, [...candidate.args, '--version'], {
+        timeout: 4000,
+        windowsHide: true,
+      });
+      if (probe.status === 0 && probe.error == null) {
+        console.log(`Python secildi: ${candidate.cmd} ${candidate.args.join(' ')}`.trim());
+        return candidate;
+      }
+    } catch (_) {}
+  }
+  return candidates[0];
+}
+
+const PYTHON = resolvePythonCommand();
 
 // Backend ag katmani: sabitler/durum enjeksiyonu
 const { requestBackendJson, waitForBackendReady, findFreePort } = createBackendNet({
@@ -87,7 +125,7 @@ async function startFlaskServer(timeoutMs) {
     const flaskHost = rt.lanRuntimeEnabled ? '0.0.0.0' : HOST;
     const [command, args] = app.isPackaged
       ? [resolvePath(path.join('backend', backendBinary)), []]
-      : [PYTHON_COMMAND, [path.join(APP_ROOT, 'flask_app', 'app.py')]];
+      : [PYTHON.cmd, [...PYTHON.args, path.join(APP_ROOT, 'flask_app', 'app.py')]];
 
     if (app.isPackaged) {
       const quickIntegrity = verifyQuickIntegritySync();

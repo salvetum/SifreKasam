@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Özel Form Kontrolleri modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Özel Form Kontrolleri modülü (ES Module)
  *
  * 2b. bölüm: data-custom-select sarmalayıcıları, data-number-stepper ve
  * ilgili açık dropdown / scroll / resize davranışları.
@@ -152,7 +152,7 @@ export function initCustomControls({ createIcon }) {
       optionButtons,
       closeTimer: 0,
       openRequested: false,
-      host: wrapper.closest('.glass-sm, .settings-card, .vault-field'),
+      host: wrapper.closest('.settings-card, .vault-field'),
       layerHosts: [
         wrapper.closest('.vault-form-panel'),
         wrapper.closest('.settings-panel'),
@@ -308,6 +308,6 @@ export function initCustomControls({ createIcon }) {
     input.addEventListener('change', clampInput);
   });
 
-  return { customSelectStates, closeCustomSelect, closeCustomSelects };
+  return { customSelectStates, closeCustomSelect };
 
 }

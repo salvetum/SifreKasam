@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Canlı tarama oturumu modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Canlı tarama oturumu modülü (ES Module)
  *
  * Canlı sızıntı taramasını sayfalar arası tutarlı kılar: oturum durumu
  * sessionStorage'da yaşar; hangi sayfada olunursa olunsun üst yükleme

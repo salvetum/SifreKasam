@@ -7,8 +7,6 @@ import time
 import uuid
 from typing import Any
 
-from flask import g, has_request_context
-
 from kasa_core.constants import (
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
     DEFAULT_CARD_DEPTH_ENABLED,
@@ -18,19 +16,20 @@ from kasa_core.constants import (
     DEFAULT_CHROMA_ACCENT_ENABLED,
     DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GLASS_BLUR,
+    DEFAULT_GLASS_FROST,
     DEFAULT_GLASS_VEIL,
     DEFAULT_GRADIENTS_ENABLED,
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
     DEFAULT_POWER_SAVE_ENABLED,
 )
-from kasa_core.extensions import db
-from kasa_core.models import Setting
+from kasa_core.settings_store import get_setting, set_setting
 from kasa_core.validation import (
     normalize_background_style,
     normalize_chroma_accent_speed,
     normalize_glass_blur,
     normalize_glass_effects,
+    normalize_glass_frost,
     normalize_glass_quality,
     normalize_glass_veil,
     normalize_hex_color,
@@ -90,29 +89,15 @@ class AppearanceSettings:
     def get_setting(key: str) -> str | None:
         # Tek istek içinde aynı ayar çok kez okunur (kart döngüleri, context
         # processor). Her okuma SQL sorgusu demekti: 150 kayıtlık kasa sayfasında
-        # ~2470 sorgu. İstek başına g-cache'i bu maliyeti sıfıra indirir.
-        if has_request_context():
-            cache = g.setdefault('_appearance_settings_cache', {})
-            if key in cache:
-                return cache[key]
-            setting = Setting.query.filter_by(key=key).first()
-            value = setting.value if setting else None
-            cache[key] = value
-            return value
-        setting = Setting.query.filter_by(key=key).first()
-        return setting.value if setting else None
+        # ~2470 sorgu. İstek başına g-cache'i bu maliyeti sıfıra indirir; tek
+        # uygulama artık kasa_core/settings_store.py'de.
+        return get_setting(key)
 
     @staticmethod
     def set_setting(key: str, value: str) -> None:
-        # Aynı istek içinde yazıp-okuma akışlarında bayat kalmaması için cache'i tazele.
-        if has_request_context():
-            cache = g.setdefault('_appearance_settings_cache', {})
-            cache[key] = value
-        setting = Setting.query.filter_by(key=key).first()
-        if setting:
-            setting.value = value
-        else:
-            db.session.add(Setting(key=key, value=value))
+        # Aynı istek içinde yazıp-okuma akışlarında bayat kalmaması için
+        # cache'i tazelemek de store'ın sorumluluğunda.
+        set_setting(key, value)
 
     def get_saved_theme(self) -> str:
         try:
@@ -202,6 +187,15 @@ class AppearanceSettings:
         except Exception:
             pass
         return normalize_glass_veil(self.load_file().get("glass_veil"))
+
+    def get_glass_frost(self) -> str:
+        try:
+            value = self.get_setting("glass_frost")
+            if value is not None:
+                return normalize_glass_frost(value)
+        except Exception:
+            pass
+        return normalize_glass_frost(self.load_file().get("glass_frost"))
 
     def get_animated_backgrounds_enabled(self) -> bool:
         try:
@@ -316,6 +310,12 @@ class AppearanceSettings:
         self.set_setting("glass_veil", str(veil))
         self.save_file(glass_veil=veil)
         return veil
+
+    def save_glass_frost(self, value: object) -> str:
+        frost = normalize_glass_frost(value)
+        self.set_setting("glass_frost", frost)
+        self.save_file(glass_frost=frost)
+        return frost
 
     def save_animated_backgrounds(self, value: object) -> bool:
         enabled = normalize_theme_option(

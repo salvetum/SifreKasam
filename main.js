@@ -228,9 +228,9 @@ async function onAppReady() {
       bench.dump('startup');
       startLanReconciliation();
       // GPU/Dawn/Code cache eşiği aşarsa birkaç saniye sonra temizle
-      setTimeout(() => {
-        try { pruneUserCacheDirs(); } catch (_) {}
-      }, 8000);
+      // (pruneUserCacheDirs tüm hataları kendi içinde yutar; setTimeout'a
+      //  doğrudan referans verilirse geçen bekleme argümanı userData sanılır)
+      setTimeout(() => pruneUserCacheDirs(), 8000);
     }
   } catch (err) {
     const isSquirrel = process.argv.some(arg => arg.startsWith('--squirrel-'));
@@ -245,12 +245,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
+// before-quit, will-quit'ten önce ve her quit yolunda (pencere kapatma dahil)
+// tetiklendiği için tek noktada yeterlidir.
 app.on('before-quit', () => {
-  rt.isQuiting = true;
-  shutdownFlask();
-});
-
-app.on('will-quit', () => {
   rt.isQuiting = true;
   shutdownFlask();
 });

@@ -161,22 +161,17 @@ def build_distribution_counts(
 ) -> dict[str, int]:
     """Aynı kayıt birçok risk kategorisine girebileceğinden, dağılım sayılarını
     çakışmasız (union) hesaplar. ``guvenli`` = hiçbir risk kategorisinde yok."""
-    risky: set[str] = {r["id"] for r in weak_records}
-    risky |= {r["id"] for r in old_records}
-    risky |= {r["id"] for r in expired_records}
-    risky |= {r["id"] for r in breached_records}
-    risky |= {
-        item["id"]
-        for group in password_map.values()
-        if len(group) > 1
-        for item in group
-    }
     reused = {
         item["id"]
         for group in password_map.values()
         if len(group) > 1
         for item in group
     }
+    risky: set[str] = {r["id"] for r in weak_records}
+    risky |= {r["id"] for r in old_records}
+    risky |= {r["id"] for r in expired_records}
+    risky |= {r["id"] for r in breached_records}
+    risky |= reused
     return {
         "zayif": len({
             r["id"] for r in weak_records

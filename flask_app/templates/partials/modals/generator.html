@@ -1,5 +1,5 @@
 <!-- Şifre Üretici Modal -->
-<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="password-generator-title" data-target-input="modal-generated-password-display" data-create-record-url="{{ url_for('ekle_sayfasi') }}">
+<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="password-generator-title" data-create-record-url="{{ url_for('ekle_sayfasi') }}">
     <div class="modal-dialog generator-modal-dialog">
         <div class="modal-content generator-modal-content">
             <div class="modal-header">
@@ -37,8 +37,8 @@
                                 </div>
                             </div>
                             <div class="gen-band-chips">
-                                <span class="gen-band-chip"><i class="fa-solid fa-shield-halved"></i>{{ _('Entropi') }}: <b id="modal-entropy-bits">—</b> {{ _('bit') }}</span>
-                                <span class="gen-band-chip"><i class="fa-regular fa-clock"></i>{{ _('Kırılma') }}: <b id="modal-crack-time">—</b></span>
+                                <span class="gen-band-chip" title="{{ _('Şifrenin tahmin edilmesi gereken toplam bilgi miktarı (bit). Yüksek değer = daha güçlü.') }}"><i class="fa-solid fa-shield-halved"></i>{{ _('Entropi') }}: <b id="modal-entropy-bits">—</b> {{ _('bit') }}</span>
+                                <span class="gen-band-chip" title="{{ _('Bu şifrenin olası bir saldırgan tarafından kırılacağı tahmini süre.') }}"><i class="fa-regular fa-clock"></i>{{ _('Kırılma') }}: <b id="modal-crack-time">—</b></span>
                             </div>
                             <p id="modal-strength-empty" class="generator-strength-empty">
                                 <i class="fa-solid fa-shield-halved"></i>

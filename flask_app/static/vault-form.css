@@ -72,23 +72,6 @@
     gap: 0.45rem;
     padding: 0.8rem;
 }
-.generator-option-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.55rem;
-}
-.generator-option-grid label {
-    min-height: 38px;
-    padding: 0.55rem 0.65rem;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-    transition:
-        transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
-        border-color 170ms ease,
-        background 170ms ease;
-}
-
 @media (min-width: 700px) {
         .generator-layout {
             gap: 0.8rem;
@@ -108,10 +91,6 @@
             flex: 1 1 0%;
             min-height: 52px;
         }
-
-        .generator-option-grid {
-            grid-template-columns: var(--grid-2);
-        }
     }
 
 /* === Vault Form Page === */
@@ -124,7 +103,6 @@
     gap: 1rem;
 }
 
-.vault-form-hero,
 .vault-form-panel,
 .vault-form-actions {
     border: var(--border-glass);
@@ -135,23 +113,6 @@
     -webkit-backdrop-filter: var(--glass-blur);
 }
 
-.vault-form-hero {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1rem;
-    border-radius: 22px;
-}
-
-.vault-form-title-wrap {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    min-width: 0;
-}
-
-.vault-form-title-wrap p,
 .vault-section-head p,
 .vault-help {
     margin: 0;
@@ -160,20 +121,12 @@
     line-height: 1.45;
 }
 
-.vault-form-icon,
 .vault-section-head > span {
     display: grid;
     place-items: center;
     flex: 0 0 auto;
     color: #fff;
     background: linear-gradient(135deg, rgba(124,111,247,0.95), rgba(79,145,255,0.86));
-}
-
-.vault-form-icon {
-    width: 46px;
-    height: 46px;
-    border-radius: 16px;
-    box-shadow: 0 14px 32px rgba(124,111,247,0.25);
 }
 
 .vault-form-grid {
@@ -200,7 +153,6 @@
     from { opacity: 0; transform: translateY(14px) scale(0.99); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.vault-form-hero   { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) backwards; }
 .vault-form-main   { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 80ms backwards; }
 .vault-form-access { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 160ms backwards; }
 .vault-form-notes  { animation: vaultPanelIn var(--dur-slow) var(--ease-swift) 240ms backwards; }
@@ -212,7 +164,6 @@
    çift animasyon üretiyordu. İlk yükleme tamamlanınca (son panelin
    animationend'i / güvenlik timeout'u) CSS girişleri kapatılır — tip
    geçişlerinde yalnız WAAI motoru kalır. */
-body.form-booted .vault-form-hero,
 body.form-booted .vault-form-main,
 body.form-booted .vault-form-access,
 body.form-booted .vault-form-notes,
@@ -246,32 +197,15 @@ body.form-booted .vault-form-side {
     60%  { transform: scale(1.15); }
     100% { transform: scale(1); }
 }
-.vault-form-panel .vault-section-head > span,
-.vault-form-hero .vault-form-icon {
+.vault-form-panel .vault-section-head > span {
     animation: sectionIconPop 0.4s var(--ease-spring) backwards;
 }
 .vault-form-main .vault-section-head > span   { animation-delay: 160ms; }
 .vault-form-access .vault-section-head > span { animation-delay: 240ms; }
 .vault-form-notes .vault-section-head > span  { animation-delay: 320ms; }
 .vault-form-expiry .vault-section-head > span { animation-delay: 240ms; }
-body.form-booted .vault-form-panel .vault-section-head > span,
-body.form-booted .vault-form-hero .vault-form-icon {
+body.form-booted .vault-form-panel .vault-section-head > span {
     animation: none;
-}
-
-/* ── Focus ring animasyonu ────────────────────────────────────────
-   Input focus olunca accent renkli halka outward expand. */
-.vault-field--icon .kasa-field:focus {
-    box-shadow:
-        0 0 0 0 rgba(var(--accent-rgb), 0.30),
-        0 0 0 3px rgba(var(--accent-rgb), 0.12);
-}
-.vault-field--icon .kasa-field:focus-visible {
-    animation: focusRingExpand 0.3s var(--ease-swift) forwards;
-}
-@keyframes focusRingExpand {
-    0%   { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.30), 0 0 0 0 rgba(var(--accent-rgb), 0.0); }
-    100% { box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18), 0 0 0 5px rgba(var(--accent-rgb), 0.08); }
 }
 
 /* ── Alan stagger girişi ───────────────────────────────────────────
@@ -345,6 +279,7 @@ body.form-booted .vault-form-hero .vault-form-icon {
     position: relative;
     display: flex;
     align-items: center;
+    min-width: 0;
 }
 .vault-field .vault-field-input-wrap .kasa-field,
 .vault-field .vault-field-input-wrap textarea.kasa-field {
@@ -461,13 +396,6 @@ body.form-booted .vault-form-hero .vault-form-icon {
     grid-column: 1 / -1;
 }
 /* Select için: custom select overlay kullanılıyorsa simge select wrapper'ına taşınır */
-.vault-field--icon .custom-select-wrap .kasa-field {
-    padding-left: 2.6rem;
-}
-/* password line: copy/generate düğmeleri sağda, ikon solda — çakışma yok */
-.vault-field--icon .vault-password-line .vault-password-input {
-    padding-left: 2.6rem !important;
-}
 
 .vault-form-row {
     display: grid;
@@ -621,8 +549,8 @@ body.form-booted .vault-form-hero .vault-form-icon {
         width: min(94vw, 1360px);
     }
 
-    .vault-form-grid {
-        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.32fr);
+.vault-form-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 0.36fr);
         grid-template-areas:
             "main side"
             "access side"
@@ -674,16 +602,6 @@ body.form-booted .vault-form-hero .vault-form-icon {
 @media (max-width: 560px) {
     .kasa-form-page-shell {
         padding: 0.75rem !important;
-    }
-
-    .vault-form-hero {
-        align-items: flex-start;
-        flex-direction: column;
-        border-radius: 18px;
-    }
-
-    .vault-form-back {
-        width: 100%;
     }
 
     .vault-generator-panel .page-generator-options {
@@ -797,14 +715,7 @@ body.form-booted .vault-form-hero .vault-form-icon {
 
 .toastify.kasa-toast-warning::before { content: '!'; }
 .toastify.kasa-toast-success::before { content: '✓'; }
-.toastify.kasa-toast-info::before { display: none; }
-.toastify.kasa-toast-info {
-    padding-left: 1rem !important;
-    background: rgba(var(--accent-rgb), 0.14);
-}
-.toastify.kasa-toast-info i {
-    margin-right: 0.5rem;
-}
+
 
 html[data-glass-effects="off"] .toastify.kasa-toast {
     backdrop-filter: none;
@@ -982,7 +893,6 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
     gap: clamp(1rem, 2vw, 1.4rem);
 }
 
-.vault-form-hero,
 .vault-form-panel,
 .vault-form-actions {
     border-color: var(--glass-border);
@@ -991,7 +901,6 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
         var(--panel-bg);
 }
 
-.vault-form-icon,
 .vault-section-head > span {
     background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.96), rgba(var(--accent-2-rgb), 0.86));
     box-shadow: 0 14px 32px rgba(var(--accent-rgb), 0.22);
@@ -1531,7 +1440,7 @@ input.kasa-field[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: block;
     font-size: 0.78rem;
     font-weight: 600;
-    color: var(--text-soft);
+    color: var(--text-muted);
 }
 .gen-ambiguous-row small { display: block; margin-top: 0.12rem; font-size: 0.7rem; }
 

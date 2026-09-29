@@ -13,6 +13,8 @@ const CANONICAL_UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVers
 const LEGACY_UNINSTALL_KEYS = [
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ŞifreKasam',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SifrekasamV2.1',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.7.0-beta.3',
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.7.0-beta.3',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.7.0-beta.2',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam-v2.7.0-beta.2',
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\sifrekasam_v2.7.0-beta.1',
@@ -133,7 +135,6 @@ function cleanupApplicationData(currentInstallRoot) {
     'sifrekasam-v2.3',
     'sifrekasam-v2.2',
     'SifrekasamV2.1',
-    'Kasa', // todo; bunu silmek iyi olabilir. 
   ];
 
   const dataTargets = [
@@ -190,7 +191,6 @@ function removeKnownShortcuts(appData, userProfile, publicProfile) {
     'ŞifreKasam.lnk',
     'SifreKasam.lnk',
     'SifrekasamV2.1.lnk',
-    'Kasa.lnk', // todo; bunu silmek iyi olabilir. 
   ];
 
   shortcutDirs.forEach(dir => {

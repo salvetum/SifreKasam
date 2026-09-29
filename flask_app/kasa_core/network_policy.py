@@ -13,7 +13,7 @@ Semantik:
   ``internet_allowed()`` doğru olmadan tek bir istek bile gönderilmez.
 """
 
-from kasa_core.models import Setting
+from kasa_core.settings_store import get_setting as _get_setting
 
 INTERNET_KILL_SWITCH_SETTING = 'internet_kill_switch'
 LIVE_BREACH_SCAN_SETTING = 'live_breach_scan'
@@ -22,11 +22,6 @@ LIVE_BREACH_SCAN_SETTING = 'live_breach_scan'
 # canlı tarama ayrıca kapalı olduğu için yine de garanti edilir.
 DEFAULT_INTERNET_KILL_SWITCH_ENABLED = False
 DEFAULT_LIVE_BREACH_SCAN_ENABLED = False
-
-
-def _get_setting(key: str) -> str | None:
-    setting = Setting.query.filter_by(key=key).first()
-    return setting.value if setting else None
 
 
 def internet_kill_switch_enabled() -> bool:

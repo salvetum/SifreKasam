@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - LAN Erişimi modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - LAN Erişimi modülü (ES Module)
  *
  * 3b. bölüm: LAN bilgi kutusu durumları (bekliyor / aktif) ve fetchLanInfo.
  * initLanSettings, app.js içindeki DOMContentLoaded sırasında çağrılır.
@@ -22,6 +22,12 @@ export function initLanSettings({ apiJson }) {
   const lanPendingNote = document.getElementById('lan-pending-note');
   const lanPasswordWrap = document.getElementById('lan-password-wrap');
   const lanPassword = document.getElementById('lan-password');
+
+  // Uzak istemcide LAN paneli render edilmediğinden (yalnızca bu bilgisayar)
+  // modül hiç devreye girmesin ve /api/lan-info isteği atılmasın.
+  if (!lanToggle && !lanInfoBox) {
+    return;
+  }
 
   const lanActiveOnLoad = Boolean(lanToggle && lanToggle.checked);
 

@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Görünüm Ayarları modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Görünüm Ayarları modülü (ES Module)
  *
  * 3. bölüm: tema/efekt toggle'ları, glass kalitesi, vurgu rengi seçici,
  * chroma akcent, özel arka plan yükleme/galeri.
@@ -42,6 +42,8 @@ export function initAppearanceSettings({
   applyThemeFeature,
   normalizeGlassQuality,
   applyGlassQuality,
+  normalizeGlassFrost,
+  applyGlassFrost,
   normalizeHexColor,
   hexToRgb,
   hexToHsv,
@@ -104,6 +106,8 @@ export function initAppearanceSettings({
   const glassQualityCard = document.getElementById('glass-quality-card');
   const glassQualitySelect = document.getElementById('glass-quality-select');
   const glassScalesCard = document.getElementById('glass-scales-card');
+  const glassFrostCard = document.getElementById('glass-frost-card');
+  const glassFrostSelect = document.getElementById('glass-frost-select');
   let glassQualitySyncFrame = 0;
 
   const syncGlassQualityVisibility = (enabled, animate = true) => {
@@ -119,12 +123,24 @@ export function initAppearanceSettings({
       glassScalesCard.classList.toggle('is-no-transition', !animate);
       glassScalesCard.classList.toggle('is-collapsed', !shouldShow);
     }
+    if (glassFrostCard) {
+      glassFrostCard.setAttribute('aria-hidden', String(!shouldShow));
+      glassFrostCard.classList.toggle('is-no-transition', !animate);
+      glassFrostCard.classList.toggle('is-collapsed', !shouldShow);
+    }
     if (glassQualitySelect) {
       glassQualitySelect.disabled = !shouldShow;
       glassQualitySelect.tabIndex = glassQualitySelect.dataset.customSelectReady === 'true'
         ? -1
         : (shouldShow ? 0 : -1);
       glassQualitySelect.kasaSyncCustomSelect?.();
+    }
+    if (glassFrostSelect) {
+      glassFrostSelect.disabled = !shouldShow;
+      glassFrostSelect.tabIndex = glassFrostSelect.dataset.customSelectReady === 'true'
+        ? -1
+        : (shouldShow ? 0 : -1);
+      glassFrostSelect.kasaSyncCustomSelect?.();
     }
 
     glassQualityCard.classList.toggle('is-no-transition', !animate);
@@ -133,6 +149,7 @@ export function initAppearanceSettings({
       glassQualitySyncFrame = requestAnimationFrame(() => {
         glassQualityCard.classList.remove('is-no-transition');
         glassScalesCard?.classList.remove('is-no-transition');
+        glassFrostCard?.classList.remove('is-no-transition');
       });
     }
   };
@@ -289,6 +306,19 @@ export function initAppearanceSettings({
       glassQualitySelect.value = glassQuality;
       glassQualitySelect.kasaSyncCustomSelect?.();
       apiPost('/settings/appearance', { glass_quality: glassQuality });
+    });
+  }
+
+  if (glassFrostSelect) {
+    glassFrostSelect.value = normalizeGlassFrost(
+      document.documentElement.getAttribute('data-glass-frost')
+    );
+    glassFrostSelect.kasaSyncCustomSelect?.();
+    glassFrostSelect.addEventListener('change', () => {
+      const glassFrost = applyGlassFrost(glassFrostSelect.value);
+      glassFrostSelect.value = glassFrost;
+      glassFrostSelect.kasaSyncCustomSelect?.();
+      apiPost('/settings/appearance', { glass_frost: glassFrost });
     });
   }
 
@@ -480,26 +510,33 @@ export function initAppearanceSettings({
 
   let appearanceSavePromise = null;
 
+  /* /settings/appearance gövdesinin TEK kaynağı. Otomatik kayıt
+     (queueAppearanceSave) ve kapanış kaydı (flushAppearanceSave) aynı
+     payload'ı gönderir; alan listesinde drift olursa sessiz veri kaybı
+     yaşanmasın diye burada toplandı. */
+  const appearancePayload = (accent, background) => ({
+    accent_color: accent,
+    background_style: background,
+    chroma_accent_enabled: chromaAccentEnabled,
+    chroma_accent_speed: chromaAccentSpeed,
+    animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
+    interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
+    gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
+    card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
+    card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
+    card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
+    vault_accent_enabled: vaultAccentToggle?.checked ?? themeFeatureEnabled('data-kasa-vault-accent'),
+    power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
+  });
+
   const queueAppearanceSave = (accent, background) => {
     clearTimeout(appearanceSaveTimer);
     appearanceSaveTimer = setTimeout(() => {
-      appearanceSavePromise = apiPost('/settings/appearance', {
-        accent_color: accent,
-        background_style: background,
-        chroma_accent_enabled: chromaAccentEnabled,
-        chroma_accent_speed: chromaAccentSpeed,
-        animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
-        interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
-        gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
-        card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
-        card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
-        card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
-        vault_accent_enabled: vaultAccentToggle?.checked ?? themeFeatureEnabled('data-kasa-vault-accent'),
-        power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
-      }).finally(() => {
-        appearanceSavePromise = null;
-        window.dispatchEvent(new CustomEvent('kasa:appearance-saved'));
-      });
+      appearanceSavePromise = apiPost('/settings/appearance', appearancePayload(accent, background))
+        .finally(() => {
+          appearanceSavePromise = null;
+          window.dispatchEvent(new CustomEvent('kasa:appearance-saved'));
+        });
     }, 250);
   };
 
@@ -508,23 +545,11 @@ export function initAppearanceSettings({
     if (appearanceSavePromise) return appearanceSavePromise;
     const accent = accentInput?.value || currentAppearance.accent;
     const background = backgroundHidden?.value || currentAppearance.background;
-    appearanceSavePromise = apiPost('/settings/appearance', {
-      accent_color: accent,
-      background_style: background,
-      chroma_accent_enabled: chromaAccentEnabled,
-      chroma_accent_speed: chromaAccentSpeed,
-      animated_backgrounds_enabled: motionToggle?.checked ?? themeFeatureEnabled('data-kasa-motion'),
-      interface_animations_enabled: interfaceAnimationsToggle?.checked ?? themeFeatureEnabled('data-kasa-animations'),
-      gradients_enabled: gradientsToggle?.checked ?? themeFeatureEnabled('data-kasa-gradient'),
-      card_sheen_enabled: cardSheenToggle?.checked ?? themeFeatureEnabled('data-kasa-card-sheen'),
-      card_frame_enabled: cardFrameToggle?.checked ?? themeFeatureEnabled('data-kasa-card-frame'),
-      card_depth_enabled: cardDepthToggle?.checked ?? themeFeatureEnabled('data-kasa-card-depth'),
-      vault_accent_enabled: vaultAccentToggle?.checked ?? themeFeatureEnabled('data-kasa-vault-accent'),
-      power_save_enabled: powerSaveToggle?.checked ?? themeFeatureEnabled('data-kasa-power-save'),
-    }).finally(() => {
-      appearanceSavePromise = null;
-      window.dispatchEvent(new CustomEvent('kasa:appearance-saved'));
-    });
+    appearanceSavePromise = apiPost('/settings/appearance', appearancePayload(accent, background))
+      .finally(() => {
+        appearanceSavePromise = null;
+        window.dispatchEvent(new CustomEvent('kasa:appearance-saved'));
+      });
     return appearanceSavePromise;
   };
 
@@ -1076,6 +1101,7 @@ export function initAppearanceSettings({
     glassToggle,
     syncGlassQualityVisibility,
     glassQualitySelect,
+    glassFrostSelect,
     motionToggle,
     interfaceAnimationsToggle,
     gradientsToggle,

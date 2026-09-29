@@ -13,7 +13,8 @@
 {% endblock %}
 
 {% block navbar_after_lock %}
-<a href="{{ url_for('ekle_sayfasi') }}"
+<a href="{{ url_for('ekle_sayfasi') }}" title="{{ _('Kayıt Oluşturucu') }}"
+   aria-label="{{ _('Kayıt Oluşturucu') }}"
    class="kasa-btn kasa-btn-primary">
     <i class="fa-solid fa-plus text-xs"></i>{{ _('Kayıt Oluşturucu') }}
 </a>
@@ -29,4 +30,5 @@
 {% include 'partials/modals/generator.html' %}
 {% include 'partials/modals/history.html' %}
 {% include 'partials/modals/bulk-category.html' %}
+{% include 'partials/modals/onboarding.html' %}
 {% endblock %}

@@ -7,7 +7,6 @@
             return window.TRANSLATIONS[key] || key;
         };
 
-        const kasaRuntimeNonce = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') || '{{ csp_nonce }}';
         window.KASA_SET_RUNTIME_STYLE = function (key, cssText) {
             if (!key) return;
             const id = 'kasa-runtime-style-' + key;
@@ -51,6 +50,13 @@
         const storedGlassQuality = normalizeGlassQuality(localStorage.getItem('kasa-glass-quality') || "{{ GLASS_QUALITY|default('normal') }}");
         document.documentElement.setAttribute('data-glass-quality', storedGlassQuality);
         localStorage.setItem('kasa-glass-quality', storedGlassQuality);
+
+        const normalizeGlassFrost = function (value) {
+            return ['off', 'low', 'med', 'high'].includes(value) ? value : 'off';
+        };
+        const storedGlassFrost = normalizeGlassFrost(localStorage.getItem('kasa-glass-frost') || "{{ GLASS_FROST|default('off') }}");
+        document.documentElement.setAttribute('data-glass-frost', storedGlassFrost);
+        localStorage.setItem('kasa-glass-frost', storedGlassFrost);
 
         const normalizeGlassScale = function (value, minimum, maximum, fallback) {
             if (value === null || value === '') return fallback;

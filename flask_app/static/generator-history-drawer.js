@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 — Şifre Üretici Geçmiş Drawer modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 — Şifre Üretici Geçmiş Drawer modülü (ES Module)
  *
  * Sağdan süzülen geçmiş paneli: üretici modalının footer'ındaki "Geçmiş"
  * butonuyla açılır; scrim / kapat butonu / Escape ile kapanır.

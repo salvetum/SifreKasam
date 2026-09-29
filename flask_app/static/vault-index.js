@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Index / Kart Listesi modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Index / Kart Listesi modülü (ES Module)
  *
  * 9. bölüm: kart arama/filtreleme, sayfalama, geçmiş modalı,
  * silme onayı, pin toggle ve tepsi ayarı.
@@ -19,6 +19,9 @@ export function initVaultIndex({
   copyToClipboard,
   kasaModalAc,
   refreshStatsBar,
+  applyAppearance,
+  applyGlassQuality,
+  getCurrentBackground,
 }) {
 
   if (document.getElementById('card-container')) {
@@ -45,6 +48,11 @@ export function initVaultIndex({
     let statsFilter = null;
     let vaultStats = { zayif_ids: [], eski_ids: [], expired_ids: [] };
     let statsLoadPromise = null;
+    /* /api/stats isteğinin sahibi app.js'teki refreshStatsBar (aynı yanıtla
+       istatistik barını da boyar). Burada ikinci bir fetch açmıyoruz. */
+    const loadStats = () => (typeof refreshStatsBar === 'function'
+      ? refreshStatsBar()
+      : apiJson('/api/stats').catch(() => null));
 
     const normalizeSearchText = (value) =>
       String(value || '').toLocaleLowerCase(window.LANG || 'tr').trim();
@@ -249,11 +257,12 @@ export function initVaultIndex({
     // ── İstatistik filtresi (zayıf / eski / süresi dolmuş id'leri) ──
     const markWeakCards = () => {
       const weakSet = new Set((vaultStats.zayif_ids || []).map(String));
-      getCards().forEach(w => {
-        const chip = w.querySelector('.card-weak-chip');
-        const isWeak = weakSet.has(String(w.dataset.id || ''));
+      // kartCache zaten {wrapper,id,...} taşıyor → tam DOM sorgusu gereksiz
+      cardCache.forEach(({ wrapper }) => {
+        const chip = wrapper.querySelector('.card-weak-chip');
+        const isWeak = weakSet.has(String(wrapper.dataset.id || ''));
         if (chip) chip.hidden = !isWeak;
-        w.classList.toggle('card-is-weak', isWeak);
+        wrapper.classList.toggle('card-is-weak', isWeak);
       });
     };
 
@@ -275,8 +284,9 @@ export function initVaultIndex({
 
     const ensureStats = (force = false) => {
       if (statsLoadPromise && !force) return statsLoadPromise;
-      statsLoadPromise = apiJson('/api/stats')
+      statsLoadPromise = loadStats()
         .then(data => {
+          if (!data) throw new Error('stats-load-failed');
           vaultStats = {
             zayif_ids: (data && Array.isArray(data.zayif_ids)) ? data.zayif_ids : [],
             eski_ids: (data && Array.isArray(data.eski_ids)) ? data.eski_ids : [],
@@ -577,7 +587,8 @@ export function initVaultIndex({
             rebuildCardCache();
             filterCards({ preservePage: true, animate: true });
           }
-          refreshStatsBar();
+          // ensureStats(true) içindeki refreshStatsBar hem barı boyar hem
+          // vaultStats'ı tazeler → eskiden buradaki 2 satır 2 ayrı istek atıyordu
           ensureStats(true);
           showToast({
             ...TOAST_BASE,
@@ -679,4 +690,231 @@ export function initVaultIndex({
     }
   }
 
+  // ── İlk Açılış Karşılaması (Onboarding) ──
+  const onboardingModal = document.getElementById('onboardingModal');
+  if (onboardingModal) {
+    initOnboarding({
+      modal: onboardingModal,
+      apiPost,
+      applyAppearance,
+      applyGlassQuality,
+      getCurrentBackground,
+      kasaModalAc,
+      kasaModalKapat: window.kasaModalKapat,
+      startPageLoading: window.KASA_SET_PAGE_LOADING,
+    });
+  }
+
+}
+
+/* Onboarding sihirbazı: boş kasada ilk açılışta tema / vurgu rengi /
+   cam efektleri + dil seçimi sunar; canlı önizlemeyle uygular. */
+function initOnboarding({
+  modal,
+  apiPost,
+  applyAppearance,
+  applyGlassQuality,
+  getCurrentBackground,
+  kasaModalAc,
+  kasaModalKapat,
+  startPageLoading,
+}) {
+  const root = document.documentElement;
+  const shouldShow = modal.dataset.kasaOnboarding === 'true';
+  const bodyHandlersBound = modal.dataset.kasaOnbBound === 'true';
+  if (shouldShow && !bodyHandlersBound) {
+    modal.dataset.kasaOnbBound = 'true';
+
+    const panels = modal.querySelectorAll('[data-onb-step]');
+    const dots = modal.querySelectorAll('[data-onb-step-dot]');
+    const prevBtn = modal.querySelector('[data-onb-nav="prev"]');
+    const nextBtn = modal.querySelector('[data-onb-nav="next"]');
+    const finishBtn = modal.querySelector('[data-onb-finish]');
+    const skipBtn = modal.querySelector('[data-onb-skip]');
+    const langSelect = modal.querySelector('[data-onb-lang]');
+    const themeSegs = modal.querySelectorAll('[data-onb-theme]');
+    const accentSegs = modal.querySelectorAll('[data-onb-accent]');
+    const glassToggle = modal.querySelector('[data-onb-glass-toggle]');
+    const qualitySegs = modal.querySelectorAll('[data-onb-quality]');
+    const glassStateLabel = modal.querySelector('[data-onb-glass-state]');
+
+    const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const VALID_THEME_MODES = ['light', 'dark', 'system'];
+    const QUALITY_LABELS = { low: 'Düşük', normal: 'Normal', high: 'Yüksek' };
+    const ACCENT_COLORS = ['#7c6ff7', '#38bdf8', '#22c55e', '#f59e0b', '#f43f5e', '#14b8a6', '#6366f1', '#84cc16'];
+    let currentStep = 1;
+    let completionPosted = false;
+
+    const resolveEffectiveTheme = (mode) => {
+      if (mode === 'system') return systemThemeQuery.matches ? 'dark' : 'light';
+      return mode === 'light' ? 'light' : 'dark';
+    };
+
+    const applyThemeMode = (mode) => {
+      if (!VALID_THEME_MODES.includes(mode)) mode = 'dark';
+      const effective = resolveEffectiveTheme(mode);
+      root.setAttribute('data-bs-theme', effective);
+      localStorage.setItem('kasa-theme', effective);
+      localStorage.setItem('kasa-theme-mode', mode);
+      themeSegs.forEach(seg => {
+        const isActive = seg.dataset.onbTheme === mode;
+        seg.classList.toggle('is-active', isActive);
+        seg.setAttribute('aria-pressed', String(isActive));
+      });
+      apiPost('/settings/theme-mode', { theme_mode: mode });
+    };
+
+    const applyAccent = (accent) => {
+      const normalizedAccent = ACCENT_COLORS.includes(accent.toLowerCase())
+        ? accent.toLowerCase()
+        : accent;
+      accentSegs.forEach(seg => {
+        const isActive = seg.dataset.onbAccent.toLowerCase() === normalizedAccent.toLowerCase();
+        seg.classList.toggle('is-active', isActive);
+        seg.setAttribute('aria-pressed', String(isActive));
+      });
+      applyAppearance(normalizedAccent, getCurrentBackground());
+      apiPost('/settings/appearance', { accent_color: normalizedAccent });
+    };
+
+    const normalizeGlassQuality = (quality) => {
+      const q = String(quality || '');
+      return ['low', 'normal', 'high'].includes(q) ? q : 'normal';
+    };
+
+    const syncGlassUI = () => {
+      const effectsOn = root.getAttribute('data-glass-effects') !== 'off';
+      const quality = normalizeGlassQuality(root.getAttribute('data-glass-quality'));
+      if (glassToggle) glassToggle.checked = effectsOn;
+      qualitySegs.forEach(seg => {
+        const isActive = seg.dataset.onbQuality === quality;
+        seg.classList.toggle('is-active', isActive);
+        seg.setAttribute('aria-pressed', String(isActive));
+      });
+      if (glassStateLabel) {
+        glassStateLabel.textContent = effectsOn
+          ? window._(QUALITY_LABELS[quality] || 'Normal')
+          : window._('Kapalı');
+      }
+    };
+
+    const applyGlassEffects = (enabled) => {
+      const value = enabled ? 'on' : 'off';
+      root.setAttribute('data-glass-effects', value);
+      localStorage.setItem('kasa-glass-effects', value);
+      syncGlassUI();
+      apiPost('/settings/glass-effects', { enabled });
+    };
+
+    const applyQuality = (quality) => {
+      const normalizedQuality = applyGlassQuality(quality);
+      syncGlassUI();
+      if (glassStateLabel) glassStateLabel.textContent = window._(QUALITY_LABELS[normalizedQuality] || 'Normal');
+      apiPost('/settings/appearance', { glass_quality: normalizedQuality });
+    };
+
+    const goToStep = (target) => {
+      const next = Math.min(3, Math.max(1, Number(target) || 1));
+      const direction = next > currentStep ? 'fwd' : (next < currentStep ? 'back' : null);
+      currentStep = next;
+      let activePanel = null;
+      panels.forEach(panel => {
+        const panelStep = Number(panel.dataset.onbStep);
+        const isActive = panelStep === currentStep;
+        panel.hidden = !isActive;
+        panel.classList.toggle('is-active', isActive);
+        panel.classList.remove('onb-panel-anim', 'onb-panel-fwd', 'onb-panel-back');
+        if (isActive) activePanel = panel;
+      });
+      if (direction && activePanel) {
+        void activePanel.offsetWidth;
+        activePanel.classList.add('onb-panel-anim', direction === 'fwd' ? 'onb-panel-fwd' : 'onb-panel-back');
+      }
+      dots.forEach(dot => {
+        const dotStep = Number(dot.dataset.onbStepDot);
+        dot.classList.toggle('is-active', dotStep === currentStep);
+        dot.classList.toggle('is-done', dotStep < currentStep);
+      });
+      prevBtn.hidden = currentStep === 1;
+      nextBtn.hidden = currentStep === 3;
+      finishBtn.hidden = currentStep !== 3;
+    };
+
+    const postCompletion = () => {
+      if (completionPosted) return;
+      completionPosted = true;
+      apiPost('/settings/onboarding', { done: true }).catch(() => {
+        completionPosted = false;
+      });
+    };
+
+    // ── Gezinme ──
+    nextBtn?.addEventListener('click', () => goToStep(currentStep + 1));
+    prevBtn?.addEventListener('click', () => goToStep(currentStep - 1));
+    finishBtn?.addEventListener('click', () => {
+      postCompletion();
+      if (kasaModalKapat) kasaModalKapat('onboardingModal');
+    });
+    skipBtn?.addEventListener('click', () => {
+      postCompletion();
+      if (kasaModalKapat) kasaModalKapat('onboardingModal');
+    });
+    // X / overlay / Esc ile kapanınca da tamamlanmış say
+    modal.addEventListener('kasa:modal-closing', postCompletion);
+
+    // ── Dil ──
+    if (langSelect) {
+      langSelect.addEventListener('change', () => {
+        const lang = langSelect.value;
+        startPageLoading?.(true, {
+          title: window._('Dil değiştiriliyor…'),
+          subtitle: window._('Arayüz seçilen dilde yeniden yükleniyor.'),
+        });
+        apiPost('/settings/language', { language: lang }).then((response) => {
+          if (!response || !response.ok) throw new Error('language-save-failed');
+          localStorage.setItem('kasa-lang', lang);
+          window.location.reload();
+        }).catch(() => {
+          startPageLoading?.(false);
+          langSelect.value = window.LANG || 'tr';
+          window.KASA_SHOW_WARNING_TOAST?.(window._('Dil değiştirilemedi.'));
+        });
+      });
+    }
+
+    // ── Tema ──
+    themeSegs.forEach(seg => seg.addEventListener('click', () => applyThemeMode(seg.dataset.onbTheme)));
+
+    // ── Vurgu rengi ──
+    accentSegs.forEach(seg => seg.addEventListener('click', () => applyAccent(seg.dataset.onbAccent)));
+
+    // ── Cam efekleri / kalite ──
+    glassToggle?.addEventListener('change', () => applyGlassEffects(glassToggle.checked));
+    qualitySegs.forEach(seg => seg.addEventListener('click', () => applyQuality(seg.dataset.onbQuality)));
+
+    // ── Başlangıç durumu + açılış ──
+    const initialMode = localStorage.getItem('kasa-theme-mode') || 'dark';
+    applyThemeMode(VALID_THEME_MODES.includes(initialMode) ? initialMode : 'dark');
+    const initialAccent = (window.KASA_APPEARANCE && window.KASA_APPEARANCE.accent)
+      || localStorage.getItem('kasa-accent') || '#7c6ff7';
+    accentSegs.forEach(seg => {
+      const isActive = seg.dataset.onbAccent.toLowerCase() === initialAccent.toLowerCase();
+      seg.classList.toggle('is-active', isActive);
+      seg.setAttribute('aria-pressed', String(isActive));
+    });
+    syncGlassUI();
+    goToStep(1);
+
+    const openWhenReady = (startedAt) => {
+      // is-page-loading hiç kalkmazsa (örn. gezinme iptali / hata) sonsuz
+      // rAF döngüsüne takılmamak için 5 sn'lik üst sınır uygula.
+      if (document.body.classList.contains('is-page-loading')
+          && Date.now() - startedAt < 5000) {
+        window.requestAnimationFrame(() => openWhenReady(startedAt));
+        return;
+      }
+      window.setTimeout(() => kasaModalAc('onboardingModal'), 260);
+    };
+    openWhenReady(Date.now());
+  }
 }

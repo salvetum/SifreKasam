@@ -6,16 +6,13 @@
    GPU compositing'e alabilir.
 
    KAPSAM: iki özel yüzeyde sabit parametreler, diğer tüm
-   .glass / .glass-sm yüzeylerde boyut-tabanlı kademeli kırılma:
+   .glass yüzeylerde boyut-tabanlı kademeli kırılma:
      .settings-modal-content  →  #kasa-liquid-settings  (blur 22)
      .entry-login-card        →  #kasa-liquid-login     (blur 13)
-     .glass / .glass-sm       →  boyuta göre tier:
+     .glass                   →  boyuta göre tier:
          büyük yüzeyler (≥150000 px²) : blur 20, saturate 1.4
          orta yüzeyler   (≥40000 px²)  : blur 14, saturate 1.3
          küçük yüzeyler               : blur  9, saturate 1.25
-
-   Tek yüzeyi devre dışı bırakmak için o elemente
-   data-kasa-refraction="off" ekleyin.
 
    data-glass-quality ≠ high, data-glass-effects="off" veya
    data-kasa-low-power="on" → hiçbir katman uygulanmaz, blur CSS'e
@@ -48,7 +45,6 @@
      çok küçük/kapalı modal içindeki yüzeyler için null. */
   function visibleRect(el) {
     if (!el || !el.isConnected) return null;
-    if (el.getAttribute && el.getAttribute('data-kasa-refraction') === 'off') return null;
     var rect = el.getBoundingClientRect();
     if (rect.width < 40 || rect.height < 40) return null;
     var modal = el.closest('.kasa-modal');
@@ -112,11 +108,11 @@
       }, enabled);
     }
 
-    /* Tüm diğer .glass / .glass-sm yüzeyler: boyut-tabanlı tier.
+    /* Tüm diğer .glass yüzeyler: boyut-tabanlı tier.
        Vault kartları (.vault-card-shell) hariç: kartlar kalıcı
        CSS --glass-vivid-blur ile GPU tarafından boyanır; JS tier
        override'i çift render (glass flash) yaratır. */
-    var nodes = document.querySelectorAll('.glass:not(.vault-card-shell), .glass-sm:not(.vault-card-shell)');
+    var nodes = document.querySelectorAll('.glass:not(.vault-card-shell)');
     for (i = 0; i < nodes.length; i++) {
       var node = nodes[i];
       if (seen.has(node)) continue;
@@ -128,9 +124,17 @@
   function init() {
     refreshAll();
 
+    /* ── TETİK YOLU (c): kök nitelikleri ──────────────────────────
+       data-glass-quality / data-glass-effects / data-glass-blur /
+       data-kasa-low-power / data-bs-theme (tema geçişi) değişimi.
+       data-bs-theme daha önce bu listede yoktu; tema değişimi cam
+       yüzeyleri doğrudan etkilediği için eklendi. */
     new MutationObserver(refreshAll).observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-glass-quality', 'data-glass-effects', 'data-glass-blur', 'data-kasa-low-power']
+      attributeFilter: [
+        'data-glass-quality', 'data-glass-effects', 'data-glass-blur',
+        'data-kasa-low-power', 'data-bs-theme'
+      ]
     });
 
     var settingsModal = document.getElementById('settingsModal');
@@ -141,10 +145,33 @@
       });
     }
 
-    /* Görünürlük değişimlerinde (filtre/sayfa geçişi, modal aç/kapa)
-       anında buğu uygulanması için senkron bir kanal. Gönderen taraf
-       (ör. vault-index) kartlar görünür olduğunda bu event'i fırlatır. */
+    /* ── TETİK YOLU (a): uygulama olayları ────────────────────────
+       kasa:glass-refresh : vault-index.js cam kart görünürlüğü,
+                            blur/veil ölçek değişimi (app.js:1367)
+       kasa:cards-page-changed : filtre/sayfalama/derin filtre sonrası
+                            kart sayfası değişti (vault-index.js:224,
+                            lock.html:112) — bu olay daha önce HİÇBİR
+                            dinleyiciye sahip değildi, gövde gözlemcisi
+                            dolaylı olarak karşılıyordu. */
     window.addEventListener('kasa:glass-refresh', refreshAll);
+    window.addEventListener('kasa:cards-page-changed', refreshAll);
+
+    /* ── TETİK YOLU (b): modal açılışı / kapanışı ─────────────────
+       Eski gövde gözlemcisi `class` değişimini izleyerek bunu
+       dolaylı olarak yakalıyordu. Artık modal sistemi olayları
+       doğrudan dinleniyor: kasaModalAc her açılışta
+       `kasa:modal-opened`, kasaModalKapat her kapanışta
+       `kasa:modal-closing` fırlatır (modal-system.js).
+       Ölçüm, açılış animasyonunun (rAF) ve kapanış gecikmesinin
+       (190ms) SONUNDA alınır. */
+    window.addEventListener('kasa:modal-opened', function () {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { refreshAll(); });
+      });
+    });
+    window.addEventListener('kasa:modal-closing', function () {
+      setTimeout(refreshAll, 220);
+    });
 
     /* Boyut değişimlerinde tier'ı güncelle. ResizeObserver, pencere
        resize + modal açılış animasyonu + font değişimi gibi tüm boyut
@@ -161,18 +188,45 @@
 
     var resizeObserver = null;
 
+    /* ResizeObserver.observe() aynı hedef için idempotenttir; bu yüzden
+       artık disconnect() + yeniden observe() zinciri YOK. Önceden her
+       DOM mutasyonunda tüm cam yüzeyleri gözlemden çıkarılıp geri
+       bağlanıyordu (O(n) unobserve/observe churn). */
+    function observeSurface(el) {
+      if (typeof ResizeObserver === 'undefined' || !el) return;
+      if (!resizeObserver) resizeObserver = new ResizeObserver(scheduleResizeRefresh);
+      resizeObserver.observe(el);
+    }
     function rescanObservedSurfaces() {
       if (typeof ResizeObserver === 'undefined') return;
-      if (!resizeObserver) resizeObserver = new ResizeObserver(scheduleResizeRefresh);
-      resizeObserver.disconnect();
-      var els = document.querySelectorAll('.glass:not(.vault-card-shell), .glass-sm:not(.vault-card-shell)');
-      for (var i = 0; i < els.length; i++) resizeObserver.observe(els[i]);
+      var els = document.querySelectorAll('.glass:not(.vault-card-shell)');
+      for (var i = 0; i < els.length; i++) observeSurface(els[i]);
     }
     rescanObservedSurfaces();
 
-    /* Dinamik eklenen/çıkan cam yüzeyler + hidden/class görünürlük
-       değişimleri için (debounced). hidden değişimi childList değil
-       attribute olduğundan ayrıca izlenir. */
+    /* ── TETİK YOLU (d): yeni DOM + gizlilik değişimleri ──────────
+       childList : yeni eklenen/çıkan düğümler (yeni cam yüzeyleri)
+       hidden    : kart ve menü görünürlüğü (wrapper.hidden = …)
+       `class` BİLEREK İZLENMİYOR: 60+ kartta filtre/sayfalama her
+       adımda yüzlerce class değişimi üretiyordu ve vault kartları
+       zaten .vault-card-shell olarak dışlanıyor. Cam etkileyen class
+       değişimlerinin tamamı yukarıdaki olay/nitelik yollarıyla
+       kapsanıyor:
+         · modal is-visible/is-open  → kasa:modal-opened/closing
+         · dropdown menü is-open     → aşağıdaki portal gözlemcisi
+         · .glass-grain/.kasa-frost  → data-kasa-low-power / quality
+         · swal2-shown               → vücut ölçümü değiştirmez
+       Gizli kalan cam yüzey: portal kökü (bildirim menüsü + tooltip). */
+    var portalRoot = document.getElementById('kasa-portal-root');
+    if (portalRoot) {
+      new MutationObserver(function () {
+        requestAnimationFrame(refreshAll);
+      }).observe(portalRoot, {
+        attributes: true,
+        attributeFilter: ['class', 'hidden']
+      });
+    }
+
     var domTimer = null;
     new MutationObserver(function () {
       if (domTimer) return;
@@ -185,14 +239,9 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['hidden', 'class']
+      attributeFilter: ['hidden']
     });
   }
-
-  /* Tek element glass uygulaması — vault-index.js tarafından
-     kart görünür olduğunda forced reflow'dan HEMEN ÖNCE çağrılır.
-     Vault kartları saf CSS --glass-vivid-blur ile boyanır; no-op. */
-  window.__kasaGlassApply = function () {};
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

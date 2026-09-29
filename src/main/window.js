@@ -199,13 +199,24 @@ async function createWindow() {
   // tüm isteklere token enjekte etmek XSS durumunda CSRF korumasını baypas eder.
   const _TOKEN_INJECT_PATHS = new Set([
     '/heartbeat', '/shutdown', '/api/lan-info', '/settings/runtime',
+    // GET-only okuma yolları (aşağıdaki _TOKEN_INJECT_GET_ONLY ile sınırlı):
+    '/settings/tray', '/settings/language',
   ]);
+  // Bu iki yol 200 dönen JSON okuma uçları; backend tarafında CSRF muafiyetli
+  // (_TOKEN_ENDPOINTS / _PUBLIC_ENDPOINTS) kabul ediliyor ancak ana süreç
+  // buraya token enjekte etmiyordu — oturumsuz/yeniden yüklenen renderer'da
+  // istek 403/302 ile karşılaşıyordu. Yalnızca GET'e eklenir: aynı yolların
+  // POST'ları (ayarları yazma) hâlâ oturum + X-CSRF-Token ister, böylece
+  // CSRF muafiyeti state-changing isteklere yayılmaz.
+  const _TOKEN_INJECT_GET_ONLY = new Set(['/settings/tray', '/settings/language']);
   rt.mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
     { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/*`] },
     (details, callback) => {
       try {
         const { pathname } = new URL(details.url);
-        if (_TOKEN_INJECT_PATHS.has(pathname)) {
+        const isTokenPath = _TOKEN_INJECT_PATHS.has(pathname);
+        const isGetOnlyPath = _TOKEN_INJECT_GET_ONLY.has(pathname);
+        if (isTokenPath && (!isGetOnlyPath || details.method === 'GET')) {
           details.requestHeaders['X-App-Token'] = APP_TOKEN;
         }
       } catch (_) {}

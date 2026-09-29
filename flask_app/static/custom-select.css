@@ -628,7 +628,6 @@
 .kasa-modal.is-open .generator-history-card { animation-delay: 90ms; }
 
 .generator-strength-card,
-.generator-option-grid label,
 .gen-history-item {
     border-radius: var(--control-radius);
 }
@@ -646,7 +645,6 @@
     text-align: center;
 }
 
-.generator-option-grid label,
 .vault-generator-panel .page-generator-options label {
     align-items: center;
     min-height: 42px;
@@ -684,7 +682,6 @@
     gap: 1.15rem;
 }
 
-.vault-form-hero,
 .vault-form-panel,
 .vault-form-actions {
     border-radius: var(--panel-radius);
@@ -724,7 +721,6 @@
     border-radius: calc(var(--panel-radius) - 4px);
 }
 
-html[data-glass-effects="off"] .vault-form-hero,
 html[data-glass-effects="off"] .vault-form-panel,
 html[data-glass-effects="off"] .vault-form-actions,
 html[data-glass-effects="off"] .settings-card {

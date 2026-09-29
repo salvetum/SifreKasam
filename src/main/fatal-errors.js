@@ -7,7 +7,7 @@ const { app, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const SAFE_MODE_FLAG = '--sifrekasam-safe-mode';
 
@@ -43,7 +43,11 @@ function isRunningAsAdmin() {
   if (process.platform !== 'win32') return false;
   try {
     const netPath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'net.exe');
-    execSync(`"${netPath}" session`, { stdio: 'ignore', timeout: 3000 });
+    // Kabuk dizesi yerine doğrudan spawn: SystemRoot çevre değişkeni kontrol
+    // edildiği için yol güvenilir, ancak execSync her çağrıda cmd.exe
+    // zincirinden geçtiği için SystemRoot'a gömülü bir karakter (örn. `&`)
+    // komut enjeksiyonuna ve konsol penceresi açılmasına yol açabilirdi.
+    execFileSync(netPath, ['session'], { stdio: 'ignore', timeout: 3000 });
     return true;
   } catch (_) {
     return false;

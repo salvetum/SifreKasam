@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Renk Matematiği modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Renk Matematiği modülü (ES Module)
  *
  * Hex renk ayrıştırma, RGB/HSV dönüşümleri ve accent karışımları.
  * Saf fonksiyonlar; DOM veya ağ erişimi yoktur. app.js ile base.html
@@ -21,7 +21,7 @@ export const hexToRgb = (hex) => {
   ].join(', ');
 };
 
-export const hexToChannels = (hex) =>
+const hexToChannels = (hex) =>
   hexToRgb(hex).split(',').map(channel => Number(channel.trim()));
 
 export const hexToHsv = (hex) => {

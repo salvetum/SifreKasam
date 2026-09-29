@@ -6,6 +6,35 @@
     <meta name="description" content="ŞifreKasam güvenli giriş ekranı hazırlanıyor.">
     <meta name="theme-color" content="#080912">
     <meta name="color-scheme" content="dark light">
+    <!-- ── BU BELGEDE NASIL CSP UYGULANIR ────────────────────────────────────
+         Bu dosya iki farklı bağlamda yüklenir:
+           1) Ana süreç `loadFile()` ile file:// üzerinden yükler
+              (src/main/page-loader.js → resolveLoadingPagePath). Bu yolda Flask
+              hiç devreye girmez: ne csp_nonce üretilir ne de add_security_headers
+              çalışır → sayfa BELGESİZ CSP ile açılırdı.
+           2) GET /loading herkese açık uçtan Jinja ile render edilir
+              (app.py: loading_page) → gerçek nonce'lu header CSP'si zaten
+              uygulanmaktadır.
+         Aşağıdaki meta (1) yolundaki boşluğu kapatır. (2) yolunda header ile
+         KESİŞİM (intersection) uygulanır: bir politika diğerini genişletemez,
+         dolayısıyla header'daki gerçek nonce zorunluluğu gevşemez.
+         Ayrıntılar:
+           * 'unsafe-inline' yalnızca (1) yolu için gerekli: statik dosyada nonce
+             üretilemez ve sayfanın tüm CSS'i/script'i satır içidir. (2) yolda
+             header `script-src 'self' 'nonce-…'` zaten nonce'suz satır içi
+             script'i bloke eder.
+           * Aşağıdaki satırlardaki nonce="{{ csp_nonce }}" öznitelikleri
+             BİLEREK KORUNMUŞTUR: (2) yolunda gerçek nonce'tir ve olmazsa
+             header CSP inline script/style'i bloke ederdi; (1) yolunda geçersiz
+             bir değer olduğu için zaten yok sayılır.
+           * font-src'a eklenen `file:` yalnızca (1) yolu içindir: Chromium'da
+             'self' kaynağı file:// belgelerinde belgenin kendi yoluna birebir
+             eşleşir, ../static/fonts/sora.woff2 eşleşmezdi ve yazı tipi
+             kesilirdi. (2) yolunda header'daki `font-src 'self' data:` ile
+             kesiştiği için fazladan izin vermez.
+           * frame-ancestors meta ile verilemez (Chromium meta'da yok sayar);
+             (2) yolunda header'de 'none'. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src-attr 'none'; img-src 'self' data: blob:; font-src 'self' data: file:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'">
     <title>SifreKasam</title>
     <style nonce="{{ csp_nonce }}" id="loading-runtime-styles"></style>
     <script nonce="{{ csp_nonce }}">

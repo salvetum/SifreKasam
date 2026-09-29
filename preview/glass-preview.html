@@ -136,11 +136,11 @@
         </div>
 
         <div class="preview-section">
-            <h3>Vault Kartları (.vault-card-shell.glass)</h3>
+            <h3>Vault Kartları (.vault-card-shell)</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="card-container">
 
                 <article class="card-wrapper vault-card card-animated">
-                    <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
+                    <div class="vault-card-shell h-full flex flex-col rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
                         <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
                             <div class="vault-card-header flex justify-between items-start mb-3">
                                 <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
@@ -181,7 +181,7 @@
                 </article>
 
                 <article class="card-wrapper vault-card card-animated">
-                    <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
+                    <div class="vault-card-shell h-full flex flex-col rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
                         <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
                             <div class="vault-card-header flex justify-between items-start mb-3">
                                 <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
@@ -222,7 +222,7 @@
                 </article>
 
                 <article class="card-wrapper vault-card card-animated">
-                    <div class="vault-card-shell h-full flex flex-col glass rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
+                    <div class="vault-card-shell h-full flex flex-col rounded-2xl shadow-lg hover:border-kasa-border-hi transition-all duration-200 overflow-hidden">
                         <div class="vault-card-body flex flex-col flex-1 p-4 pb-3">
                             <div class="vault-card-header flex justify-between items-start mb-3">
                                 <div class="vault-title-line flex items-center gap-2 min-w-0 pr-2">
@@ -250,34 +250,43 @@
         <div class="preview-section" style="max-width: 560px;">
             <h3>Ayarlar — switch &amp; aksiyon kartları (cam ailesi)</h3>
             <div style="display:grid; gap:0.7rem;">
-                <div class="settings-toggle-card">
-                    <div class="settings-toggle-main">
-                        <div class="settings-toggle-copy">
+                <div class="settings-card settings-card-toggle">
+                    <div class="settings-card-head">
+                        <span class="settings-card-icon"><i class="fa-solid fa-microchip"></i></span>
+                        <div class="settings-card-copy">
                             <h4>Donanım Hızlandırma</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">Grafik performansı için GPU hızlandırmayı kullan.</p>
+                            <p>Grafik performansı için GPU hızlandırmayı kullan.</p>
                         </div>
+                    </div>
+                    <div class="settings-card-control">
                         <div class="settings-switch-control">
                             <input class="settings-switch-input" type="checkbox" checked>
                         </div>
                     </div>
                 </div>
-                <div class="settings-toggle-card">
-                    <div class="settings-toggle-main">
-                        <div class="settings-toggle-copy">
+                <div class="settings-card settings-card-toggle">
+                    <div class="settings-card-head">
+                        <span class="settings-card-icon"><i class="fa-solid fa-inbox"></i></span>
+                        <div class="settings-card-copy">
                             <h4>Tepsiye Küçült</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">Kapatınca uygulamayı sistem tepsisinde tut.</p>
+                            <p>Kapatınca uygulamayı sistem tepsisinde tut.</p>
                         </div>
+                    </div>
+                    <div class="settings-card-control">
                         <div class="settings-switch-control">
                             <input class="settings-switch-input" type="checkbox">
                         </div>
                     </div>
                 </div>
-                <div class="settings-toggle-card">
-                    <div class="settings-toggle-main">
-                        <div class="settings-toggle-copy">
+                <div class="settings-card settings-card-toggle">
+                    <div class="settings-card-head">
+                        <span class="settings-card-icon"><i class="fa-solid fa-fill-drip"></i></span>
+                        <div class="settings-card-copy">
                             <h4>Cam Efektleri</h4>
-                            <p class="text-xs text-kasa-text-muted mb-0">Buzlu cam yüzeylerini aç/kapat.</p>
+                            <p>Buzlu cam yüzeylerini aç/kapat.</p>
                         </div>
+                    </div>
+                    <div class="settings-card-control">
                         <div class="settings-switch-control">
                             <input class="settings-switch-input" type="checkbox" checked>
                         </div>

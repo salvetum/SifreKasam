@@ -53,7 +53,6 @@ module.exports = {
       /^\/opencode\.json$/,
       /^\/\.pytest_cache($|\/)/,
       /^\/forge\.config\.js$/,
-      /^\/_chk.*\.py$/,
       /^\/preview($|\/)/,
       /^\/tests($|\/)/,
       /^\/docs($|\/)/,

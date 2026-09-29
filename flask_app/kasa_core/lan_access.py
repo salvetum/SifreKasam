@@ -19,7 +19,11 @@ from kasa_core.crypto import (
     hash_master_password,
     new_salt_b64,
 )
+from kasa_core.extensions import db
 from kasa_core.models import Setting
+from kasa_core.settings_store import forget_setting as _forget_setting
+from kasa_core.settings_store import get_setting as _get_setting
+from kasa_core.settings_store import set_setting as _set_setting
 
 log = logging.getLogger(__name__)
 
@@ -29,20 +33,6 @@ LAN_VAULT_WRAP_SETTING = 'lan_vault_wrap'
 
 LAN_PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'  # 0/o/1/i/l karışıklığı önlenir
 LAN_PASSWORD_LENGTH = 10
-
-
-def _get_setting(key: str) -> str | None:
-    setting = Setting.query.filter_by(key=key).first()
-    return setting.value if setting else None
-
-
-def _set_setting(key: str, value: str) -> None:
-    setting = Setting.query.filter_by(key=key).first()
-    if setting:
-        setting.value = value
-    else:
-        from kasa_core.extensions import db
-        db.session.add(Setting(key=key, value=value))
 
 
 def generate_password() -> str:
@@ -123,6 +113,9 @@ def clear_settings() -> None:
     for key in (LAN_ACCESS_HASH_SETTING, LAN_ACCESS_SECRET_SETTING,
                 LAN_VAULT_WRAP_SETTING):
         Setting.query.filter_by(key=key).delete()
+        # Toplu delete() önbelleği bayat bırakır; aynı istekte yeniden üretim
+        # kararı bu anahtarları okuduğu için önbellekten düşürülmeleri gerekir.
+        _forget_setting(key)
 
 
 def refresh_bindings(old_key: bytes, new_key: bytes) -> None:
@@ -137,9 +130,7 @@ def refresh_bindings(old_key: bytes, new_key: bytes) -> None:
         _set_setting(LAN_ACCESS_SECRET_SETTING, encrypt_access_secret(new_key, lan_password))
         _set_setting(LAN_VAULT_WRAP_SETTING,
                      build_vault_wrap(lan_password, new_key))
-        from kasa_core.extensions import db
         db.session.commit()
     except Exception:
-        from kasa_core.extensions import db
         db.session.rollback()
         log.exception('LAN erisim sarmallari yenilenemedi.')

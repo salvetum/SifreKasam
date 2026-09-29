@@ -1,6 +1,6 @@
 """Application constants shared by backend modules."""
 
-APP_VERSION_DEFAULT = "2.7.0-beta.3"
+APP_VERSION_DEFAULT = "2.7.0-beta.4"
 UPDATE_REPOSITORY = "salvetum/SifreKasam"
 UPDATE_RELEASE_API = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
 
@@ -24,6 +24,10 @@ CUSTOM_BACKGROUND_HISTORY_LIMIT = 8
 CUSTOM_BACKGROUND_UPLOAD_WINDOW_SECONDS = 60
 CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW = 5
 CARD_PAGE_SIZE = 50
+# İlk kurulum ön kontrolü: bu kadar boş alan yoksa kurulum başlatılmaz,
+# bu kadarın altında ama üstündeyse kullanıcıya bilgilendirme uyarısı gösterilir.
+SETUP_MIN_FREE_BYTES = 100 * 1024 * 1024
+SETUP_RECOMMENDED_FREE_BYTES = 500 * 1024 * 1024
 DEFAULT_CHROMA_ACCENT_ENABLED = False
 DEFAULT_CHROMA_ACCENT_SPEED = 15
 VALID_CHROMA_ACCENT_SPEEDS = {8, 15, 30, 60}
@@ -35,6 +39,8 @@ GLASS_BLUR_MAX = 1.5
 DEFAULT_GLASS_VEIL = 1.0
 GLASS_VEIL_MIN = 0.0
 GLASS_VEIL_MAX = 2.0
+DEFAULT_GLASS_FROST = "off"
+VALID_GLASS_FROSTS = {"off", "low", "med", "high"}
 VALID_THEME_MODES = {"light", "dark", "system"}
 DEFAULT_THEME_MODE = "dark"
 DEFAULT_ANIMATED_BACKGROUNDS_ENABLED = True
@@ -54,4 +60,4 @@ PBKDF2_ITERATIONS = 600_000
 LEGACY_PBKDF2_ITERATIONS = 100_000
 RECORD_METADATA_PREFIX = "sifrekasam:v1:"
 RECORD_METADATA_SETTING = "record_metadata_encryption_v1"
-RECORD_METADATA_FIELDS = ("title", "website_url", "login", "email")
+RECORD_METADATA_FIELDS = ("title", "website_url", "login", "email", "card_holder")

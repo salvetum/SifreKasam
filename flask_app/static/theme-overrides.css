@@ -39,8 +39,6 @@
         rgba(242,245,251,0.78);
 }
 
-[data-bs-theme="light"] .settings-toggle-card,
-[data-bs-theme="light"] .settings-select-card,
 [data-bs-theme="light"] .settings-action-card,
 [data-bs-theme="light"] .settings-card {
     color: var(--text);
@@ -71,8 +69,6 @@
 }
 
 html[data-glass-effects="off"] .settings-nav,
-html[data-glass-effects="off"] .settings-toggle-card,
-html[data-glass-effects="off"] .settings-select-card,
 html[data-glass-effects="off"] .settings-action-card,
 html[data-glass-effects="off"] .settings-card,
 html[data-glass-effects="off"] .background-choice-grid button,
@@ -109,8 +105,6 @@ html[data-glass-effects="off"] .settings-switch-input:checked {
 }
 
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-nav,
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-toggle-card,
-html[data-bs-theme="light"][data-glass-effects="off"] .settings-select-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-action-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .settings-card,
 html[data-bs-theme="light"][data-glass-effects="off"] .background-choice-grid button,
@@ -236,11 +230,6 @@ input.settings-timeout-input,
         width: 100%;
     }
 
-    .settings-select-card {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
     .settings-inline-select {
         width: 100%;
     }
@@ -332,7 +321,6 @@ html[data-kasa-gradient="off"] .filter-btn.active {
 html[data-kasa-gradient="off"] .vault-type-icon,
 html[data-kasa-gradient="off"] .card-icon-btn,
 html[data-kasa-gradient="off"] .icon-btn,
-html[data-kasa-gradient="off"] .settings-toggle-card,
 html[data-kasa-gradient="off"] .settings-action-card {
     border-color: rgba(var(--accent-rgb), 0.22) !important;
     background: rgba(var(--accent-rgb), 0.075) !important;
@@ -352,7 +340,6 @@ html[data-kasa-gradient="off"] .kasa-btn-primary {
 html[data-bs-theme="light"][data-kasa-gradient="off"] .vault-type-icon,
 html[data-bs-theme="light"][data-kasa-gradient="off"] .card-icon-btn,
 html[data-bs-theme="light"][data-kasa-gradient="off"] .icon-btn,
-html[data-bs-theme="light"][data-kasa-gradient="off"] .settings-toggle-card,
 html[data-bs-theme="light"][data-kasa-gradient="off"] .settings-action-card {
     border-color: rgba(var(--accent-rgb), 0.18) !important;
     background: rgba(var(--accent-rgb), 0.045) !important;

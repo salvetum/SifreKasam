@@ -227,7 +227,10 @@ html:not([data-kasa-card-depth="off"])[data-bs-theme="light"] .card-wrapper.vaul
         0 14px 34px var(--accent-glow);
 }
 
-/* ── Low power / efekt kapalı: pseudo katmanları gizle ─────────── */
+/* ── Low power / efekt kapalı: pseudo katmanları gizle ─────────────
+   glass.css içindeki karşılığı `.vault-card-shell.glass` bileşik
+   seçicisini kullanıyor; hiçbir element bu iki sınıfı birlikte
+   taşımadığı için o kural eşleşmiyor. Yaşayan tek kaynak burasıdır. */
 html[data-kasa-low-power="on"] .vault-card-shell::before,
 html[data-kasa-low-power="on"] .vault-card-shell::after,
 html[data-glass-effects="off"] .vault-card-shell::before,
@@ -643,4 +646,47 @@ html[data-kasa-gradient="off"] .card-pagination {
 
 @media (prefers-reduced-motion: reduce) {
     .vault-card-curtain > .card-animated { animation-delay: 0ms !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   KART FOOTER AKSİYONLARI — hover/focus'ta accent pill + kalkma.
+   Sil butonuna ayrı red pill (base !important kuralı hover rengini
+   eziyordu; daha yüksek spesifite ile düzeltildi).
+   ════════════════════════════════════════════════════════════════ */
+.vault-card-shell .footer-action-btn {
+    padding: 0.28rem 0.5rem;
+    margin: -0.28rem -0.35rem;
+    border-radius: 9px;
+    transition: color var(--speed) ease, background var(--speed) ease, transform var(--dur-fast) ease;
+}
+
+.vault-card-shell .footer-action-btn:hover,
+.vault-card-shell .footer-action-btn:focus-visible {
+    color: var(--accent-2) !important;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    transform: translateY(-1px);
+}
+
+.vault-card-shell .footer-action-btn.text-red-400:hover,
+.vault-card-shell .footer-action-btn.text-red-400:focus-visible {
+    color: #fecaca !important;
+    background: color-mix(in srgb, #ef4444 12%, transparent);
+}
+
+html[data-kasa-low-power="on"] .vault-card-shell .footer-action-btn,
+html[data-glass-effects="off"] .vault-card-shell .footer-action-btn {
+    transition: color var(--speed) ease;
+}
+
+html[data-kasa-low-power="on"] .vault-card-shell .footer-action-btn:hover,
+html[data-kasa-low-power="on"] .vault-card-shell .footer-action-btn:focus-visible,
+html[data-glass-effects="off"] .vault-card-shell .footer-action-btn:hover,
+html[data-glass-effects="off"] .vault-card-shell .footer-action-btn:focus-visible {
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vault-card-shell .footer-action-btn { transition: color var(--dur-fast) ease; }
+    .vault-card-shell .footer-action-btn:hover,
+    .vault-card-shell .footer-action-btn:focus-visible { transform: none; }
 }

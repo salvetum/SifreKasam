@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 
 
 def normalize_version(value: str | None) -> str:
-    return str(value or "").strip().lstrip("vV")
+    return str(value or "").strip().removeprefix("v").removeprefix("V")
 
 
 def version_parts(value: str | None) -> tuple[int, ...]:
@@ -16,10 +16,25 @@ def version_parts(value: str | None) -> tuple[int, ...]:
     return tuple((numbers + [0, 0, 0])[:3])
 
 
+_PRE_RELEASE_ORDER = {"dev": 0, "alpha": 1, "beta": 2, "rc": 3}
+
+
+def _version_key(value: str | None) -> tuple[tuple[int, ...], tuple[int, int, str]]:
+    """Sürümü sıralanabilir anahtar çevirir; ön sürüm ekleri de karşılaştırılır."""
+    normalized = normalize_version(value)
+    if "-" not in normalized:
+        return (version_parts(normalized), (1, 0, ""))
+    suffix = normalized.split("-", 1)[1]
+    match = re.match(r"([A-Za-z]+)\.?(\d*)", suffix)
+    if not match:
+        return (version_parts(normalized), (0, 0, normalized))
+    label = match.group(1).lower()
+    rank = _PRE_RELEASE_ORDER.get(label, 0)
+    return (version_parts(normalized), (0, rank, int(match.group(2) or 0)))
+
+
 def is_newer_version(latest: str | None, current: str | None) -> bool:
-    latest_parts = version_parts(latest)
-    current_parts = version_parts(current)
-    return bool(latest_parts) and latest_parts > current_parts
+    return bool(normalize_version(latest)) and _version_key(latest) > _version_key(current)
 
 
 def fetch_latest_release(

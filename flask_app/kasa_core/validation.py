@@ -7,6 +7,7 @@ from kasa_core.constants import (
     DEFAULT_BACKGROUND_STYLE,
     DEFAULT_CHROMA_ACCENT_SPEED,
     DEFAULT_GLASS_BLUR,
+    DEFAULT_GLASS_FROST,
     DEFAULT_GLASS_QUALITY,
     DEFAULT_GLASS_VEIL,
     DEFAULT_THEME_MODE,
@@ -16,6 +17,7 @@ from kasa_core.constants import (
     GLASS_VEIL_MIN,
     VALID_BACKGROUND_STYLES,
     VALID_CHROMA_ACCENT_SPEEDS,
+    VALID_GLASS_FROSTS,
     VALID_GLASS_QUALITIES,
     VALID_RECORD_TYPES,
     VALID_THEME_MODES,
@@ -94,6 +96,12 @@ def normalize_chroma_accent_speed(value: object) -> int:
 def normalize_glass_quality(value: object) -> str:
     text = str(value or DEFAULT_GLASS_QUALITY).strip().lower()
     return text if text in VALID_GLASS_QUALITIES else DEFAULT_GLASS_QUALITY
+
+
+def normalize_glass_frost(value: object) -> str:
+    """Frost/buz dokusu seviyesi (off|low|med|high)."""
+    text = str(value or DEFAULT_GLASS_FROST).strip().lower()
+    return text if text in VALID_GLASS_FROSTS else DEFAULT_GLASS_FROST
 
 
 def _normalize_clamped_scale(

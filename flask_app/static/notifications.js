@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Bildirim merkezi modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Bildirim merkezi modülü (ES Module)
  *
  * 7. bölüm: küresel yükleme çubuğu (KASA_PROGRESS), bildirim zili (badge + panel)
  * ve hatırlatma toast'ları. initNotifications, app.js içindeki DOMContentLoaded
@@ -313,15 +313,9 @@ export function initNotifications({ apiFetch }) {
       return;
     }
 
-    // Hepsini okundu olarak işaretle
-    if (event.target.closest('#notif-mark-all-read')) {
-      renderBell(currentReminders);
-      dismissAll();
-      return;
-    }
-
-    // Tüm bildirimleri sil
-    if (event.target.closest('#notif-delete-all')) {
+    // Hepsini okundu olarak işaretle + Tüm bildirimleri sil
+    // (her ikisi de aynı davranış: listeyi yeniden çiz + toplu sustur)
+    if (event.target.closest('#notif-mark-all-read, #notif-delete-all')) {
       renderBell(currentReminders);
       dismissAll();
       return;

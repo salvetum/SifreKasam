@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Şifre Üretici modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Şifre Üretici modülü (ES Module)
  *
  * 8. ve 8b. bölümler: şifre üretici ve üretici geçmişi.
  * app.js (main modül) içindeki DOMContentLoaded sırasında
@@ -59,7 +59,8 @@ export function initPasswordGenerator({
   };
 
   const motionOff = () =>
-    document.documentElement.getAttribute('data-kasa-animations') === 'off';
+    document.documentElement.getAttribute('data-kasa-animations') === 'off' ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const stripAmbiguous = (key) => {
     const set = CHAR_SETS[key] || '';

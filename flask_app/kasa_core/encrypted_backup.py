@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import secrets
 from dataclasses import dataclass
 from typing import Any
@@ -38,6 +39,10 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
+from kasa_core.constants import MAX_IMPORT_RECORDS
+
+log = logging.getLogger(__name__)
 
 MAGIC = b"KASAENC1"
 VERSION = 0x01
@@ -194,7 +199,19 @@ def build_encrypted_export_payload(
 def decrypt_encrypted_records(
     blob: bytes, password: str
 ) -> list[dict[str, Any]]:
-    """Şifreli .kasaenc içeriğini JSON kayıt listesine çözer."""
+    """Şifreli .kasaenc içeriğini JSON kayıt listesine çözer.
+
+    DoS sınırı: dönen kayıt listesi ``MAX_IMPORT_RECORDS`` ile kırpılır.
+    Uygulama gövde boyutunu (``MAX_CONTENT_LENGTH``, 64 MB) sınırlar ama bu
+    yalnızca *ham* boyuttur; her JSON kayıt iç içe geçmiş nesnelere dönüştüğünde
+    içerik amplifikasyonu ~10-20x olur. Restore yolu kayıtları çözdükten sonra
+    ``Record.query.delete()`` çalıştırdığı için sınırsız liste uygulamayı
+    dondurabilir/çökertirdi. Aynı sınır düz (JSON/txt) import'ta zaten
+    ``import_export.parse_import_payload`` içinde uygulanmaktadır.
+
+    Kırpma sessizce yapılmaz: atlanan kayıt sayısı ``log.warning`` ile
+    kaydedilir, aksi halde kullanıcı eksik veri yüklendiğini sanardı.
+    """
     plaintext = decrypt_payload(blob, password)
     try:
         data = json.loads(plaintext)
@@ -202,7 +219,15 @@ def decrypt_encrypted_records(
         raise CorruptBackupError("corrupt-backup")
     if not isinstance(data, list):
         raise CorruptBackupError("invalid-import-payload")
-    return [item for item in data if isinstance(item, dict)]
+    records = [item for item in data if isinstance(item, dict)]
+    if len(records) > MAX_IMPORT_RECORDS:
+        log.warning(
+            "Şifreli yedek kayıt sınırı aştı: %d kayıttan %d tanesi atlandı.",
+            len(records),
+            len(records) - MAX_IMPORT_RECORDS,
+        )
+        records = records[:MAX_IMPORT_RECORDS]
+    return records
 
 
 def generate_backup_password() -> str:

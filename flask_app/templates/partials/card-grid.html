@@ -20,18 +20,22 @@
                             <label class="bulk-select-control flex items-center justify-center" for="select-{{ kayit.id }}" hidden>
                                 <input type="checkbox" id="select-{{ kayit.id }}" class="select-item bulk-select-checkbox" value="{{ kayit.id }}">
                             </label>
-                            <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm">
+                            <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm" title="{{ kayit.normalized.baslik }}">
                                 {{ getBrandIcon(kayit.normalized.baslik, kayit.full_data.website_url, kayit.full_data.type) }}
                             </span>
-                             <h2 id="record-title-{{ kayit.id }}" class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text">
+                             <h2 id="record-title-{{ kayit.id }}" class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text" title="{{ kayit.normalized.baslik }}">
                                  {{ kayit.normalized.baslik }}
                             </h2>
                             {% if kayit.full_data.expiry_date %}
                             <span class="expiry-badge" data-expiry="{{ kayit.full_data.expiry_date }}"></span>
                             {% endif %}
                         </div>
-                        <!-- Sağ üst: Kategori rozeti + Favori Butonu -->
+                        <!-- Sağ üst: Zayıf rozeti + Kategori rozeti + Favori Butonu -->
                         <div class="flex items-center gap-2 flex-shrink-0">
+                            <span class="card-weak-chip" hidden>
+                                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                                <span>{{ _('Zayıf') }}</span>
+                            </span>
                             {% if kayit.full_data.category %}
                             <span class="card-category-badge" title="{{ kayit.full_data.category }}">
                                 <i class="fa-solid fa-tag" aria-hidden="true"></i>
@@ -56,16 +60,12 @@
                         {% if anahtar == 'Şifre' or anahtar == 'CVV / Şifre' %}
                         <div class="vault-detail-row vault-detail-row-action password-row">
                             <p class="vault-detail-main m-0">
-                                <span class="vault-detail-label"><i class="fa-solid fa-key" aria-hidden="true"></i>{{ anahtar }}</span>
+                                <span class="vault-detail-label" title="{{ anahtar }}"><i class="fa-solid fa-key" aria-hidden="true"></i>{{ anahtar }}</span>
                                 <span class="password-field vault-detail-value vault-secret font-mono tracking-wide" data-id="{{ kayit.id }}" data-visible="false">
                                     ••••••••
                                 </span>
                             </p>
                             <div class="vault-row-actions">
-                                <span class="card-weak-chip" hidden>
-                                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                                    <span>{{ _('Zayıf') }}</span>
-                                </span>
                                 <button type="button" class="card-icon-btn toggle-password" title="{{ _('Göster/Gizle') }}" aria-label="{{ _('Göster/Gizle') }}"><i class="fa-solid fa-eye text-xs"></i></button>
                                 <button type="button" class="card-icon-btn copy-password" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}"><i class="fa-solid fa-copy text-xs"></i></button>
                             </div>
@@ -75,8 +75,8 @@
                         {% set url = deger if deger.startswith('http') else 'https://' + deger %}
                         <div class="vault-detail-row vault-detail-row-action vault-url-row">
                             <p class="vault-detail-main m-0">
-                                <span class="vault-detail-label"><i class="fa-solid fa-globe" aria-hidden="true"></i>{{ anahtar }}</span>
-                                <a href="{{ url }}" target="_blank" rel="noopener noreferrer"
+                                <span class="vault-detail-label" title="{{ anahtar }}"><i class="fa-solid fa-globe" aria-hidden="true"></i>{{ _('Adres') }}</span>
+                                <a href="{{ url }}" target="_blank" rel="noopener noreferrer" title="{{ deger }}"
                                    class="vault-detail-value vault-link text-[#4f91ff] hover:text-[#7c6ff7] transition-colors duration-150 no-underline vault-value-ellipsis">
                                     {{ deger }}
                                 </a>
@@ -89,13 +89,13 @@
                         {% elif anahtar == 'Kullanıcı Adı' or anahtar == 'E-posta' or anahtar == 'Kart Numarası' %}
                         <div class="vault-detail-row vault-detail-row-action password-row">
                             <p class="vault-detail-main m-0">
-                                <span class="vault-detail-label">
+                                <span class="vault-detail-label" title="{{ anahtar }}">
                                     {% if anahtar == 'Kullanıcı Adı' %}<i class="fa-solid fa-user" aria-hidden="true"></i>
                                     {% elif anahtar == 'E-posta' %}<i class="fa-solid fa-envelope" aria-hidden="true"></i>
                                     {% else %}<i class="fa-solid fa-credit-card" aria-hidden="true"></i>{% endif %}
                                     {{ anahtar }}
                                 </span>
-                                <span class="vault-detail-value vault-value-ellipsis">{{ deger }}</span>
+                                <span class="vault-detail-value vault-value-ellipsis" title="{{ deger }}">{{ deger }}</span>
                             </p>
                             <button type="button" class="card-icon-btn copy-username flex-shrink-0" title="{{ _('Kopyala') }}" aria-label="{{ _('Kopyala') }}"
                                     data-username="{{ deger }}">
@@ -105,8 +105,8 @@
 
                         {% elif anahtar == 'Not' %}
                         <div class="vault-detail-row vault-note-row">
-                            <span class="vault-detail-label"><i class="fa-solid fa-note-sticky" aria-hidden="true"></i>{{ anahtar }}</span>
-                            <span class="vault-detail-value vault-note-text">{{ deger }}</span>
+                            <span class="vault-detail-label" title="{{ anahtar }}"><i class="fa-solid fa-note-sticky" aria-hidden="true"></i>{{ anahtar }}</span>
+                            <span class="vault-detail-value vault-note-text" title="{{ deger }}">{{ deger }}</span>
                         </div>
 
                         {% elif anahtar == 'Kategori' %}
@@ -114,8 +114,8 @@
 
                         {% else %}
                         <div class="vault-detail-row">
-                            <span class="vault-detail-label">{{ anahtar }}</span>
-                            <span class="vault-detail-value">{{ deger }}</span>
+                            <span class="vault-detail-label" title="{{ anahtar }}">{{ anahtar }}</span>
+                            <span class="vault-detail-value" title="{{ deger }}">{{ deger }}</span>
                         </div>
                         {% endif %}
 

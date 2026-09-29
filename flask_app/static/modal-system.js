@@ -1,5 +1,5 @@
 /**
- * ŞifreKasam v2.7.0-beta.3 - Modal Sistemi modülü (ES Module)
+ * ŞifreKasam v2.7.0-beta.4 - Modal Sistemi modülü (ES Module)
  *
  * 6. bölüm: window.kasaModalAc / window.kasaModalKapat, kasa-modal
  * tıklama / kapatma davranışları ve Escape yönetimi.
@@ -27,7 +27,15 @@ export function initModalSystem({ customSelectStates, closeCustomSelect }) {
   window.kasaModalKapat = (modalId) => {
     const modal = document.getElementById(modalId);
     if (!modal) return;
-    modal.dispatchEvent(new CustomEvent('kasa:modal-closing'));
+    /* Kapanan modal henüz .is-visible olduğu için, listeden çıkarılmış hâli
+       "kaç modal açık kalacak" bilgisini verir. Dinleyiciler (ör. app.js'teki
+       scrollbar telafisi) bu sayıyla DOM sorgusu yapmadan karar verebilir. */
+    const remainingModalCount = Array.from(
+      document.querySelectorAll('.kasa-modal.is-visible')
+    ).filter(visibleModal => visibleModal !== modal).length;
+    modal.dispatchEvent(new CustomEvent('kasa:modal-closing', {
+      detail: { remainingModalCount },
+    }));
     const transitionsDisabled = document.documentElement.getAttribute('data-kasa-animations') === 'off'
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     modal.classList.remove('is-open');
