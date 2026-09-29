@@ -766,6 +766,58 @@ _TOKEN_ENDPOINTS = {'heartbeat', 'shutdown', 'lan_info', 'settings_runtime'}
 # sadece GET/HEAD ile. POST tarafı oturum + X-CSRF-Token ister.
 _TOKEN_READ_ENDPOINTS = {'settings_tray', 'settings_content_protection'}
 
+# ─── OTOMATİK KİLİT (SUNUCU TARAFI) ───────────────────────────────────────────
+# Renderer'daki auto-lock.html yalnızca kasa sayfası açıkken çalışır ve
+# kullanıcı girdisi sayar. Renderer çökerse/kaparsa (veya bir saldırgan JS'i
+# devre dışı bırakırsa) o anahtar bellekte _VAULT_KEY_TTL (60 dk) boyunca
+# kalır. Bu yüzden hareketsizlik sunucu tarafında da ölçülür: etkinlik yalnız
+# gerçek kullanıcı istekleriyle yenilenir.
+_IDLE_SESSION_KEY = 'kasa_last_activity'
+
+def _auto_lock_settings() -> tuple[bool, int]:
+    """(etkin, dakika) — istek önbelleğinden okunur, ek sorgu maliyeti düşük."""
+    enabled = str(_get_setting('auto_lock_enabled') or '').lower() == 'true'
+    minutes = safe_int(_get_setting('auto_lock_timeout'), 5, 1, 240)
+    return enabled, minutes
+
+def _idle_tracking_applies(endpoint: str | None) -> bool:
+    """Bu istek kullanıcı etkinliği sayılıyor mu?
+
+    Sayılmayanlar:
+      * statik dosyalar ( servis worker arka planda çekebiliyor),
+      * herkese açık uçlar (login, loading, sw) ve /lock'un kendisi,
+      * ana süreç token uçları — heartbeat bir CANLILIK sinyalidir, kullanıcı
+        etkinliği değildir; sayılsa otomatik kilit hiç tetiklenmezdi.
+    """
+    if endpoint is None or endpoint == 'static':
+        return False
+    if request.path.startswith('/static/'):
+        return False
+    if endpoint in _PUBLIC_ENDPOINTS or endpoint == 'lock':
+        return False
+    if endpoint in _TOKEN_ENDPOINTS:
+        return False
+    return True
+
+def _enforce_idle_lock() -> bool:
+    """Hareketsiz oturum kilitlendiyse True döner (yanıt `before_request`'te verilir)."""
+    last = session.get(_IDLE_SESSION_KEY)
+    if last is None:
+        return False
+    enabled, minutes = _auto_lock_settings()
+    idle_seconds = time.time() - float(last)
+    if not enabled:
+        session[_IDLE_SESSION_KEY] = time.time()
+        return False
+    if idle_seconds <= minutes * 60:
+        session[_IDLE_SESSION_KEY] = time.time()
+        return False
+    log.info('Hareketsiz oturum kilitlendi (%.0f saniye).', idle_seconds)
+    _clear_vault_password()
+    session.clear()
+    logout_user()
+    return True
+
 def _is_local_request() -> bool:
     remote = request.remote_addr or '127.0.0.1'
     try:
@@ -956,6 +1008,15 @@ def check_token_and_auth():
                     'error': _('Güvenlik doğrulaması başarısız. Lütfen sayfayı yenileyip tekrar deneyin.'),
                 }), 400
     g.csrf_token = _get_csrf_token()
+
+    # Hareketsiz oturum kilidi (sunucu tarafı). Renderer çalışmasa bile uygulanır.
+    # Yalnızca oturumlu + gerçek kullanıcı istekleri etkinlik sayar; heartbeat gibi
+    # ana süreç token uçları sayılmaz (aksi halde kilit hiç tetiklenmezdi).
+    if current_user.is_authenticated and not token_ok:
+        if _idle_tracking_applies(endpoint):
+            if _enforce_idle_lock():
+                return redirect(url_for('login'))
+            session[_IDLE_SESSION_KEY] = time.time()
 
     # Re-encrypt sürerken eski anahtarla yeni veri yazılmasını engeller.
     if (request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}

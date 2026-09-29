@@ -4421,6 +4421,104 @@ class SecurityHardeningTests(unittest.TestCase):
     # ── Oturum çerezinin SameSite=Strict olduğu için yalnızca GET/HEAD dışı
     # isteklerde Origin zorunluluğu ölçülür.
 
+    # ── Otomatik kilit (sunucu tarafı hareketsizlik)
+    # Renderer çökerse/kaparsa anahtar _VAULT_KEY_TTL (60 dk) boyunca bellekte
+    # kalırdı; bu yüzden hareketsizlik sunucu tarafında da ölçülür.
+
+    def _set_auto_lock(self, enabled: str, minutes: int) -> None:
+        with app_module.app.app_context():
+            app_module.Setting.query.filter(
+                app_module.Setting.key.in_(('auto_lock_enabled',
+                                             'auto_lock_timeout'))).delete()
+            app_module.db.session.add(app_module.Setting(
+                key='auto_lock_enabled', value=enabled))
+            app_module.db.session.add(app_module.Setting(
+                key='auto_lock_timeout', value=str(minutes)))
+            app_module.db.session.commit()
+
+    def _set_idle(self, seconds_ago: float) -> None:
+        with self.client.session_transaction() as sess:
+            sess[app_module._IDLE_SESSION_KEY] = time.time() - seconds_ago
+
+    def test_idle_session_is_locked_server_side(self) -> None:
+        """Eşik aşılmış hareketsiz oturum sunucu tarafında kilitlenir."""
+        self._seed_vault()
+        self._set_auto_lock('true', 5)
+        self._login()
+        self.assertEqual(self.client.get('/').status_code, 200)
+        with self.client.session_transaction() as sess:
+            sid = sess['vault_session_id']
+        with app_module.app.app_context():
+            self.assertIsNotNone(
+                app_module._get_vault_key_for(sid),
+                'oturum açıkken anahtar bellekte olmalı')
+
+        self._set_idle(5 * 60 + 30)          # 5 dk eşiğini aştı
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login', response.headers.get('Location', ''))
+        with app_module.app.app_context():
+            self.assertIsNone(app_module._get_vault_key_for(sid),
+                              'kilitlenince bellekte anahtar kalmamalı')
+
+    def test_active_session_stays_unlocked(self) -> None:
+        """Son etkinlik eşiğin içindeyse oturum açık kalır (sunucu renderer'dan
+        da gevşek olmalı: bir HTTP isteği kullanıcı girdisi sayılmaz)."""
+        self._seed_vault()
+        self._set_auto_lock('true', 5)
+        self._login()
+        self._set_idle(5 * 60 - 30)          # eşiğin hemen içinde
+        self.assertEqual(self.client.get('/').status_code, 200)
+
+    def test_heartbeat_does_not_refresh_idle_timer(self) -> None:
+        """Heartbeat bir canlılık sinyalidir, kullanıcı etkinliği DEĞİLDİR.
+
+        Sayılırsa otomatik kilit hiç tetiklenmezdi (kullanıcı hiçbir şey
+        yapmasa bile 15 sn'de bir yenilenir) — en tehlikeli regresyon.
+
+        Doğrulama iki aşamalı: (1) heartbeat oturumu KİLİTLEMEMELİ (anahtar
+        bellekte kalmalı), (2) sonraki gerçek kullanıcı isteği kilitlemeli.
+        Tek başına "sonuç 302" demek yeterli değil: mutasyonda heartbeat'in
+        kendisi oturumu sıfırladığı için test yanlış sebeple geçerdi.
+        """
+        self._seed_vault()
+        self._set_auto_lock('true', 5)
+        self._login()
+        with self.client.session_transaction() as sess:
+            sid = sess['vault_session_id']
+        self._set_idle(5 * 60 + 30)          # eşik aşıldı
+
+        for _ in range(3):
+            self.client.post('/heartbeat', headers={
+                'X-App-Token': app_module.APP_TOKEN})
+
+        with app_module.app.app_context():
+            self.assertIsNotNone(
+                app_module._get_vault_key_for(sid),
+                'heartbeat oturumu kilitlememeli (canlılık sinyali != etkinlik)')
+        # Gerçek kullanıcı isteği gelince hareketsizlik uygulanmalı.
+        self.assertEqual(self.client.get('/').status_code, 302)
+
+    def test_idle_lock_respects_disabled_setting(self) -> None:
+        """Otomatik kilit kapalıyken sunucu tarafı kilitlemez."""
+        self._seed_vault()
+        self._set_auto_lock('false', 5)
+        self._login()
+        self._set_idle(5 * 60 + 30)
+        self.assertEqual(self.client.get('/').status_code, 200)
+
+    def test_lock_endpoint_is_exempt_from_idle_check(self) -> None:
+        """/lock kendisi idle kontrolünden muaf: renderer'ın manuel kilidi,
+        kontrolü tetikleyen istek olduğu için reddedilmemeli."""
+        self._seed_vault()
+        self._set_auto_lock('true', 5)
+        self._login()
+        csrf = self._session_csrf()          # eşiği aşmadan token al
+        self._set_idle(5 * 60 + 30)
+        response = self.client.post('/lock', headers={'X-CSRF-Token': csrf})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['status'], 'locked')
+
     def test_settings_tray_post_requires_csrf_token(self) -> None:
         self._seed_vault()
         self._login()
@@ -4462,6 +4560,82 @@ class SecurityHardeningTests(unittest.TestCase):
         # Dil seçici giriş/kilit/yükleme ekranlarında oturumsuz da çalışmalı.
         response = self.client.post('/settings/language', json={'language': 'en'})
         self.assertEqual(response.status_code, 200)
+
+    def test_legacy_vault_login_migrates_to_per_install_salt(self) -> None:
+        """Legacy (sabit salt) kasa girişte per-install salt'a taşınır.
+
+        `derive_key` legacy salt'a düşse bile bu kasa legacy salt ile
+        kullanılmaz: login sırasında `migrate_legacy_pbkdf2_salt` çalışır.
+        """
+        legacy_fernet = Fernet(app_module._derive_key_with_salt(
+            self.MASTER,
+            app_module.LEGACY_PBKDF2_SALT,
+            app_module.LEGACY_PBKDF2_ITERATIONS,
+        ))
+        with app_module.app.app_context():
+            # Per-install salt YOK (eski kasa) + legacy salt ile şifrelenmiş kayıt
+            app_module.db.session.add(app_module.Setting(
+                key='master_hash',
+                value=app_module.hash_master_password(self.MASTER),
+            ))
+            app_module.db.session.add(app_module.Record(
+                id="legacy-login-record",
+                type="Website",
+                category="Genel",
+                title="Legacy",
+                encrypted_password=app_module.safe_encrypt(legacy_fernet, "eski-sifre"),
+                encrypted_comment=app_module.safe_encrypt(legacy_fernet, "eski-not"),
+            ))
+            app_module.db.session.commit()
+            try:
+                with patch.object(app_module, "backup_database"), \
+                     patch.object(app_module, "_refresh_database_backup"):
+                    token = self._csrf(self.client.get('/login').get_data(as_text=True))
+                    response = self.client.post('/login', data={
+                        'master_password': self.MASTER, 'csrf_token': token,
+                    })
+                self.assertEqual(response.status_code, 302)
+                # Salt artık kayıtlı (rastgele) ve kayıt yeni anahtarla çözülüyor.
+                saved_salt = app_module._get_saved_pbkdf2_salt()
+                self.assertIsNotNone(saved_salt)
+                self.assertNotEqual(saved_salt, app_module.LEGACY_PBKDF2_SALT)
+                app_module.db.session.expire_all()
+                migrated = app_module.db.session.get(app_module.Record, "legacy-login-record")
+                new_fernet = Fernet(app_module.derive_key(self.MASTER))
+                self.assertEqual(
+                    app_module.safe_decrypt(new_fernet, migrated.encrypted_password),
+                    "eski-sifre")
+            finally:
+                # Kaydı bırakma: sonraki testler `_reencrypt_task` ile TÜM kayıtları
+                # geziyor; yarım kalan şifreli bir satır onları kırabilir.
+                app_module.db.session.rollback()
+                app_module.Record.query.filter_by(id="legacy-login-record").delete()
+                app_module.db.session.commit()
+
+    def test_login_blocked_when_legacy_salt_migration_fails(self) -> None:
+        """Migration başarısızsa giriş DURDURULUR (sessizce legacy salt'ta devam yok).
+
+        Sabit salt ile devam etmek, kaynak kodda bulunan salt'la açılabilen bir
+        kasa bırakır; bu yüzden hata halinde giriş reddedilir.
+        """
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key='master_hash',
+                value=app_module.hash_master_password(self.MASTER),
+            ))
+            app_module.db.session.commit()
+            with patch.object(app_module, "migrate_legacy_pbkdf2_salt",
+                              side_effect=RuntimeError("simulated migration failure")):
+                token = self._csrf(self.client.get('/login').get_data(as_text=True))
+                response = self.client.post('/login', data={
+                    'master_password': self.MASTER, 'csrf_token': token,
+                })
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("giriş durduruldu",
+                      response.get_data(as_text=True))
+        # Salt yazılmadı: kasa legacy modda açılmadı.
+        with app_module.app.app_context():
+            self.assertIsNone(app_module._get_saved_pbkdf2_salt())
 
     def test_state_change_from_foreign_origin_rejected(self) -> None:
         response = self.client.post(
