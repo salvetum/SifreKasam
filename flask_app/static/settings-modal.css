@@ -476,27 +476,82 @@ html[data-bs-theme="light"] .settings-exp-badge {
     transition: none !important;
 }
 
-.settings-glass-quality-card.is-collapsed,
-.settings-chroma-speed-card.is-collapsed {
-    visibility: hidden;
-    opacity: 0;
-    clip-path: inset(0 100% 0 0 round 16px);
-    transform: translateX(-24px) scaleX(0.86);
-    border-color: transparent !important;
-    pointer-events: none;
-    transition:
-        opacity 160ms ease,
-        clip-path 240ms var(--ease-out),
-        transform 240ms var(--ease-out),
-        border-color 160ms ease,
-        visibility 0s linear 240ms;
+/* ── BAĞIMLI AYAR KİLİDİ (settings-dependencies.js) ────────────────────────
+   2026-10: bu kartlar önce `is-collapsed` ile GİZLENİYORDU. Kullanıcı camı
+   ya da renk akışını kapattığında "kalite: yüksek" gibi bir seçimini kaybettiğini
+   göremiyordu (değer korunuyordu, sadece saklanıyordu). Artık griye boyanıyor,
+   başlığının yanında kilit rozeti var ve neden satırın içinde yazıyor.
+   Değerler HİÇ değişmez/silinmez — yalnız etkileşim kapatılır. */
+[data-lockable].is-locked {
+    opacity: 0.58;
+    filter: saturate(0.55);
+    border-style: dashed;
 }
 
-.settings-glass-quality-card.has-open-select,
-.settings-chroma-speed-card.has-open-select {
-    z-index: 120;
-    overflow: visible;
-    clip-path: none;
+[data-lockable].is-locked .settings-card-copy p,
+[data-lockable].is-locked .settings-card-copy h4 {
+    color: var(--text-muted);
+}
+
+/* Kilitli toggle: `disabled` KULLANILMAZ (değer koruma tuzağı — bkz.
+   settings-dependencies.js başlığı), yalnız `aria-disabled` + bu sınıf.
+   `.settings-switch-input[aria-disabled="true"]` yerine kapsayıcı kart sınıfı
+   üzerinden giriş durumu kesin olarak engellenir. */
+[data-lockable].is-locked .settings-switch-input[aria-disabled="true"],
+[data-lockable].is-locked .kasa-field[aria-disabled="true"],
+[data-lockable].is-locked .settings-range-input[aria-disabled="true"] {
+    pointer-events: none;
+}
+
+[data-lockable].is-locked .settings-card-control,
+[data-lockable].is-locked .settings-timeout-row {
+    cursor: not-allowed;
+}
+
+/* Başlık yanındaki kilit rozeti — yalnız kilitliyken görünür. */
+.settings-lock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.42rem;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, 0.14);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+/* Kilit notunun ikonu JS tarafından gerçek bir `<i class="fa-solid fa-lock">`
+   olarak basılır. Burada `content: "\f023"` + sabit `font-family` KULLANILMAZ:
+   yerel `all.min.css` Font Awesome **7** ("Font Awesome 7 Free") ve sürüm
+   ileride değişebilir — sabit yazılırsa ikon sessizce boş görünür. Projenin
+   geri kalanı zaten gerçek `<i>` elemanı kullanıyor. */
+.settings-lock-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border);
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.settings-lock-note > i {
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+    opacity: 0.75;
+    font-size: 10px;
+}
+
+[data-lockable].is-locked .settings-card-control + .settings-lock-note,
+.settings-timeout-row.is-locked .settings-lock-note {
+    margin-top: 0.55rem;
 }
 
 .settings-glass-scales-card {
@@ -556,19 +611,11 @@ html[data-bs-theme="light"] .settings-exp-badge {
     border-top: 1px solid var(--border);
 }
 
-.settings-glass-scales-card.is-collapsed {
-    visibility: hidden;
-    opacity: 0;
-    clip-path: inset(0 100% 0 0 round 16px);
-    transform: translateX(-24px) scaleX(0.86);
-    border-color: transparent !important;
-    pointer-events: none;
-    transition:
-        opacity 160ms ease,
-        clip-path 240ms var(--ease-out),
-        transform 240ms var(--ease-out),
-        border-color 160ms ease,
-        visibility 0s linear 240ms;
+.settings-glass-quality-card.has-open-select,
+.settings-chroma-speed-card.has-open-select {
+    z-index: 120;
+    overflow: visible;
+    clip-path: none;
 }
 
 .settings-range-input {

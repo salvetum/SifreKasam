@@ -41,6 +41,13 @@ const SHIM = `${MARKER}
 
 // Drop-in replace for extract-zip: Node 26 + yauzl on large zips stalls
 // after the first entry; delegate to Python stdlib instead.
+//
+// 🔴 PYTHON ÇÖZÜMLEYİCİ: 'python' PATH'te OLMAYABILIR (Windows kurulumlarında
+// sık; bu makinede de yok, sadece 'py -3.12' var). Sabit 'python' çağırmak
+// sessizce başarısız oluyor ve node_modules/electron/dist hiç oluşmuyor →
+// npm start / package / make çalışmıyor. Projenin kendi çözümleyicisi
+// (src/main/python-command.js → resolvePythonCommand) kullanılır; o da yoksa
+// makul adaylar sırayla denenir.
 
 const { execFile } = require('child_process');
 const fs = require('fs');
@@ -51,6 +58,35 @@ const execFileAsync = promisify(execFile);
 
 const PYTHON_CODE = ${JSON.stringify(PYTHON_CODE)};
 
+function pythonCandidates() {
+  const out = [];
+  try {
+    const { resolvePythonCommand } = require('../src/main/python-command');
+    const resolved = resolvePythonCommand();
+    if (resolved && resolved.cmd) out.push([resolved.cmd, resolved.args || []]);
+  } catch (_) { /* resolver yoksa aday listesine devam et */ }
+  out.push(['python', []]);
+  out.push(['py', ['-3']]);
+  out.push(['py', ['-3.12']]);
+  out.push(['python3', []]);
+  return out;
+}
+
+async function runPython(zipPath, dest) {
+  let lastError = null;
+  for (const [cmd, args] of pythonCandidates()) {
+    try {
+      await execFileAsync(cmd, [...args, '-c', PYTHON_CODE, zipPath, dest]);
+      return cmd;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  const detail = (lastError && (lastError.stderr || '').toString()) || (lastError && lastError.message) || 'bilinmiyor';
+  throw new Error('hicbir Python adayi calismadi (' +
+    pythonCandidates().map(([c, a]) => c + ' ' + a.join(' ')).join(' | ') + '): ' + detail);
+}
+
 async function extractZIP(zipPath, opts) {
   const dir = opts.dir;
   if (!path.isAbsolute(dir)) {
@@ -58,12 +94,8 @@ async function extractZIP(zipPath, opts) {
   }
   fs.mkdirSync(dir, { recursive: true });
   const canonicalDest = fs.realpathSync(dir);
-  try {
-    await execFileAsync('python', ['-c', PYTHON_CODE, path.resolve(zipPath), canonicalDest]);
-  } catch (err) {
-    const detail = (err.stderr ? err.stderr.toString() : '') || err.message || String(err);
-    throw new Error('extract-zip (python-extract patch) failed: ' + detail);
-  }
+  const used = await runPython(path.resolve(zipPath), canonicalDest);
+  if (process.env.KASA_EXTRACT_VERBOSE) console.log('[extract-zip] ' + used + ' ile acildi: ' + zipPath);
 }
 
 module.exports = extractZIP;
@@ -102,11 +134,17 @@ function main() {
     process.exit(0);
   }
   const current = fs.readFileSync(EXTRACT_ZIP_INDEX, 'utf8');
-  if (current.includes(MARKER)) {
-    console.log('SKIP: extract-zip already patched');
+  // Yalnız marker'a bakmak YETERSİZ: shim'in içeriği değiştiğinde (ör. python
+  // çözümleyicisi düzeltmesi) marker aynı kalıp ESKİ hali yerinde kalıyordu.
+  // Hedef içerikle birebir karşılaştır, farklıysa yaz.
+  if (current.trim() === SHIM.trim()) {
+    console.log('SKIP: extract-zip zaten guncel (icrik esit)');
   } else {
+    const why = current.includes(MARKER)
+      ? 'shim eski icerige sahip (marker var ama kod degismis)'
+      : 'shim hic uygulanmamis';
     fs.writeFileSync(EXTRACT_ZIP_INDEX, SHIM, 'utf8');
-    console.log('PATCHED: ' + EXTRACT_ZIP_INDEX);
+    console.log('PATCHED: ' + EXTRACT_ZIP_INDEX + '  (' + why + ')');
   }
   patchCrossZip();
 }

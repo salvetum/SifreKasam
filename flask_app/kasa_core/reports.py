@@ -52,6 +52,11 @@ def build_vault_report_payloads(
 ) -> tuple[dict[str, int], dict[str, list]]:
     rows = Record.query.with_entities(
         Record.id,
+        # `type` yalnız görüntü amaçlı taşınıyor: `app.py` LAN'da kart
+        # numarasını gizlerken hangi kaydın CreditCard olduğunu buradan
+        # anlıyor (kart no `login` sütununda saklanıyor). `stats` yalnız `id`
+        # okuduğu için ek sütun stats'i değiştirmiyor.
+        Record.type,
         Record.title,
         Record.website_url,
         Record.login,
@@ -91,6 +96,12 @@ def build_vault_report_payloads(
         skorlu_kayitlar += 1
         record_data: dict[str, Any] = {
             "id": record.id,
+            # `type` sadece görüntü için: `app.py` LAN'da kart numarasını
+            # gizlerken hangi kaydın CreditCard olduğunu buradan anlıyor.
+            # `getattr(..., None)` ile alınır: `rows` bir SQLAlchemy `Row`
+            # olduğu için eksik sütun `AttributeError` fırlatıyordu ve
+            # doğrudan `record.type` erişimi raporu komple çökertiyordu.
+            "type": getattr(record, 'type', None),
             "title": title,
             "url": url,
             "login": login,

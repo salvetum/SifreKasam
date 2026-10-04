@@ -30,6 +30,13 @@ log = logging.getLogger(__name__)
 LAN_ACCESS_HASH_SETTING = 'lan_access_hash'
 LAN_ACCESS_SECRET_SETTING = 'lan_access_secret'
 LAN_VAULT_WRAP_SETTING = 'lan_vault_wrap'
+# LAN oturumlarına tam yetki verilip verilmeyeceği. Varsayılan 'false' = LAN
+# istemcileri kasayı yalnızca OKUYABİLİR; yazma/silme/dışa aktarma reddedilir.
+LAN_FULL_ACCESS_SETTING = 'lan_full_access_enabled'
+# LAN oturumlarında açık metin şifre gösterimi. Varsayılan KAPALI: ağdaki
+# cihaz kayıt başlıklarını görür ama şifreyi göremez. Tam yetkiden bağımsız
+# bir anahtardır (tam yetki = kayıt düzenleme, şifre gösterme değil).
+LAN_REVEAL_PASSWORDS_SETTING = 'lan_reveal_passwords_enabled'
 
 LAN_PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'  # 0/o/1/i/l karışıklığı önlenir
 LAN_PASSWORD_LENGTH = 10

@@ -25,6 +25,8 @@ from flask import (Flask, Response, abort, g, jsonify, has_request_context,
 from flask_login import current_user, login_required, login_user, logout_user
 
 from kasa_core.appearance import AppearanceSettings
+from kasa_core.audit import audit as _audit
+from kasa_core.audit import set_audit_log_dir as _set_audit_log_dir
 from kasa_core.certificates import (
     cert_missing_lan_ips,
     detect_lan_ips,
@@ -35,13 +37,11 @@ from kasa_core.certificates import (
 from kasa_core.constants import (
     APP_VERSION_DEFAULT,
     CARD_PAGE_SIZE,
-    CUSTOM_BACKGROUND_HISTORY_LIMIT,
     CUSTOM_BACKGROUND_CACHE_SECONDS,
     # app.py gövdesinde kullanılmaz; tests/test_kasa.py bu adı app_module
     # üzerinden okuyor (sözleşme). Silme.
     CUSTOM_BACKGROUND_MAX_IMAGE_BYTES,  # noqa: F401
     CUSTOM_BACKGROUND_UPLOAD_MAX_PER_WINDOW,  # noqa: F401
-    CUSTOM_BACKGROUND_UPLOAD_WINDOW_SECONDS,
     DEFAULT_ACCENT_COLOR,
     DEFAULT_ANIMATED_BACKGROUNDS_ENABLED,
     DEFAULT_BACKGROUND_STYLE,
@@ -199,8 +199,11 @@ def _fetch_latest_release() -> dict[str, Any]:
         APP_VERSION,
     )
 
+# Oturum ömrünün TEK kaynağı. Hem Flask'in kalıcı oturum ömrü hem de kasa
+# anahtarının bellekte bekleme süresi (`_VAULT_KEY_TTL`) bundan türetilir.
+_VAULT_SESSION_MINUTES = 60
 app.secret_key = FLASK_SECRET_KEY
-app.permanent_session_lifetime = timedelta(minutes=60)
+app.permanent_session_lifetime = timedelta(minutes=_VAULT_SESSION_MINUTES)
 app.config.update(
     MAX_CONTENT_LENGTH=64 * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
@@ -237,6 +240,10 @@ _file_handler = logging.handlers.RotatingFileHandler(
 )
 _file_handler.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s %(message)s'))
 logging.getLogger().addHandler(_file_handler)
+
+# Güvenlik olay günlüğü aynı LOGS_DIR altına, ayrı bir dosyaya yazar
+# (guvenlik-olaylari.log). Arayüzü yoktur; yalnızca konsol + dosya.
+_set_audit_log_dir(LOGS_DIR)
 
 app.config['SQLALCHEMY_DATABASE_URI']        = f"sqlite:///{DB_FILE}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -369,7 +376,11 @@ threading.Thread(target=_check_heartbeat, daemon=True).start()
 
 _vault_keys: dict[str, bytes] = {}
 _vault_keys_lock = threading.Lock()
-_VAULT_KEY_TTL = 60 * 60  # session.permanent_session_lifetime ile eşleşir
+# `_VAULT_SESSION_MINUTES` (yukarıda tanımlı) tek kaynaktır: hem oturum ömrü
+# hem de kasa anahtarının bellekte bekleme süresi bundan türetilir. İki
+# bağımsız sabit sessizce ayrışırsa "oturum ne kadar açık kalır" sorusunun iki
+# farklı cevabı olur ve anahtar çerezden daha uzun süre bellekte kalır.
+_VAULT_KEY_TTL = _VAULT_SESSION_MINUTES * 60  # saniye
 
 def _set_vault_key_bytes(vault_key: bytes):
     """Oturuma kasa şifreleme anahtarını bağlar (master'dan türetilmiş ya da LAN sarmalından)."""
@@ -530,8 +541,14 @@ def _is_first_setup() -> bool:
             return False
         return not _vault_initialized() and not _has_existing_vault_data()
     except Exception:
-        # Durum belirlenemiyorsa yeniden şifre oluşturmayı teşvik etmemek için güvenli tarafta kal.
         return False
+
+def _lan_reveal_enabled() -> bool:
+    try:
+        return _get_setting(lan_access.LAN_REVEAL_PASSWORDS_SETTING) == 'true'
+    except Exception:
+        return False
+
 
 def migrate_legacy_pbkdf2_salt(master_password: str) -> bool:
     if _get_saved_pbkdf2_salt():
@@ -647,6 +664,68 @@ def get_bulk_ids() -> list[str]:
 
 # ─── CONTEXT PROCESSORS ───────────────────────────────────────────────────────
 
+# Giriş ekranındaki "Son yedek" satırı bu yaştan eskiyse uyarı rengine geçer.
+_ENTRY_BACKUP_STALE_DAYS = 7
+
+
+def entry_facts() -> dict[str, Any]:
+    """Giriş ekranı alt bilgisi: sürüm · son yedek · LAN (sürüm/LAN zaten global).
+
+    🔴 YALNIZCA YEREL İSTEKLER İÇİN. Uzak LAN istemciye `is_local=False` döner:
+    yedek tarihi kullanıcının alışkanlığını ele verir (mutlak yol/klasör bilgisi
+    2026-10 turunda kaldırıldı; bkz. _first_setup_render'ın aynı gerekçesi).
+
+    🔴 SALT-OKUNUR. `_probe_writable()` ve `get_storage_status()` BİLEREK
+    kullanılmaz: ilki her çağrıda veri klasörüne geçici dosya yazıp siler.
+    `backups_dir()` de kullanılmaz (mkdir yapar). Boş alan da ölçülmez — tek
+    syscall kazancı, kullanıcıya gösterecek satır olmadığı için gereksiz.
+    Yalnızca `os.path.isdir` + `os.listdir` + `os.path.getmtime`.
+
+    🔴 ŞEMA SABİTTİR: uzak istekte de aynı anahtarlar döner, sadece alanlar
+    boştur. Eksik anahtar Jinja'da `Undefined` üretir ve
+    `{% if x is not none %}` denetimlerini YANLIŞLIKLA geçirip 500'e düşürür
+    (yaşanan buydu): sızıntıyı engelleyen dal, sızıntı olmadığı için patlıyordu.
+
+    Jinja'ya FONKSİYON olarak verilir: yalnızca login.html referans verdiği
+    için hesaplanır, diğer sayfalarda çalışmaz.
+    """
+    if not has_request_context() or not _is_local_request():
+        return {
+            'is_local': False,
+            'backup_age_days': None,
+            'backup_date': '',
+            'backup_stale': False,
+        }
+
+    facts: dict[str, Any] = {
+        'is_local': True,
+        'backup_age_days': None,
+        'backup_date': '',
+        'backup_stale': True,
+    }
+
+    try:
+        backup_dir = os.path.join(DATA_DIR, 'backups')
+        if os.path.isdir(backup_dir):
+            newest = max(
+                (
+                    os.path.getmtime(os.path.join(backup_dir, name))
+                    for name in os.listdir(backup_dir)
+                    if name.endswith('.kasaenc')
+                ),
+                default=None,
+            )
+            if newest:
+                age_days = max(0, int((time.time() - newest) / 86400))
+                facts['backup_age_days'] = age_days
+                facts['backup_date'] = datetime.fromtimestamp(newest).strftime('%d.%m.%Y')
+                facts['backup_stale'] = age_days > _ENTRY_BACKUP_STALE_DAYS
+    except OSError:
+        log.debug('Giriş ekranı için son yedek okunamadı', exc_info=True)
+
+    return facts
+
+
 @app.context_processor
 def inject_globals():
     auto_lock_enabled  = True
@@ -672,6 +751,8 @@ def inject_globals():
     hardware_acceleration = DEFAULT_HARDWARE_ACCELERATION_ENABLED
     power_save_enabled = DEFAULT_POWER_SAVE_ENABLED
     lan_enabled        = False
+    lan_full_access    = False
+    lan_reveal         = False
     try:
         v = _get_setting('auto_lock_enabled')
         if v is not None:
@@ -702,6 +783,12 @@ def inject_globals():
         le           = _get_setting('lan_enabled')
         if le is not None:
             lan_enabled = le.lower() == 'true'
+        lf = _get_setting(lan_access.LAN_FULL_ACCESS_SETTING)
+        if lf is not None:
+            lan_full_access = lf.lower() == 'true'
+        lr = _get_setting(lan_access.LAN_REVEAL_PASSWORDS_SETTING)
+        if lr is not None:
+            lan_reveal = lr.lower() == 'true'
         internet_kill_switch = network_policy.internet_kill_switch_enabled()
         live_breach_scan = network_policy.live_breach_scan_enabled()
     except Exception:
@@ -744,7 +831,13 @@ def inject_globals():
         'HARDWARE_ACCELERATION_ENABLED': hardware_acceleration,
         'POWER_SAVE_ENABLED': power_save_enabled,
         'LAN_ENABLED':           lan_enabled,
+        'LAN_FULL_ACCESS':       lan_full_access,
+        'LAN_REVEAL_PASSWORDS':  lan_reveal,
         'IS_LOCAL':              _is_local_request(),
+        # Uzak LAN oturumlarında dışa/içe aktarma ve yedekleme her zaman kapalı
+        # (bkz. _LAN_TRANSFER_DENIED_ENDPOINTS). Arayüz bu bayrakla ilgili
+        # düğmeleri gizler; yasak yalnız arayüzde değil, sunucuda da uygulanır.
+        'LAN_TRANSFER_BLOCKED':  bool(lan_enabled and not _is_local_request()),
         'INTERNET_KILL_SWITCH_ENABLED': internet_kill_switch,
         'LIVE_BREACH_SCAN_ENABLED': live_breach_scan,
         'CAN_LIVE_SCAN': bool(internet_kill_switch is False and live_breach_scan),
@@ -753,6 +846,10 @@ def inject_globals():
         'TRANSLATIONS':          lang_translations,
         'csp_nonce':             getattr(g, 'csp_nonce', ''),
         'csrf_token':            getattr(g, 'csrf_token', ''),
+        # Giriş ekranı alt bilgisi (veri klasörü / son yedek / boş alan).
+        # FONKSİYON olarak verilir: yalnız login.html referans verdiğinde
+        # hesaplanır ve uzak LAN istemciye boş döner.
+        'entry_facts':          entry_facts,
         'getBrandIcon':          getBrandIcon,
         '_':                     _,
     }
@@ -814,7 +911,7 @@ def _enforce_idle_lock() -> bool:
         return False
     log.info('Hareketsiz oturum kilitlendi (%.0f saniye).', idle_seconds)
     _clear_vault_password()
-    session.clear()
+    _reset_session_preserving_csrf()
     logout_user()
     return True
 
@@ -830,6 +927,141 @@ def _lan_access_enabled() -> bool:
         return _get_setting('lan_enabled') == 'true'
     except Exception:
         return False
+
+def _lan_full_access_enabled() -> bool:
+    """LAN oturumlarına tam yetki verilsin mi? Varsayılan HAYIR (salt okunur)."""
+    try:
+        return _get_setting(lan_access.LAN_FULL_ACCESS_SETTING) == 'true'
+    except Exception:
+        return False
+
+# Salt okunur LAN modunda izin verilen durum değiştiren uçlar. Yalnızca
+# oturum/cihaz durumu: kasaya hiçbir veri yazmazlar.
+#   lock              → kasa kilitleme (her istemci kendi oturumunu kapatır)
+#   heartbeat         → canlılık sinyali (zaten _TOKEN_ENDPOINTS muafiyetinde)
+#   logout            → kendi oturumunu kapatma
+# settings_tray ve settings_language BİLEREK listede DEĞİL: ikisi de uzak
+# istemcinin makinedeki davranışı (tepsiye tercihi, arayüz dili) değiştiriyor.
+# Dil seçici kilit/giriş ekranında çalışmaya devam eder çünkü o istekler
+# kimlik doğrulanmamıştır ve bu kontrol yalnızca oturum açıkken çalışır.
+_LAN_READ_ONLY_EXEMPT_ENDPOINTS = {
+    'lock', 'heartbeat', 'logout',
+}
+
+# Kasa verisinin MAKİNEYİ DIŞINA çıkmasına (veya dışarıdan makineye girmesine)
+# yol açan uçlar. Bunlar LAN üzerinden **hiçbir koşulda** kullanılamaz — yani
+# "LAN oturumlarına tam yetki" anahtarı açık olsa bile. Gerekçe: tam yetki
+# "kayıt ekleme/silme/düzenleme" anlamına gelir; kasayı bir dosyaya dökmek ise
+# bambaşka bir yetenek ve şifre yöneticisinde asıl tehlike odur. Yedekler de
+# kapsamda: yedek almak/geri yüklemek/silmek aynı sınıf işlemlerdir.
+_LAN_TRANSFER_DENIED_ENDPOINTS = {
+    # dışa aktarma
+    'export_data', 'encrypted_export_prepare', 'encrypted_export_download',
+    'bulk_export', 'health_export',
+    # içe aktarma
+    'import_data',
+    # yedekleme
+    'api_backups_list', 'api_backups_create', 'api_backups_delete',
+    'api_backups_restore', 'health_backup_now',
+}
+
+# LAN'dan **açık metin şifre** döndüren uçlar. Varsayılan kapalıdır: ağdaki
+# bir cihaz kayıt başlıklarını görür ama şifreleri göremez. Anahtar yalnızca
+# bu bilgisayardan açılabilir. Not: bu uçlar salt okunur kontrolden FARKLIDIR —
+# kasa verisini değiştirmezler, sadece okurlar; bu yüzden "tam yetki" ayarından
+# da bağımsız olarak kendi anahtarlarıyla denetlenirler.
+_LAN_REVEAL_ENDPOINTS = {
+    'get_record_password', 'get_gecmis',
+}
+
+# Düzenleme formu da sırları düz metin basar (`duzenle_sayfasi`: Password,
+# Card holder, Comment; `panel-access.html` value= olarak yazıyor). Bu yüzden
+# yalnız iki API ucu denetlemek YETERLİ DEĞİLDİ — form yolu kapatılmadan
+# "LAN'da şifreler gizli" sözü boş kalıyordu.
+#
+# Yalnız GET reddedilir: POST yani kayıt düzenleme "LAN tam yetki" ayarının
+# sahip olduğu yetkidir ve korunur (kullanıcı kararı, 2026-10).
+_LAN_REVEAL_FORM_GET_ENDPOINTS = {
+    'duzenle_sayfasi',
+}
+
+
+def _lan_secret_visibility_blocked() -> bool:
+    """Bu istekte sırlar gizlenmeli mi? (render tarafı için)
+
+    `_enforce_lan_reveal_block` ile BİREBİR aynı koşulları uygular. İki yerin
+    kuralı ayrışırsa sızıntı geri gelir; bu yüzden ayrı yazılmadı, ortak
+    yardımcıdan okunur. Uç reddi `before_request`'te 403 ile karşılanır,
+    burada ise sır gizlenir (403 yerine sayfa bozulmaz).
+    """
+    if _app_token_valid() or not current_user.is_authenticated:
+        return False
+    if _is_local_request() or not _lan_access_enabled():
+        return False
+    return not _lan_reveal_enabled()
+
+
+def _enforce_lan_transfer_block(endpoint):
+    """Uzak LAN oturumları için kasa aktarım uçlarını her koşulda reddeder."""
+    if endpoint not in _LAN_TRANSFER_DENIED_ENDPOINTS:
+        return None
+    if _app_token_valid() or not current_user.is_authenticated:
+        return None
+    if _is_local_request() or not _lan_access_enabled():
+        return None
+    log.warning("LAN aktarımı engellendi: uzak oturum %s ucunu denedi.", endpoint)
+    _audit('lan_aktarim_reddedildi', uc=endpoint)
+    return jsonify({
+        'error': _('Bu cihaz LAN üzerinden bağlı olduğu için kasa verisi dışa aktarılamaz ve içe aktarılamaz. Bu işlemleri bu bilgisayardan yapın.'),
+    }), 403
+
+
+def _enforce_lan_reveal_block(endpoint):
+    """LAN'da şifre gösterme kapalıyken açık metin şifre uçlarını reddeder."""
+    leaks_secret = (
+        endpoint in _LAN_REVEAL_ENDPOINTS
+        or (endpoint in _LAN_REVEAL_FORM_GET_ENDPOINTS and request.method == 'GET')
+    )
+    if not leaks_secret:
+        return None
+    if _app_token_valid() or not current_user.is_authenticated:
+        return None
+    if _is_local_request() or not _lan_access_enabled():
+        return None
+    if _lan_reveal_enabled():
+        return None
+    log.warning("LAN şifre gizleme: uzak oturum %s ucunu denedi.", endpoint)
+    _audit('lan_sifre_gosterme_reddedildi', uc=endpoint)
+    return jsonify({
+        'error': _('Bu cihaz LAN üzerinden bağlı olduğu için şifreler gizleniyor. Şifreyi görmek için bu bilgisayardan giriş yapın.'),
+    }), 403
+
+
+def _enforce_lan_read_only(endpoint):
+    """LAN oturumlarını varsayılan olarak salt okunur tutar.
+
+    LAN erişimi açıldığında ağdaki her cihaz, kasanın TAM yetkisine sahip
+    olurdu (kayıt silme, şifre değiştirme, dışa aktarma). Güvenli varsayılan:
+    uzak istemciler okur, yazamaz. Bu ayar yalnızca bu bilgisayarın ekranından
+    açılabilir; açıldığında eski (tam yetki) davranış geri gelir.
+    """
+    if request.method not in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+        return None
+    if endpoint in _LAN_READ_ONLY_EXEMPT_ENDPOINTS or endpoint in _TOKEN_ENDPOINTS:
+        return None
+    if _app_token_valid():
+        return None
+    if not current_user.is_authenticated:
+        return None
+    if _is_local_request() or not _lan_access_enabled():
+        return None
+    if _lan_full_access_enabled():
+        return None
+    log.warning("LAN salt okunur: uzak oturumun yazma isteği reddedildi (%s).", endpoint)
+    _audit('lan_yazma_reddedildi', uc=endpoint)
+    return jsonify({
+        'error': _('Bu cihaz LAN üzerinden bağlı olduğu için kasa salt okunurdur. Kayıt eklemek veya değiştirmek için bu bilgisayardan işlem yapın.'),
+    }), 403
 
 # ─── LAN ERİŞİM ŞİFRESİ ───────────────────────────────────────────────────────
 # Kasa anahtarı sarma/çözme ve ayar yaşam döngüsü kasa_core/lan_access içinde;
@@ -940,6 +1172,14 @@ def invalidate_vault_report_cache() -> None:
         with _vault_report_cache_lock:
             _vault_report_cache.clear()
 
+def _kanal_etiketi() -> str:
+    """Olayın nereden geldiğini belirtir (yerel mi, uzak LAN mı)."""
+    try:
+        return 'uzak' if not _is_local_request() else 'yerel'
+    except Exception:
+        return 'yerel'
+
+
 def _app_token_valid() -> bool:
     """Ana süreç imzasını (X-App-Token) sabit zamanlı olarak doğrular."""
     token = request.headers.get('X-App-Token')
@@ -957,10 +1197,16 @@ def _same_origin_state_change() -> bool:
     origin = request.headers.get('Origin') or request.headers.get('Referer')
     fetch_site = request.headers.get('Sec-Fetch-Site')
     if not origin:
-        # Tarayıcı göstergesi (Sec-Fetch-Site) varsa bu bir tarayıcı isteğidir ve
-        # kaynak başlığı eksiktir (proxy/gizlilik aracı) -> reddet. Hiçbir tarayıcı
-        # göstergesi yoksa (ana süreç, CLI, test istemcisi) esnek davranış korunur.
-        return not fetch_site
+        # Fail-closed: durum değiştiren bir istek için kaynak göstergesi
+        # (Origin/Referer) ve tarayıcı göstergesi (Sec-Fetch-Site) HİÇBİRİ
+        # yoksa bu istek tarayıcı kaynaklı olamaz — ya CLI/ana süreç (ki o
+        # zaman ana süreç imzası taşır ve yukarıda elendi) ya da başlıkları
+        # düşüren bir arakatman. İkisi de reddedilir.
+        #
+        # Tarayıcı tarafı: Chromium 76+, Firefox 90+, Safari 16.4+ durum
+        # değiştiren her fetch/XHR/form isteğinde `Sec-Fetch-Site` gönderir; bu
+        # uygulama hem Electron (Chromium) hem güncel mobil tarayıcı hedefler.
+        return False
     if fetch_site and fetch_site not in {'same-origin', 'same-site', 'none'}:
         return False
     parsed = urlparse(origin)
@@ -975,6 +1221,29 @@ def _get_csrf_token() -> str:
         token = secrets.token_urlsafe(32)
         session['csrf_token'] = token
     return token
+
+def _reset_session_preserving_csrf(rotate: bool = False) -> None:
+    """Oturumu temizler ama oturuma bağlı CSRF belirtecini KORUR.
+
+    `session.clear()` csrf_token alanını da siler. Giriş başarısız olduğunda
+    çağrılan temizlik, bir sonraki denemenin gönderdiği belirteği geçersiz
+    kılıyordu: kullanıcı yanlış şifreyi 2. kez denediğinde "Güvenlik
+    doğrulaması başarısız" hatası alıyor ve forma bir daha erişemiyordu.
+    `g.csrf_token` render sırasında kullanıldığı için ikisi de tazelenir.
+
+    `rotate=True` ayrıca belirteci yeniden üretir. Bu, **ayrıcalık değişiminden
+    sonra** kullanılmalıdır (kilit/çıkış): eski belirteç, önceki oturuma ait
+    bir çerezle gönderilmiş olsa bile artık geçerli sayılmaz. Oturum çerezi
+    zaten imzalıdır ve sunucu tarafında session id tutulmadığı için oturum
+    sabitleme (session fixation) riski zaten yoktur; bu, "token hiç
+    dönmüyor" standardını kapatır.
+    """
+    token = None if rotate else session.get('csrf_token')
+    session.clear()
+    if token:
+        session['csrf_token'] = token
+    g.csrf_token = _get_csrf_token()
+
 
 def _csrf_authorized() -> bool:
     # Ana süreç imzası (X-App-Token) başka bir kaynaktan öğrenilemez; bu istekler
@@ -994,12 +1263,11 @@ def check_token_and_auth():
     token_ok = _app_token_valid()
     endpoint = request.endpoint
 
-    if not _same_origin_state_change():
-        abort(403)
-
-    # Oturum çereziyle kimlik doğrulanan durum değiştiren isteklerde CSRF belirteci zorunludur.
-    # X-App-Token yalnızca stateless API uçları için enjekte edilir; state-changing
-    # istekler X-CSRF-Token ile korunur. Token taşıyan istekler CSRF'den muaftır.
+    # Sıralama önemli: CSRF belirteci ÖNCE denetlenir, kaynak denetimi SONRA.
+    # Böylece belirteci olmayan istek "Güvenlik doğrulaması başarısız" (400)
+    # alır — kullanıcıya hangi eksik olduğunu söyler. Kaynak denetimi ancak
+    # istek zaten CSRF korumasını geçtikten sonra devreye girer; yani ikisi
+    # birlikte fail-closed'tır ama biri diğerinin hata mesajını gizlemez.
     if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
         if (token_ok or current_user.is_authenticated
                 or request.endpoint == 'login'):
@@ -1007,6 +1275,8 @@ def check_token_and_auth():
                 return jsonify({
                     'error': _('Güvenlik doğrulaması başarısız. Lütfen sayfayı yenileyip tekrar deneyin.'),
                 }), 400
+    if not _same_origin_state_change():
+        abort(403)
     g.csrf_token = _get_csrf_token()
 
     # Hareketsiz oturum kilidi (sunucu tarafı). Renderer çalışmasa bile uygulanır.
@@ -1026,6 +1296,22 @@ def check_token_and_auth():
 
     is_local = _is_local_request()
     lan_enabled = _lan_access_enabled()
+
+    # LAN aktarımı (dışa/içe aktarma + yedekleme) tam yetkiden BAĞIMSIZ olarak
+    # her zaman kapalıdır: tam yetki yalnızca kayıt düzenleme yetkisidir.
+    lan_transfer_response = _enforce_lan_transfer_block(endpoint)
+    if lan_transfer_response is not None:
+        return lan_transfer_response
+
+    # LAN'da şifre gösterme (varsayılan kapalı) — tam yetkiden bağımsız.
+    lan_reveal_response = _enforce_lan_reveal_block(endpoint)
+    if lan_reveal_response is not None:
+        return lan_reveal_response
+
+    # LAN oturumlarını varsayılan salt okunurdur (bkz. _enforce_lan_read_only).
+    lan_read_only_response = _enforce_lan_read_only(endpoint)
+    if lan_read_only_response is not None:
+        return lan_read_only_response
 
     if token_ok:
         if endpoint in _PUBLIC_ENDPOINTS or endpoint in _TOKEN_ENDPOINTS:
@@ -1088,6 +1374,16 @@ def add_security_headers(response):
         'Permissions-Policy',
         'camera=(), microphone=(), geolocation=()',
     )
+    # Kaba kaynak kökeni yalıtımı: uygulama tamamen aynı kökenden beslenir, hiçbir
+    # yanlış kaynaktan gömülemez (no-cors alt-kaynaklar tarayıcı tarafından
+    # engellenir). COEP require-corp BILINCLI OLARAK EKLENMEDI: cam dokusu
+    # (glass-grain) ve marka ikonlari data: URI kullaniyor ve require-corp
+    # data: alt-kaynaklarini engelledigi icin gorsel kirilma olurdu.
+    # HSTS de eklenmedi (NOTES.md): sertifika kendinden imzali oldugu icin
+    # tarayici bypass edemez ve LAN/mobil erişimi kalıcı olarak kırılır.
+    response.headers.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
+    response.headers.setdefault('Cross-Origin-Resource-Policy', 'same-origin')
+    response.headers.setdefault('X-Permitted-Cross-Domain-Policies', 'none')
     if request.endpoint not in {'static', 'serve_custom_background', 'serve_history_background'}:
         response.headers['Cache-Control'] = 'no-store, max-age=0'
         response.headers['Pragma'] = 'no-cache'
@@ -1151,16 +1447,20 @@ def shutdown():
 @app.route('/lock', methods=['POST'])
 def lock():
     _clear_vault_password()
-    session.clear()
+    # Kilit bir ayrıcalık değişimidir: CSRF belirteci yenilenir.
+    _reset_session_preserving_csrf(rotate=True)
     logout_user()
+    _audit('kasa_kilitlendi', kaynak='kullanici')
     return jsonify({"status": "locked"})
 
 @app.route('/logout')
 @login_required
 def logout():
     _clear_vault_password()
-    session.clear()
+    # Çıkış da ayrıcalık değişimidir: CSRF belirteci yenilenir.
+    _reset_session_preserving_csrf(rotate=True)
     logout_user()
+    _audit('cikis', kaynak='kullanici')
     return redirect(url_for('login'))
 
 def _setup_storage_status():
@@ -1299,10 +1599,12 @@ def login():
         lan_hash = _get_setting(lan_access.LAN_ACCESS_HASH_SETTING)
         if not lan_hash or not verify_master_password(lan_hash, mp):
             _clear_vault_password()
-            session.clear()
+            _reset_session_preserving_csrf()
             logout_user()
             retry_after = _record_login_failure(attempt_key)
             log.warning("Hatalı LAN erişim şifresi denemesi.")
+            _audit('giris_basarisiz', kanal='lan', uzaktan_mi=True,
+                   kalan_saniye=retry_after)
             if retry_after > 0:
                 return render_template(
                     'login.html', error=_too_many_attempts_message(retry_after),
@@ -1317,7 +1619,7 @@ def login():
         vault_key = _unwrap_lan_vault_key(mp)
         if not vault_key:
             _clear_vault_password()
-            session.clear()
+            _reset_session_preserving_csrf()
             logout_user()
             log.error("LAN kasa anahtarı çözülemedi; LAN kurulumu yenilenmeli.")
             return render_template(
@@ -1340,10 +1642,12 @@ def login():
         write_init_marker = False
         if not verify_master_password(setting.value, mp):
             _clear_vault_password()
-            session.clear()
+            _reset_session_preserving_csrf()
             logout_user()
             retry_after = _record_login_failure(attempt_key)
             log.warning("Hatalı ana şifre denemesi.")
+            _audit('giris_basarisiz', kanal='yerel', uzaktan_mi=False,
+                   kalan_saniye=retry_after)
             if retry_after > 0:
                 return render_template(
                     'login.html', error=_too_many_attempts_message(retry_after),
@@ -1437,6 +1741,13 @@ def index():
         Record.created_at.desc()
     ).all()
 
+    # Uzak LAN oturumu ve "şifreleri göster" kapalıyken kart numarası, kart
+    # üzerindeki isim ve not/SecureNote metni de SIRR'dır. Bunlar şablonda
+    # düz metin basılır (kopyalama düğmeli), bu yüzden gizleme DEĞER
+    # MASKESİYLE değil satırı hiç oluşturarak yapılır: sır şablona hiç
+    # girmesin. `Şifre`/`CVV` zaten `SECRET_PLACEHOLDER` ile maskeleniyordu.
+    hide_secrets = _lan_secret_visibility_blocked()
+
     kasa_verileri = []
     for r in rows:
         title = decrypt_metadata(fernet, r.title)
@@ -1446,10 +1757,19 @@ def index():
         dec_comm = safe_decrypt(fernet, r.encrypted_comment)
         card_holder_value = decrypt_metadata(fernet, r.card_holder)
 
+        # Kart numarası CreditCard kaydında `login` alanında saklanır; yalnız
+        # kart tipinde sırdır (normal kayıtta `login` kullanıcı adıdır ve
+        # ızgaranın temel bilgisi olarak görünmeye devam eder).
+        card_number_value = login_value if r.type == 'CreditCard' else ''
+        if hide_secrets:
+            dec_comm = ''
+            card_holder_value = ''
+            card_number_value = ''
+
         if r.type == 'CreditCard':
             detaylar = {k: v for k, v in [
                 ('Kart Üzerindeki İsim', card_holder_value),
-                ('Kart Numarası', login_value),
+                ('Kart Numarası', card_number_value),
                 ('CVV / Şifre', SECRET_PLACEHOLDER if r.encrypted_password else '')
             ] if v}
         elif r.type == 'SecureNote':
@@ -1486,6 +1806,22 @@ def index():
         show_onboarding=show_onboarding,
     )
 
+# Düzenleme formu alan adı → Record niteliği. `/duzenle` POST'unda alan
+# GÖNDERILMEMIŞSE mevcut değer korunur (aşağıya bak). `/ekle`'de bu harita
+# kullanılmaz: yeni kayıtta her alan formdan gelmelidir.
+_FORM_FIELD_TO_ATTR = {
+    'kayit_tipi': 'type',
+    'kategori': 'category',
+    'isim': 'title',
+    'website_url': 'website_url',
+    'login': 'login',
+    'email': 'email',
+    'password': 'encrypted_password',
+    'comment': 'encrypted_comment',
+    'card_holder': 'card_holder',
+    'expiry_date': 'expiry_date',
+}
+
 def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str, Any]:
     """Form verilerini okuyup (id, Record alanları) döner."""
     record_type = normalize_record_type(request.form.get('kayit_tipi'))
@@ -1519,6 +1855,9 @@ def ekle_sayfasi():
         db.session.add(new_record)
         db.session.commit()
         invalidate_vault_report_cache()
+        # Yalnızca kayıt SAYISI ve tipi günlüğe girer; başlık/şifre hiçbir
+        # zaman buradan geçmez (bkz. kasa_core/audit.py alan adı reddi).
+        _audit('kayit_olusturuldu', tur=fields.get('type', ''))
         return redirect(url_for('index'))
     return render_template('ekle.html', title="Yeni Kayıt Ekle", kayit=None)
 
@@ -1532,6 +1871,16 @@ def duzenle_sayfasi(kayit_id):
         old_password = safe_decrypt(fernet, r.encrypted_password)
         new_password = request.form.get('password', '')
         fields = _record_from_form(fernet, record_id=kayit_id)
+        # Alan GÖNDERILMEMIŞSE mevcut değer korunur — yokluk "silmek" değildir.
+        # Bu, `/ekle` için doğru olmazdı (yeni kayıtta her alan formdan gelmeli)
+        # ama `/duzenle`'de kritik: LAN + "şifreleri göster" kapalıyken uzak
+        # istemci formu açamıyor (403) ancak POST atabiliyordu; yalnız CSRF
+        # gönderen bir istek kaydın 10 alanının tamamını sessizce sıfırlıyordu
+        # (2026-10 turunda ölçüldü: PasswordHistory de yazılmıyordu, yani
+        # geri dönüş yolu yoktu).
+        for form_field, attr in _FORM_FIELD_TO_ATTR.items():
+            if form_field not in request.form:
+                fields[attr] = getattr(r, attr)
         if r.encrypted_password and fields['encrypted_password'] and new_password != old_password:
             _append_password_history(kayit_id, r.encrypted_password, fernet)
         backup_database()
@@ -1540,6 +1889,7 @@ def duzenle_sayfasi(kayit_id):
                 setattr(r, key, val)
         db.session.commit()
         invalidate_vault_report_cache()
+        _audit('kayit_guncellendi', kanal=_kanal_etiketi(), adet=1)
         return redirect(url_for('index'))
 
     dec_pass = safe_decrypt(fernet, r.encrypted_password)
@@ -1569,6 +1919,7 @@ def sil_kayit(kayit_id):
     deleted = _delete_records_and_history([kayit_id])
     db.session.commit()
     invalidate_vault_report_cache()
+    _audit('kayit_silindi', silinen_kayit_sayisi=deleted)
     if request.accept_mimetypes.best == 'application/json':
         return jsonify({'status': 'ok', 'deleted': deleted})
     return redirect(url_for('index'))
@@ -1602,6 +1953,7 @@ def get_gecmis(kayit_id):
             'date': row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '',
         })
         previous_password = password
+    _audit('sifre_gecmisi_gosterildi', kanal=_kanal_etiketi())
     return jsonify(history)
 
 @app.route('/api/record/<kayit_id>/password')
@@ -1609,6 +1961,9 @@ def get_gecmis(kayit_id):
 def get_record_password(kayit_id):
     fernet = get_fernet()
     r = db.get_or_404(Record, kayit_id)
+    # KİMLİK DEĞİL, yalnızca "birisi şifreyi açtı" olayı. Kayıt kimliği ve
+    # şifrenin kendisi denetime ASLA yazılmaz.
+    _audit('sifre_gosterildi', kanal=_kanal_etiketi())
     return jsonify({'password': safe_decrypt(fernet, r.encrypted_password)})
 
 @app.route('/api/password-strength', methods=['POST'])
@@ -1624,6 +1979,49 @@ def _build_vault_report_payloads() -> tuple[dict[str, int], dict[str, list]]:
     """Stats ve sağlık verisini tek decrypt/score geçişinde üretir."""
     return _calculate_vault_report_payloads(get_fernet(), _score_password)
 
+# Sağlık raporundaki `login` alanı CreditCard kayıtlarında KART NUMARASIDIR
+# (kart no `login` sütununda tutulur). `index()` bu satırı LAN'da gizliyordu;
+# `/saglik` "düzenleme formu" yüzünden gizlenmeyi atlayan ikinci render yolu
+# olduğu için kart numaralarını buradan düz metin veriyordu (2026-10 turunda
+# ölçüldü: 3/3 kart sızdı, `lan_full_access` gerekmiyordu). Aynı politika:
+# gizleme değer maskesiyle değil alanı boşaltarak yapılır.
+_HEALTH_RECORD_LISTS = ('zayif', 'eski', 'expired', 'sizinti')
+
+def _redact_health_for_lan(health: dict) -> dict:
+    """LAN'da sırlar gizleniyorsa sağlık raporundaki kart numaralarını boşaltır."""
+    if not _lan_secret_visibility_blocked():
+        return health
+
+    def _clean(item: dict) -> dict:
+        # Yalnız kart numarası sır; başlık/kullanıcı adı/e-posta/adres
+        # `index()` ile aynı şekilde görünmeye devam eder.
+        if item.get('type') != 'CreditCard':
+            return item
+        return {**item, 'login': ''}
+
+    cleaned = dict(health)
+    for key in _HEALTH_RECORD_LISTS:
+        cleaned[key] = [_clean(item) for item in (health.get(key) or [])]
+    # `tekrar` liste-içinde-liste; aynı `record_data` sözlükleri diğer
+    # listelerle PAYLAŞILIR, bu yüzden özgün (cache) sözlükler MUTASYON
+    # EDİLMEZ — her render kendi kopyasını alır.
+    cleaned['tekrar'] = [
+        [_clean(item) for item in group] for group in (health.get('tekrar') or [])
+    ]
+    return cleaned
+
+@app.route('/saglik')
+@login_required
+def saglik_raporu():
+    cached = _get_vault_report_cache('saglik')
+    if cached is not None:
+        return render_template('saglik.html', **_redact_health_for_lan(cached))
+
+    stats, health = _build_vault_report_payloads()
+    _set_vault_report_cache('stats', stats)
+    _set_vault_report_cache('saglik', health)
+    return render_template('saglik.html', **_redact_health_for_lan(health))
+
 @app.route('/api/stats')
 @login_required
 def api_stats():
@@ -1635,18 +2033,6 @@ def api_stats():
     _set_vault_report_cache('stats', stats)
     _set_vault_report_cache('saglik', health)
     return jsonify(stats)
-
-@app.route('/saglik')
-@login_required
-def saglik_raporu():
-    cached = _get_vault_report_cache('saglik')
-    if cached is not None:
-        return render_template('saglik.html', **cached)
-
-    stats, health = _build_vault_report_payloads()
-    _set_vault_report_cache('stats', stats)
-    _set_vault_report_cache('saglik', health)
-    return render_template('saglik.html', **health)
 
 # ─── CANLI SIZINTI TARAMASI (HaveIBeenPwned) ─────────────────────────────
 # Tarama bir arka plan iş parçacığında yürür; üretilen sonuçlar HIBP önek
@@ -1800,10 +2186,11 @@ def _now_iso() -> str:
 def _touch_last_backup(iso_value: str | None = None) -> str:
     """'Son yedek zaman damgası' ayarını tazeler ve değeri döndürür.
 
-    Çağıranlar (sağlık paneli, otomatik yedek, düz dışa aktarım) aynı zaman
-    damgasını tek satırda yazıyordu; tek noktaya toplandı. DİKKAT: dışa aktarma
-    yolları da bu damgayı yazıyor — yani "yedek alınmadı" hatırlatması bir export
-    ile susuyor. Bu davranım bilinçli olarak DEĞİŞTİRİLMEDİ (kullanıcı kararı).
+    Çağıranlar (sağlık paneli, otomatik yedek) aynı zaman damgasını tek satırda
+    yazıyordu; tek noktaya toplandı. DİKKAT: yalnızca GERÇEK yedek alan yollar
+    çağırır. Dışa aktarma (/export, şifreli dışa aktarma) kasaya bir yedek
+    yazmaz — sadece kullanıcıya bir dosya verir — bu yüzden damgaya dokunmaz;
+    aksi halde "yedek alınmadı" hatırlatması hiç gerçek yedek alınmadan susuyordu.
     """
     stamp = iso_value or _now_iso()
     _set_setting(LAST_BACKUP_SETTING, stamp)
@@ -2205,13 +2592,62 @@ def health_export():
 # yönetilebilir; arayüz de LAN kartını uzak oturumlarda gizliyor.
 _LOCAL_ONLY_SETTING_FIELDS = {
     'lan_enabled', 'internet_kill_switch', 'live_breach_scan', 'auto_lock_enabled',
+    'auto_lock_timeout',
+    'lan_full_access_enabled',
+    'lan_reveal_passwords_enabled',
+    # Aşağıdakiler "kasa verisi" değil ama bir LAN istemcisinin zayıflatmaması
+    # gereken savunma ayarları. 2026-10'da eklendi: `auto_lock_timeout` uzak
+    # tam-yetkili oturumla 5 -> 240 dk'a çekilebiliyordu, yani otomatik kilit
+    # pratikte etkisizleştirilebiliyordu. `_save_flag` yalnız `full_form`
+    # (yerel) veya alan gönderilmişse yazdığı için uzak kısmi istek bunları
+    # normalde sıfırlamıyor — AMA alanı göndermesi yeterliydi.
+    'content_protection_enabled',
+    'auto_backup_interval',
+    'hardware_acceleration_enabled',
 }
 
-def _reject_remote_critical_settings() -> None:
+def _reject_remote_critical_settings(payload: str = 'form') -> None:
+    """Uzak istemcinin yalnız bu bilgisayardan yönetilebilecek ayarı
+    değiştirmesini engeller.
+
+    `payload='form'` (varsayılan) `POST /save_settings` içindir; `payload='json'`
+    olan uçlar gövdeyi JSON gönderir (`/settings/content-protection` gibi) ve
+    `request.form` boş geldiği için aynı kural onlarda sessizce işlemezdi —
+    2026-10'daki bulgu tam olarak buydu.
+    """
     if _is_local_request():
         return
-    if _LOCAL_ONLY_SETTING_FIELDS & set(request.form):
+    names = set(request_json()) if payload == 'json' else set(request.form)
+    if _LOCAL_ONLY_SETTING_FIELDS & names:
         abort(403)
+
+def appearance_state() -> dict:
+    """Görünüm ayarlarının okuma tarafındaki TEK gösterimi.
+
+    Hem POST /save_settings (XHR) hem de GET /settings/appearance aynı 15
+    alanı döndürüyordu; iki liste ayrı ayrı büyüyünce birinde yeni alan
+    unutulup diğer yerde sessizce eksik kalıyordu. `jsonify` anahtarları
+    sıraladığı için yanıt şeması DEĞİŞMEZ.
+    """
+    return {
+        "accent_color": get_saved_accent_color(),
+        "background_style": get_saved_background_style(),
+        "chroma_accent_enabled": get_chroma_accent_enabled(),
+        "chroma_accent_speed": get_chroma_accent_speed(),
+        "glass_quality": get_glass_quality(),
+        "glass_blur": get_glass_blur(),
+        "glass_veil": get_glass_veil(),
+        "glass_frost": get_glass_frost(),
+        "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
+        "interface_animations_enabled": get_interface_animations_enabled(),
+        "gradients_enabled": get_gradients_enabled(),
+        "card_sheen_enabled": get_card_sheen_enabled(),
+        "card_frame_enabled": get_card_frame_enabled(),
+        "card_depth_enabled": get_card_depth_enabled(),
+        "vault_accent_enabled": get_vault_accent_enabled(),
+        "power_save_enabled": get_power_save_enabled(),
+    }
+
 
 @app.route('/save_settings', methods=['POST'])
 @login_required
@@ -2276,6 +2712,12 @@ def save_settings():
     else:
         # Uzak istek LAN alanını göndermedi: LAN durumuna dokunulmaz.
         lan_now_enabled = lan_was_enabled
+    # LAN oturumlarının tam yetkili olup olmayacağı. Değişiklik backend'i
+    # yeniden başlatmaz; yalnızca istek kabul kuralı değişir.
+    _save_flag('lan_full_access_enabled', lambda v: _set_setting(
+        lan_access.LAN_FULL_ACCESS_SETTING, v))
+    _save_flag('lan_reveal_passwords_enabled', lambda v: _set_setting(
+        lan_access.LAN_REVEAL_PASSWORDS_SETTING, v))
     _save_flag('internet_kill_switch', lambda v: _set_setting(
         network_policy.INTERNET_KILL_SWITCH_SETTING, v))
     _save_flag('live_breach_scan', lambda v: _set_setting(
@@ -2296,25 +2738,10 @@ def save_settings():
     db.session.commit()
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
+            **appearance_state(),
             "status": "ok",
             "glass_effects_enabled": get_glass_effects_enabled(),
-            "accent_color": get_saved_accent_color(),
-            "background_style": get_saved_background_style(),
-            "chroma_accent_enabled": get_chroma_accent_enabled(),
-            "chroma_accent_speed": get_chroma_accent_speed(),
-            "glass_quality": get_glass_quality(),
-            "glass_blur": get_glass_blur(),
-            "glass_veil": get_glass_veil(),
-            "glass_frost": get_glass_frost(),
-            "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
-            "interface_animations_enabled": get_interface_animations_enabled(),
-            "gradients_enabled": get_gradients_enabled(),
-            "card_sheen_enabled": get_card_sheen_enabled(),
-            "card_frame_enabled": get_card_frame_enabled(),
-            "card_depth_enabled": get_card_depth_enabled(),
-            "vault_accent_enabled": get_vault_accent_enabled(),
             "hardware_acceleration_enabled": get_hardware_acceleration_enabled(),
-            "power_save_enabled": get_power_save_enabled(),
             "lan_enabled": _lan_access_enabled(),
             "internet_kill_switch_enabled": network_policy.internet_kill_switch_enabled(),
             "live_breach_scan_enabled": network_policy.live_breach_scan_enabled(),
@@ -2511,8 +2938,6 @@ def export_data():
     rows   = Record.query.all()
     export_format = _requested_export_format()
 
-    _touch_last_backup()
-    db.session.commit()
     return _send_records_export(
         _serialize_records(rows, fernet),
         f"sifrekasam_yedek_{datetime.now().strftime('%Y%m%d')}",
@@ -2556,8 +2981,6 @@ def encrypted_export_prepare():
         }
         _pending_encrypted_exports[token] = (now, password)
 
-    _touch_last_backup()
-    db.session.commit()
     return jsonify({
         'status': 'ok',
         'token': token,
@@ -2736,8 +3159,18 @@ def settings_content_protection():
     if request.method == 'POST':
         if not _settings_write_allowed():
             abort(403)
-        val = request_json().get('content_protection_enabled')
-        _set_setting('content_protection_enabled', str(val).lower())
+        data = request_json()
+        # Anahtar YOKSA hiçbir şey yazılmaz. Denetim (`_reject_remote_critical_settings`)
+        # yalnız "anahtar gönderildi mi" diye bakar; yazma ise eskiden koşulsuzdu,
+        # yani boş JSON `{}` ya da form gövdesi denetimi sessizce geçip ayarı
+        # sıfırlıyordu (`str(None).lower()` == 'none' → okuma tarafı kapalı).
+        if 'content_protection_enabled' not in data:
+            abort(400)
+        # Ekran yakalama engeli bir savunma ayarı: uzak LAN istemcisi kapatıp
+        # kasa başında keylogger/ekran kaydı riskini açmamalı.
+        _reject_remote_critical_settings(payload='json')
+        _set_setting('content_protection_enabled',
+                     'true' if data['content_protection_enabled'] else 'false')
         db.session.commit()
         return jsonify({"status": "ok"})
     s       = Setting.query.filter_by(key='content_protection_enabled').first()
@@ -2749,8 +3182,11 @@ def settings_hardware_acceleration():
     if request.method == 'POST':
         if not _settings_write_allowed():
             abort(403)
-        val = request_json().get('hardware_acceleration_enabled')
-        save_hardware_acceleration('true' if val else 'false')
+        data = request_json()
+        if 'hardware_acceleration_enabled' not in data:
+            abort(400)
+        _reject_remote_critical_settings(payload='json')
+        save_hardware_acceleration('true' if data['hardware_acceleration_enabled'] else 'false')
         db.session.commit()
         return jsonify({"status": "ok"})
     return jsonify({
@@ -2801,7 +3237,7 @@ def lan_info():
     payload = {
         'hostname': socket.gethostname(),
         'ips': detect_lan_ips(),
-        'port': safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535),
+        'port': _get_public_port(),
         'ssl': os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE),
     }
     if _lan_access_enabled():
@@ -2944,23 +3380,8 @@ def settings_appearance():
             "power_save_enabled": power_save,
         })
     return jsonify({
-        "accent_color": get_saved_accent_color(),
-        "background_style": get_saved_background_style(),
+        **appearance_state(),
         "custom_background_url": url_for('serve_custom_background') if get_saved_background_style() == 'custom' and _find_custom_background() else None,
-        "chroma_accent_enabled": get_chroma_accent_enabled(),
-        "chroma_accent_speed": get_chroma_accent_speed(),
-        "glass_quality": get_glass_quality(),
-        "glass_blur": get_glass_blur(),
-        "glass_veil": get_glass_veil(),
-        "glass_frost": get_glass_frost(),
-        "animated_backgrounds_enabled": get_animated_backgrounds_enabled(),
-        "interface_animations_enabled": get_interface_animations_enabled(),
-        "gradients_enabled": get_gradients_enabled(),
-        "card_sheen_enabled": get_card_sheen_enabled(),
-        "card_frame_enabled": get_card_frame_enabled(),
-        "card_depth_enabled": get_card_depth_enabled(),
-        "vault_accent_enabled": get_vault_accent_enabled(),
-        "power_save_enabled": get_power_save_enabled(),
     })
 
 @app.route('/api/background/upload', methods=['POST'])
@@ -3329,6 +3750,8 @@ def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str,
             # Otomatik yedek anahtarı da yeni kasa anahtarıyla yeniden sarılır.
             _backups.refresh_backup_key(old_fernet, new_fernet)
             log.info("Ana şifre başarıyla değiştirildi.")
+            _audit('ana_sifre_degistirildi', kayit_sayisi=total,
+                   oturum_dusuruldu=len(stale_sids) if vault_sid else 0)
             with _reencrypt_lock:
                 _reencrypt_state[task_id] = {'progress': 100, 'total': total, 'done': True}
 
@@ -3338,6 +3761,10 @@ def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str,
         except Exception:
             pass
         log.exception("Password change error")
+        # Başarısız şifre değişimi de kayda geçer: kasa eski anahtarda kaldı
+        # ama kullanıcı yeni şifreyi sanmış olabilir. Denetime istisna metni
+        # yazılmaz (izin listesinde `sebep` alanı sabit bir etiket bekler).
+        _audit('ana_sifre_degistirme_basarisiz')
         with _reencrypt_lock:
             _reencrypt_state[task_id] = {
                 'progress': -1,
@@ -3387,6 +3814,7 @@ def change_password():
         threading.Thread(target=_reencrypt_task,
                          args=(task_id, old_key, new_key, new_hash, vault_sid),
                          daemon=True).start()
+        _audit('ana_sifre_degistirme_basladi')
         return jsonify({'task_id': task_id})
     except Exception:
         _vault_write_locked.clear()
@@ -3459,6 +3887,68 @@ normalize_pem_file(CERT_FILE, log)
 
 # ─── BAŞLATMA ─────────────────────────────────────────────────────────────────
 
+# Gerçekte bağlanan TCP portu. 0 = henüz bilinmiyor.
+#
+# Neden ayrı bir global? Ana süreç portu TAHMİN ETMEZ: FLASK_PORT=0 gönderir, işletim
+# sistemi boş portu seçer, Flask da `bind()` + `listen()` TAMAMLANDIKTAN SONRA
+# gerçek portu stdout'a `KASA_PORT=<port>` satırı olarak bildirir. Böylece
+# "port seç -> dinleyiciyi kapat -> Flask o porta bağlan" ayrışıklığı ortadan kalkar
+# (bkz. SECURITY.md "Port yarışı (TOCTOU)" kalemi). `/api/lan-info` da kullanıcıya
+# tahmini değil, dinleyicinin fiilen bağlandığı portu gösterir.
+_bound_port = 0
+
+
+def _get_bound_port() -> int:
+    """Bağlanan gerçek portu döndürür; henüz bilinmiyorsa 0."""
+    return _bound_port
+
+
+def _report_bound_port(bound_port) -> None:
+    """Gerçek portu global'e yazar ve ana sürece tek satırla bildirir.
+
+    `flush=True` ZORUNLUDUR: flush'sız print boruya yazılan veriyi 1.5 sn'de ya da
+    süreç kapanana kadar teslim etmez; ana süreç o süre boyunca portu bilmediği
+    için başlatmayı zaman aşımına uğratırdı. Paketli (PyInstaller, console=False)
+    çalışma modunda bile stdout boruya bağlı olduğu için bu satır oraya ulaşır.
+
+    Ayırıcı desen (`^KASA_PORT=(\\d{1,5})$`) sunucunun kendi stdout çıktısından
+    ayırt edilebilir kılar: bu modülün log handler'ı `[INFO] ...` satırları basar,
+    Werkzeug fallback'i de banner yazar. Ana süreç satır satır tarar ve **yalnızca
+    baştan sona tam eşleşmeyi** kabul eder; diğer satırlar yutulur.
+    """
+    global _bound_port
+    try:
+        port = int(bound_port)
+    except (TypeError, ValueError):
+        return
+    if port < 1 or port > 65535:
+        return
+    _bound_port = port
+    try:
+        print('KASA_PORT=%d' % port, flush=True)
+    except Exception:  # pragma: no cover - stdout kapali olabilir
+        pass
+
+
+def _configured_port() -> int:
+    """İstenen port (0 geçerli: 'işletim sistemi seçsin' demektir)."""
+    return safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 0, 65535)
+
+
+def _get_public_port() -> int:
+    """Kullanıcıya gösterilecek port (her zaman 1-65535).
+
+    Öncelik gerçek bağlanan porttadır: LAN açıkken ana süreç `FLASK_PORT=0`
+    gönderir, env değeri 0'a düşer ve kullanıcıya 0/kabaca bir port göstermek
+    yanlış olur. Sunucu henüz bağlanmadıysa (testler, `import` sırasındaki
+    çağrılar) istenen porta, o da 0 veya geçersizse 5000'e düşülür.
+    """
+    for candidate in (_get_bound_port(), _configured_port()):
+        if 1 <= candidate <= 65535:
+            return candidate
+    return 5000
+
+
 def _get_server_host() -> str:
     configured_host = os.environ.get('FLASK_HOST')
     if configured_host:
@@ -3468,19 +3958,49 @@ def _get_server_host() -> str:
 
 if __name__ == '__main__':
     flask_host = _get_server_host()
-    flask_port = safe_int(os.environ.get('FLASK_PORT') or os.environ.get('PORT'), 5000, 1, 65535)
+    flask_port = _configured_port()
     _auto_backups_dir()  # yedek klasörünü başlangıçta hazırla
     threading.Thread(target=_auto_backup_loop, name='auto-backup-loop', daemon=True).start()
     try:
         from cheroot.wsgi import Server as _CherootServer
         from cheroot.ssl.builtin import BuiltinSSLAdapter as _CherootSSLAdapter
-        _server = _CherootServer((flask_host, flask_port), app, numthreads=8)
+
+        class _PortReportingCherootServer(_CherootServer):
+            """bind()+listen() sonrası gerçek portu ana sürece bildiren sunucu.
+
+            cheroot `bind()` içinde `self.bind_addr = self.resolve_real_bind_addr(sock)`
+            yapar; yani istenen port 0 iken `bind_addr[1]` artık OS'in atadığı
+            GERÇEK portu tutar. `prepare()` `listen()` + iş parçacıklarını
+            başlattıktan sonra döner, dolayısıyla rapor anında port zaten
+            bağlantı kabul ediyordur.
+            """
+
+            def prepare(self):
+                result = super().prepare()
+                try:
+                    _report_bound_port(self.bind_addr[1])
+                except (AttributeError, IndexError, TypeError):
+                    pass
+                return result
+
+        _server = _PortReportingCherootServer((flask_host, flask_port), app, numthreads=8)
         if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
             _server.ssl_adapter = _CherootSSLAdapter(CERT_FILE, KEY_FILE)
         _server.safe_start()
     except ImportError:
-        # cheroot yuklu degilse Werkzeug gelistirme sunucusuna geri don
+        # cheroot yuklu degilse Werkzeug gelistirme sunucusuna geri don.
+        # app.run() ephemeral port (0) senaryosunda portu GERI DONDURMEZ; bu yuzden
+        # make_server ile sunucuyu elle kurup `.port` ozelligini okuyoruz
+        # (Werkzeug `self.port = self.server_address[1]` ile gercek portu yazar).
         ssl_ctx = (CERT_FILE, KEY_FILE) if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE) else None
-        app.run(host=flask_host, port=flask_port, ssl_context=ssl_ctx, threaded=True)
+        from werkzeug.serving import make_server as _make_server
+        _server = _make_server(flask_host, flask_port, app, ssl_context=ssl_ctx, threaded=True)
+        _report_bound_port(_server.port)
+        try:
+            _server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            _server.server_close()
 
 

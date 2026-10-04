@@ -8,12 +8,13 @@ import { initRevealCopy, copyToClipboard } from './reveal-copy.js';
 import { initPasswordStrength } from './password-strength.js';
 import { initCustomControls } from './custom-controls.js';
 import { initLanSettings } from './lan-settings.js';
+import { initSettingsDependencies } from './settings-dependencies.js?v=1';
 import { initModalSystem } from './modal-system.js';
 import { initHeartbeat } from './heartbeat.js';
 import { initNotifications } from './notifications.js?v=9.3';
 import { initScanSession } from './scan-session.js';
 import { initAppearanceSettings } from './appearance-settings.js';
-import { initVaultIndex } from './vault-index.js';
+import { initVaultIndex } from './vault-index.js?v=2';
 import { initVaultForm } from './vault-form.js';
 import { initFormCalendar } from './form-calendar.js';
 import { initDataPanel } from './data-panel.js';
@@ -27,6 +28,10 @@ import {
 } from './color-math.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  // Sekme gecis tanilamasi: konsoldan `__tabDiag.__enable = true` ile acilir,
+  // en fazla `max` kayit tutar. Kapaliyken hicbir olcum yapilmaz.
+  window.__tabDiag = { __enable: false, max: 25, entries: [] };
 
   // ─── SABİTLER & YARDIMCILAR ───────────────────────────────────────────────
 
@@ -726,6 +731,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── 3b. LAN ERİŞİMİ (lan-settings.js) ─────────────────────────────────
   const { lanToggle, lanInfoBox, showPending, showActive, hide } = initLanSettings({ apiJson });
 
+  // ─── 3c. BAĞIMLI AYAR KİLİTLERİ (settings-dependencies.js) ────────────
+  // `appearance-settings.js` cam/chroma kartlarına dokunduğu için bu
+  // init ondan SONRA gelmeli; modül ayrıca `kasa:appearance-synced` olayını
+  // dinleyerek kendini yeniden eşitler.
+  initSettingsDependencies();
+
   // ─── 4. TOAST & PANO ──────────────────────────────────────────────────────
 
   // ─── 4a. TOAST SİSTEMİ (toast.js) ────────────────────────────────────
@@ -1023,23 +1034,29 @@ document.addEventListener('DOMContentLoaded', () => {
         ? settingsPanels.indexOf(nextPanel) > settingsPanels.indexOf(prevPanel)
         : true;
 
-      // Sekme gecis tanilamasi (konsoldan __tabDiag ile okunur)
-      try {
-        const diag = {
-          to: tabName,
-          dir: goingDown ? 'down' : 'up',
-          t: Math.round(performance.now()),
-          reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
-          engine: 'waapi'
-        };
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          try {
-            diag.opAfter2f = +(+getComputedStyle(nextPanel).opacity).toFixed(2);
-          } catch (_) {}
-        }));
-        window.__tabDiag = window.__tabDiag || [];
-        window.__tabDiag.push(diag);
-      } catch (_) {}
+      // Sekme gecis tanilamasi. Varsayilan KAPALI: her sekme gecisinde iki rAF
+      // + getComputedStyle okumasi ve sinirsiz buyuyen bir dizi uretmek yerine
+      // konsoldan `__tabDiag.__enable = true` ile bilerek acilir. Kapatilirken
+      // toplanan kayitlar `__tabDiag.entries` icinde korunur.
+      if (window.__tabDiag && window.__tabDiag.__enable) {
+        try {
+          const diag = {
+            to: tabName,
+            dir: goingDown ? 'down' : 'up',
+            t: Math.round(performance.now()),
+            reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+            engine: 'waapi'
+          };
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            try {
+              diag.opAfter2f = +(+getComputedStyle(nextPanel).opacity).toFixed(2);
+            } catch (_) {}
+          }));
+          const log = window.__tabDiag.entries;
+          log.push(diag);
+          if (log.length > window.__tabDiag.max) log.shift();
+        } catch (_) {}
+      }
 
       const reduced = motionDisabled();
       // Cam yüzey tespiti: backdrop-filter'li bir elementin opakligini
@@ -1589,6 +1606,8 @@ document.addEventListener('DOMContentLoaded', () => {
       modalEl.addEventListener('kasa:modal-opened', () => {
         kasaCancelPendingModalClose();
         kasaSyncModalScrollLock(true);
+        // Modal açıldığında tetikleyenin balonu ekranda kalmasın.
+        hideTooltip();
       });
       modalEl.addEventListener('kasa:modal-closing', (event) => {
         kasaCancelPendingModalClose();
@@ -1603,6 +1622,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ─── 6b. BAŞLIK DROPDOWN (Ayarlar) ──────────────────────────────────────
+  // Balon (tooltip) bir panel/modal açılınca KAPANMALI: bildirim düğmesine
+  // gelip panel açıldığında imleç düğmenin üstünde kaldığı için `mouseout`
+  // hiç tetiklenmez ve balon panel açıkken ekranda asılı kalır. 6c'de
+  // atan gerçek uygulama buraya geri çağrılır.
+  let hideTooltip = () => {};
   const headerDropdowns = Array.from(document.querySelectorAll('[data-kasa-dropdown]'));
 
   /* Portal-aware menu bulucu: menü artık dropdown wrapper içinde olmayabilir
@@ -1692,6 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
     trigger.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
+      hideTooltip();
       if (menu.hidden) {
         closeHeaderDropdowns(dropdown);
         clearTimeout(dropdown._kasaMenuHideTimeout);
@@ -1810,9 +1835,19 @@ document.addEventListener('DOMContentLoaded', () => {
       'a.card-icon-btn, a.footer-action-btn, a.kasa-btn'
     );
 
-    /* Balon konumu: hedef elemanın KUTUSUNUN ortası değil, METNİN görünür
-       ortası kullanılır → kısa değerlerde balon metnin yakınında çıkar,
-       boş geniş kutunun ortasında yüzen bir balon olmaz. */
+    /* Balon konumu. İKİ FARKLI ÇAPA:
+       * Etkileşimli denetimlerde (buton, ikon butonu, a) balon KUTUNUN ortasına
+         hizalanır. Eskiden tüm durumlarda metin çapası kullanılıyordu; ikonu
+         solda olan bir butonda ("<i>…</i>Yenile") metin kutu sağına kaydığı için
+         balon butonun ortasından HAFİF SAĞDA çıkıyordu.
+       * Metin elemanlarında (kart değeri, kesilmiş metin) metnin görünür
+         ortası kullanılır: kutu geniş, metin kısa olduğunda boş kutunun
+         ortasında yüzen bir balon olmasın. */
+    const anchorX = (el) => {
+      const rect = el.getBoundingClientRect();
+      if (isControl(el)) return rect.left + rect.width / 2;
+      return textAnchorX(el);
+    };
     const textAnchorX = (el) => {
       const rect = el.getBoundingClientRect();
       const range = getTextRange(el);
@@ -1865,7 +1900,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bubble.hidden = false;
       const w = bubble.offsetWidth;
       const h = bubble.offsetHeight;
-      let left = Math.max(8, Math.min(textAnchorX(target) - w / 2, window.innerWidth - w - 8));
+      let left = Math.max(8, Math.min(anchorX(target) - w / 2, window.innerWidth - w - 8));
       let top = rect.top - h - margin;
       let below = false;
       if (top < 8) {
@@ -1879,6 +1914,33 @@ document.addEventListener('DOMContentLoaded', () => {
       bubble.style.left = `${left}px`;
       bubble.style.top = `${top}px`;
     };
+
+    /* Kendi kendini onarma: balon gösterildikten sonra imleç hedefin ÜSTÜNDE
+       değilse balonu kapat. Portal menü açılması, panelin imlecin altına
+       kayması, yeniden yerleşim gibi `mouseout` üretmeyen durumlar vardı ve
+       bunlarda balon ekranda asılı kalıyordu (kullanıcı bildirim panelini
+       açtığında da tooltip'in görünmeye devam etmesi bu yüzden). */
+    let _ttSelfHealFrame = 0;
+    const selfHeal = () => {
+      _ttSelfHealFrame = 0;
+      if (!_ttShown && !_ttPending) return;
+      const el = document.elementFromPoint(
+        window.__kasaLastPointerX || -1,
+        window.__kasaLastPointerY || -1,
+      );
+      const node = _ttShown ? _ttTarget : _ttPending;
+      if (!node) return;
+      if (el && (node === el || node.contains(el) || el.contains(node))) return;
+      if (_ttPending) { _ttPending = null; if (_ttTimer) { clearTimeout(_ttTimer); _ttTimer = null; } }
+      hide();
+    };
+    document.addEventListener('mousemove', (event) => {
+      window.__kasaLastPointerX = event.clientX;
+      window.__kasaLastPointerY = event.clientY;
+      if (!_ttShown && !_ttPending) return;
+      if (_ttSelfHealFrame) return;
+      _ttSelfHealFrame = requestAnimationFrame(selfHeal);
+    }, { passive: true });
 
     const show = (target, text) => {
       if (!text) text = target.getAttribute('title') ? target.getAttribute('title').trim() : '';
@@ -1950,6 +2012,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') hide();
     });
+
+    // 6b (dropdown açılışı) ve modal açılışı bu kapatmayı geri çağırır.
+    hideTooltip = hide;
   };
   initTooltips();
 

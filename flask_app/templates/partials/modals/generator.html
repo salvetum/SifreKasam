@@ -1,5 +1,9 @@
 <!-- Şifre Üretici Modal -->
-<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="password-generator-title" data-create-record-url="{{ url_for('ekle_sayfasi') }}">
+<!-- data-target-input: setupPasswordGenerator() ürettiği şifreyi bu alana yazar.
+     YOKSA targetInput null'a düşer ve modal hiçbir yere şifre basmaz (sessiz
+     no-op — kullanıcı "Üret"e basar, hiçbir şey olmaz). Bu modal yalnız
+     index.html'de bulunur; index'de #page-password yoktur. -->
+<div class="kasa-modal" id="passwordGeneratorModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="password-generator-title" data-target-input="modal-generated-password-display" data-create-record-url="{{ url_for('ekle_sayfasi') }}">
     <div class="modal-dialog generator-modal-dialog">
         <div class="modal-content generator-modal-content">
             <div class="modal-header">

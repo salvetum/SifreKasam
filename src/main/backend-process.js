@@ -24,7 +24,7 @@ const {
   LAN_RESTART_MIN_INTERVAL_MS,
 } = require('./config');
 const { createBackendNet } = require('./backend-net');
-const { getPinnedHttpsOptions, resetPinnedCertificateCache } = require('./certificates');
+const { getPinnedHttpsOptions, resetPinnedCertificateCache, waitForPinnedCertificate, createPinnedCertificateMissingError } = require('./certificates');
 const { showFriendlyFatalError } = require('./fatal-errors');
 const { loadBackendPage } = require('./page-loader');
 const { verifyQuickIntegritySync, verifyFullIntegrityAsync } = require('./integrity');
@@ -34,7 +34,7 @@ const { resolvePythonCommand } = require('./python-command');
 const PYTHON = resolvePythonCommand();
 
 // Backend ag katmani: sabitler/durum enjeksiyonu
-const { requestBackendJson, waitForBackendReady, findFreePort } = createBackendNet({
+const { requestBackendJson, waitForBackendReady } = createBackendNet({
   host: HOST,
   getToken: () => APP_TOKEN,
   getPort: () => rt.PORT,
@@ -44,6 +44,8 @@ const { requestBackendJson, waitForBackendReady, findFreePort } = createBackendN
 });
 
 function checkMinimizeToTray() {
+  // Port bildirilmediyse (başlatma yarıda kaldı) sorulacak backend de yoktur.
+  if (!rt.PORT) return Promise.resolve(false);
   return new Promise((resolve) => {
     const req = https.request(
       { hostname: HOST, port: rt.PORT, path: '/settings/tray',
@@ -79,7 +81,66 @@ async function applyContentProtection() {
   }
 }
 
+// Port yarışı (TOCTOU) YOK: ana süreç port seçmez. FLASK_PORT=0 gönderilir,
+// işletim sistemi boş portu seçer ve Flask `bind()`+`listen()` tamamlandıktan
+// HEMEN SONRA gerçek portu stdout'a `KASA_PORT=<port>` satırı olarak yazar
+// (bkz. flask_app/app.py: _report_bound_port). Böylece "portu seç, dinleyiciyi
+// kapat, sonra Flask o porta bağlan" ayrışıklığı ve onun doğurduğu boşluk
+// tamamen ortadan kalkar; port ile dinleyici aynı atomik bind() içinde
+// birlikte doğar. Sertifika pini bu sıralamada ikinci savunma hattıdır
+// (bkz. certificates.js) — port çalma imkânsız olsa bile, sahte bir sunucu
+// Flask'ın sertifikasına sahip olamayacağı için geçerli yanıt üretemez.
+//
+// Bu, LAN modunda daha da kritikti: findFreePort() HER ZAMAN 127.0.0.1'e
+// bağlanırken Flask 0.0.0.0'a bağlanıyordu. Windows 11'de ölçüldü: yerel bir
+// süreç loopback'i alırken wildcard bind'i BAŞARIYLA tamamlayabiliyor
+// (daha spesifik dinleyici yanıtlar) → Flask bind hatası vermiyor, retry
+// tetiklenmiyor, ana süreç saldırganın sunucusuna bağlanıyordu.
+//
+// Yine de FLASK_PORT_BIND_RETRY_LIMIT döngüsü korunur: sabit port isteyen
+// (FLASK_PORT=5000) geliştirici/kurulum senaryolarında bind hatası yine de
+// mümkündür ve o zaman yeniden denemek doğru davranıştır.
+const FLASK_PORT_BIND_RETRY_LIMIT = 3;
+const _BIND_ERROR_PATTERN = /EADDRINUSE|address already in use|only one usage of each socket|10048|98:\s*Address/i;
+// Werkzeug make_server bind hatasında "Port N is in use by another program" yazıp
+// sys.exit(1) ile çıkar; mesajda 10048 yoktur, bu yüzden desen genişletildi.
+const _BIND_ERROR_PATTERN_EXTRA = /is in use by another program/i;
+
+function isPortBindFailure(error) {
+  if (!error) return false;
+  const message = error.message || String(error);
+  return _BIND_ERROR_PATTERN.test(message) || _BIND_ERROR_PATTERN_EXTRA.test(message);
+}
+
+// Ana sürecin ayrıştırdığı tek satır biçimi. Backend'in kendi stdout çıktısı
+// (`[INFO] ...` log satırları, Werkzeug banner'ı) bu desene uymaz; ayrıştırıcı
+// satırın BAŞINDAN SONUNA kadar eşleşmesini şart koşar.
+const _BOUND_PORT_LINE_PATTERN = /^KASA_PORT=(\d{1,5})$/;
+
+function parseBoundPortLine(line) {
+  const match = _BOUND_PORT_LINE_PATTERN.exec(line);
+  if (!match) return 0;
+  const port = Number(match[1]);
+  return port >= 1 && port <= 65535 ? port : 0;
+}
+
 async function startFlaskServer(timeoutMs) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= FLASK_PORT_BIND_RETRY_LIMIT; attempt += 1) {
+    if (attempt > 1) {
+      console.warn(`Flask portu alinamadi (deneme ${attempt}/${FLASK_PORT_BIND_RETRY_LIMIT}); isletim sistemi yeni bir port secti.`);
+    }
+    try {
+      return await startFlaskServerOnce(timeoutMs);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= FLASK_PORT_BIND_RETRY_LIMIT || !isPortBindFailure(error)) throw error;
+    }
+  }
+  throw lastError || new Error('Flask baslatilamadi.');
+}
+
+async function startFlaskServerOnce(timeoutMs) {
   if (rt.flaskProcess) {
     await stopFlaskServer();
   }
@@ -103,26 +164,49 @@ async function startFlaskServer(timeoutMs) {
       }
     }
 
-    console.log(`Flask baslatiliyor: ${command} ${args.join(' ')} (${flaskHost}:${rt.PORT})`);
+    console.log(`Flask baslatiliyor: ${command} ${args.join(' ')} (${flaskHost}, port isletim sisteminden)`);
     bench.mark('flask-spawn');
 
+    // FLASK_PORT=0: "boş portu sen seç" -> port tahmin edilen bir sayı olmaktan
+    // çıkar, bind() ile birlikte doğar. `rt.PORT` spawn anında 0'dır ve
+    // `KASA_PORT=` satırı geldiğinde gerçek değerle güncellenir.
     const spawnedProcess = spawn(command, args, {
       env: { ...process.env, APP_TOKEN,
              FLASK_SECRET_KEY,
              APP_VERSION: app.getVersion(),
              FLASK_HOST: flaskHost,
-             FLASK_PORT: String(rt.PORT), PORT: String(rt.PORT),
+             FLASK_PORT: '0', PORT: '0',
              KASA_RESET_LAN_ON_START: rt.resetSavedLanOnNextStart ? '1' : '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     rt.flaskProcess = spawnedProcess;
+    rt.PORT = 0;
     rt.resetSavedLanOnNextStart = false;
     let startupComplete = false;
     let startupSettled = false;
 
+    // TEK bütçe: port raporu + sertifika bekleme + hazır olma probu bu
+    // deadline'dan paylaşır. Önceden üst üste binecek şekilde 15 sn (sertifika)
+    // + timeoutMs (probu) kullanılıyordu; toplam bekleme sınırı aşılabiliyordu.
+    const startupBudgetMs = timeoutMs || 15000;
+    const startupDeadline = Date.now() + startupBudgetMs;
+    const remainingMs = () => Math.max(1000, startupDeadline - Date.now());
+
+    // Port raporu sözleşmesi: stdout'ta KASA_PORT=<port> görülene kadar rt.PORT
+    // bilinmez. Bu kapı, hazır olma probunun YANLIŞ porta (0'a) gitmesini
+    // engeller; ayrıca Flask süreci port raporlamadan ölürse bekleme sonsuza
+    // kadar sürmesin diye 'exit' ve deadline üzerinden reddedilir.
+    let resolveBoundPort;
+    let rejectBoundPort;
+    const boundPortPromise = new Promise((resolve, reject) => {
+      resolveBoundPort = resolve;
+      rejectBoundPort = reject;
+    });
+
     const failStartup = (error) => {
       if (startupSettled) return;
       startupSettled = true;
+      rejectBoundPort(error);
       reject(error);
     };
     const completeStartup = () => {
@@ -151,8 +235,27 @@ async function startFlaskServer(timeoutMs) {
       });
     }
 
+    let stdoutBuffer = '';
     let stderrBuffer = '';
-    spawnedProcess.stdout.on('data', () => {});
+    // stdout yalnızca port raporu için okunur. Bu modülün log handler'ı `[INFO] ...`
+    // satırları basar, Werkzeug fallback'i banner yazar; ayrıştırıcı yalnızca tam
+    // eşleşmeyi kabul ettiği için bunlar yutulur.
+    spawnedProcess.stdout.on('data', (data) => {
+      stdoutBuffer += data.toString();
+      if (stdoutBuffer.length > 8192) stdoutBuffer = stdoutBuffer.slice(-8192);
+      let newlineIndex = stdoutBuffer.indexOf('\n');
+      while (newlineIndex !== -1) {
+        const line = stdoutBuffer.slice(0, newlineIndex).replace(/\r$/, '').trim();
+        stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+        const reportedPort = parseBoundPortLine(line);
+        if (reportedPort) {
+          rt.PORT = reportedPort;
+          bench.mark('port-reported');
+          resolveBoundPort(reportedPort);
+        }
+        newlineIndex = stdoutBuffer.indexOf('\n');
+      }
+    });
     spawnedProcess.stderr.on('data', (data) => {
       stderrBuffer += data.toString();
       if (stderrBuffer.length > 4096) stderrBuffer = stderrBuffer.slice(-4096);
@@ -172,7 +275,52 @@ async function startFlaskServer(timeoutMs) {
       }
     });
 
-    waitForBackendReady(completeStartup, failStartup, timeoutMs);
+    // Port raporlanmazsa sonsuza kadar beklememek için deadline ayrıca bir
+    // reddediş kaynağıdır (Flask çökmezse ama satırı da basmazsa).
+    const portDeadlineTimer = setTimeout(() => {
+      failStartup(new Error(
+        `Flask ${Math.round(startupBudgetMs / 1000)}s icinde baglanan portu bildirmedi (KASA_PORT).`
+      ));
+    }, remainingMs());
+
+    // Flask sertifikayı kendisi üretir (flask_app/app.py: _ensure_self_signed_cert,
+    // import sırasında — sunucu bind edilmeden ÖNCE). Dosya hazır olana kadar
+    // beklemek ilk kurulumda pin doğrulamasını mümkün kılar ve ek gecikme
+    // yaratmaz (zaten hazır olma probu bekleniyor; timeout bütçesi aynı kalır,
+    // bekleme süresi bu probu içinden düşülür).
+    //
+    // NOT: Buradaki geri çağırma bir microtask'te çalışır, Promise constructor'ı
+    // onu YAKALAMAZ. try/catch olmadan bir throw "unhandled rejection" olur,
+    // promise hiç settle olmaz ve startFlaskServer sonsuza kadar asılı kalır
+    // (restartFlaskServer'ın catch'i de düşmez). Bu yüzden açıkça sarıyoruz.
+    //
+    // FAIL-CLOSED: pin deadline'da hâlâ yoksa backend'e HİÇBİR istek gönderilmez.
+    // Önceden bu dal yalnızca uyarı basıp sessizce geçiyordu; sonraki tüm ana
+    // süreç istekleri getPinnedHttpsOptions() -> rejectUnauthorized:false ile
+    // doğrulamasız gidiyordu (yerel sahte sunucuya MITM imkânı). Artık net bir
+    // hata üretilir; main.js bunu kullanıcıya "Arka plan hizmeti başlatılamadı"
+    // diyaloğuyla gösterir.
+    //
+    // SIRA: önce port, sonra sertifika, sonra hazır olma probu. Port bilinmeden
+    // proba denemek anlamsızdır (rt.PORT 0'dı) ve pin kontrolü port bilgisi
+    // olmadan da anlamlıdır; yine de tek sıra, tek deadline.
+    boundPortPromise
+      .then(() => waitForPinnedCertificate({ timeoutMs: Math.min(remainingMs(), 15000) }))
+      .then((hasPinnedCertificate) => {
+        if (!hasPinnedCertificate) {
+          failStartup(createPinnedCertificateMissingError());
+          return;
+        }
+        try {
+          waitForBackendReady(completeStartup, failStartup, remainingMs());
+        } catch (error) {
+          failStartup(error);
+        }
+      })
+      .catch((error) => {
+        failStartup(error);
+      })
+      .then(() => clearTimeout(portDeadlineTimer));
   });
 }
 
@@ -369,13 +517,17 @@ function shutdownFlask() {
   const pid = rt.flaskProcess.pid;
   rt.flaskProcess = null;
 
-  const req = https.request({
-    hostname: HOST, port: rt.PORT, path: '/shutdown',
-    method: 'POST', headers: { 'X-App-Token': APP_TOKEN },
-    ...getPinnedHttpsOptions(),
-  });
-  req.on('error', () => {});
-  req.end();
+  // Port henuz bildirilmediyse (cok erken kapatma) /shutdown adresi bilinmiyor;
+  // zaten SIGTERM ile kapatıyoruz, istek atmayı dene.
+  if (rt.PORT) {
+    const req = https.request({
+      hostname: HOST, port: rt.PORT, path: '/shutdown',
+      method: 'POST', headers: { 'X-App-Token': APP_TOKEN },
+      ...getPinnedHttpsOptions(),
+    });
+    req.on('error', () => {});
+    req.end();
+  }
 
   try {
     kill(pid, 'SIGTERM', (err) => {
@@ -397,5 +549,4 @@ module.exports = {
   shutdownFlask,
   requestBackendJson,
   waitForBackendReady,
-  findFreePort,
 };

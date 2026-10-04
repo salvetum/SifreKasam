@@ -153,11 +153,32 @@ export function initPasswordGenerator({
     const entropyEl     = $('entropy-bits');
     const crackTimeEl   = $('crack-time');
     const strengthEmpty = $('strength-empty');
-    const targetInputId = container.dataset.targetInput || 'page-password';
     let generatedAnimationTimer = null;
     let rollHandle = null;
 
     const charSetButtons = [...container.querySelectorAll('[data-char-set]')];
+
+    // Hedef alan bu kodun tek "nereye yazıyorum" kararıdır. Yanlış/eksik
+    // data-target-input sessiz bir no-op'a yol açar (şifre üretilir, hiçbir
+    // yere yazılmaz — kullanıcı "Üret"e basar ve hiçbir şey olmaz). Bu yüzden
+    // hem şimdi doğrulanır hem de kapsayıcıya işaret bırakılır: test paketi
+    // (GeneratorWiringTests) her konteynerin data-target-input taşıdığını ve
+    // hedef alanın gerçekten var olduğunu doğrular.
+    const targetInputId = container.dataset.targetInput;
+    if (!targetInputId) {
+      console.error(
+        `[password-generator] "${containerId}" konteynerinde data-target-input yok; `
+        + 'üretilen şifre hiçbir alana yazılmayacak.',
+      );
+      container.dataset.generatorMiswired = 'missing-target-input';
+    }
+    const targetInput = targetInputId ? document.getElementById(targetInputId) : null;
+    if (targetInputId && !targetInput) {
+      console.error(
+        `[password-generator] "${containerId}" hedefi #${targetInputId} bulunamadı.`,
+      );
+      container.dataset.generatorMiswired = 'missing-target-element';
+    }
     const selectedSets = new Set(
       charSetButtons
         .filter((btn) => btn.classList.contains('is-active'))

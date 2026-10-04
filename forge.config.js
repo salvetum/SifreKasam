@@ -1,5 +1,7 @@
 const path = require('path');
 const fs = require('fs');
+const { FusesPlugin } = require('@electron-forge/plugin-fuses');
+const { FuseVersion, FuseV1Options } = require('@electron/fuses');
 
 const iconPath = path.resolve(__dirname, 'favicon.ico');
 const installerLoadingGifPath = path.resolve(__dirname, 'assets', 'installer-loading.gif');
@@ -107,7 +109,30 @@ module.exports = {
       // WSLg ile GUI testi icin /etc/wsl.conf icinde [boot] systemd=true olmali
     },
   ],
-  plugins: [],
+  plugins: [
+    // ASAR bütünlük doğrulaması + Electron çalışma zamanı sertleştirmesi.
+    // @electron/packager app.asar header SHA256'sini zaten ELECTRONASAR PE
+    // resource'ına yazıyor; bu plugin o resource'a dokunmadan yalnızca fuse
+    // wire'ını çevirir (packageAfterCopy -> asar oluşturulmadan ÖNCE çalışır,
+    // resedit/ELECTRONASAR yazımı SONRA olur — sıra doğru).
+    new FusesPlugin({
+      // main.js / src/main/window.js loading.html'i file:// ile yüklüyor;
+      // GrantFileProtocolExtraPrivileges plugin varsayılanı (inherit) olarak
+      // bilinçli korunuyor — kapatılırsa uygulama açılmaz.
+      //
+      // strictlyRequireAllFuses BİLİNÇLİ OLARAK KULLANILMIYOR: Electron
+      // yükseltmelerinde fuse wire'ına yeni fuse eklenirse build, fuse
+      // tanımlanmadığı için kırılır. Yeni fuse'lar bilinçli gözden geçirilip
+      // eklenmelidir.
+      version: FuseVersion.V1,
+      [FuseV1Options.RunAsNode]: false,
+      [FuseV1Options.EnableCookieEncryption]: true,
+      [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+      [FuseV1Options.EnableNodeCliInspectArguments]: false,
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+    }),
+  ],
   // Paketleme bitince kullanılmayan Chromium locale'lerini buda (paket boyutu)
   hooks: {
     postPackage: async (_forgeConfig, { outputPaths }) => {

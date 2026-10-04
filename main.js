@@ -29,7 +29,6 @@ const {
   shutdownFlask,
   requestBackendJson,
   waitForBackendReady,
-  findFreePort,
 } = require('./src/main/backend-process');
 const { createTray } = require('./src/main/tray');
 const {
@@ -89,8 +88,10 @@ async function onAppReady() {
     }
     verifyPackagedStartupResources();
     bench.mark('resources-verified');
-    rt.PORT = await findFreePort();
-    bench.mark('port-resolved');
+    // Port burada seçilmez: Flask'a FLASK_PORT=0 gönderilir, OS boş portu seçer
+    // ve Flask gerçek portu stdout'dan bildirir (KASA_PORT=...). rt.PORT o
+    // satır gelene kadar 0'dır; pencere file:// üzerinden açıldığı için
+    // backend adresi bu aşamada hiç kullanılmaz. Bkz. backend-process.js.
 
     const flaskTimeoutMs = isFirstRun() ? FLASK_TIMEOUT_FIRST_RUN_MS : FLASK_TIMEOUT_MS;
 
@@ -204,6 +205,21 @@ async function onAppReady() {
 
     clearProgressTimer();
 
+    // ── BACKEND URL'İNE İLK GEÇİŞ ──────────────────────────────────────────
+    // Buraya gelindiğinde pin (ssl/cert.pem) ÜSTTEKİ flaskStartPromise başarıyla
+    // çözülmüş olduğu için diskte MEVCUTTUR: startFlaskServerOnce() içindeki
+    // waitForPinnedCertificate() (backend-process.js) pin olmadan /heartbeat
+    // probuna geçmez ve başlatmayı hata ile reddeder; Flask da cert.pem'i
+    // bind'dan önce yazar (flask_app/app.py: _ensure_self_signed_cert import
+    // sırasında). Yani renderer'ın gideceği ilk backend adresi, ana sürecin
+    // daha önce bant dışı doğruladığı sunucudur — 'pin hazır olana kadar ertele'
+    // davranışı main.js'in bu sıralamasıyla zaten sağlanır ve bedeli yoktur
+    // (loading ekranı file:// üzerinden çalışır, backend'e gitmez).
+    // Sertifika kanalındaki sezgisel kabul (CN/self-signed/SAN) kaldırıldığı
+    // için bu sıralama artık GÜVENLİĞİN ÖN KOŞULUDUR, konfor değil:
+    // loadBackendPage() pin yoksa yine de loadURL'ı çağırmayı reddeder
+    // (page-loader.js), yani sıralama bozulursa sessizce güvensizleşmek yerine
+    // net bir hata verilir.
     if (rt.mainWindow) {
       try {
         const loadingLanguage = await rt.mainWindow.webContents.executeJavaScript(
@@ -217,13 +233,18 @@ async function onAppReady() {
           });
         }
       } catch (_) { /* Loading ekranı tercihi yoksa kayıtlı backend dili kullanılır. */ }
-      try {
-        await rt.mainWindow.webContents.executeJavaScript('transitionToApp()');
-      } catch (_) { /* loading.html henüz yüklenmemiş olabilir */ }
-      bench.mark('transition-done');
+      // ÖNCEKİ DAVRANIŞ: burada transitionToApp() çağrılıyordu, yani loading
+      // ekranı NAVIGASYON ÖNCESİ 220 ms boyunca sönümleniyordu. Belge değişimi
+      // sırasında eski belge zaten yok olduğu için bu, pencere boş zeminde
+      // geçen süreyi UZATIYORDU. Artık sönümleme yok: loading ekranı tam
+      // görünürken yeni belge gelir, Chromium geçişi kendisi yapar.
+      bench.mark('navigation-start');
       rt.mainWindow.setBackgroundColor(getSavedWindowBackgroundColor());
       applyContentProtection();
-      await loadBackendPage('/login?entry=loading');
+      const entryPath = bench.enabled
+        ? '/login?entry=loading&bench=1'
+        : '/login?entry=loading';
+      await loadBackendPage(entryPath);
       bench.mark('app-page-loaded');
       bench.dump('startup');
       startLanReconciliation();

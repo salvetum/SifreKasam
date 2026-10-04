@@ -1,10 +1,9 @@
 // ─── BACKEND AĞ KATMANI ──────────────────────────────────────────────────────
-// Flask backend'e giden HTTPS istekleri: boş port bulma, hazır olma probu ve
-// JSON istek yardımcıları. Ana süreç sabitlerine (HOST/APP_TOKEN/PORT) doğrudan
+// Flask backend'e giden HTTPS istekleri: hazır olma probu ve JSON istek
+// yardımcıları. Ana süreç sabitlerine (HOST/APP_TOKEN/PORT) doğrudan
 // bağlı olmamak için fabrika ile yapılandırılır; böylece test edilebilir kalır.
 
 const https = require('https');
-const net = require('net');
 
 const {
   getPinnedHttpsOptions,
@@ -107,23 +106,12 @@ function createBackendNet({ host, getToken, getPort, timeoutMs, retryIntervalMs,
     probe();
   }
 
-  // Yerel sunucu için müsait bir TCP portu seçer.
-  function findFreePort() {
-    return new Promise((resolve, reject) => {
-      const server = net.createServer();
-      server.unref();
-      server.on('error', reject);
-      server.listen(0, host, () => {
-        const address = server.address();
-        const port = typeof address === 'object' && address ? address.port : 0;
-        server.close(() =>
-          port ? resolve(port) : reject(new Error('Bos port bulunamadi.'))
-        );
-      });
-    });
-  }
-
-  return { requestBackendJson, waitForBackendReady, findFreePort };
+  // NOT: findFreePort() BİLEREK YOK. Port artık ana süreç tarafından seçilmiyor;
+  // Flask'a FLASK_PORT=0 gönderilir ve OS boş portu seçer (bkz.
+  // backend-process.js: startFlaskServerOnce). "Seç -> dinleyiciyi kapat ->
+  // Flask o porta bağlan" ayrışıklığı, aradaki TOCTOU boşluğu ve LAN modundaki
+  // 127.0.0.1 / 0.0.0.0 çakışması bu yüzden birden kalkar.
+  return { requestBackendJson, waitForBackendReady };
 }
 
 module.exports = { createBackendNet };

@@ -377,6 +377,66 @@ html[data-bs-theme="light"][data-glass-effects="off"] .settings-panel > .setting
         0 9px 24px rgba(60,74,101,0.07);
 }
 
+/* ── EFFECTS OFF: kapsamlı yüzey yedeği (2026-10) ──────────────────────
+   DESEN: Bir yüzeyin opak görünmesi çoğu yerde `backdrop-filter`'dan gelir;
+   arka planı kendisi çok düşük opaklıklıdır (`rgba(255,255,255,0.045)` gibi).
+   Cam KAPALI olunca `--glass-blur: none` olur → blur gider, saydam tabaka
+   KALIR ve yüzey saydam/karemsi görünür.
+
+   Ölçülen minimum opaklıklar (bkz. cam-off denetimi):
+     .filter-empty-state 0.028 · .vault-form-panel/actions/side 0.032
+     .kasa-navbar-inner 0.04  · .card-page-btn 0.045
+     .kasa-field 0.05          · .kasa-panel 0.085
+   Bu yüzden hepsi burada opak bir tabakaya bağlanıyor. `.glass` sınıfını
+   taşıyan yüzeyler yukarıdaki (307) kuraldan zaten opak zemin alıyor;
+   kasa kartları `cards.css` içinde kendi 14 varyantına sahip. */
+html[data-glass-effects="off"] .kasa-panel,
+html[data-glass-effects="off"] .vault-form-panel,
+html[data-glass-effects="off"] .vault-form-actions,
+html[data-glass-effects="off"] .vault-form-side,
+html[data-glass-effects="off"] .vault-generator-panel,
+html[data-glass-effects="off"] .filter-empty-state,
+html[data-glass-effects="off"] .kasa-navbar-inner,
+html[data-glass-effects="off"] .kasa-navbar-right .kasa-btn-muted,
+html[data-glass-effects="off"] .kasa-navbar .kasa-dropdown-trigger {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-color: rgba(var(--accent-rgb), 0.22) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.09), transparent 44%),
+        linear-gradient(145deg, rgba(29,33,55,0.97), rgba(20,23,42,0.97)) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-panel,
+html[data-bs-theme="light"][data-glass-effects="off"] .vault-form-panel,
+html[data-bs-theme="light"][data-glass-effects="off"] .vault-form-actions,
+html[data-bs-theme="light"][data-glass-effects="off"] .vault-form-side,
+html[data-bs-theme="light"][data-glass-effects="off"] .vault-generator-panel,
+html[data-bs-theme="light"][data-glass-effects="off"] .filter-empty-state,
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-navbar-inner,
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-navbar-right .kasa-btn-muted,
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-navbar .kasa-dropdown-trigger {
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.06), transparent 44%),
+        linear-gradient(145deg, #edf1f8, #dde5f2) !important;
+}
+
+/* Form girdileri: yüzeylerden ayrılsın diye içe gömük (daha koyu) opak
+   dolgu. `vault-form.css` tabanı yalnızca %6.5 beyaz — cam kapalıyken
+   görünmez hale geliyordu. */
+html[data-glass-effects="off"] .kasa-field {
+    background: rgba(9,11,24,0.92) !important;
+    border-color: rgba(255,255,255,0.12) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .kasa-field {
+    background: rgba(255,255,255,0.92) !important;
+    border-color: rgba(31,41,55,0.16) !important;
+}
+
 /* ══ BÖLÜM 5 — Frosted Glass grain (Google "Material You" yaklaşımı) ══
    Mevcut .glass sistemine EKLEME. Ek blur yok; tek statik,
    tam ekran, düşük opaklıklı grain katmanı cam yüzeylere mat/buzlu bir

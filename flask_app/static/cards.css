@@ -602,10 +602,34 @@ html[data-kasa-gradient="off"] .vault-card-shell::after {
     opacity: 0.72;
 }
 
+/* 2026-10 düzeltmesi: buradaki kural `%7 accent` veriyordu — cam AÇIKKEN
+   `backdrop-filter` saydamlığı kapatıyordu, cam KAPALIYKEN ise yüzey
+   neredeyse tamamen saydam kalıyordu (kullanıcı raporu: "saydam").
+   Artık cam kapalıyken opak bir tabaka var; aynı desen `glass.css`
+   "EFFECTS OFF" bloğunda tüm yüzeyler için merkezileştirildi. */
 html[data-glass-effects="off"] .card-pagination,
 html[data-kasa-gradient="off"] .card-pagination {
     border-color: rgba(var(--accent-rgb), 0.24) !important;
-    background: rgba(var(--accent-rgb), 0.07) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.10), transparent 42%),
+        linear-gradient(145deg, rgba(29,33,55,0.97), rgba(20,23,42,0.97)) !important;
+}
+
+html[data-glass-effects="off"] .card-page-btn,
+html[data-glass-effects="off"] .card-page-jump-input {
+    background: rgba(255,255,255,0.08) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .card-pagination,
+html[data-kasa-gradient="off"] .card-pagination {
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.07), transparent 42%),
+        linear-gradient(145deg, #edf1f8, #dde5f2) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .card-page-btn,
+html[data-bs-theme="light"][data-glass-effects="off"] .card-page-jump-input {
+    background: rgba(255,255,255,0.75) !important;
 }
 
 @media (max-width: 980px) {
@@ -689,4 +713,44 @@ html[data-glass-effects="off"] .vault-card-shell .footer-action-btn:focus-visibl
     .vault-card-shell .footer-action-btn { transition: color var(--dur-fast) ease; }
     .vault-card-shell .footer-action-btn:hover,
     .vault-card-shell .footer-action-btn:focus-visible { transform: none; }
+}
+
+/* ─── Filtre sonrasi kart girisi (camsiz kare duzeltmesi) ──────────────────────
+   BELIRTI: kullanci "arama sonucu kartlari ONCE cam efektsiz geliyor, sonra
+   camli" diye raporladi.
+
+   OLCULEN KOK NEDEN: sayfa-1 disindaki kartlar sablonda `hidden` dogar
+   (card-grid.html: `{% if loop.index0 >= card_page_size %}hidden{% endif %}`),
+   yani `display:none` ile. Arama onlari gorunur yaptiginda display:none -> block
+   gecisi olur; Chromium bu geciste backdrop-filter katmanini YENIDEN kurar ve
+   ilk karede ornekleme yapmadan boyar. Kart o karede "camsiz" gorunur.
+
+   COZUM: `card-animated` (cardSlideIn) YALNIZCA ilk yuklemede oynatilir
+   (vault-index.js: finishInitialReveal, 650ms sonra sinif kaldirilir) ve
+   transform icerdigi icin ayni Chromium sorununu yaratirdi; arama yolunda
+   zaten oynamiyordu. Onun yerine: gorunurluk ANINDA acilir, opaklik 0'dan
+   baslayan 180ms'lik bir giris animasyonuyla oynatilir. Bulaniklasma 1-2 karede
+   (~32 ms) tamamlandigi icin kart %20 opakliga gelmeden cam hazir olur; goz
+   "camsiz" kareyi goremez.
+   `both` fill-mode bitince degerleri geri yukler; sinif animationend'de
+   kaldirilir (aksi halde yeniden aramada animasyon yeniden oynamazdi).
+   Not: bu duzeltme `hidden` yerine gecmez — grid akisini degistirmek riskli,
+   gecilmis, uzerinde CSS'i olmayan bir sinif zaten bekliyordu. */
+@keyframes cardFilterReveal {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-wrapper.filter-reveal {
+    animation: cardFilterReveal 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+html[data-kasa-animations="off"] .card-wrapper.filter-reveal {
+    animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-wrapper.filter-reveal {
+        animation-duration: 0.01ms;
+    }
 }

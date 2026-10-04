@@ -100,6 +100,11 @@ import { showSuccessToast, showWarningToast } from './toast.js';
 
 
 export function initRevealCopy({ apiJson }) {
+  // LAN'da "şifreleri göster" kapalıyken sunucu 403 döner ve şifreyi hiç
+  // göndermez. Sessizce hiçbir şey olmamasın diye (düğmeye basıldı ama bir
+  // tepki yok → kullanıcı hata sanır) ayrı bir uyarı gösterilir.
+  let revealBlockedWarned = false;
+
   const fetchRowPassword = async (row) => {
     const field = row?.querySelector('.password-field');
     const recordId = field?.dataset.id;
@@ -108,6 +113,17 @@ export function initRevealCopy({ apiJson }) {
       const data = await apiJson(`/api/record/${encodeURIComponent(recordId)}/password`);
       return data.password || '';
     } catch {
+      if (!revealBlockedWarned) {
+        revealBlockedWarned = true;
+        try {
+          // Sunucunun 403 mesajıyla BİREBİR aynı metin: zaten iki katalogda
+          // da çevrili, ayrı bir çeviri anahtarı gerekmiyor ve kullanıcı
+          // ne olacağını önceden biliyor.
+          showWarningToast(window._('Bu cihaz LAN üzerinden bağlı olduğu için şifreler gizleniyor. Şifreyi görmek için bu bilgisayardan giriş yapın.'));
+        } catch (err) {
+          console.warn('Reveal blocked toast failed:', err);
+        }
+      }
       return '';
     }
   };

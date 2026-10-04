@@ -1,4 +1,16 @@
     <script nonce="{{ csp_nonce }}">
+        // Başlangıç geçiş penceresinin ölçümü. Ana süreç bu satırları
+        // console-message kancasıyla startup-bench.json'a toplar
+        // (bkz. src/main/window.js). Yalnız SIFREKASAM_BENCH=1 / --bench ile
+        // açılır; normal çalışmada tek bir boolean kontrolü.
+        window.KASA_BENCH = /[?&]bench=1\b/.test(location.search)
+            || !!window.__KASA_BENCH__;
+        window.__kasaBench = function (name) {
+            if (!window.KASA_BENCH) return;
+            try { console.log('[bench] ' + name); } catch (_) {}
+        };
+        window.__kasaBench('html-head');
+
         window.LANG = {{ CURRENT_LANG|tojson }};
         window.TRANSLATIONS = {{ TRANSLATIONS|tojson }};
         window.AVAILABLE_LANGS = {{ AVAILABLE_LANGS|tojson }};
@@ -293,3 +305,18 @@
             transition: opacity 0.25s ease;
         }
     </style>
+    <!-- İlk boya ölçümü: stylesheet'ler indirilip uygulandıktan SONRA, çerçeve
+         başına bir kez işaretlenir. Ana süreçtaki
+         'loading-file-loaded → navigation-start → renderer:first-paint'
+         farkı, pencere boş zeminde geçen süreyi verir. -->
+    <script nonce="{{ csp_nonce }}">
+        (function () {
+            if (!window.__kasaBench) return;
+            window.addEventListener('load', function () {
+                window.__kasaBench('window-load');
+                requestAnimationFrame(function () {
+                    window.__kasaBench('first-paint');
+                });
+            });
+        })();
+    </script>

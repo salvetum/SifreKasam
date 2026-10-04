@@ -5,7 +5,10 @@
     <button type="button" id="bulk-category-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
         <i class="fa-solid fa-tag mr-1"></i>{{ _('Kategori') }}
     </button>
-    <button type="button" id="bulk-export-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5">
+    {# LAN oturumlarında dışa aktarma sunucu tarafında engelli; düğme gizlenir
+       ama DOM'DA TUTULUR: lock.html bu öğeye doğrudan addEventListener bağlıyor,
+       kaldırılırsa o sayfada betik hatası verir. #}
+    <button type="button" id="bulk-export-btn" class="kasa-btn kasa-btn-muted text-xs px-3 py-1.5"{% if LAN_TRANSFER_BLOCKED %} hidden{% endif %}>
         <i class="fa-solid fa-download mr-1"></i>{{ _('Dışa Aktar') }}
     </button>
     <button type="button" id="bulk-delete-btn" class="kasa-btn kasa-btn-danger text-xs px-3 py-1.5">

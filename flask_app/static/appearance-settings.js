@@ -7,6 +7,8 @@
  * ayarlar formu (bölüm 4) için gerekli referansları döndürür.
  */
 
+import { refreshSettingsDependencies } from './settings-dependencies.js?v=1';
+
 // Gerçek byte probe: yerel Blob üzerinde <video> ile metadata yüklemeyi dener.
 // canPlayType tek başına güvenilmez (HEVC/H.265 vb. duyurulmaz); demux gerçekten
 // yapılıp yapılamadığını buradan anlarız.
@@ -110,6 +112,9 @@ export function initAppearanceSettings({
   const glassFrostSelect = document.getElementById('glass-frost-select');
   let glassQualitySyncFrame = 0;
 
+  // 2026-10: Bu kartlar artık GİZLENMİYOR, griye boyanıyor (kilitli) — aynı
+  // gerekçe ve aynı tek kaynak: `settings-dependencies.js`. Burada yalnız kendi
+  // odak/sekme sırası senkronumuz kalıyor (kilit uygulaması orada).
   const syncGlassQualityVisibility = (enabled, animate = true) => {
     if (!glassQualityCard) return;
     animate = animate
@@ -117,41 +122,19 @@ export function initAppearanceSettings({
       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const shouldShow = Boolean(enabled);
     cancelAnimationFrame(glassQualitySyncFrame);
-    glassQualityCard.setAttribute('aria-hidden', String(!shouldShow));
-    if (glassScalesCard) {
-      glassScalesCard.setAttribute('aria-hidden', String(!shouldShow));
-      glassScalesCard.classList.toggle('is-no-transition', !animate);
-      glassScalesCard.classList.toggle('is-collapsed', !shouldShow);
-    }
-    if (glassFrostCard) {
-      glassFrostCard.setAttribute('aria-hidden', String(!shouldShow));
-      glassFrostCard.classList.toggle('is-no-transition', !animate);
-      glassFrostCard.classList.toggle('is-collapsed', !shouldShow);
-    }
+
     if (glassQualitySelect) {
-      glassQualitySelect.disabled = !shouldShow;
       glassQualitySelect.tabIndex = glassQualitySelect.dataset.customSelectReady === 'true'
         ? -1
         : (shouldShow ? 0 : -1);
-      glassQualitySelect.kasaSyncCustomSelect?.();
     }
     if (glassFrostSelect) {
-      glassFrostSelect.disabled = !shouldShow;
       glassFrostSelect.tabIndex = glassFrostSelect.dataset.customSelectReady === 'true'
         ? -1
         : (shouldShow ? 0 : -1);
-      glassFrostSelect.kasaSyncCustomSelect?.();
     }
 
-    glassQualityCard.classList.toggle('is-no-transition', !animate);
-    glassQualityCard.classList.toggle('is-collapsed', !shouldShow);
-    if (!animate) {
-      glassQualitySyncFrame = requestAnimationFrame(() => {
-        glassQualityCard.classList.remove('is-no-transition');
-        glassScalesCard?.classList.remove('is-no-transition');
-        glassFrostCard?.classList.remove('is-no-transition');
-      });
-    }
+    document.dispatchEvent(new CustomEvent('kasa:appearance-synced'));
   };
 
   if (glassToggle) {
@@ -501,10 +484,13 @@ export function initAppearanceSettings({
       customBgActiveHint.classList.toggle('hidden', background !== 'custom');
     }
     if (motionToggle) {
-      const lockMotion = background === 'custom';
-      motionToggle.disabled = lockMotion;
-      const motionCard = motionToggle.closest('.settings-card-toggle');
-      if (motionCard) motionCard.classList.toggle('is-bg-locked', lockMotion);
+      // 2026-10: Özel arka plan etkinken "Hareketli Arkaplan" kilitlenir —
+      // ama kilit AÇIKLAMASI ve değer koruması `settings-dependencies.js`
+      // tarafından yönetilir. Burada `disabled` KULLANILMAZDI ve kullanılması
+      // bir veri kaybıydı: `save_settings` bu bayrağı `_save_flag()` ile
+      // yazıyor, `disabled` checkbox gövdeye girmiyor → yerel kayıtta
+      // tercih 'false' olarak SIFIRLANIYORDU.
+      refreshSettingsDependencies();
     }
   };
 
@@ -558,30 +544,23 @@ export function initAppearanceSettings({
     clearTimeout(glassScaleSaveTimer);
   };
 
+  // 2026-10: Bu kartlar artık GİZLENMİYOR, griye boyanıyor (kilitli).
+  // Gerekçe: kullanıcı camı kapattığında "kalite: yüksek" gibi bir seçimini
+  // kaybettiğini göremezdi; değer korunuyordu ama gizliydi. Kilit ve açıklama
+  // metni tek yerden `settings-dependencies.js` tarafından yönetilir; burada
+  // yalnız kendi erişilebilirlik/odak senkronumuz kalır.
   const syncChromaSpeedVisibility = (enabled, animate = true) => {
     if (!chromaSpeedCard) return;
-    const shouldAnimate = animate
-      && document.documentElement.getAttribute('data-kasa-animations') !== 'off'
-      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const shouldShow = Boolean(enabled);
     cancelAnimationFrame(chromaSpeedSyncFrame);
-    chromaSpeedCard.setAttribute('aria-hidden', String(!shouldShow));
 
     if (chromaSpeedSelect) {
-      chromaSpeedSelect.disabled = !shouldShow;
       chromaSpeedSelect.tabIndex = chromaSpeedSelect.dataset.customSelectReady === 'true'
         ? -1
         : (shouldShow ? 0 : -1);
-      chromaSpeedSelect.kasaSyncCustomSelect?.();
     }
 
-    chromaSpeedCard.classList.toggle('is-no-transition', !shouldAnimate);
-    chromaSpeedCard.classList.toggle('is-collapsed', !shouldShow);
-    if (!shouldAnimate) {
-      chromaSpeedSyncFrame = requestAnimationFrame(() => {
-        chromaSpeedCard.classList.remove('is-no-transition');
-      });
-    }
+    document.dispatchEvent(new CustomEvent('kasa:appearance-synced'));
   };
 
   const setChromaAccentPreference = (enabled, speed = chromaAccentSpeed, persist = true, animate = true) => {

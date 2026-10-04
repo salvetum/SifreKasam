@@ -1,5 +1,14 @@
                     <section id="settings-panel-data" class="settings-panel" role="tabpanel"
                              aria-labelledby="settings-tab-data" data-settings-panel="data" hidden>
+                    {% if LAN_TRANSFER_BLOCKED %}
+                    <div class="lan-warning-card settings-panel-notice" role="note">
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <div>
+                            <strong>{{ _('Bu cihaz LAN üzerinden bağlı') }}</strong>
+                            <p>{{ _('LAN oturumlarında içe aktarma, dışa aktarma ve yedekleme kapalıdır. Bu işlemleri kasanın bulunduğu bilgisayardan yapın.') }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-database"></i></span>
                         <div>
@@ -8,6 +17,7 @@
                         </div>
                     </div>
                     <!-- İçe/Dışa Aktar Butonları -->
+                    {% if not LAN_TRANSFER_BLOCKED %}
                     <div class="settings-action-grid">
                         <button type="button" data-kasa-modal="importModal"
                             class="settings-action-card">
@@ -28,6 +38,7 @@
                             <i class="fa-solid fa-chevron-right settings-action-arrow"></i>
                         </button>
                     </div>
+                    {% endif %}
                     <div class="settings-action-grid settings-action-grid-single">
                         <button type="button" data-kasa-modal="privacyPolicyModal"
                             class="settings-action-card">
@@ -55,11 +66,13 @@
                                 <p id="auto-backup-last" class="auto-backup-last">{{ _('Henüz yedek alınmadı') }}</p>
                             </div>
                             <div class="settings-card-control">
+                                {% if not LAN_TRANSFER_BLOCKED %}
                                 <button type="button" id="auto-backup-now-btn" class="kasa-btn kasa-btn-primary auto-backup-now-btn"
                                     aria-labelledby="setting-auto-backup-title">
                                     <i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
                                     <span>{{ _('Şimdi Yedek Al') }}</span>
                                 </button>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="settings-card-head settings-card-head-divider">
@@ -81,6 +94,7 @@
                             </div>
                         </div>
                     </div>
+                    {% if not LAN_TRANSFER_BLOCKED %}
                     <div class="settings-card settings-backup-tray">
                         <div id="auto-backup-list" class="auto-backup-list"
                             aria-live="polite" aria-label="{{ _('Otomatik yedekler') }}"></div>
@@ -94,6 +108,7 @@
                             </span>
                         </p>
                     </div>
+                    {% endif %}
                     <!-- Hatırlatma Sıklıkları -->
                     <div class="settings-section-heading">
                         <span><i class="fa-solid fa-bell"></i></span>

@@ -107,6 +107,17 @@ export function initVaultIndex({
       });
     };
 
+    // ─── Kart görünürlüğü: `hidden` (display:none) → `display:block` geçişi
+    // Chromium'da backdrop-filter katmanını YENİDEN kurar ve ilk karede
+    // örnekleme yapmadan boyar; kullanıcı kartı "önce camsız, sonra camlı"
+    // görüyordu (cards.css: cardFilterReveal bloğu — ölçülen kök neden).
+    // Çözüm: display:none'ı bir rAF gecikmesiyle DEĞİL, doğrudan kaldır ve
+    // opaklığı 0'dan başlayan kısa giriş animasyonuyla oynat. Bulanıklama
+    // 1-2 karede tamamlandığı için kart belirgin hâle gelmeden cam hazır olur.
+    const reduceMotion = () =>
+      document.documentElement.getAttribute('data-kasa-animations') === 'off'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const setCardVisible = (wrapper, visible, animate = false) => {
       if (!visible) {
         wrapper.classList.remove('filter-reveal');
@@ -114,13 +125,18 @@ export function initVaultIndex({
         return;
       }
       if (!wrapper.hidden) return;
-      if (animate) {
+      // Görünürlük ANINDA açılır: eski `requestAnimationFrame(() => hidden=false)`
+      // bir kare daha camsız ekran üretiyordu.
+      wrapper.hidden = false;
+      if (!animate || reduceMotion()) return;
+      wrapper.classList.remove('filter-reveal');
+      // Yeniden oynatma: kaldırma `hidden` dalında da yapılır ama sınıf
+      // görünürlük açıkken kalırsa bir sonraki aramada animasyon tetiklenmez.
+      void wrapper.offsetWidth;
+      wrapper.classList.add('filter-reveal');
+      wrapper.addEventListener('animationend', () => {
         wrapper.classList.remove('filter-reveal');
-        wrapper.classList.add('filter-reveal');
-        requestAnimationFrame(() => { wrapper.hidden = false; });
-      } else {
-        wrapper.hidden = false;
-      }
+      }, { once: true });
     };
 
     const createPageControl = (page, label = String(page), isActive = false) => {
@@ -223,10 +239,8 @@ export function initVaultIndex({
       renderPagination(matchedCards.length, pageCount, startIndex, endIndex);
       window.dispatchEvent(new CustomEvent('kasa:cards-page-changed'));
       if (scrollToGrid) {
-        const reduceMotion = document.documentElement.getAttribute('data-kasa-animations') === 'off'
-          || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         document.getElementById('card-container')?.scrollIntoView({
-          behavior: reduceMotion ? 'auto' : 'smooth',
+          behavior: reduceMotion() ? 'auto' : 'smooth',
           block: 'start',
         });
       }

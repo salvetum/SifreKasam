@@ -155,6 +155,7 @@ async function createWindow() {
 
   rt.mainWindow.webContents.on('did-finish-load', () => {
     rt.backendPageRecoveryAttempts = 0;
+    bench.mark('backend-dom-ready');
   });
 
   rt.mainWindow.webContents.on('render-process-gone', (_event, details) => {
@@ -174,6 +175,17 @@ async function createWindow() {
 
   rt.mainWindow.webContents.on('console-message', (event, _level, message, _line, sourceId) => {
     const text = String(message || '');
+
+    // Renderer tarafı kilometre taşları: prepaint.html geçiş penceresini
+    // ölçmek için `[bench] <ad> <ms>` yazar. Ana süreç işaretlerini tek
+    // zaman çizelgesinde topluyoruz (startup-bench.json).
+    const benchLine = /^\[bench\]\s+([a-z0-9-]+)(?:\s+([\d.]+))?$/i.exec(text.trim());
+    if (benchLine) {
+      bench.mark(`renderer:${benchLine[1]}`);
+      if (bench.enabled) event.preventDefault();
+      return;
+    }
+
     const source = String(sourceId || '');
     const isLocalCertificateNoise = source.startsWith(`${PROTOCOL}://${HOST}:`)
       && SSL_NOISE_PATTERNS.some((pattern) => text.includes(pattern));
@@ -209,14 +221,30 @@ async function createWindow() {
   // POST'ları (ayarları yazma) hâlâ oturum + X-CSRF-Token ister, böylece
   // CSRF muafiyeti state-changing isteklere yayılmaz.
   const _TOKEN_INJECT_GET_ONLY = new Set(['/settings/tray', '/settings/language']);
+  // FiltreLERDE port SABİT YAZILMAZ. findFreePort yarışında Flask başlarken
+  // port değişebiliyor; portu filtreye gömünce yeni porta hiçbir istek
+  // eşleşmez ve token enjeksiyonu sessizce kopar (403 → fail-closed, ama LAN
+  // mutabakatı/tray senkronu bozulur). Chromium eşleşme deseninde port
+  // verilmezse HER port eşleşir; port doğrulaması aşağıda çalışma anında yapılır.
+  const _BACKEND_URL_FILTER = `${PROTOCOL}://${HOST}/*`;
+  const _isCurrentBackendUrl = (rawUrl) => {
+    try {
+      const url = new URL(rawUrl);
+      return url.hostname === HOST && Number(url.port || 443) === Number(rt.PORT);
+    } catch (_) {
+      return false;
+    }
+  };
   rt.mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
-    { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/*`] },
+    { urls: [_BACKEND_URL_FILTER] },
     (details, callback) => {
       try {
         const { pathname } = new URL(details.url);
         const isTokenPath = _TOKEN_INJECT_PATHS.has(pathname);
         const isGetOnlyPath = _TOKEN_INJECT_GET_ONLY.has(pathname);
-        if (isTokenPath && (!isGetOnlyPath || details.method === 'GET')) {
+        if (_isCurrentBackendUrl(details.url)
+            && isTokenPath
+            && (!isGetOnlyPath || details.method === 'GET')) {
           details.requestHeaders['X-App-Token'] = APP_TOKEN;
         }
       } catch (_) {}
@@ -224,13 +252,35 @@ async function createWindow() {
     }
   );
 
-  rt.mainWindow.webContents.session.webRequest.onCompleted(
-    { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/save_settings`] },
-    (details) => {
-      if (details.method === 'POST' && details.statusCode >= 200 && details.statusCode < 300) {
-        setTimeout(syncLanRuntimeState, 250);
-      }
+  // ⚠️ TEK onCompleted kaydı. Electron webRequest'te olay başına YALNIZCA SON
+  // eklenen dinleyici kullanılır ("Only the last attached listener will be used",
+  // docs/api/web-request.md; electron/electron#10478). Burada iki ayrı kayıt
+  // vardı: /save_settings -> LAN mutabakatı ve /settings/content-protection ->
+  // içerik koruması. İkincisi birincisini SİLİYORDU, yani save_settings
+  // üzerinden LAN mutabakatı ölüydü (bu yüzden aynı iş renderer'dan ayrıca
+  // haber veriyordu). İki davranış tek dinleyicide, porttan bağımsız filtreyle
+  // ve çalışma anında yol kontrolüyle birleştirildi:
+  //
+  // Port filtreye gömülemez — port artık başlangıçta tahmin edilmiyor, Flask
+  // bind() sonrası stdout'dan bildiriyor (KASA_PORT). Chromium eşleşme deseninde
+  // port verilmezse HER port eşleşir; port doğrulaması çalışma anında
+  // _isCurrentBackendUrl ile yapılır (onBeforeSendHeaders da aynı deseni kullanır).
+  const _onBackendCompleted = (details) => {
+    if (!_isCurrentBackendUrl(details.url)) return;
+    if (details.method !== 'POST') return;
+    if (details.statusCode < 200 || details.statusCode >= 300) return;
+    if (details.url.endsWith('/save_settings')) {
+      setTimeout(syncLanRuntimeState, 250);
+      return;
     }
+    if (details.url.endsWith('/settings/content-protection')) {
+      setTimeout(applyContentProtection, 250);
+    }
+  };
+
+  rt.mainWindow.webContents.session.webRequest.onCompleted(
+    { urls: [_BACKEND_URL_FILTER] },
+    _onBackendCompleted
   );
 
   // webRequest kancası bazı ortamlarda güvenilir tetiklenmediği için
@@ -239,15 +289,6 @@ async function createWindow() {
   ipcMain.on('kasa:lan-saved', () => {
     setTimeout(syncLanRuntimeState, 120);
   });
-
-  rt.mainWindow.webContents.session.webRequest.onCompleted(
-    { urls: [`${PROTOCOL}://${HOST}:${rt.PORT}/settings/content-protection`] },
-    (details) => {
-      if (details.method === 'POST' && details.statusCode >= 200 && details.statusCode < 300) {
-        setTimeout(applyContentProtection, 250);
-      }
-    }
-  );
 
   // Kapat yerine gizle / tepside çalışmaya devam et
   rt.mainWindow.on('close', (event) => {

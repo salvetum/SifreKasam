@@ -22,6 +22,10 @@ export function initLanSettings({ apiJson }) {
   const lanPendingNote = document.getElementById('lan-pending-note');
   const lanPasswordWrap = document.getElementById('lan-password-wrap');
   const lanPassword = document.getElementById('lan-password');
+const lanFullAccessToggle = document.getElementById('lan-full-access-toggle');
+const lanFullAccessWarning = document.getElementById('lan-full-access-warning');
+const lanRevealToggle = document.getElementById('lan-reveal-toggle');
+const lanRevealWarning = document.getElementById('lan-reveal-warning');
 
   // Uzak istemcide LAN paneli render edilmediğinden (yalnızca bu bilgisayar)
   // modül hiç devreye girmesin ve /api/lan-info isteği atılmasın.
@@ -85,6 +89,29 @@ export function initLanSettings({ apiJson }) {
   // LAN zaten kayıtlı ve çalışıyorken sayfa yüklendiyse adresi doğrudan göster.
   if (lanActiveOnLoad) {
     showActive();
+  }
+
+  // "Tam yetki" uyarısı yalnızca seçenek açıkken görünür. Sunucu tarafı
+  // başlangıç durumunu basar; değişiklik anında önizlenir (kaydetme ayrıdır).
+  function syncLanFullAccessWarning() {
+    if (!lanFullAccessToggle || !lanFullAccessWarning) return;
+    lanFullAccessWarning.classList.toggle('hidden', !lanFullAccessToggle.checked);
+  }
+  if (lanFullAccessToggle) {
+    syncLanFullAccessWarning();
+    lanFullAccessToggle.addEventListener('change', syncLanFullAccessWarning);
+  }
+
+  // "LAN Oturumlarında Şifreleri Göster" — tam yetkiden bağımsız bir anahtar.
+  // Açıkken ağdaki her cihaz kasadaki tüm şifreleri okuyabilir; bu yüzden
+  // kaydedildiği anda uyarı kartı görünür olur.
+  function syncLanRevealWarning() {
+    if (!lanRevealToggle || !lanRevealWarning) return;
+    lanRevealWarning.classList.toggle('hidden', !lanRevealToggle.checked);
+  }
+  if (lanRevealToggle) {
+    syncLanRevealWarning();
+    lanRevealToggle.addEventListener('change', syncLanRevealWarning);
   }
 
   document.querySelectorAll('.lan-copy-btn').forEach(btn => {

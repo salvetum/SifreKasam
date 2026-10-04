@@ -21,7 +21,7 @@
                             </div>
                         </div>
                         <div class="settings-card-body">
-                            <div class="settings-timeout-row">
+                            <div id="auto-lock-timeout-row" class="settings-timeout-row" data-lockable>
                                 <label class="text-xs text-kasa-text-muted" for="auto_lock_timeout">{{ _('Zaman Aşımı (Dakika)') }}</label>
                                 <div class="settings-number-stepper" data-number-stepper>
                                     <input type="number" name="auto_lock_timeout" id="auto_lock_timeout" min="1" max="60"
@@ -36,6 +36,7 @@
                                         <i class="fa-solid fa-chevron-down"></i>
                                     </button>
                                 </div>
+                                <div class="settings-lock-note" data-lock-note hidden></div>
                             </div>
                         </div>
                     </div>

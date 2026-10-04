@@ -1,8 +1,8 @@
 // ─── YEREL SERTİFİKA SABİTLEME ───────────────────────────────────────────────
-// Self-signed localhost sertifikasının pin'lenmesi, sertifika hatası
-// diyaloğu ve backend'e giden istekler için keep-alive bağlantı havuzu.
+// Self-signed localhost sertifikasının pin'lenmesi (Chromium/renderer kanalı
+// dahil) ve backend'e giden istekler için keep-alive bağlantı havuzu.
 
-const { app, dialog } = require('electron');
+const { app } = require('electron');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -15,12 +15,7 @@ let pinnedCertificateDer = null;
 let pinnedCertificateMtime = 0;
 let warnedPinnedCertificateUnavailable = false;
 let hasReportedLocalCertificateNoise = false;
-
-const _temporaryTrustedFingerprints = new Set();
-
-function _fpHex(buf) {
-  try { return crypto.createHash('sha256').update(buf).digest('hex'); } catch (_) { return null; }
-}
+let hasReportedRejectedCertificate = false;
 
 function _normalizeCertToDer(certData) {
   if (!certData) return null;
@@ -36,54 +31,23 @@ function _normalizeCertToDer(certData) {
   }
 }
 
-function _isExpectedLocalCertificate(certBuffer) {
-  if (!certBuffer) return false;
-  try {
-    const pemOrBuffer = Buffer.isBuffer(certBuffer) ? certBuffer : Buffer.from(String(certBuffer));
-    const cert = new crypto.X509Certificate(pemOrBuffer);
-    const subject = cert.subject || '';
-    const issuer = cert.issuer || '';
-    const san = cert.subjectAltName || '';
-    const matchesAppName = subject.includes('CN=ŞifreKasam') || subject.includes('CN=SifreKasam');
-    const isSelfSigned = subject === issuer;
-    const hasLocalHosts = san.includes('DNS:localhost') || san.includes('IP Address:127.0.0.1') || san.includes('IP Address:::1');
-    return Boolean(matchesAppName && isSelfSigned && hasLocalHosts);
-  } catch (_) {
-    return false;
-  }
-}
+// Not: burada "görünen sertifikayı kabul et" (TOFU) mantığı BİLEREK YOKTUR.
+// CN / self-signed / localhost SAN denetimleri yalnızca kimliği değil
+// kimliğin DOĞRULANMIŞ olup olmadığını söylemez; aynı kullanıcı bağlamında
+// çalışan bir saldırgan bu nitelikleri taklit eden kendi sertifikasını
+// sunabilir. Tek güven kuralı: sunulan DER, diskteki pin ile bayt bayt
+// eşleşmek zorundadır. Eşleşme yoksa bağlantı reddedilir.
 
-function _readPresentedPem(presentedRaw) {
-  let presentedPem = null;
-  if (presentedRaw) {
-    const asUtf = presentedRaw.toString('utf8');
-    if (asUtf.includes('-----BEGIN CERTIFICATE-----')) {
-      presentedPem = asUtf;
-    } else {
-      const certBase64 = presentedRaw.toString('base64');
-      const chunks = certBase64.match(/.{1,64}/g) || [certBase64];
-      presentedPem = `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n`;
-    }
-  }
-  return presentedPem;
-}
-
-function _persistPinnedCertificate(certPath, pem, fallbackDer) {
-  fs.mkdirSync(path.dirname(certPath), { recursive: true });
-  fs.writeFileSync(certPath, pem, { encoding: 'utf8' });
-  pinnedCertificatePem = fs.readFileSync(certPath);
-  try {
-    pinnedCertificateDer = Buffer.from(new crypto.X509Certificate(pinnedCertificatePem).raw);
-  } catch (_) {
-    pinnedCertificateDer = fallbackDer;
-  }
-  pinnedCertificateMtime = fs.statSync(certPath).mtimeMs;
-}
-
-// Self-signed SSL sertifikasını kabul et
-// Not: birden fazla kaynak için aynı sertifika hatası tekrar tekrar gelebilir. Bu yüzden
-// - aynı sertifikayı geçici olarak güvenmek için fingerprint önbelleği tutuyoruz,
-// - yalnızca bilinmeyen sertifikalar için kullanıcıya prompt gösteriyoruz.
+// Chromium/renderer kanalı TAMAMEN fail-closed çalışır: sunulan sertifika
+// diskteki pin ile DER düzeyinde birebir eşleşmiyorsa bağlantı reddedilir.
+// Pin yoksa da reddedilir — kullanıcıya "gördüğünü kaydet / görmeden geç"
+// seçeneği sunulmaz, çünkü o seçeneğin kendisi trust-on-first-use'dır ve ilk
+// açılıştaki sahte sunucu senaryosunu yeniden içeri sokar.
+//
+// Renderer'ın pin'e güvenebilmesinin ön koşulu main.js'te zaten sağlanır:
+// loadBackendPage() çağrısına geline kadar startFlaskServerOnce() içindeki
+// waitForPinnedCertificate() pinin varlığını doğrulamış OLMALIDIR (aksi halde
+// başlatma zaten başarısız olur). Bkz. page-loader.js:loadBackendPage.
 function registerCertificateErrorHandler(host) {
   app.on('certificate-error', (event, _webContents, url, _error, certificate, callback) => {
     if (!url.startsWith(`https://${host}:`)) {
@@ -92,18 +56,12 @@ function registerCertificateErrorHandler(host) {
     }
 
     event.preventDefault();
+    // Dosya LAN restart'ta yeniden üretilebildiği için her olayda tazele.
     try { loadPinnedCertificate(); } catch (_) {}
     const presentedRaw = certificate && certificate.data ? Buffer.from(certificate.data) : null;
     const presented = _normalizeCertToDer(presentedRaw);
-    const presentedFp = presentedRaw ? _fpHex(presentedRaw) : null;
 
-    // Aynı sertifikayı daha önce geçici olarak kabul ettiysek direkt kabul et
-    if (presentedFp && _temporaryTrustedFingerprints.has(presentedFp)) {
-      callback(true);
-      return;
-    }
-
-    // Pinned sertifika ile DER normalization sonrası tam eşleşiyorsa kabul et
+    // Pinned sertifika ile DER normalization sonrası tam eşleşiyorsa kabul et.
     if (pinnedCertificateDer && presented
         && presented.length === pinnedCertificateDer.length
         && presented.equals(pinnedCertificateDer)) {
@@ -115,79 +73,17 @@ function registerCertificateErrorHandler(host) {
       return;
     }
 
-    // Pin mevcut ama eşleşmiyor (sertifika yeniden üretilmiş) VEYASE pin hiç yok
-    // (ilk açılış) — sertifika uygulamanın kendi ürettiği self-signed sertifikası
-    // ise otomatik kabul et. Eşzamanlı isteklerin hepsine tek tek diyalog
-    // göstermemek için kritik. Heuristic geçerse pin'i güncelle.
-    if (_isExpectedLocalCertificate(presentedRaw)) {
-      if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
-      if (presented && !pinnedCertificateDer) {
-        try {
-          const dataDir = getDataDir();
-          const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
-          if (certPath) {
-            const asUtf = presentedRaw.toString('utf8');
-            const presentedPem = asUtf.includes('-----BEGIN CERTIFICATE-----') ? asUtf : null;
-            if (presentedPem) {
-              _persistPinnedCertificate(certPath, presentedPem, presented);
-            }
-          }
-        } catch (_) { /* Pin güncellenemezse geçici güven yeterli */ }
-      }
-      callback(true);
-      return;
+    // Eşleşme yok. Nedeni ayırt et ama ikisinde de aynı kapıyı kapat: bağlantı
+    // reddedilir, pin'e hiçbir şey yazılmaz.
+    if (!hasReportedRejectedCertificate) {
+      hasReportedRejectedCertificate = true;
+      console.warn(pinnedCertificateDer
+        ? 'Yerel SSL sertifikası pin ile eslesmedi; baglanti guvenlik geregi reddedildi. '
+          + 'Sertifika yeniden uretilmis olabilir (LAN erisimi). Sorun surerse uygulamayi '
+          + 'kapatip ssl klasorundeki sertifika dosyalarini silerek yeniden baslatin.'
+        : 'Yerel SSL sertifika pini bulunamadi; baglanti guvenlik geregi reddedildi.');
     }
-
-    // Sunulan sertifikayı PEM formatına dönüştür (kullanıcıya göstermek ve kaydetmek için)
-    const presentedPem = _readPresentedPem(presentedRaw);
-
-    const message = pinnedCertificateDer
-      ? 'Sunulan yerel SSL sertifikası beklenenle eşleşmiyor.'
-      : 'Yerel SSL sertifikası bulunamadı.';
-    const detail = 'Bu uygulamanın arka plan hizmeti self-signed bir sertifika kullanıyor. Sertifikayı kabul etmek güvenli olabilir ancak yalnızca cihazınızda çalıştığınıza emin olun. İsterseniz sertifikayı kalıcı olarak kaydedebilirsiniz (daha sonra otomatik olarak doğrulanır), yalnızca bu oturum için geçici olarak kabul edebilir veya bağlantıyı reddedebilirsiniz.';
-    const buttons = presentedPem ? ['Güven ve Kaydet', 'Geçici Güven', 'Reddet'] : ['Geçici Güven', 'Reddet'];
-
-    dialog.showMessageBox({
-      type: 'warning',
-      title: 'ŞifreKasam - Sertifika Doğrulama',
-      message,
-      detail,
-      buttons,
-      defaultId: 0,
-      noLink: true,
-    }).then(({ response }) => {
-      // 0 = Güven ve Kaydet, 1 = Geçici Güven, 2 = Reddet
-      if (presentedPem && response === 0) {
-        try {
-          const dataDir = getDataDir();
-          const certPath = dataDir ? path.join(dataDir, 'ssl', 'cert.pem') : null;
-          if (certPath) {
-            _persistPinnedCertificate(certPath, presentedPem, presented);
-            console.warn('Yerel sertifika kaydedildi ve pin güncellendi.');
-            callback(true);
-            return;
-          }
-        } catch (err) {
-          console.warn('Sertifika kaydedilemedi, geçici güven veriliyor:', err.message);
-          if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
-          callback(true);
-          return;
-        }
-      }
-
-      const tempTrustIndex = presentedPem ? 1 : 0;
-      if (response === tempTrustIndex) {
-        if (presentedFp) _temporaryTrustedFingerprints.add(presentedFp);
-        console.warn('Kullanıcı sertifikayı geçici olarak kabul etti. (kaydedilmedi)');
-        callback(true);
-        return;
-      }
-
-      callback(false);
-    }).catch((err) => {
-      console.warn('Sertifika onay diyaloğu açılamadı, bağlantı reddediliyor:', err.message);
-      callback(false);
-    });
+    callback(false);
   });
 }
 
@@ -214,18 +110,53 @@ function loadPinnedCertificate() {
   }
   if (!warnedPinnedCertificateUnavailable) {
     warnedPinnedCertificateUnavailable = true;
-    console.warn('Yerel SSL sertifikasi bulunamadi; ana istekler sertifika dogrulamasi olmadan yapilacak.');
+    console.warn('Yerel SSL sertifikasi bulunamadi; backend istekleri guvenlik geregi reddedilecek (dogrulamasi yapilmadan baglanilmayacak).');
   }
   return false;
 }
 
+// Pin eksikliğinin tüketicilere gösterilecek tek hata metni. Hem ana akıştaki
+// başlangıç kapısı (backend-process.js) hem de ağ katmanı için aynı kaynak.
+const PINNED_CERT_MISSING_MESSAGE =
+  'Yerel SSL sertifikasi (pin) bulunamadi. Guvenlik geregi backend\'e dogrulamasi '
+  + 'yapilmayan bir baglanti kurulmaz. Lutfen uygulamayi tamamen kapatip yeniden '
+  + 'baslatin.';
+
+function createPinnedCertificateMissingError() {
+  const error = new Error(PINNED_CERT_MISSING_MESSAGE);
+  error.code = 'ERR_KASA_PINNED_CERT_MISSING';
+  return error;
+}
+
+// Sabitlenmiş sertifika yokken ASLA dogrulamasiz baglanma.
+//
+// Once burada "guvensiz" bir pencere birakiliyordu: pin dosyasi yoksa
+// rejectUnauthorized:false donduruluyordu. Ana surec portu tahmin edip
+// dinleyicisini kapattigi ile Flask'in o porta bind oldugu arasindaki TOCTOU
+// penceresinde yerel bir sahte sunucu bu dogrulamasiz akisi kullanarak araya
+// girebiliyordu. O pencere artik yok (port OS tarafindan bind ile birlikte
+// seciliyor, bkz. backend-process.js); pin yine de ASIL savunma hatti olarak
+// kaliyor: sifreleme anahtari/elinde URL'si olan yerel bir surec Flask'in
+// sertifikasina sahip olamaz, dolayisiyla gecerli bir yanit uretemez.
+//
+// DIKKAT: bu fonksiyon BILEREK throw ETMEZ. backend-net.js icindeki
+// waitForBackendReady() -> retry() -> setTimeout(probe, ...) yolunda
+// getPinnedHttpsOptions() bir setTimeout geri cagirmasi icinde cagrilir; orada
+// throw "uncaught exception" olur ve fatal-errors.js sureci kapatir. Bunun
+// yerine dogrulamanin KESIN basarisiz oldugu bir secenek dondurulur: TLS
+// handshake reddedilir, istek hicbir zaman gonderilmez ve mevcut her tuketici
+// zaten 'error' olayini yakaladigi icin sessizce basarisiz olur.
 function getPinnedHttpsOptions() {
   if (loadPinnedCertificate()) {
     return { rejectUnauthorized: true, ca: pinnedCertificatePem };
   }
-  // Pin yokken yalnızca localhost'a bağlanmayı zorla (ilk kurulum penceresi).
+  // Pin yok: guven zincirini BOSS birak ve dogrulamayi zorunlu kil. Kendi
+  // urettigimiz self-signed sertifika bu haliyle reddedilir (dogrulanmis:
+  // DEPTH_ZERO_SELF_SIGNED_CERT), yani veri gonderilmeden hata doner.
+  // hostname allowlist'i korunur.
   return {
-    rejectUnauthorized: false,
+    rejectUnauthorized: true,
+    ca: [],
     checkServerIdentity: (hostname) => {
       const allowed = ['127.0.0.1', 'localhost', '::1'];
       if (!allowed.includes(hostname)) {
@@ -233,6 +164,34 @@ function getPinnedHttpsOptions() {
       }
     },
   };
+}
+
+// İlk kurulumda sertifika dosyası Flask tarafından üretilir (bkz.
+// kasa_core/certificates.py: ensure_self_signed_cert). Ana süreç Flask'i
+// zaten "hazır" olana kadar beklediği için bu bekleme EK MALİYET getirmez;
+// buna karşılık getPinnedHttpsOptions() ilk çalıştırmadan itibaren gerçek
+// pin ile (rejectUnauthorized: true) çalışabilir hale gelir.
+//
+// Not: kontrollü bekleme yapılsa bile dosya deadline'da hâlâ oluşmamışsa
+// ESKİ gevşek davranışa düşülmez — artık fail-closed'dur: çağıran taraf
+// (backend-process.js: startFlaskServerOnce) bu false sonucunu net bir hataya
+// çevirip başlamayı reddeder, getPinnedHttpsOptions() da doğrulamasız
+// bağlantı kurmayı reddeder. Çağıran bu boolean'ı yok saysa bile ağ katmanı
+// doğrulanmamış sunucuya bağlanamaz (defans derinliği).
+function waitForPinnedCertificate({ timeoutMs = 15000, intervalMs = 150 } = {}) {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs;
+    const attempt = () => {
+      if (loadPinnedCertificate()) { resolve(true); return; }
+      if (Date.now() >= deadline) {
+        console.warn('Yerel SSL sertifikati zamaninda hazir olmadi; pin dogrulamasi kullanilamiyor ve backend istekleri guvenlik geregi reddedilecek.');
+        resolve(false);
+        return;
+      }
+      setTimeout(attempt, intervalMs);
+    };
+    attempt();
+  });
 }
 
 // Backend'e giden tekrarlanan istekler için yeniden kullanılabilir bağlantı
@@ -263,6 +222,9 @@ function resetPinnedCertificateCache() {
   pinnedCertificatePem = null;
   pinnedCertificateDer = null;
   pinnedCertificateMtime = 0;
+  // Yeni sertifika üretimi yeni bir "başlangıç"tır: önceki nesil için
+  // kilitlenen ret günlüğü bayrağı da sıfırlanır (yalnızca loglama).
+  hasReportedRejectedCertificate = false;
   resetBackendKeepAliveAgent();
 }
 
@@ -277,8 +239,10 @@ function markLocalCertificateNoiseReported() {
 module.exports = {
   registerCertificateErrorHandler,
   loadPinnedCertificate,
+  waitForPinnedCertificate,
   getPinnedHttpsOptions,
   getBackendKeepAliveAgent,
   resetPinnedCertificateCache,
   markLocalCertificateNoiseReported,
+  createPinnedCertificateMissingError,
 };

@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sqlite3
 import stat
 import sys
@@ -31,9 +32,26 @@ from flask import Flask, session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FLASK_APP_DIR = PROJECT_ROOT / "flask_app"
+# Gerçek kasa dizinini APPDATA'yı değiştirmeden ÖNCE kaydet: izolasyon
+# denetiminde bununla karşılaştıracağız. Testler yanlışlıkla gerçek kasaya
+# yazarsa (bir kez oldu) buradan tespit edilir.
+REAL_VAULT_DIR = (
+    Path(os.environ.get("APPDATA", "")).resolve() / ".SifrekasamV2"
+    if os.name == "nt"
+    else Path(
+        os.environ.get("XDG_CONFIG_HOME",
+                       Path.home() / ".config")
+    ).resolve() / "sifrekasam"
+)
 RUNTIME_DIR = Path(tempfile.mkdtemp(prefix="sifrekasam-tests-"))
 os.environ["APPDATA"] = str(RUNTIME_DIR)
 os.environ["XDG_CONFIG_HOME"] = str(RUNTIME_DIR)
+# Kasa ana şifresi hâlâ bu oturumda doğrulanabiliyor olsun diye APPDATA'yı
+# değiştirdikten sonra kaydedilmiş kimlik bilgilerini de temizle. Aksi halde
+# Flask oturum imzası eski APPDATA'dan gelen anahtarla üretilir, modül
+# önbellekleri karışır.
+for _stale in ("FLASK_SECRET_KEY", "SECRET_KEY", "APP_TOKEN"):
+    os.environ.pop(_stale, None)
 if str(FLASK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLASK_APP_DIR))
 
@@ -98,6 +116,72 @@ TRANSLATION_CALL = re.compile(
     re.DOTALL,
 )
 UNICODE_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+_REAL_TEST_CLIENT = app_module.app.test_client
+
+
+class _BrowserLikeClient:
+    """Gerçek bir tarayıcının gönderdiği kaynak başlıklarını taklit eder.
+
+    `_same_origin_state_change()` artık **fail-closed**: durum değiştiren bir
+    istekte `Origin`/`Referer` yoksa reddedilir. Werkzeug test istemcisi bu
+    başlıkları göndermez (o bir tarayıcı değil), ama Chromium/Firefox/Safari
+    her durum değiştiren istekte `Origin` ve `Sec-Fetch-Site` gönderir.
+
+    Werkzeug'da istek başına verilen `environ_base` istemci seviyesindeki
+    `environ_base`'i **değiştirir**; bu yüzden sarmalama her çağrıda birleştirme
+    yapar. Kaynaklı ya da reddeden testler `headers=` (environ_overrides) ile
+    başlıkları kendileri geçersiz kılmaya devam eder.
+    """
+
+    def __init__(self):
+        self._client = _REAL_TEST_CLIENT()
+
+    def open(self, *args, **kwargs):
+        base = dict(kwargs.pop('environ_base', None) or {})
+        base.setdefault('HTTP_ORIGIN', 'http://localhost')
+        base.setdefault('HTTP_SEC_FETCH_SITE', 'same-origin')
+        kwargs['environ_base'] = base
+        return self._client.open(*args, **kwargs)
+
+    # Werkzeug'un `get`/`post` kısayolları iç istemcinin `open`'una doğrudan
+    # gider, sarmalayıcınınkine değil; bu yüzden hepsi tek tek açılmalı.
+    def get(self, *args, **kwargs):
+        return self.open(*args, method='GET', **kwargs)
+
+    def post(self, *args, **kwargs):
+        return self.open(*args, method='POST', **kwargs)
+
+    def put(self, *args, **kwargs):
+        return self.open(*args, method='PUT', **kwargs)
+
+    def patch(self, *args, **kwargs):
+        return self.open(*args, method='PATCH', **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return self.open(*args, method='DELETE', **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._client, name)
+
+
+def _new_test_client():
+    return _BrowserLikeClient()
+
+
+_JS_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_JS_LINE_COMMENT = re.compile(r"(?<![:'\"])//[^\n]*")
+
+
+def _strip_js_comments(source: str) -> str:
+    """JS yorumlarını siler; sözleşme denetimlerinde kullanılır.
+
+    Ana süreç dosyalarında geçmişi anlatan yorumlar (örn. "findFreePort HER ZAMAN
+    127.0.0.1'e bağlanıyordu") kalıcı kod gibi görünmesin diye önce temizlenir.
+    """
+    cleaned = _JS_BLOCK_COMMENT.sub(" ", source)
+    return _JS_LINE_COMMENT.sub(" ", cleaned)
 
 
 @contextmanager
@@ -625,7 +709,7 @@ class TranslationCoverageTests(unittest.TestCase):
 
 class RouteContractTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
 
     def test_route_paths_and_methods_remain_stable(self) -> None:
         rules = {rule.endpoint: rule for rule in app_module.app.url_map.iter_rules()}
@@ -786,7 +870,7 @@ class RouteContractTests(unittest.TestCase):
 
 class ContentSecurityPolicyTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
 
     def test_csp_uses_request_nonce_without_unsafe_inline(self) -> None:
         response = self.client.get('/login')
@@ -1126,7 +1210,7 @@ class MetadataMigrationTests(unittest.TestCase):
 
 class CustomBackgroundUploadTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         self._token = {'X-App-Token': app_module.APP_TOKEN}
         backgrounds_module._upload_log.clear()
         with self.client.session_transaction() as session:
@@ -1394,7 +1478,7 @@ class CustomBackgroundUploadTests(unittest.TestCase):
             app_module._set_setting('lan_enabled', 'true')
             app_module.db.session.commit()
         try:
-            lan_client = app_module.app.test_client()
+            lan_client = _new_test_client()
             response = lan_client.get(
                 '/api/background/current',
                 environ_base={'REMOTE_ADDR': '192.168.1.50'},
@@ -1412,7 +1496,7 @@ class CustomBackgroundUploadTests(unittest.TestCase):
             app_module._set_setting('lan_enabled', 'false')
             app_module.db.session.commit()
         try:
-            remote_client = app_module.app.test_client()
+            remote_client = _new_test_client()
             response = remote_client.get(
                 '/api/background/current',
                 environ_base={'REMOTE_ADDR': '192.168.1.90'},
@@ -1695,7 +1779,7 @@ class CustomBackgroundUploadTests(unittest.TestCase):
 
 class CsrfAndPasswordStrengthTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
 
     def _extract_csrf_token(self, html: str) -> str:
         match = re.search(r'name="csrf_token" value="([^"]+)"', html)
@@ -1718,6 +1802,42 @@ class CsrfAndPasswordStrengthTests(unittest.TestCase):
         self.client.get('/login')
         response = self.client.post('/login', data={'master_password': 'ignored'})
         self.assertEqual(response.status_code, 400)
+
+    def test_repeated_wrong_password_does_not_break_csrf(self) -> None:
+        """Yanlış şifre 2. kez denendiğinde form kullanılamaz hale gelmemeli.
+
+        Hatalı girişte çağrılan oturum temizliği CSRF belirtecini de siliyordu;
+        bir sonraki deneme "Güvenlik doğrulaması başarısız" ile reddediliyor
+        ve kullanıcı doğru şifreyi bile giremiyordu.
+        """
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key='master_hash', value=app_module.hash_master_password('Dogru-Sifre-123!')))
+            app_module.db.session.add(app_module.Setting(
+                key='pbkdf2_salt_b64', value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key='vault_initialized', value='true'))
+            app_module.db.session.commit()
+
+        token = self._extract_csrf_token(
+            self.client.get('/login').get_data(as_text=True)
+        )
+        # 429 (geçici kilit) veya 200 (hatalı şifre) kabul edilir; 400 ASLA olmamalı.
+        for attempt in ('yanlis-sifre-1', 'yanlis-sifre-2', 'Dogru-Sifre-123!'):
+            response = self.client.post('/login', data={
+                'master_password': attempt, 'csrf_token': token,
+            })
+            self.assertNotEqual(
+                response.status_code, 400,
+                f'{attempt} denemesi CSRF hatasina dustu: '
+                f'{response.get_data(as_text=True)[:120]}',
+            )
+            self.assertNotIn(
+                'Güvenlik doğrulaması başarısız', response.get_data(as_text=True))
+
+    # Kilit/CSRF dönüşümü testleri `SecurityHardeningTests` içinde yaşıyor:
+    # `/lock` oturum açık değilken 403 döndürdüğü için (kilit hiç oluşmuyor)
+    # buradaki sınıfta bu testler sessizce "geçiyor"du.
 
     def test_first_setup_accepts_weak_master_password(self) -> None:
         with patch.object(app_module, "_vault_initialized", return_value=False), \
@@ -1916,7 +2036,7 @@ class LanAccessPasswordTests(unittest.TestCase):
     MASTER = 'test-master-password'
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         login_lockout._login_attempts.clear()
         self._reset_vault_state()
 
@@ -1981,7 +2101,7 @@ class LanAccessPasswordTests(unittest.TestCase):
         return data['lan_password']
 
     def _lan_login(self, password: str, remote: str = '192.168.1.50'):
-        lan_client = app_module.app.test_client()
+        lan_client = _new_test_client()
         token = self._extract_csrf(lan_client.get(
             '/login', environ_base={'REMOTE_ADDR': remote}).get_data(as_text=True))
         response = lan_client.post(
@@ -2034,7 +2154,7 @@ class LanAccessPasswordTests(unittest.TestCase):
         self._local_login()
         self._enable_lan()
 
-        fresh = app_module.app.test_client()
+        fresh = _new_test_client()
         data = fresh.get(
             '/api/lan-info', headers={'X-App-Token': app_module.APP_TOKEN},
         ).get_json()
@@ -2081,7 +2201,7 @@ class LanAccessPasswordTests(unittest.TestCase):
             with app_module.app.app_context():
                 app_module._set_setting('lan_enabled', 'true')
                 app_module.db.session.commit()
-            lan_client = app_module.app.test_client()
+            lan_client = _new_test_client()
             token = self._extract_csrf(lan_client.get(
                 '/login', environ_base={'REMOTE_ADDR': '192.168.1.70'},
             ).get_data(as_text=True))
@@ -2115,9 +2235,222 @@ class LanAccessPasswordTests(unittest.TestCase):
                 )
 
 
+class BoundPortReportingTests(unittest.TestCase):
+    """Port yarışı (TOCTOU) kapatıldı: port, dinleyiciyle birlikte doğar.
+
+    Önceden ana süreç `findFreePort()` ile bir port seçip dinleyiciyi KAPATIYOR,
+    sonra Flask o porta bağlanıyordu; aradaki boşlukta yerel bir süreç portu
+    çalabiliyordu. Artık `FLASK_PORT=0` gönderilir, işletim sistemi boş portu
+    seçer ve Flask `bind()`+`listen()` tamamlandıktan sonra gerçek portu
+    stdout'a `KASA_PORT=<port>` satırı olarak bildirir.
+
+    Bu sınıf üç şeyi doğrular:
+      1. `_configured_port()` 0'ı kabul eder (ESKİDEN 1'e kırpılıyordu).
+      2. `/api/lan-info` gerçek BAĞLANAN portu döndürür, 0'ı ASLA göstermez.
+      3. Gerçek `app.py` süreci FLASK_PORT=0 ile başlatıldığında stdout'ta geçerli
+         bir `KASA_PORT=<port>` satırı basar ve o port fiilen dinlemededir.
+    """
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        self._saved_bound_port = app_module._get_bound_port()
+
+    def tearDown(self) -> None:
+        app_module._bound_port = self._saved_bound_port
+
+    def test_configured_port_accepts_zero(self) -> None:
+        with patch.dict(os.environ, {'FLASK_PORT': '0'}, clear=False):
+            os.environ.pop('PORT', None)
+            self.assertEqual(app_module._configured_port(), 0)
+
+    def test_configured_port_still_clamps_out_of_range(self) -> None:
+        with patch.dict(os.environ, {'FLASK_PORT': '99999'}, clear=False):
+            self.assertEqual(app_module._configured_port(), 65535)
+        with patch.dict(os.environ, {'FLASK_PORT': 'abc'}, clear=False):
+            self.assertEqual(app_module._configured_port(), 5000)
+
+    def test_public_port_prefers_real_bound_port(self) -> None:
+        with patch.dict(os.environ, {'FLASK_PORT': '0'}, clear=False):
+            app_module._bound_port = 51234
+            self.assertEqual(app_module._get_public_port(), 51234)
+
+    def test_public_port_never_returns_zero(self) -> None:
+        with patch.dict(os.environ, {'FLASK_PORT': '0'}, clear=False):
+            app_module._bound_port = 0
+            # Sunucu henüz bağlanmadıysa kullanıcıya 0 gösterilMEZ: 0
+            # "belirlenmedi" anlamına gelir ve panoya kopyalanan LAN adresi
+            # çalışmaz. Makul bir varsayılana düşülür.
+            self.assertEqual(app_module._get_public_port(), 5000)
+
+    def test_public_port_falls_back_to_configured_when_not_bound(self) -> None:
+        with patch.dict(os.environ, {'FLASK_PORT': '5001'}, clear=False):
+            app_module._bound_port = 0
+            self.assertEqual(app_module._get_public_port(), 5001)
+
+    def test_lan_info_reports_real_bound_port_not_zero(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+        with patch.dict(os.environ, {'FLASK_PORT': '0'}, clear=False):
+            app_module._bound_port = 54321
+            payload = self.client.get(
+                '/api/lan-info', headers={'X-App-Token': app_module.APP_TOKEN},
+            ).get_json()
+        self.assertEqual(payload['port'], 54321)
+
+    def test_lan_info_never_exposes_zero_port(self) -> None:
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "admin"
+            session["_fresh"] = True
+        with patch.dict(os.environ, {'FLASK_PORT': '0'}, clear=False):
+            app_module._bound_port = 0
+            payload = self.client.get(
+                '/api/lan-info', headers={'X-App-Token': app_module.APP_TOKEN},
+            ).get_json()
+        self.assertGreaterEqual(payload['port'], 1)
+        self.assertLessEqual(payload['port'], 65535)
+
+    def test_report_bound_port_writes_single_line_and_flushes(self) -> None:
+        buffer = io.StringIO()
+        app_module._bound_port = 0
+        with patch('sys.stdout', buffer):
+            app_module._report_bound_port(4711)
+        self.assertEqual(app_module._get_bound_port(), 4711)
+        self.assertEqual(buffer.getvalue().strip(), 'KASA_PORT=4711')
+        # Ana sürecin ayrıştırdığı desene birebir uymalı.
+        self.assertRegex(buffer.getvalue().strip(), r'^KASA_PORT=\d{1,5}$')
+
+    def test_report_bound_port_rejects_invalid_values(self) -> None:
+        buffer = io.StringIO()
+        app_module._bound_port = 4711
+        with patch('sys.stdout', buffer):
+            app_module._report_bound_port(0)
+            app_module._report_bound_port(70000)
+            app_module._report_bound_port('port-boyle-bir-sayi')
+            app_module._report_bound_port(None)
+        self.assertEqual(app_module._get_bound_port(), 4711)
+        self.assertEqual(buffer.getvalue(), '')
+
+    def test_main_process_no_longer_selects_the_port(self) -> None:
+        """Ana süreç port tahmin etmemeli: findFreePort geri kalmamalı."""
+        main_js = _strip_js_comments((PROJECT_ROOT / "main.js").read_text(encoding="utf-8"))
+        backend_process = _strip_js_comments(
+            (PROJECT_ROOT / "src" / "main" / "backend-process.js").read_text(encoding="utf-8"))
+        backend_net = _strip_js_comments(
+            (PROJECT_ROOT / "src" / "main" / "backend-net.js").read_text(encoding="utf-8"))
+        window_js = (PROJECT_ROOT / "src" / "main" / "window.js").read_text(encoding="utf-8")
+
+        # findFreePort / isPortStillFree tamamen kalksın: port seçimi ve dinleyici
+        # arasındaki ayrışma bu iki fonksiyonla mümkünydü. (Yorumlar temizlenir;
+        # geçmişi anlatan yorum satırları kalıcı kod sanılmasın.)
+        for source, label in ((main_js, 'main.js'),
+                              (backend_process, 'backend-process.js'),
+                              (backend_net, 'backend-net.js')):
+            self.assertNotIn('findFreePort', source, f'{label} findFreePort icermemeli')
+            self.assertNotIn('isPortStillFree', source, f'{label} isPortStillFree icermemeli')
+
+        # Doğru sözleşme: 0 gönderilir, KASA_PORT satırı ayrıştırılır.
+        self.assertIn("FLASK_PORT: '0'", backend_process)
+        self.assertIn('KASA_PORT=', backend_process)
+        self.assertIn('port-reported', backend_process)
+        # Port bilinmeden hazır olma probu denenmemeli.
+        self.assertIn('boundPortPromise', backend_process)
+
+        # Pencere kancaları porta GÖMÜLMEZ (port başlangıçta bilinmiyor).
+        self.assertNotIn('${rt.PORT}/settings/content-protection', window_js)
+
+    def test_web_request_on_completed_registered_once(self) -> None:
+        """Electron webRequest'te olay başına yalnızca SON dinleyici kullanılır.
+
+        İki ayrı onCompleted kaydı, içerik koruması kancasının LAN mutabakatı
+        kancasını SİLMESİNE yol açıyordu. Tek kayıt olmalı.
+        """
+        window_js = (PROJECT_ROOT / "src" / "main" / "window.js").read_text(encoding="utf-8")
+        self.assertEqual(window_js.count('webRequest.onCompleted('), 1)
+        # Her iki davranış da tek dinleyicide kalmalı.
+        self.assertIn("endsWith('/save_settings')", window_js)
+        self.assertIn("endsWith('/settings/content-protection')", window_js)
+
+    def test_app_reports_ephemeral_port_on_real_process(self) -> None:
+        """UÇTAN UCA: gerçek app.py süreci FLASK_PORT=0 ile KASA_PORT basar.
+
+        Bu test olmadan "cheroot bind_addr gerçek portu verir" varsayımı
+        doğrulanmamış kalırdı. Süreç ayrı bir ortamda açılır, stdout'tan port
+        satırı okunur ve portun gerçekten bağlantı kabul ettiği ÖLÇÜLÜR
+        (süreç hâlâ ayaktayken).
+        """
+        import socket
+        import subprocess
+        import threading
+
+        # Süreç kendi kasa dizinini kullansın: ana test sürecinin DB/sertifika
+        # dosyalarıyla paylaşmasın (SQLite kilidi, yeniden üretilen cert.pem).
+        data_dir = Path(tempfile.mkdtemp(prefix='sifrekasam-porttest-'))
+        env = dict(os.environ)
+        env['FLASK_PORT'] = '0'
+        env['PORT'] = '0'
+        env['FLASK_HOST'] = '127.0.0.1'
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUNBUFFERED'] = '1'
+        if os.name == 'nt':
+            env['APPDATA'] = str(data_dir)
+        else:
+            env['XDG_CONFIG_HOME'] = str(data_dir)
+
+        proc = subprocess.Popen(
+            [sys.executable, str(FLASK_APP_DIR / 'app.py')],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env, cwd=str(FLASK_APP_DIR), text=True, encoding='utf-8',
+            errors='replace', bufsize=1,
+        )
+        reported_port = 0
+        connection_ok = False
+        try:
+            def _read_port() -> None:
+                nonlocal reported_port, connection_ok
+                for line in proc.stdout:
+                    match = re.match(r'^KASA_PORT=(\d{1,5})$', line.strip())
+                    if not match:
+                        continue
+                    reported_port = int(match.group(1))
+                    # 0 ASLA raporlanmaz: 0, "port henüz bilinmiyor" demektir ve
+                    # ana süreç 0'a istek atamaz.
+                    if not 1 <= reported_port <= 65535:
+                        return
+                    # Raporlanan port gerçekten bağlanmış olmalı (uydurma değil).
+                    try:
+                        with socket.create_connection(('127.0.0.1', reported_port), timeout=5):
+                            connection_ok = True
+                    except OSError:
+                        connection_ok = False
+                    return
+
+            reader = threading.Thread(target=_read_port, daemon=True)
+            reader.start()
+            reader.join(timeout=60)
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=10)
+            shutil.rmtree(data_dir, ignore_errors=True)
+
+        self.assertTrue(
+            1 <= reported_port <= 65535,
+            f'KASA_PORT satiri gelmedi (raporlanan: {reported_port!r})',
+        )
+        self.assertTrue(
+            connection_ok,
+            f'raporlanan port {reported_port} baglantı kabul etmiyor',
+        )
+
+
 class HardwareAccelerationSettingsTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -2297,7 +2630,7 @@ class HardwareAccelerationSettingsTests(unittest.TestCase):
 
 class RecordFormTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -2379,7 +2712,309 @@ class RecordFormTests(unittest.TestCase):
         self.assertIn('kullanici@mail.com', html)
 
 
-class CardAndStatsUiTemplateTests(unittest.TestCase):
+class SettingsDependencyLockTests(unittest.TestCase):
+    """Bağımlı ayar kilitleri (settings-dependencies.js) — 2026-10.
+
+    İki kural bu sınıfın varlık sebebi:
+      1. Kilit uygulanırken **devre dışı seçeneklerin değerleri korunmalı.**
+         Ayar formu GERÇEK bir HTML formu; `disabled` input'lar GÖNDERİLMEZ.
+         Backend'de select/number alanlar `if 'x' in request.form:` ile
+         yazıldığı için eksik gönderim değeri korur, ama checkbox'lar
+         `_save_flag()` ile yazılıyor ve yerel oturumda `full_form` olduğu
+         için eksik gönderim `'false'` YAZAR. Yani bağımlı bir toggle'a
+         `disabled` koymak kullanıcının tercihini SİLER.
+      2. Bağımlılık tablosundaki her seçici gerçekten şablonda var olmalı;
+         yoksa kilit sessizce hiçbir şey yapmaz (kullanıcı bozuk UI görür).
+    """
+
+    STATIC = FLASK_APP_DIR / "static"
+    SETTINGS_PARTIALS = FLASK_APP_DIR / "templates" / "partials" / "settings"
+
+    def _read(self, name: str) -> str:
+        return (self.SETTINGS_PARTIALS / name).read_text(encoding="utf-8")
+
+    def _module(self) -> str:
+        return (self.STATIC / "settings-dependencies.js").read_text(encoding="utf-8")
+
+    def _all_settings_html(self) -> str:
+        return "\n".join(
+            p.read_text(encoding="utf-8") for p in sorted(self.SETTINGS_PARTIALS.glob("*.html"))
+        )
+
+    def test_toggles_never_get_the_disabled_attribute(self) -> None:
+        """Değer koruma tuzağı: checkbox/radio için `disabled` YASAK."""
+        module = self._module()
+        self.assertIn("field.type === 'checkbox' || field.type === 'radio'", module)
+        # Toggle dalında `.disabled =` YAZILMAMALI olmalı; `field.disabled`
+        # yalnız select/number dalında geçmeli.
+        toggle_branch = module.split("field.type === 'checkbox' || field.type === 'radio'", 1)[1]
+        other_branch = toggle_branch.split("} else {", 1)[1]
+        self.assertNotIn("field.disabled", toggle_branch.split("} else {", 1)[0])
+        self.assertIn("field.disabled = locked", other_branch)
+
+    def test_dependent_select_fields_are_not_disabled_in_template(self) -> None:
+        """Sunucu ilk render'da da kilitlemez; kilit JS'in işidir (aksi halde
+        JS yüklenmeden önce değer kaybolurdu)."""
+        appearance = self._read("panel-appearance.html")
+        for field in ("glass_quality", "glass_frost", "chroma_accent_speed"):
+            line_start = appearance.find(f'name="{field}"')
+            self.assertNotEqual(line_start, -1, f"{field} alanı bulunamadı")
+            tag_end = appearance.find(">", line_start)
+            tag = appearance[line_start:tag_end]
+            self.assertNotIn("disabled", tag, f"{field} sunucuda disabled edilmemeli")
+
+    def test_every_dependency_selector_exists_in_templates(self) -> None:
+        """Tablodaki her parent/dependent seçici gerçekten bir elemana
+        oturmalı; aksi halde kilit sessizce çalışmaz."""
+        module = self._module()
+        html = self._all_settings_html()
+        parents = re.findall(r"parent:\s*'([^']+)'", module)
+        cards = re.findall(r"card:\s*'([^']+)'", module)
+        self.assertGreaterEqual(len(parents), 5)
+        self.assertGreaterEqual(len(cards), 8)
+        for selector in parents + cards:
+            self.assertTrue(
+                selector.startswith("#"), f"seçici id ile başlamalı: {selector}")
+            element_id = selector[1:]
+            found = any(
+                f'id="{element_id}"' in (self.SETTINGS_PARTIALS / p.name).read_text(encoding="utf-8")
+                for p in sorted(self.SETTINGS_PARTIALS.glob("*.html"))
+            )
+            self.assertTrue(found, f"şablonda yok: {selector}")
+
+    def test_lockable_cards_have_note_slot(self) -> None:
+        """Her kilitlenebilir kartın açıklama yuvası olmalı."""
+        html = self._all_settings_html()
+        self.assertEqual(html.count("data-lockable"), html.count("data-lock-note"))
+
+    def test_collapse_behaviour_removed_from_glass_and_chroma(self) -> None:
+        """2026-10: cam/chroma kartları artık GİZLENMİYOR, griye boyanıyor."""
+        for name in ("panel-appearance.html", "panel-access.html",
+                     "panel-behavior.html"):
+            self.assertNotIn("is-collapsed", self._read(name), name)
+        module_src = (self.STATIC / "appearance-settings.js").read_text(encoding="utf-8")
+        self.assertNotIn("is-collapsed", module_src)
+        self.assertNotIn("glassQualitySelect.disabled", module_src)
+        self.assertNotIn("glassFrostSelect.disabled", module_src)
+        self.assertNotIn("chromaSpeedSelect.disabled", module_src)
+        # Tek doğruluk kaynağı kalsın.
+        self.assertIn("is-locked", (self.STATIC / "settings-modal.css").read_text(encoding="utf-8"))
+
+    def test_settings_dependency_text_is_localised(self) -> None:
+        for lang in ("tr", "en"):
+            data = json.loads(
+                (FLASK_APP_DIR / "translations" / f"{lang}.json").read_text(encoding="utf-8")
+            )
+            self.assertIn("Kilitli", data, f"{lang}.json missing 'Kilitli'")
+            self.assertTrue(data["Kilitli"].strip(), f"{lang}.json empty 'Kilitli'")
+
+    def test_new_module_is_wired_everywhere(self) -> None:
+        app_js = (self.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn("from './settings-dependencies.js?v=1'", app_js)
+        self.assertIn("initSettingsDependencies()", app_js)
+        # Modül app.js tarafından import edilir (base.html'de <script> değil),
+        # bu yüzden varlığı static/ altında doğrulanır. sw.js ASSETS listesi
+        # yalnız SÜRÜMSÜZ isteklenen dosyaları içerir (bkz. ServiceWorkerCacheTests).
+        self.assertTrue((self.STATIC / "settings-dependencies.js").exists())
+
+    def test_animated_background_lock_has_explanation(self) -> None:
+        """Özel arka plan etkinken "Hareketli Arkaplan" kilitlenir ve neden
+        YAZILIR. 2026-10 öncesi: `disabled` + başlıkta soluk nokta — ne açıklama
+        vardı ne de değer koruması (`_save_flag` tercihi sıfırlıyordu)."""
+        appearance = self._read("panel-appearance.html")
+        self.assertIn('id="animated-background-card"', appearance)
+        # Kart gövdesinin tamamı (h4'ün `id="…"`si dilimi erken kesmesin diye
+        # sabit pencere kullanılıyor).
+        card_start = appearance.find('id="animated-background-card"')
+        card = appearance[card_start:card_start + 1200]
+        self.assertIn("data-lockable", card)
+        self.assertIn("data-lock-note", card)
+
+        module = self._module()
+        self.assertIn("#animated-background-card", module)
+        # Koşul tabanlı kural `when` predicate'i kullanır (üst ayar toggle değil).
+        self.assertIn("when:", module)
+        # Eski `disabled` yaklaşımı TAMAMEN kalktı.
+        self.assertNotIn("motionToggle.disabled", module)
+        self.assertNotIn("is-bg-locked", module)
+        app_module_src = (self.STATIC / "appearance-settings.js").read_text(encoding="utf-8")
+        self.assertNotIn("motionToggle.disabled", app_module_src)
+        self.assertNotIn("is-bg-locked", app_module_src)
+        self.assertIn("refreshSettingsDependencies()", app_module_src)
+
+    def test_lock_icons_use_real_fontawesome_elements(self) -> None:
+        """İkon `content` + sabit font-family ile DEĞİL, gerçek
+        `<i class="fa-solid fa-lock">` ile basılmalı. Yerel all.min.css
+        Font Awesome **7**; sabit sürüm yazılırsa ikon sessizce BOŞ görünür
+        (AGENTS.md tuzağı). Yorumlarda geçen açıklama metni kural değildir,
+        bu yüzden KURAL (`.settings-lock-note::before`) aranıyor."""
+        css = (self.STATIC / "settings-modal.css").read_text(encoding="utf-8")
+        self.assertNotIn('font-family: "Font Awesome', css)
+        self.assertNotIn("Font Awesome 6 Free", css)
+        self.assertNotIn(".settings-lock-note::before", css)
+        # Buna karşılık gerçek eleman kuralı DURMALI.
+        self.assertIn(".settings-lock-note > i", css)
+        module = self._module()
+        self.assertIn("fa-solid fa-lock", module)
+        # Kilit notu ikonu gerçek eleman olarak basılıyor (innerHTML değil —
+        # CSP `script-src-attr 'none'` altında innerHTML de riskli).
+        self.assertNotIn("innerHTML", module)
+        self.assertIn("createElement('i')", module)
+
+    def test_lock_icon_exists_in_local_fontawesome(self) -> None:
+        """Kullandığımız ikon yerel all.min.css'te GERÇEKTEN var mı?"""
+        fa = (self.STATIC / "all.min.css").read_text(encoding="utf-8", errors="replace")
+        self.assertRegex(fa, r"\.fa-lock[\s,{]")
+        self.assertIn('--fa: "\\f023"', fa)
+
+    def test_dead_bg_lock_css_removed(self) -> None:
+        utilities = (self.STATIC / "utilities.css").read_text(encoding="utf-8")
+        # Kural (`.` ile başlayan seçici) kalkmalı; yorumda geçen kelime değil.
+        self.assertNotIn(".is-bg-locked", utilities)
+        self.assertNotIn("is-bg-locked .settings-card-head", utilities)
+
+    def test_partial_save_preserves_dependent_select_values(self) -> None:
+        """Sunucu tarafı: bağımlı select gönderilmezse mevcut değer KORUNUR.
+        (JS `disabled` bu yüzden güvenli; checkbox'ta güvenli değil.)"""
+        self.assertIn("if 'glass_quality' in request.form:",
+                      (FLASK_APP_DIR / "app.py").read_text(encoding="utf-8"))
+        app_src = (FLASK_APP_DIR / "app.py").read_text(encoding="utf-8")
+        for field in ("glass_quality", "glass_blur", "glass_veil", "glass_frost",
+                      "chroma_accent_speed", "auto_lock_timeout"):
+            self.assertIn(f"if '{field}' in request.form:", app_src)
+
+
+class GlassOffSurfaceTests(unittest.TestCase):
+    """Cam KAPALI iken yüzeylerin saydam kalmasını engeller (2026-10).
+
+    DESEN: Çoğu yüzeyin opak görünmesi `backdrop-filter`'dan gelir; arka planı
+    çok düşük opaklıklıdır (`rgba(255,255,255,0.045)`). Cam kapanınca
+    `--glass-blur: none` olur → blur gider, saydam tabaka kalır. Ölçülen
+    minimum opaklık: `.filter-empty-state` 0.028, form panelleri 0.032.
+
+    Beklenen: `backdrop-filter: var(--glass-blur)` kullanan her yüzey ya
+    `.glass` sınıfını taşır, ya da `data-glass-effects="off"` altında opak
+    (alpha >= 0.90) bir tabaka alır.
+    """
+
+    STATIC = FLASK_APP_DIR / "static"
+
+    # Bu yüzeyler zaten opak; `data-glass-effects="off"` kuralı gereksiz.
+    ALREADY_OPAQUE = {
+        ".kasa-modal .modal-content",   # modals.css: 0.88 koyu tabaka
+        ".swal2-popup.kasa-swal-popup",  # modals.css: 0.88
+        ".page-loading-overlay",         # modals.css: 0.72 tam kaplama
+        ".kasa-dropdown-menu",           # misc.css: rgba(12,14,28,0.82)
+        ".vault-card-shell",             # cards.css: 14 ayrı varyant
+        ".kasa-notif-menu",              # glass.css bölüm 6
+        ".lan-warning-card",             # glass.css:307
+        ".glass",                        # glass.css:307
+        "html[data-bs-theme=\"light\"] .kasa-navbar-inner",  # misc.css: 0.92
+        # İÇ İÇE kontroller: kendi başlarına saydam kalmaları sorun DEĞİL,
+        # çünkü artık opak bir kapsayıcının ÜZERİNDE duruyorlar. Saydamlık
+        # kapsayıcının arkasında kalmaz, üstte yalnız ince bir vurgu katmanı
+        # olur (düğme/kenar görünürlüğü için gerekli).
+        ".card-page-btn",                # cards.css — .card-pagination içinde
+        ".card-page-jump-input",         # cards.css — .card-pagination içinde
+        ".kasa-navbar-right .kasa-btn-muted",   # glass.css — navbar içinde
+        ".kasa-navbar .kasa-dropdown-trigger",  # glass.css — navbar içinde
+    }
+
+    def _css_files(self) -> dict[str, str]:
+        return {p.name: p.read_text(encoding="utf-8", errors="replace")
+                for p in sorted(self.STATIC.glob("*.css"))
+                if p.name != "all.min.css"}
+
+    @staticmethod
+    def _strip_comments(src: str) -> str:
+        return re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+
+    def _selectors_using_glass_blur(self) -> dict[str, str]:
+        found: dict[str, str] = {}
+        for name, src in self._css_files().items():
+            for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", self._strip_comments(src)):
+                sel, body = m.group(1), m.group(2)
+                if "backdrop-filter" not in body or "var(--glass-blur" not in body:
+                    continue
+                for part in sel.split(","):
+                    s = re.sub(r"\s+", " ", part.strip().replace("\n", " "))
+                    if s and not s.startswith("@"):
+                        found.setdefault(s, name)
+        return found
+
+    def test_every_blurred_surface_has_opaque_fallback_when_glass_off(self) -> None:
+        selectors = self._selectors_using_glass_blur()
+        self.assertGreater(len(selectors), 8, "denetim boş döndü — CSS ayrıştırma bozuk")
+        all_css = "\n".join(self._css_files().values())
+        clean = self._strip_comments(all_css)
+
+        problems = []
+        for sel, defined_in in sorted(selectors.items()):
+            if sel in self.ALREADY_OPAQUE:
+                continue
+            base = re.split(r"[:>\s~+,]", sel)[0].strip()
+            if base in (".glass", ".settings-card", ".filter-btn",
+                        ".kasa-btn", ".kasa-dropdown-trigger", "#search-input",
+                        ".bulk-select-all-control", ".background-choice-grid",
+                        ".accent-preset-row", ".generator-output-card",
+                        ".generator-options-card", ".generator-history-card",
+                        ".generator-strength-card", ".settings-action-card",
+                        ".kasa-custom-select", ".kasa-input"):
+                continue
+            # Birden fazla glass-off kuralı olabilir (farklı dosyalarda, amaçları
+            # farklı: custom-select.css'teki katman/z-index, glass.css'teki
+            # opak zemin). Doğrusu: OPAK OLAN BİR KURALIN VARLIĞI.
+            bodies = re.findall(
+                r'data-glass-effects="off"\]\s*' + re.escape(base) + r"\b[^{}]*\{([^{}]*)\}",
+                clean)
+            if not bodies:
+                problems.append(f"{sel} ({defined_in}): glass-off kurali YOK")
+                continue
+            best = 0.0
+            for body in bodies:
+                alphas = [float(a) for a in
+                          re.findall(r"rgba\([^)]*?,\s*(0?\.\d+|1)\s*\)", body)]
+                for hexa in re.findall(r"#([0-9a-fA-F]{8})\b", body):
+                    alphas.append(int(hexa[6:8], 16) / 255)
+                best = max([best] + alphas)
+            if best < 0.90:
+                problems.append(
+                    f"{sel} ({defined_in}): glass-off zemini saydam "
+                    f"(max_alpha={best:.2f})")
+
+        self.assertEqual(problems, [], "\n".join(problems))
+
+    def test_pagination_surface_is_opaque_when_glass_off(self) -> None:
+        """Kullanıcı raporu: anasayfa pagination kapsayıcısı saydam görünüyordu."""
+        cards = self._css_files()["cards.css"]
+        clean = self._strip_comments(cards)
+        match = re.search(
+            r'data-glass-effects="off"\]\s*\.card-pagination[^{}]*\{([^{}]*)\}', clean)
+        self.assertIsNotNone(match, "cards.css'te card-pagination glass-off kurali yok")
+        body = match.group(1)
+        self.assertIn("0.97", body, "pagination zemini opak olmali (0.97)")
+        self.assertNotIn("rgba(var(--accent-rgb), 0.07)", body)
+
+    def test_vault_form_panels_are_opaque_when_glass_off(self) -> None:
+        """Kullanıcı raporu: kayit ekle/düzenle 'tarih/kaydet' bolgesi
+        karemsi/saydam gorunuyordu."""
+        glass = self._css_files()["glass.css"]
+        clean = self._strip_comments(glass)
+        match = re.search(
+            r'data-glass-effects="off"\]\s*\.vault-form-panel[^{}]*\{([^{}]*)\}', clean)
+        self.assertIsNotNone(match, "glass.css'te vault-form-panel glass-off kurali yok")
+        self.assertIn("0.97", match.group(1))
+        for sel in (".vault-form-actions", ".vault-form-side", ".kasa-panel",
+                    ".vault-generator-panel", ".filter-empty-state",
+                    ".kasa-navbar-inner", ".kasa-field"):
+            self.assertRegex(
+                clean, re.escape(f'data-glass-effects="off"]') + r"[^\n]*" + re.escape(sel),
+                f"{sel} icin glass-off kurali yok")
+
+    def test_asset_versions_bumped_for_glass_fixes(self) -> None:
+        base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
+        self.assertIn("cards.css') }}?v=81", base)
+        self.assertIn("glass.css') }}?v=89", base)
     """Kart tasarımı + istatistik filtresi batch: şablon/asset/çeviri regresyonları."""
 
     PARTIALS = FLASK_APP_DIR / "templates" / "partials"
@@ -2558,13 +3193,14 @@ class CardAndStatsUiTemplateTests(unittest.TestCase):
 
     def test_asset_versions_bumped(self) -> None:
         base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
-        self.assertIn("cards.css') }}?v=79", base)
+        self.assertIn("cards.css') }}?v=81", base)
         self.assertIn("theme-states.css') }}?v=74", base)
-        self.assertIn("utilities.css') }}?v=75", base)
-        self.assertIn("app.js') }}?v=9.47", base)
+        self.assertIn("utilities.css') }}?v=76", base)
+        self.assertIn("app.js') }}?v=9.50", base)
         sw = (FLASK_APP_DIR / "templates" / "sw.js").read_text(encoding="utf-8")
-        self.assertIn("assets-v204", sw)
-        self.assertIn("assets-v204", self._read("scripts/sw-register.html"))
+        self.assertIn("assets-v209", sw)
+        self.assertIn("assets-v209", self._read("scripts/sw-register.html"))
+        self.assertIn("entry-shell.css') }}?v=1", base)
 
     def test_username_input_not_blocked_by_card_number_formatter(self) -> None:
         # Bug #1: kart numarası formatlama Kullanıcı Adı alanına şartsız
@@ -2945,7 +3581,7 @@ class BreachScanRouteTests(unittest.TestCase):
     )
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -3044,7 +3680,7 @@ class BreachScanRouteTests(unittest.TestCase):
             )
 
     def test_status_requires_authentication(self) -> None:
-        response = app_module.app.test_client().get(
+        response = _new_test_client().get(
             "/api/breach/scan",
             headers={"X-App-Token": app_module.APP_TOKEN},
         )
@@ -3179,7 +3815,7 @@ class HealthQuickActionsRouteTests(unittest.TestCase):
     STRONG = "Xk9$vT2!mQ8@wL4#"
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -3439,7 +4075,7 @@ class HealthQuickActionsRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
 
     def test_endpoints_require_authentication(self) -> None:
-        anonymous = app_module.app.test_client()
+        anonymous = _new_test_client()
         for method, path in (
             ("get", "/api/health/duplicates/preview"),
             ("get", "/api/health/weak/count"),
@@ -3469,7 +4105,7 @@ class NotificationsReminderTests(unittest.TestCase):
     )
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -3491,7 +4127,7 @@ class NotificationsReminderTests(unittest.TestCase):
         return [r["kind"] for r in self.client.get("/api/notifications").get_json()["reminders"]]
 
     def test_notifications_require_authentication(self) -> None:
-        response = app_module.app.test_client().get(
+        response = _new_test_client().get(
             "/api/notifications",
             headers={"X-App-Token": app_module.APP_TOKEN},
         )
@@ -3551,7 +4187,7 @@ class NotificationPersistenceTests(unittest.TestCase):
     )
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -3695,7 +4331,7 @@ class NotificationPersistenceTests(unittest.TestCase):
         self.assertNotIn("notifications_reset", app_module._TOKEN_ENDPOINTS)
 
     def test_dismiss_requires_authentication(self) -> None:
-        anonymous = app_module.app.test_client()
+        anonymous = _new_test_client()
         response = anonymous.post(
             "/api/notifications/dismiss",
             json={"id": "backup"},
@@ -3976,7 +4612,7 @@ class AutomaticBackupApiTests(unittest.TestCase):
     STRONG = "Xk9$vT2!mQ8@wL4#"
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -4026,7 +4662,7 @@ class AutomaticBackupApiTests(unittest.TestCase):
         )
 
     def test_list_requires_authentication(self) -> None:
-        anonymous = app_module.app.test_client()
+        anonymous = _new_test_client()
         response = anonymous.get(
             "/api/backups", headers=self._headers())
         self.assertEqual(response.status_code, 302)
@@ -4262,7 +4898,7 @@ class ReminderFrequencyTests(unittest.TestCase):
     )
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         with self.client.session_transaction() as session:
             session["_user_id"] = "admin"
             session["_fresh"] = True
@@ -4366,7 +5002,7 @@ class SecurityHardeningTests(unittest.TestCase):
     NEW_MASTER = 'test-master-password-new'
 
     def setUp(self) -> None:
-        self.client = app_module.app.test_client()
+        self.client = _new_test_client()
         login_lockout._login_attempts.clear()
         self._reset_vault_state()
 
@@ -4377,8 +5013,33 @@ class SecurityHardeningTests(unittest.TestCase):
     @classmethod
     def _reset_vault_state(cls) -> None:
         with app_module.app.app_context():
-            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized'):
+            # Ağ/kilit/yedek damgası ayarları da temizlenir: bu sınıftaki testler
+            # bunları seed ediyor veya gerçekten yazıyor, sızarsa sonraki testin
+            # kararını değiştirir (sızıntı, üretim hatası değil test izolasyonu
+            # hatasıdır).
+            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized',
+                        'lan_enabled', 'lan_full_access_enabled',
+                        'lan_reveal_passwords_enabled',
+                        'auto_lock_enabled', 'auto_lock_timeout',
+                        # 2026-10: bu anahtar SIFIRLANMADIĞI için sürecin ilk
+                        # girişinde `migrate_plaintext_record_metadata` tüm
+                        # metadata'yı ana şifreden türetilen Fernet ile
+                        # şifreliyor ve testin `encrypt_metadata` ile yazdığı
+                        # `card_holder` çözülemez hale geliyordu → kart-ismi
+                        # sızıntı assertion'ı koşul bağımsız olmaktan çıkıp
+                        # BOŞ (vacuous) kalıyordu. Aynı sınıftan bir izolasyon
+                        # hatasının yeni örneği (bkz. SECURITY.md).
+                        app_module.RECORD_METADATA_SETTING,
+                        app_module.LAST_BACKUP_SETTING,
+                        app_module._backups.LAST_AUTO_BACKUP_SETTING):
                 app_module.Setting.query.filter_by(key=key).delete()
+            # Kayıt tabloları da temizlenir. Bu sınıftaki testler kasa ANAHTARI
+            # ile şifreli kayıt bırakıyor; sızarsa sonraki testin şifre
+            # değiştirme (_reencrypt_task) işlemi TÜM kayıtları gezdiği için
+            # Fernet InvalidToken ile çöküyordu. Sızma bir hata üretmiyor, ANCAK
+            # yanlış test sırasına yol açıyordu (izole GEÇEN, tam koşuda FAIL).
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
             app_module.db.session.commit()
             with app_module._vault_keys_lock:
                 app_module._vault_keys.clear()
@@ -4417,6 +5078,39 @@ class SecurityHardeningTests(unittest.TestCase):
         match = re.search(r'window\.KASA_CSRF_TOKEN\s*=\s*"([^"]+)"', page)
         assert match is not None, 'csrf token sayfada bulunamadı'
         return match.group(1)
+
+    # ── Kilit: CSRF belirteci korunmaz, yenilenir ──────────────────────────
+    #
+    # Önceki sürümde burada `test_lock_preserves_csrf_token` vardı ve
+    # oturumsuz sınıfta çalışıyordu: `/lock` 403 döndürdüğü için kilit hiç
+    # oluşmuyor, belirteç de zaten değişmiyordu → test yanlış sebeple geçiyordu.
+    # Artık oturum açık, belirteç gönderiliyor ve kilidin GERÇEKTEN oluştuğu
+    # doğrulanıyor.
+
+    def test_lock_rotates_csrf_token(self) -> None:
+        """Kasa kilitlenirken CSRF belirteci yenilenir (ayrıcalık değişti)."""
+        self._seed_vault()
+        self._login()
+        token = self._session_csrf()
+        response = self.client.post(
+            '/lock', data={'csrf_token': token},
+            headers={'X-CSRF-Token': token})
+        self.assertIn(response.status_code, (200, 302),
+                      msg=f'kilit gerçekleşmedi: {response.status_code}')
+        with self.client.session_transaction() as sess:
+            rotated = sess.get('csrf_token')
+        self.assertTrue(rotated)
+        self.assertNotEqual(rotated, token)
+
+    def test_lock_without_csrf_token_is_rejected(self) -> None:
+        """Oturumlu olsa bile belirteç olmadan /lock reddedilir."""
+        self._seed_vault()
+        self._login()
+        token = self._session_csrf()
+        response = self.client.post('/lock')
+        self.assertEqual(response.status_code, 400)
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('csrf_token'), token)
 
     # ── Oturum çerezinin SameSite=Strict olduğu için yalnızca GET/HEAD dışı
     # isteklerde Origin zorunluluğu ölçülür.
@@ -4673,13 +5367,19 @@ class SecurityHardeningTests(unittest.TestCase):
         self._seed_vault()
         self._login()
         with app_module.app.app_context():
-            # Uzak istemci yalnızca LAN açıkken erişebilir.
+            # Uzak istemci yalnızca LAN açıkken erişebilir. Kısmi form
+            # davranışı salt okunur moddan BAĞIMSIZ olduğu için (ve bu test
+            # o kuralı sınamak için) burada tam yetki açılır.
             app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
             app_module._set_setting('power_save_enabled', 'true')
             app_module._set_setting('card_sheen_enabled', 'true')
             app_module.db.session.commit()
+        # Kısmi form gönderilen alan dışındaki bayrakları SİLMEZ. Gönderilen
+        # alan `auto_lock_timeout` değil `accent_color`: timeout 2026-10'da
+        # yerel-only yapıldı, uzak istemci artık onu yazamaz.
         response = self.client.post(
-            '/save_settings', data={'auto_lock_timeout': '9'},
+            '/save_settings', data={'accent_color': '#4f91ff'},
             headers={'X-CSRF-Token': self._session_csrf()},
             environ_base={'REMOTE_ADDR': '192.168.1.77'})
         self.assertEqual(response.status_code, 302)
@@ -4738,6 +5438,1771 @@ class SecurityHardeningTests(unittest.TestCase):
                 headers={'X-CSRF-Token': self._session_csrf()},
                 content_type='multipart/form-data')
         self.assertEqual(response.status_code, 500)
+
+    def test_lan_session_is_read_only_by_default(self) -> None:
+        # LAN erişimi açıkken uzak oturum kasayı OKUYABİLİR ama yazamaz.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module.db.session.commit()
+        # Okuma çalışır.
+        self.assertEqual(
+            self.client.get('/api/stats', environ_base={'REMOTE_ADDR': '192.168.1.80'}).status_code,
+            200)
+        # Yazma reddedilir: hem kasa kaydı hem de durum değiştiren uçlar.
+        for path, payload in (
+            ('/save_settings', {'auto_lock_timeout': '9'}),
+            ('/api/notifications/dismiss', {'id': 'backup-2026-01-01'}),
+        ):
+            with self.subTest(path=path):
+                response = self.client.post(
+                    path, data=payload,
+                    headers={'X-CSRF-Token': self._session_csrf()},
+                    environ_base={'REMOTE_ADDR': '192.168.1.80'})
+                self.assertEqual(response.status_code, 403)
+                self.assertIn('salt okunur',
+                              response.get_json().get('error', ''))
+
+    def test_lan_full_access_opt_in_restores_write(self) -> None:
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        # NOT: `auto_lock_timeout` artık yerel-only (2026-10) ve burada kullanılamaz;
+        # "uzak tam yetki yazabiliyor" sözleşmesini uzaktan değiştirilebilen
+        # GERÇEK bir görünüm ayarı kanıtlamak daha doğru olurdu, ama bu testin
+        # amacı yalnızca yazma iznidir.
+        response = self.client.post(
+            '/save_settings', data={'accent_color': '#4f91ff'},
+            headers={'X-CSRF-Token': self._session_csrf()},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 302)
+
+    def test_lan_read_only_allows_lock_but_not_machine_preferences(self) -> None:
+        # Salt okunur mod oturum uçlarını kapatmamalı: kullanıcı telefonunu
+        # kilitleyebilmeli. Ancak MAKİNEye ait tercihler (tepsiye, arayüz dili)
+        # artık uzak istemciden değiştirilemez — bunlar kasa verisi değil ama
+        # uzak bir cihazın uygulamanın davranışını değiştirmemesi gerekir.
+        # NOT: dil seçicinin oturum AÇIKken çalışması gerekmez; giriş/kilit
+        # ekranındaki seçici kimlik doğrulanmamışken çalışır ve bu kontrol
+        # yalnızca oturum açıkken devrededir.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module.db.session.commit()
+        lock = self.client.post(
+            '/lock', headers={'X-CSRF-Token': self._session_csrf()},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(lock.status_code, 200)
+        self._login()
+        lang = self.client.post(
+            '/settings/language', data={'language': 'en'},
+            headers={'X-CSRF-Token': self._session_csrf()},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(lang.status_code, 403)
+        with app_module.app.app_context():
+            self.assertNotEqual(app_module.get_saved_language(), 'en')
+
+    def test_language_change_rejected_for_anonymous_remote_client(self) -> None:
+        # Önceden onaylanmış davranış (M-D düzeltmesi): dil değişimi uzak
+        # ANONİM istemciden yapılamaz. Yani uzak bir cihazda dil seçici zaten
+        # çalışmıyordu; salt okunur muafiyetinden `settings_language`'ı
+        # çıkarmak hiçbir işlevsellik kaybettirmedi.
+        self._seed_vault()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/settings/language', data={'language': 'en'},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 403)
+        with app_module.app.app_context():
+            self.assertNotEqual(app_module.get_saved_language(), 'en')
+
+    def test_language_change_still_works_locally_without_session(self) -> None:
+        # Bu bilgisayarda oturumsuz da değiştirilebilir (giriş ekranı seçicisi).
+        self._seed_vault()
+        response = self.client.post(
+            '/settings/language', data={'language': 'en'})
+        self.assertEqual(response.status_code, 200)
+
+    def test_local_session_never_blocked_by_lan_read_only(self) -> None:
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/save_settings', data={'auto_lock_timeout': '9'},
+            headers={'X-CSRF-Token': self._session_csrf()})
+        self.assertEqual(response.status_code, 302)
+
+    def test_lan_full_access_setting_cannot_be_changed_remotely(self) -> None:
+        # Tam yetki açmak da yalnızca bu bilgisayardan mümkün olmalı; aksi halde
+        # uzak istemci önce salt okunur kısıtını kaldırıp sonra yazabilirdi.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/save_settings', data={'lan_full_access_enabled': '1'},
+            headers={'X-CSRF-Token': self._session_csrf()},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 403)
+
+    # ── LAN: aktarım uçları tam yetkiden BAĞIMSIZ olarak kapalı ──────────────
+    #
+    # "LAN oturumlarına tam yetki" kayıt düzenleme yetkisidir. Kasayı bir
+    # dosyaya dökmek (veya içeriden geri yüklemek) bambaşka bir yetenek; şifre
+    # yöneticisinde asıl tehlike odur. Bu yüzden dışa/içe aktarma ve yedekleme
+    # uçları, tam yetki anahtarı AÇIK olsa bile uzak LAN oturumuna reddedilir.
+
+    _LAN_TRANSFER_DENIED_PATHS = (
+        ('get', '/export', None),
+        ('get', '/api/backups', None),
+        ('get', '/api/health/export', None),
+        ('post', '/api/export/encrypted', {}),
+        ('post', '/api/backups/create', {}),
+        ('post', '/api/backups/delete', {'filename': 'x.kasaenc'}),
+        ('post', '/api/backups/restore', {'filename': 'x.kasaenc', 'confirm': True}),
+        ('post', '/api/health/backup', {}),
+        ('post', '/api/bulk/export', {'ids': ['1']}),
+    )
+
+    def test_lan_cannot_export_or_backup_even_with_full_access(self) -> None:
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        csrf = self._session_csrf()
+        for method, path, payload in self._LAN_TRANSFER_DENIED_PATHS:
+            with self.subTest(path=path):
+                response = self.client.open(
+                    path, method=method.upper(), json=payload,
+                    headers={'X-CSRF-Token': csrf},
+                    environ_base={'REMOTE_ADDR': '192.168.1.80'})
+                self.assertEqual(response.status_code, 403)
+                self.assertIn('dışa aktarılamaz',
+                              response.get_json().get('error', ''))
+
+    def test_lan_import_is_blocked(self) -> None:
+        # /import multipart olduğu için ayrı test: yanıt yine 403 olmalı ve
+        # hiçbir kayıt eklenmemeli.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/import',
+            data={'file': (__import__('io').BytesIO(
+                json.dumps([{'title': 'LAN', 'password': 'p',
+                             'type': 'Website'}]).encode()), 'x.json')},
+            headers={'X-CSRF-Token': self._session_csrf()},
+            content_type='multipart/form-data',
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 403)
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module.Record.query.filter_by(title='LAN').count(), 0)
+
+    def test_local_can_export_and_backup_normally(self) -> None:
+        # Aynı uçlar bu bilgisayardan çalışmaya devam etmeli.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        csrf = self._session_csrf()
+        self.assertEqual(
+            self.client.get('/api/backups').status_code, 200)
+        self.assertEqual(
+            self.client.post('/api/health/backup', json={},
+                             headers={'X-CSRF-Token': csrf}).status_code, 200)
+        self.assertEqual(
+            self.client.post('/api/backups/create', json={},
+                             headers={'X-CSRF-Token': csrf}).status_code, 200)
+
+    def test_transfer_block_requires_lan_enabled(self) -> None:
+        # LAN kapalıyken uzak istemci zaten oturum alamıyor; kural tetiklenmemeli.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'false')
+            app_module.db.session.commit()
+        response = self.client.get(
+            '/api/backups', environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertIn(response.status_code, (302, 403))
+
+    # ── LAN: açık metin şifre gösterme varsayılan KAPALI ───────────────────
+    #
+    # Salt okunur mod "ağdaki cihaz kasanı görebilir" demekti; bu yüzden şifre
+    # gizlemeyi kapatmak bir ayrı anahtar olarak eklendi (varsayılan kapalı).
+    # Tam yetkiden BAĞIMSIZ: tam yetki = kayıt düzenleme, şifre gösterme değil.
+
+    def _seed_encrypted_record(self) -> tuple[str, Fernet]:
+        """Sabit bir Fernet ile şifreli kayıt oluşturur.
+
+        Kayıt yazma ve şifre okuma tarafları aynı `get_fernet()` çağrısını
+        paylaştığı için ikisi de bu yardımcının döndürdüğü Fernet'e bağlanır
+        (paketin mevcut deseniyle aynı).
+        """
+        fernet = Fernet(Fernet.generate_key())
+        with app_module.app.app_context():
+            record = app_module.Record(
+                id=f'reveal-{os.urandom(6).hex()}',
+                type='Website', category='Genel', title='GizliKayit',
+                login='kullanici',
+                encrypted_password=app_module.safe_encrypt(fernet, 'Gizli-Sifre-1!'))
+            app_module.db.session.add(record)
+            app_module.db.session.commit()
+            return record.id, fernet
+
+    def test_lan_password_reveal_is_hidden_by_default(self) -> None:
+        self._seed_vault()
+        self._login()
+        record_id, fernet = self._seed_encrypted_record()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        remote = {'REMOTE_ADDR': '192.168.1.80'}
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(
+                f'/api/record/{record_id}/password', environ_base=remote)
+            self.assertEqual(response.status_code, 403)
+            self.assertIn('gizleniyor', response.get_json().get('error', ''))
+            # Şifre hiçbir şekilde sızmamalı.
+            self.assertNotIn('Gizli-Sifre', response.get_data(as_text=True))
+            self.assertEqual(
+                self.client.get(f'/gecmis/{record_id}',
+                                environ_base=remote).status_code, 403)
+
+    def test_lan_reveal_opt_in_restores_password_access(self) -> None:
+        self._seed_vault()
+        self._login()
+        record_id, fernet = self._seed_encrypted_record()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_REVEAL_PASSWORDS_SETTING, 'true')
+            app_module.db.session.commit()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(
+                f'/api/record/{record_id}/password',
+                environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json().get('password'), 'Gizli-Sifre-1!')
+
+    def test_local_reveal_always_allowed(self) -> None:
+        # Bu bilgisayarda şifre gizleme ayarı ne olursa olsun çalışmaz.
+        self._seed_vault()
+        self._login()
+        record_id, fernet = self._seed_encrypted_record()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module.db.session.commit()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(f'/api/record/{record_id}/password')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json().get('password'), 'Gizli-Sifre-1!')
+
+    def test_reveal_setting_cannot_be_changed_remotely(self) -> None:
+        # Anahtarı uzak istemci açamaz; aksi halde önce kuralı kaldırıp
+        # sonra şifre okuyabilirdi.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            # Tam yetki AÇIK: reddedilme nedeni salt-okunur kuralı DEĞİL,
+            # "bu ayar yalnızca yerel değiştirilebilir" kuralı olmalı.
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/save_settings', data={'lan_reveal_passwords_enabled': '1'},
+            headers={'X-CSRF-Token': self._session_csrf()},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 403)
+        with app_module.app.app_context():
+            self.assertNotEqual(
+                app_module._get_setting(
+                    lan_access_module.LAN_REVEAL_PASSWORDS_SETTING), 'true')
+
+    # ── LAN: kart no / kart üstü isim / not da SIRR'dır (2026-10 turu) ──────
+    #
+    # Bulgu: `_LAN_REVEAL_ENDPOINTS` yalnız iki API ucunu kapsıyordu ve
+    # `_enforce_lan_read_only` yalnız POST/PUT/PATCH/DELETE'ye bakıyordu. Bu
+    # yüzden "LAN'da şifreleri göster" KAPALIyken:
+    #   - `GET /duzenle/<id>` düz metin şifreyi forma basıyordu (200),
+    #   - `GET /` (ana ızgara, LAN'ın ASIL görünümü) tam kart numarasını, kart
+    #     üzerindeki ismi ve not/SecureNote metnini düz metin basıyordu.
+    # `Şifre`/`CVV` zaten `SECRET_PLACEHOLDER` ile maskeliydi; bu satırlar
+    # maskeye değil, hiç oluşturulmamaya bağlandı (sır şablona hiç girmesin).
+
+    _CARD_NUMBER = '4111111111111111'
+    _CARD_HOLDER = 'Kart Sahibi Ad Soyad'
+    _COMMENT = 'Not metni siri'
+    _NOTE_BODY = 'Guvenli notun tam icerigi'
+
+    def _seed_secret_carrier_records(self) -> Fernet:
+        """Kart no / kart ismi / not / SecureNote taşıyan kayıtları ekler."""
+        fernet = Fernet(Fernet.generate_key())
+        with app_module.app.app_context():
+            app_module.db.session.add_all([
+                app_module.Record(
+                    id=f'grid-web-{os.urandom(6).hex()}',
+                    type='Website', category='Genel', title='IzgaraWeb',
+                    login='kullanici',
+                    encrypted_password=app_module.safe_encrypt(
+                        fernet, 'Gizli-Sifre-1!'),
+                    encrypted_comment=app_module.safe_encrypt(
+                        fernet, self._COMMENT),
+                ),
+                app_module.Record(
+                    id=f'grid-card-{os.urandom(6).hex()}',
+                    type='CreditCard', category='Genel', title='IzgaraKart',
+                    # Kart numarası CreditCard kaydında `login` alanında tutulur.
+                    login=self._CARD_NUMBER,
+                    card_holder=app_module.encrypt_metadata(
+                        fernet, self._CARD_HOLDER),
+                    encrypted_password=app_module.safe_encrypt(
+                        fernet, '123'),
+                ),
+                app_module.Record(
+                    id=f'grid-note-{os.urandom(6).hex()}',
+                    type='SecureNote', category='Genel', title='IzgaraNot',
+                    encrypted_comment=app_module.safe_encrypt(
+                        fernet, self._NOTE_BODY),
+                ),
+            ])
+            app_module.db.session.commit()
+        return fernet
+
+    def _enable_lan_from_remote_view(self) -> Fernet:
+        """LAN açık + şifre gösterimi KAPALI (güvenli varsayılan) ve sır
+        taşıyan kayıtlar eklenmiş durumda. Seed edilen Fernet'i döndürür.
+
+        Kayıtlar `_login()`'den SONRA eklenir: `login` sırasında çalışan
+        `migrate_plaintext_record_metadata` düz metin metadata'yı şifreliyor,
+        yani önce eklenen kayıtların `encrypt_metadata` ile yazılmış alanları
+        çözülemez hale gelirdi (2026-10'da ölçüldü). Tek kaynaklıdır: testler
+        ayrıca `_seed_secret_carrier_records()` çağırmamalıdır, yoksa kayıtlar
+        iki kez eklenir.
+        """
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            app_module._set_setting('lan_enabled', 'true')
+            app_module._set_setting(
+                lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+            app_module.db.session.commit()
+        return self._seed_secret_carrier_records()
+
+    def test_lan_grid_does_not_leak_card_number_holder_or_notes(self) -> None:
+        """Ana ızgara uzak LAN oturumuna sır basmamalı (başlık/ kullanıcı adı
+        dışında). Regresyon: kart no, kart ismi, not ve SecureNote metni."""
+        fernet = self._enable_lan_from_remote_view()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(
+                '/', environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 200)
+        body = response.get_data(as_text=True)
+        for secret in (self._CARD_NUMBER, self._CARD_HOLDER,
+                       self._COMMENT, self._NOTE_BODY, 'Gizli-Sifre-1!'):
+            self.assertNotIn(secret, body)
+        # Kasanın LAN'daki amacı bozulmamalı: başlıklar görünür.
+        self.assertIn('IzgaraKart', body)
+        self.assertIn('IzgaraNot', body)
+
+    def test_lan_grid_still_shows_secrets_to_local_user(self) -> None:
+        """Gizleme YALNIZCA uzak oturuma uygulanır; yerel kullanıcı her şeyi
+        görmeye devam eder."""
+        fernet = self._enable_lan_from_remote_view()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(
+                '/', environ_base={'REMOTE_ADDR': '127.0.0.1'})
+        self.assertEqual(response.status_code, 200)
+        body = response.get_data(as_text=True)
+        for secret in (self._CARD_NUMBER, self._CARD_HOLDER,
+                       self._COMMENT, self._NOTE_BODY):
+            self.assertIn(secret, body)
+
+    def test_lan_edit_form_get_is_blocked_when_reveal_disabled(self) -> None:
+        """`/duzenle/<id>` formu sırları düz metin basar; uzak oturum açamamalı."""
+        fernet = self._enable_lan_from_remote_view()
+        with app_module.app.app_context():
+            record_id = app_module.Record.query.filter_by(
+                title='IzgaraKart').first().id
+        remote = {'REMOTE_ADDR': '192.168.1.80'}
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            blocked = self.client.get(f'/duzenle/{record_id}',
+                                      environ_base=remote)
+            self.assertEqual(blocked.status_code, 403)
+            body = blocked.get_data(as_text=True)
+            for secret in (self._CARD_NUMBER, self._CARD_HOLDER, '123'):
+                self.assertNotIn(secret, body)
+            # Yerel kullanıcı formu açabilmeli.
+            local = self.client.get(f'/duzenle/{record_id}',
+                                    environ_base={'REMOTE_ADDR': '127.0.0.1'})
+            self.assertEqual(local.status_code, 200)
+            self.assertIn(self._CARD_NUMBER, local.get_data(as_text=True))
+
+    def test_lan_edit_form_available_when_reveal_opted_in(self) -> None:
+        """Reveal açıkken uzak tam-yetkili istemci formu görebilmeli."""
+        fernet = self._enable_lan_from_remote_view()
+        with app_module.app.app_context():
+            app_module._set_setting(
+                lan_access_module.LAN_REVEAL_PASSWORDS_SETTING, 'true')
+            record_id = app_module.Record.query.filter_by(
+                title='IzgaraKart').first().id
+            app_module.db.session.commit()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(
+                f'/duzenle/{record_id}',
+                environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self._CARD_NUMBER, response.get_data(as_text=True))
+
+    # ── LAN: savunma ayarlarını uzak istemci zayıflatamaz (2026-10 turu) ───
+    #
+    # Bulgu: `_LOCAL_ONLY_SETTING_FIELDS` `auto_lock_enabled` içeriyordu ama
+    # `auto_lock_timeout` İÇERMİYORDU. `save_settings` timeout'u koşulsuz
+    # yazdığı için uzak "tam yetkili" oturum 5 dakikalık otomatik kilidi
+    # 240 dakikaya çekebiliyordu. Aynı sınıfta `content_protection_enabled`
+    # (ekran yakalama engeli) ve `auto_backup_interval` de açıktı; ilki ayrı
+    # bir JSON ucu üzerinden yazıldığı için form kontrolü onu hiç görmüyordu.
+
+    def test_remote_cannot_weaken_auto_lock_timeout(self) -> None:
+        fernet = self._enable_lan_from_remote_view()
+        csrf = self._session_csrf()
+        with app_module.app.app_context():
+            app_module._set_setting('auto_lock_enabled', 'true')
+            app_module._set_setting('auto_lock_timeout', '5')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/save_settings', data={'auto_lock_timeout': '240'},
+            headers={'X-CSRF-Token': csrf},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 403)
+        with app_module.app.app_context():
+            self.assertEqual(app_module._get_setting('auto_lock_timeout'), '5')
+        # Yerel kullanıcı ayarlayabilmeli.
+        self.assertIn(
+            self.client.post('/save_settings', data={'auto_lock_timeout': '30'},
+                             headers={'X-CSRF-Token': csrf}).status_code,
+            (200, 302))
+        with app_module.app.app_context():
+            self.assertEqual(app_module._get_setting('auto_lock_timeout'), '30')
+
+    def test_remote_cannot_disable_content_protection(self) -> None:
+        """Ekran yakalama engeli ayrı bir JSON ucundan yazılıyordu; form
+        denetimi oraya hiç uzanmıyordu."""
+        fernet = self._enable_lan_from_remote_view()
+        csrf = self._session_csrf()
+        with app_module.app.app_context():
+            app_module._set_setting('content_protection_enabled', 'true')
+            app_module.db.session.commit()
+        response = self.client.post(
+            '/settings/content-protection',
+            json={'content_protection_enabled': False},
+            headers={'X-CSRF-Token': csrf},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 403)
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module._get_setting('content_protection_enabled'), 'true')
+
+    def test_remote_cannot_change_hardware_acceleration(self) -> None:
+        fernet = self._enable_lan_from_remote_view()
+        csrf = self._session_csrf()
+        response = self.client.post(
+            '/settings/hardware-acceleration',
+            json={'hardware_acceleration_enabled': False},
+            headers={'X-CSRF-Token': csrf},
+            environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 403)
+
+    # ── Boş/formsız gövde savunma ayarını sıfırlıyordu (2026-10, 2. tur) ───
+    #
+    # Bulgu: `_reject_remote_critical_settings` "anahtar gönderildi mi" diye
+    # bakıyordu ama YAZMA koşulsuzdu. `str(None).lower()` == 'none' ve okuma
+    # tarafı `value == 'true'` olduğu için `{}` gövdesi ekran yakalama
+    # engelini sessizce kapatıyordu. `test_remote_cannot_disable_content_protection`
+    # yalnız anahtarı gönderdiği için bu yolu göremiyordu.
+
+    def test_empty_body_cannot_disable_content_protection(self) -> None:
+        for body, kwargs in (({}, {'json': {}}),
+                             (None, {'data': {}}),
+                             ({}, {'data': {'csrf_token': ''}})):
+            with self.subTest(body=body):
+                # Her alt-varyant arası kasa durumu TEMİZLENİR: aksi halde
+                # ikinci `_seed_vault()` aynı settings satırını ikinci kez
+                # ekleyip UNIQUE constraint'e takılıyor.
+                self._reset_vault_state()
+                self._seed_vault()
+                self._login()
+                with app_module.app.app_context():
+                    app_module._set_setting('lan_enabled', 'true')
+                    app_module._set_setting(
+                        lan_access_module.LAN_FULL_ACCESS_SETTING, 'true')
+                    app_module._set_setting('content_protection_enabled', 'true')
+                    app_module.db.session.commit()
+                headers = {'X-CSRF-Token': self._session_csrf()}
+                response = self.client.post(
+                    '/settings/content-protection', headers=headers,
+                    environ_base={'REMOTE_ADDR': '192.168.1.80'}, **kwargs)
+                self.assertIn(response.status_code, (400, 403))
+                with app_module.app.app_context():
+                    self.assertEqual(
+                        app_module._get_setting('content_protection_enabled'),
+                        'true')
+
+    def test_content_protection_accepts_explicit_boolean(self) -> None:
+        # Yazma hâlâ çalışıyor: `false` gönderilince 'false' yazılmalı,
+        # 'none' gibi bir bozuk değer DEĞİL.
+        self._seed_vault()
+        self._login()
+        response = self.client.post(
+            '/settings/content-protection',
+            json={'content_protection_enabled': False},
+            headers={'X-CSRF-Token': self._session_csrf()})
+        self.assertEqual(response.status_code, 200)
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module._get_setting('content_protection_enabled'), 'false')
+
+    # ── `/saglik` kart numarası sızdırıyordu (2026-10, 2. tur) ────────────
+    #
+    # `index()` kart numarasını gizliyordu ama sağlık raporu ikinci bir render
+    # yoluydu: `reports.py` çözülmüş `login`'i `record_data` içine koyuyor,
+    # `saglik.html` bunu `data-pop-login` olarak basıyordu. `lan_full_access`
+    # gerekmiyordu — salt okunur LAN oturumu yeterliydi.
+
+    def test_lan_health_report_hides_card_number(self) -> None:
+        fernet = self._enable_lan_from_remote_view()
+        # Zayıf/eski/süresi dolu listelerinden birine girmesi için kasıtlı
+        # olarak zayıf bir kart şifresi kullanıldı (123).
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(
+                '/saglik', environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(self._CARD_NUMBER, response.get_data(as_text=True))
+
+    def test_local_health_report_still_shows_card_number(self) -> None:
+        fernet = self._enable_lan_from_remote_view()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.get(
+                '/saglik', environ_base={'REMOTE_ADDR': '127.0.0.1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self._CARD_NUMBER, response.get_data(as_text=True))
+
+    # ── Kısmi düzenleme formu kaydı silmiyor (2026-10, 2. tur) ───────────
+    #
+    # D1 `/duzenle` GET'ini uzak oturuma kapattı ama POST'u açık bıraktı.
+    # `_record_from_form` her alan için `request.form.get(...)` kullanıyordu;
+    # alan yoksa `''` yazılıyordu. Yani yalnız CSRF gönderen bir uzak istek
+    # kaydın 10 alanının tamamını sessizce sıfırlıyor, PasswordHistory de
+    # yazılmıyordu (geri dönüş yolu yok).
+
+    def test_partial_edit_form_preserves_existing_secrets(self) -> None:
+        fernet = self._enable_lan_from_remote_view()
+        with app_module.app.app_context():
+            record_id = app_module.Record.query.filter_by(
+                title='IzgaraKart').first().id
+        csrf = self._session_csrf()
+        # Yalnız yorum değişiyor; diğer alanlar formda YOK.
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.post(
+                f'/duzenle/{record_id}',
+                data={'comment': 'Guncel Not', 'csrf_token': csrf},
+                headers={'X-CSRF-Token': csrf},
+                environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 302)
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            body = self.client.get(
+                f'/duzenle/{record_id}',
+                environ_base={'REMOTE_ADDR': '192.168.1.80'}).get_data(
+                    as_text=True)
+        # Sır alanları korunmuş olmalı (form yine 403 döner, o yüzden
+        # doğrulama doğrudan DB üzerinden yapılır).
+        with app_module.app.app_context():
+            record = app_module.db.session.get(app_module.Record, record_id)
+            self.assertEqual(
+                app_module.decrypt_metadata(fernet, record.login),
+                self._CARD_NUMBER)
+            self.assertEqual(
+                app_module.decrypt_metadata(fernet, record.card_holder),
+                self._CARD_HOLDER)
+            self.assertEqual(
+                app_module.safe_decrypt(fernet, record.encrypted_password),
+                '123')
+            self.assertEqual(
+                app_module.decrypt_metadata(fernet, record.title),
+                'IzgaraKart')
+            self.assertEqual(
+                app_module.safe_decrypt(fernet, record.encrypted_comment),
+                'Guncel Not')
+        del body
+
+    def test_full_edit_form_still_overwrites_every_field(self) -> None:
+        """Kısmi koruma, tam formun çalışmasını bozmamalı."""
+        fernet = self._enable_lan_from_remote_view()
+        with app_module.app.app_context():
+            record_id = app_module.Record.query.filter_by(
+                title='IzgaraKart').first().id
+        csrf = self._session_csrf()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            self.client.post(
+                f'/duzenle/{record_id}',
+                data={
+                    'kayit_tipi': 'Website', 'kategori': 'Is', 'isim': 'YeniBaslik',
+                    'website_url': 'https://example.com', 'login': 'yeni-kullanici',
+                    'email': 'yeni@example.com', 'password': 'Yeni-Sifre-9!',
+                    'comment': 'Yeni Not', 'card_holder': '', 'expiry_date': '',
+                    'csrf_token': csrf,
+                },
+                headers={'X-CSRF-Token': csrf})
+        with app_module.app.app_context():
+            record = app_module.db.session.get(app_module.Record, record_id)
+            self.assertEqual(record.type, 'Website')
+            self.assertEqual(
+                app_module.decrypt_metadata(fernet, record.title), 'YeniBaslik')
+            self.assertEqual(
+                app_module.safe_decrypt(fernet, record.encrypted_password),
+                'Yeni-Sifre-9!')
+            self.assertEqual(record.card_holder, '')
+
+    def test_remote_post_to_edit_is_still_allowed(self) -> None:
+        """D1'in bilinçli kararı: gösterim kapalıyken bile LAN 'tam yetki'
+        düzenlemeye izinlidir. Bu ayrım mutasyonla kırılabilir olduğu için
+        testiyle korunuyor."""
+        fernet = self._enable_lan_from_remote_view()
+        with app_module.app.app_context():
+            record_id = app_module.Record.query.filter_by(
+                title='IzgaraWeb').first().id
+        csrf = self._session_csrf()
+        with patch.object(app_module, 'get_fernet', return_value=fernet):
+            response = self.client.post(
+                f'/duzenle/{record_id}',
+                data={'isim': 'UzaktanGuncellendi', 'csrf_token': csrf},
+                headers={'X-CSRF-Token': csrf},
+                environ_base={'REMOTE_ADDR': '192.168.1.80'})
+        self.assertEqual(response.status_code, 302)
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module.decrypt_metadata(
+                    fernet, app_module.db.session.get(
+                        app_module.Record, record_id).title),
+                'UzaktanGuncellendi')
+
+    def test_resource_isolation_headers(self) -> None:
+        # Aynı kökenden beslenen bir kasa uygulaması için kaynak kökeni
+        # yalıtımı: yanlış kaynaktan gömülemez (no-cors) ve pencere paylaşımı
+        # kesilir. COEP require-corp BİLİNÇLİ OLARAK EKLENMEDİ — cam dokusu
+        # data: URI kullandığı için görsel kırılma yaratırdı.
+        response = self.client.get('/login')
+        self.assertEqual(response.headers.get('Cross-Origin-Opener-Policy'),
+                         'same-origin')
+        self.assertEqual(response.headers.get('Cross-Origin-Resource-Policy'),
+                         'same-origin')
+        self.assertEqual(response.headers.get('X-Permitted-Cross-Domain-Policies'),
+                         'none')
+        # HSTS yok: sertifika kendinden imzalı, tarayıcı bypass edemez.
+        self.assertIsNone(response.headers.get('Strict-Transport-Security'))
+        # Mevcut başlıklar bozulmamalı.
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'DENY')
+        self.assertEqual(response.headers.get('Referrer-Policy'), 'same-origin')
+
+    def test_export_does_not_mark_last_backup(self) -> None:
+        # Dışa aktarma kasaya yedek YAZMAZ; damgaya dokunursa "yedek alınmadı"
+        # hatırlatması hiç gerçek yedek alınmadan susuyordu.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            before = app_module._get_setting(app_module.LAST_BACKUP_SETTING)
+            response = self.client.get('/export')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(
+                app_module._get_setting(app_module.LAST_BACKUP_SETTING), before)
+
+    def test_encrypted_export_does_not_mark_last_backup(self) -> None:
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            before = app_module._get_setting(app_module.LAST_BACKUP_SETTING)
+            response = self.client.post(
+                '/api/export/encrypted',
+                data={'csrf_token': self._session_csrf()},
+                headers={'X-CSRF-Token': self._session_csrf()})
+            self.assertIn(response.status_code, (200, 302))
+            self.assertEqual(
+                app_module._get_setting(app_module.LAST_BACKUP_SETTING), before)
+
+    def test_real_backup_still_marks_last_backup(self) -> None:
+        # Ters yön garantisi: gerçek yedek damgayı güncellemeye DEVAM eder.
+        self._seed_vault()
+        self._login()
+        with app_module.app.app_context():
+            self.assertIsNone(app_module._get_setting(app_module.LAST_BACKUP_SETTING))
+            response = self.client.post(
+                '/api/health/backup',
+                data={'csrf_token': self._session_csrf()},
+                headers={'X-CSRF-Token': self._session_csrf()})
+            self.assertEqual(response.status_code, 200)
+            self.assertIsNotNone(
+                app_module._get_setting(app_module.LAST_BACKUP_SETTING))
+
+
+class AuditLogTests(unittest.TestCase):
+    """Güvenlik olay günlüğü: yazım, sır reddi, maskeleme, log enjeksiyonu.
+
+    Her test kendi geçici günlük dizinini açar ve ``tearDown`` ile modülü
+    uygulamanın gerçek LOGS_DIR'ine geri bağlar; testler birbirinin günlüğüne
+    yazmaz.
+    """
+
+    MASTER = 'test-master-password'
+
+    def setUp(self) -> None:
+        from kasa_core import audit as audit_module
+
+        self.audit_module = audit_module
+        self.logs_dir = tempfile.mkdtemp(prefix="sifrekasam-audit-")
+        self.addCleanup(shutil.rmtree, self.logs_dir, True)
+        self.addCleanup(audit_module.set_audit_log_dir, app_module.LOGS_DIR)
+        self.assertTrue(audit_module.set_audit_log_dir(self.logs_dir))
+        self.log_path = Path(self.logs_dir) / audit_module.AUDIT_FILE_NAME
+
+    def _raw_lines(self) -> list[str]:
+        if not self.log_path.exists():
+            return []
+        return [
+            line for line in
+            self.log_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+    def _events(self) -> list[str]:
+        return [entry["event"] for entry in self.audit_module.read_audit_log()]
+
+    # ── Temel yazma ──────────────────────────────────────────────────────────
+
+    def test_writes_single_json_line_with_tag(self) -> None:
+        self.assertTrue(self.audit_module.audit("test_olay", adet=1))
+
+        lines = self._raw_lines()
+        self.assertEqual(len(lines), 1)
+        self.assertIn(self.audit_module.AUDIT_TAG, lines[0])
+        payload = json.loads(lines[0][len(self.audit_module.AUDIT_TAG):].strip())
+        self.assertEqual(payload["event"], "test_olay")
+        self.assertEqual(payload["adet"], 1)
+        self.assertIn("ts", payload)
+
+    def test_file_name_and_rotation_match_backend_log(self) -> None:
+        self.assertEqual(self.audit_module.AUDIT_FILE_NAME, "guvenlik-olaylari.log")
+        self.assertEqual(self.audit_module.AUDIT_MAX_BYTES, 1024 * 1024)
+        self.assertEqual(self.audit_module.AUDIT_BACKUP_COUNT, 3)
+
+    def test_set_log_dir_is_idempotent(self) -> None:
+        self.audit_module.audit("ilk")
+        # Aynı dizinle tekrar çağrı: mevcut dosya kaybolmamalı.
+        self.assertTrue(self.audit_module.set_audit_log_dir(self.logs_dir))
+        self.audit_module.audit("ikinci")
+        self.assertEqual(self._events(), ["ilk", "ikinci"])
+
+    def test_console_line_carries_security_tag(self) -> None:
+        with self.assertLogs("kasa_core.audit", level="INFO") as captured:
+            self.audit_module.audit("konsol_olayi")
+        self.assertTrue(
+            any(self.audit_module.AUDIT_TAG in line and "konsol_olayi" in line
+                for line in captured.output),
+            captured.output,
+        )
+
+    # ── Sır reddi ────────────────────────────────────────────────────────────
+
+    def test_secret_field_rejects_whole_event(self) -> None:
+        self.assertFalse(self.audit_module.audit("sirli", password="gizli"))
+
+        raw = self.log_path.read_text(encoding="utf-8") if self.log_path.exists() else ""
+        self.assertNotIn("gizli", raw)
+        # Olay hiç yazılmamış olmalı: yalnızca değer değil, olay da düşer.
+        self.assertEqual(self._raw_lines(), [])
+
+    def test_allowlist_names_are_stored_normalized(self) -> None:
+        # Alan adları `_normalize_field_name()` ile karşılaştırılır ve o
+        # fonksiyon alfasayı olmayan karakterleri (alt çizgi dahil) atar.
+        # İzin listesine alt çizgili hâliyle yazılan bir ad HİÇBİR ZAMAN
+        # eşleşmez ve her olay sessizce düşer — bu hataya karşı düzeltildi
+        # (kayit_sayisi / uzaktan_mi bu yüzden kaydırıldı).
+        normalize = self.audit_module._normalize_field_name
+        unnormalized = sorted(
+            name for name in self.audit_module.ALLOWED_FIELD_NAMES
+            if normalize(name) != name
+        )
+        self.assertEqual(unnormalized, [])
+
+    def test_unknown_field_name_rejects_whole_event(self) -> None:
+        # Red listesi TEK BAŞINA yeterli değildi: `icerik` / `kullanici`
+        # gibi listede olmayan adlar geçer sayılıp içlerine ne konursa
+        # konsunsun düz yazılıyordu (ölçüldü: parola sızdı). Varsayılan-red
+        # (allowlist) olmadan "kasa verisi asla yazılmaz" garantisi yoktur.
+        for name in ("icerik", "kullanici", "baslik", "gizli", "kayit"):
+            with self.subTest(field=name):
+                self.assertFalse(
+                    self.audit_module.audit("sizinti", **{name: "Gizli-Sifre-42!"}))
+        raw = self.log_path.read_text(encoding="utf-8") if self.log_path.exists() else ""
+        self.assertNotIn("Gizli-Sifre-42!", raw)
+        self.assertEqual(self._raw_lines(), [])
+
+    def test_allowlist_covers_every_field_used_by_call_sites(self) -> None:
+        # app.py'deki gerçek çağrı noktalarının alan adları izin listesinde
+        # olmalı; değilse olaylar sessizce kaybolur ve günlük boş görünür.
+        import re
+        source = app_module.__file__
+        with open(source, encoding="utf-8") as handle:
+            body = handle.read()
+        used = set()
+        for match in re.finditer(r"_audit\('[^']+'([^)]*)\)", body):
+            for field in re.findall(r"(\w+)\s*=", match.group(1)):
+                used.add(field)
+        missing = sorted(
+            name for name in used
+            if not self.audit_module._is_allowed_field(name)
+        )
+        self.assertEqual(missing, [], f"İzin listesinde olmayan çağrı alanları: {missing}")
+
+    def test_every_documented_secret_name_is_rejected(self) -> None:
+        for name in ("master_password", "new_password", "token", "secret",
+                     "ciphertext", "hash", "salt", "title", "username"):
+            with self.subTest(field=name):
+                self.assertFalse(
+                    self.audit_module.audit("sirli", **{name: "deger"}))
+        self.assertEqual(self._raw_lines(), [])
+
+    def test_nested_denied_field_rejects_event(self) -> None:
+        # Üst anahtar izinli görünse de iç içe parola taşımamalı.
+        self.assertFalse(
+            self.audit_module.audit("sirli", sebep={"password": "gizli"}))
+        self.assertEqual(self._raw_lines(), [])
+
+    def test_fernet_like_values_are_masked(self) -> None:
+        # Hem Fernet BELİRTECİ (şifreli metin) hem Fernet ANAHTARI maskelenir.
+        #
+        # 🔴 "Anahtar 'g' ile başlamaz" bir ÖZELLİK DEĞİL, rastgelelik eseridir:
+        # ölçüldü (20.000 üretimde %1.61'i 'g' ile başlıyor → assert ~1/64 ihtimalle
+        # kırılıyordu). Maskeleyicinin ayırt edicisi ÖN EK DEĞİL, biçimdir
+        # (audit.py: _FERNET_KEY_RE = 43 karakter + '='). Bu yüzden anahtarı
+        # belirli olarak 'g' ile başlamayan bir değere sabitliyoruz; test artık
+        # deterministik ve maskeleme davranışını aynı güçte sınıyor.
+        token = Fernet(Fernet.generate_key()).encrypt(b"kayit").decode()
+        key = "z" + Fernet.generate_key().decode()[1:]
+        self.assertTrue(token.startswith("g"))
+        self.assertFalse(key.startswith("g"))
+        self.assertEqual(len(key), 44)
+
+        for ad, value in (("belirtec", token), ("anahtar", key)):
+            with self.subTest(deger=ad):
+                self.assertTrue(self.audit_module.audit("maskeli", sebep=value))
+                entry = self.audit_module.read_audit_log()[-1]
+                self.assertEqual(entry["sebep"], self.audit_module.AUDIT_MASKED)
+
+        raw = self.log_path.read_text(encoding="utf-8")
+        self.assertNotIn(token, raw)
+        self.assertNotIn(key, raw)
+
+    def test_long_value_is_truncated(self) -> None:
+        self.audit_module.audit("uzun", sebep="x" * 500)
+        entry = self.audit_module.read_audit_log()[-1]
+        self.assertEqual(len(entry["sebep"]),
+                         self.audit_module.AUDIT_MAX_VALUE_CHARS)
+
+    def test_log_injection_cannot_forge_extra_line(self) -> None:
+        self.audit_module.audit(
+            "enjeksiyon",
+            sebep='ilk\n[GUVENLIK] {"event": "sahte_olay", "ts": "2000-01-01"}',
+        )
+
+        # Asıl güvenlik özelliği: gömülü satır sonu TEMİZLENİR, dolayısıyla
+        # dosyada tek satır vardır ve sahte olay ayrı bir olay olarak
+        # AYRIŞTIRILAMAZ. (Değerin JSON kaçışları içinde metin olarak kalması
+        # bir sızıntı değildir; sahte günlük satırı oluşturmaz.)
+        raw = self.log_path.read_text(encoding="utf-8")
+        self.assertEqual(len(self._raw_lines()), 1)
+        self.assertEqual(self._events(), ["enjeksiyon"])
+        self.assertNotIn('"event": "sahte_olay"', raw)
+
+    # ── Okuma ────────────────────────────────────────────────────────────────
+
+    def test_read_returns_latest_in_chronological_order(self) -> None:
+        for index in range(5):
+            self.audit_module.audit(f"olay_{index}")
+
+        events = [entry["event"] for entry in self.audit_module.read_audit_log(3)]
+        self.assertEqual(events, ["olay_2", "olay_3", "olay_4"])
+
+    def test_read_skips_corrupt_lines(self) -> None:
+        self.audit_module.audit("iyi_1")
+        with open(self.log_path, "a", encoding="utf-8") as handle:
+            handle.write("{bu json degil}\n")
+        self.audit_module.audit("iyi_2")
+
+        self.assertEqual(self._events(), ["iyi_1", "iyi_2"])
+
+    def test_read_before_first_write_returns_empty(self) -> None:
+        # set_audit_log_dir dizini oluşturur ama dosya ilk yazımda açılır.
+        fresh = Path(tempfile.mkdtemp(prefix="sifrekasam-audit-yok-"))
+        self.addCleanup(shutil.rmtree, fresh, True)
+        self.assertTrue(self.audit_module.set_audit_log_dir(str(fresh)))
+        self.assertEqual(self.audit_module.read_audit_log(), [])
+
+    def test_read_with_zero_or_negative_limit_returns_empty(self) -> None:
+        self.audit_module.audit("olay")
+        self.assertEqual(self.audit_module.read_audit_log(0), [])
+        self.assertEqual(self.audit_module.read_audit_log(-5), [])
+
+    # ── Hata toleransı ───────────────────────────────────────────────────────
+
+    def test_write_failure_does_not_raise(self) -> None:
+        # Altındaki dosya akışı dışarıdan kapatılırsa emit hata fırlatır;
+        # audit() bunu yutmalı, uygulamayı düşürmemeli.
+        self.audit_module.audit("once")
+        handler = self.audit_module._handler
+        self.assertIsNotNone(handler)
+        handler.stream.close()
+
+        with self.assertLogs("kasa_core.audit", level="INFO"):
+            # İstisna YÜKSELTMEMELİ; başarısızlık False ile bildirilir.
+            self.assertFalse(self.audit_module.audit("yazilamadi"))
+
+    def test_unwritable_log_dir_does_not_break_startup(self) -> None:
+        blocker = Path(self.logs_dir) / "dosya"
+        blocker.write_text("bir dosya", encoding="utf-8")
+        # Dizin olması gereken yerde dosya var: makedirs başarısız olur.
+        self.assertFalse(
+            self.audit_module.set_audit_log_dir(str(blocker / "logs")))
+        with self.assertLogs("kasa_core.audit", level="INFO"):
+            self.assertFalse(self.audit_module.audit("yazilamadi"))
+
+    def test_audit_never_raises_on_hostile_input(self) -> None:
+        class _Explosive:
+            def __str__(self) -> str:
+                raise RuntimeError("değer üretilemiyor")
+
+        with self.assertLogs("kasa_core.audit", level="INFO"):
+            # Geçersiz olay adı: yazılmaz, istisna yok.
+            self.assertFalse(self.audit_module.audit(None))
+            self.assertFalse(self.audit_module.audit("   "))
+            self.assertFalse(self.audit_module.audit(123))
+            # __str__ hata fırlatan değer: yutulur, istisna YÜKSELMEZ.
+            self.assertFalse(self.audit_module.audit("ok", sebep=_Explosive()))
+            # Sayı/bool JSON için yerinde kalır.
+            self.assertTrue(self.audit_module.audit("ok", adet=5, toplam=1))
+        # Patlayan değerden hiçbir iz kalmadı; yalnızca geçerli olay yazıldı.
+        self.assertEqual(self._events(), ["ok"])
+
+
+class AuditLogIntegrationTests(unittest.TestCase):
+    """Uç tetiklendiğinde olayın dosyada GERÇEKTEN bulunduğu."""
+
+    MASTER = 'test-master-password'
+
+    def setUp(self) -> None:
+        from kasa_core import audit as audit_module
+
+        self.audit_module = audit_module
+        self.logs_dir = tempfile.mkdtemp(prefix="sifrekasam-audit-int-")
+        self.addCleanup(shutil.rmtree, self.logs_dir, True)
+        self.addCleanup(audit_module.set_audit_log_dir, app_module.LOGS_DIR)
+        self.assertTrue(audit_module.set_audit_log_dir(self.logs_dir))
+        self.log_path = Path(self.logs_dir) / audit_module.AUDIT_FILE_NAME
+
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized',
+                        'lan_enabled'):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module._clear_lan_access_settings()
+            app_module.db.session.commit()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key='master_hash',
+                value=app_module.hash_master_password(cls.MASTER)))
+            app_module.db.session.add(app_module.Setting(
+                key='pbkdf2_salt_b64', value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key='vault_initialized', value='true'))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _extract_csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None, "CSRF token bulunamadı"
+        return match.group(1)
+
+    def _local_login(self) -> None:
+        token = self._extract_csrf(
+            self.client.get('/login').get_data(as_text=True))
+        response = self.client.post('/login', data={
+            'master_password': self.MASTER, 'csrf_token': token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _session_csrf(self) -> str:
+        with self.client.session_transaction() as flask_session:
+            return flask_session["csrf_token"]
+
+    def _enable_lan(self) -> None:
+        response = self.client.post(
+            '/save_settings', data={'lan_enabled': '1'},
+            headers={
+                'X-App-Token': app_module.APP_TOKEN,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def _lan_login(self, remote: str = '192.168.1.50'):
+        """LAN oturumu açar. LAN istemcileri ana şifreyle GİREMEZ; ayrı üretilen
+        LAN erişim şifresiyle girerler (bkz. app.py login())."""
+        lan_client = _new_test_client()
+        token = self._extract_csrf(lan_client.get(
+            '/login', environ_base={'REMOTE_ADDR': remote}).get_data(as_text=True))
+        response = lan_client.post(
+            '/login',
+            data={'master_password': self._lan_password(), 'csrf_token': token},
+            environ_base={'REMOTE_ADDR': remote},
+        )
+        self.assertEqual(response.status_code, 302)
+        return lan_client
+
+    def _lan_password(self) -> str:
+        data = self.client.get(
+            '/api/lan-info', headers={'X-App-Token': app_module.APP_TOKEN},
+        ).get_json()
+        return data['lan_password']
+
+    def _events(self) -> list[str]:
+        return [entry["event"] for entry in self.audit_module.read_audit_log()]
+
+    def _raw(self) -> str:
+        return (self.log_path.read_text(encoding="utf-8")
+                if self.log_path.exists() else "")
+
+    def test_lan_export_attempt_is_audited_on_403(self) -> None:
+        self._local_login()
+        self._enable_lan()
+        lan_client = self._lan_login()
+
+        response = lan_client.get(
+            '/export', environ_base={'REMOTE_ADDR': '192.168.1.50'})
+        self.assertEqual(response.status_code, 403)
+
+        entries = self.audit_module.read_audit_log()
+        blocked = [e for e in entries if e['event'] == 'lan_aktarim_reddedildi']
+        self.assertTrue(blocked, f"olay günlükte yok: {entries}")
+        self.assertEqual(blocked[-1]['uc'], 'export_data')
+
+    def test_failed_local_login_is_audited_without_password(self) -> None:
+        token = self._extract_csrf(
+            self.client.get('/login').get_data(as_text=True))
+        wrong = 'yanlis-ana-sifre-1234'
+        with _silence_logs():
+            response = self.client.post('/login', data={
+                'master_password': wrong,
+                'csrf_token': token,
+            })
+        # Yerel hatalı giriş, hata mesajıyla login sayfasını 200 ile döndürür
+        # (429 yalnızca kilit oluştuğunda). Önemli olan: oturum AÇILMAMIŞ olması.
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('data-retry-after="0"', response.get_data(as_text=True))
+
+        entries = self.audit_module.read_audit_log()
+        failed = [e for e in entries if e['event'] == 'giris_basarisiz']
+        self.assertTrue(failed, f"olay günlükte yok: {entries}")
+        self.assertEqual(failed[-1]['kanal'], 'yerel')
+        self.assertNotIn(wrong, self._raw())
+        self.assertNotIn(self.MASTER, self._raw())
+
+    def test_failed_lan_login_is_audited(self) -> None:
+        self._local_login()
+        self._enable_lan()
+        lan_client = _new_test_client()
+        remote = '192.168.1.55'
+        token = self._extract_csrf(lan_client.get(
+            '/login', environ_base={'REMOTE_ADDR': remote}).get_data(as_text=True))
+        with _silence_logs():
+            response = lan_client.post('/login', data={
+                'master_password': 'lan-yanlis-sifre', 'csrf_token': token,
+            }, environ_base={'REMOTE_ADDR': remote})
+        self.assertEqual(response.status_code, 401)
+
+        failed = [e for e in self.audit_module.read_audit_log()
+                  if e['event'] == 'giris_basarisiz']
+        self.assertTrue(failed)
+        self.assertEqual(failed[-1]['kanal'], 'lan')
+        self.assertNotIn('lan-yanlis-sifre', self._raw())
+
+    def test_lock_and_logout_are_audited(self) -> None:
+        self._local_login()
+        self.assertEqual(self.client.post('/lock', headers={
+            'X-CSRF-Token': self._session_csrf()}).status_code, 200)
+        self.assertIn('kasa_kilitlendi', self._events())
+
+        self._local_login()
+        self.assertEqual(self.client.get('/logout').status_code, 302)
+        self.assertIn('cikis', self._events())
+
+    def test_successful_login_is_not_audited_with_password(self) -> None:
+        self._local_login()
+        raw = self._raw()
+        self.assertNotIn(self.MASTER, raw)
+
+    def test_scope_audit_record_content_never_reaches_the_log(self) -> None:
+        """Kapsam denetimi: kayıt başlığı ve şifresi günlüğe GİRMEZ."""
+        self._local_login()
+        fernet = Fernet(Fernet.generate_key())
+        title = 'KISISIL-BASLIK-1234'
+        password = 'KISISIL-SIFRE-9876'
+        with patch.object(app_module, "get_fernet", return_value=fernet), \
+                patch.object(app_module, "backup_database"), \
+                patch.object(app_module, "invalidate_vault_report_cache"):
+            response = self.client.post('/ekle', data={
+                'kayit_tipi': 'Website',
+                'kategori': 'Genel',
+                'isim': title,
+                'website_url': 'https://kisisil-ornek.example',
+                'login': 'kisisil-kullanici',
+                'email': 'kisisil@ornek.example',
+                'password': password,
+                'comment': 'kisisil-not',
+                'expiry_date': '',
+            }, headers={
+                'X-App-Token': app_module.APP_TOKEN,
+                'X-CSRF-Token': self._session_csrf(),
+            })
+        self.assertEqual(response.status_code, 302)
+
+        raw = self._raw()
+        # Olay YAZILDI (akış denetimi anlamlı olsun) ama içerik sızmadı.
+        self.assertIn('kayit_olusturuldu', self._events())
+        for secret in (title, password, 'kisisil-kullanici',
+                       'kisisil@ornek.example', 'kisisil-not',
+                       'kisisil-ornek.example'):
+            self.assertNotIn(secret, raw, f"günlüğe sızdı: {secret}")
+
+
+class VaultIsolationGuardTests(unittest.TestCase):
+    """Test paketi ASLA gerçek kasa dizinine dokunmamalı.
+
+    Bu koruma bir hatadan sonra eklendi: teşhis için yazılan geçici bir script
+    gerçek APPDATA'yı kullanarak kasanın ayarlarını sildi ve master_hash'i
+    değiştirdi. Testler kendi geçici dizinlerini kullansa da, aynı modülü
+    elle içe aktaran bir betik aynı hatayı tekrarlayabilir. Bu yüzden
+    doğrulama burada yapılır: modülün gördüğü kasa yolu geçici dizin değilse
+    test paketi daha başlamadan hata verir.
+    """
+
+    def test_module_uses_temporary_data_dir(self) -> None:
+        from kasa_core.paths import get_data_dir
+
+        data_dir = Path(get_data_dir()).resolve()
+        runtime = RUNTIME_DIR.resolve()
+        # Kasa dizini geçici dizinin ALTINDA olmalı (get_data_dir sonuna
+        # '.SifrekasamV2' ekler). Üstünde veya dışında olması sızıntı demek.
+        self.assertEqual(
+            data_dir.parent, runtime,
+            f"Testler gerçek kasa dizinini kullanıyor: {data_dir}. "
+            f"Beklenen: {runtime}. Bu, gerçek kasanın bozulmasına yol açar.",
+        )
+        # Gerçek kasa dizinini kullanıcı adına bakmadan tespit et: gerçek
+        # APPDATA yolu, bu dosyada APPDATA'yı geçici dizine çevirmeden ÖNCE
+        # kaydedilmiş olmalı.
+        self.assertNotEqual(
+            data_dir, REAL_VAULT_DIR,
+            f"Testler gerçek kasa dizinini kullanıyor: {data_dir}. "
+            f"Gerçek kasa: {REAL_VAULT_DIR}",
+        )
+
+    def test_real_vault_files_untouched(self) -> None:
+        """Geçici dizinin dışında kasa veritabanı oluşmuşsa hata ver."""
+        runtime = RUNTIME_DIR.resolve()
+        leaked = [
+            str(p) for p in RUNTIME_DIR.glob('**/sifreler.db')
+            if not str(p.resolve()).startswith(str(runtime))
+        ]
+        self.assertEqual(leaked, [], f"Test içinde kasa dosyası oluştu: {leaked}")
+
+
+class EntryShellTests(unittest.TestCase):
+    """Giriş kabuğu: login.html + loading.html ortak kabuğu (2026-10).
+
+    İki ekran aynı kabuğu kullanır; kabuk `static/entry-shell.css` içinde tek
+    yerde tanımlıdır. Ayrıca loading.html `file://` üzerinden düz metin
+    açıldığı için İÇİNDE Jinja bulunmamalıdır — bulunduğunda ilk <script>
+    bloğu bir JS sözdizimi hatasına dönüşür ve temanın/camın/metin çevirisinin
+    tamamı ölür (yaşanan buydu).
+    """
+
+    TEMPLATES = FLASK_APP_DIR / "templates"
+    STATIC = FLASK_APP_DIR / "static"
+
+    def _read_template(self, name: str) -> str:
+        return (self.TEMPLATES / name).read_text(encoding="utf-8")
+
+    @staticmethod
+    def _without_html_comments(html: str) -> str:
+        """Yorumlar içindeki örnek kod taramayı bozuyor (aynı hata security_lint'i de
+        yakalıyordu: yorum içindeki bir `<script>` etiketi nonce'suz sayılıyor)."""
+        return re.sub(r"<!--.*?-->", "", html, flags=re.S)
+
+    def _script_blocks(self, name: str) -> str:
+        html = self._without_html_comments(self._read_template(name))
+        return "\n".join(re.findall(r"<script\b[^>]*>(.*?)</script>", html, flags=re.S))
+
+    def test_shell_css_exists_and_is_wired(self) -> None:
+        self.assertTrue((self.STATIC / "entry-shell.css").exists())
+        base = self._read_template("base.html")
+        self.assertIn("entry-shell.css') }}?v=1", base)
+        # glass.css cascade'de en üstte → kabuk ondan ÖNCE yüklenmeli.
+        self.assertLess(base.index("entry-shell.css"), base.index("filename='glass.css'"))
+        # Kabuk yalnız login.html/loading.html'de kullanılır; SW precache'i
+        # yalnız sürümsüz isteklenen dosyaları içerir (sürümlü CSS/JS ilk
+        # kullanımda ağdan gelip cache'a yazılır) → burada ARANMAMALIDIR.
+        self.assertNotIn('filename="entry-shell.css"', self._read_template("sw.js"))
+
+    def test_loading_html_has_no_jinja_inside_script(self) -> None:
+        """file:// yolunda Jinja çalışmaz → literal ifade tüm bloğu öldürür."""
+        scripts = self._script_blocks("loading.html")
+        self.assertTrue(scripts.strip(), "loading.html script bulunamadı — ayrıştırma bozuk")
+        for marker in ("{{", "{%"):
+            self.assertNotIn(
+                marker, scripts,
+                f"loading.html script içinde {marker} var; file:// yolunda "
+                "sözdizimi hatası olur ve script tamamen çalışmaz.")
+
+    def test_loading_html_has_no_jinja_url_helper(self) -> None:
+        """url_for yalnız Flask render'ında çalışır; file:// yolunda literal kalır."""
+        clean = self._without_html_comments(self._read_template("loading.html"))
+        self.assertNotIn("url_for(", clean)
+
+    def test_loading_html_asset_paths_are_relative(self) -> None:
+        """../static/ her iki bağlamda da çözülür (file:// ve GET /loading)."""
+        html = self._read_template("loading.html")
+        self.assertIn('href="../static/entry-shell.css?v=1"', html)
+        self.assertIn('src="../static/liquid-glass.js?v=5"', html)
+
+    def test_loading_html_keeps_token_out_of_script(self) -> None:
+        html = self._read_template("loading.html")
+        self.assertIn('data-csrf-token="{{ csrf_token', html)
+        self.assertIn("document.body.dataset.csrfToken", self._script_blocks("loading.html"))
+
+    def test_shell_css_is_single_source_for_both_screens(self) -> None:
+        """Eski entry-login-* kabuğu iki şablonda iki kez tanımlıydı ve kaymıştı."""
+        for name in ("login.html", "loading.html"):
+            html = self._read_template(name)
+            self.assertNotIn(
+                "entry-login-", html,
+                f"{name} hâlâ eski kabuk sınıflarını kullanıyor; CSS tek yerde.")
+            self.assertIn("entry-shell-wrap", html)
+
+    def test_login_html_has_no_inline_style_block(self) -> None:
+        """Kabuk CSS'i entry-shell.css'e taşındı; satır içi CSS kalması kaymaya yol açar."""
+        html = self._read_template("login.html")
+        self.assertNotIn("<style", html)
+        self.assertIn('class="entry-shell-wrap"', html)
+        self.assertIn("entry-shell-facts", html)
+
+    def test_login_facts_replace_marketing_copy(self) -> None:
+        """Reklam metni yerine işe yarayan bilgi: sürüm / son yedek / LAN.
+
+        2026-10 ikinci turunda "Veri klasörü" ve "Boş alan" satırları KALDIRILDI
+        (kullanıcı kararı): mutlak yol kullanıcı adını öne çıkarıyordu, disk
+        alanı ise kullanıcıya bir şey söylemiyordu. Alt bilgi artık üç satır.
+        Boş alan bilgisi İLK KURULUM rehberinde yaşıyor (orada gerçekten
+        karar verdirir: kurulumu engeller)."""
+        html = self._read_template("login.html")
+        self.assertNotIn("kapı açılana kadar", html)
+        self.assertNotIn("entry-login-title", html)
+
+        footer = html[html.find('<footer class="entry-shell-meta">'):]
+        self.assertGreater(len(footer), 200, "alt bilgi bloğu bulunamadı")
+        for key in ("Sürüm", "Son Yedek", "LAN bağlantısı"):
+            self.assertIn(f"_('{key}')", footer, f"alt bilgi satırı eksik: {key}")
+        # Kaldırılan satırlar alt bilgide olmamalı.
+        self.assertNotIn("_('Veri klasörü')", footer)
+        self.assertNotIn("_('Boş alan')", footer)
+        self.assertNotIn("facts.data_dir", footer)
+        self.assertNotIn("facts.free_gb", footer)
+        # …ama ilk kurulum rehberinde boş alan + klasör bilgisi KORUNUR.
+        guide = html[: html.find('<footer class="entry-shell-meta">')]
+        self.assertIn("_('Boş alan')", guide)
+        self.assertIn("setup_info.path", guide)
+
+        self.assertIn("v{{ APP_VERSION }}", html)
+        self.assertIn("{% set facts = entry_facts() %}", html)
+        # Hissedilen satır TEK yerel bayrağıyla toplanır: LAN istemciye basılmaz.
+        self.assertIn("{% if facts.is_local %}", footer)
+        # "Henüz yedek alınmadı" dalı: yedek yoksa satır gizlenmez, uyarılır.
+        self.assertIn("_('Henüz yedek alınmadı')", html)
+        self.assertIn("facts.backup_stale", html)
+        self.assertNotIn("Veri konumu", html)
+
+    def test_login_preserves_required_functionality(self) -> None:
+        html = self._read_template("login.html")
+        for marker in (
+            'id="login-language-select"',
+            'id="login-error-alert"',
+            'data-retry-template=',
+            'id="first-setup-guidance"',
+            'id="master-password"',
+            'id="master-password-confirm"',
+            'id="password-match-feedback"',
+            'data-loading-form',
+            "setup_blocked",
+            "lan_client",
+        ):
+            self.assertIn(marker, html, f"login.html işlevi kayboldu: {marker}")
+
+    def test_entry_shell_is_opaque_when_glass_off(self) -> None:
+        css = (self.STATIC / "entry-shell.css").read_text(encoding="utf-8")
+        clean = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        match = re.search(
+            r'data-glass-effects="off"\]\s*\.entry-shell\b[^{}]*\{([^{}]*)\}', clean)
+        self.assertIsNotNone(match, "entry-shell.css'te entry-shell glass-off kurali yok")
+        self.assertIn("0.96", match.group(1))
+        self.assertIn("rgba(255, 255, 255, 0.96)", clean)
+
+    def test_entry_facts_hide_everything_from_lan_clients(self) -> None:
+        """Alt bilgi YALNIZCA yerel: mutlak yol kullanıcı adını içerir, yedek
+        tarihi ve disk alanı ise kasa kullanımını ele verir.
+
+        🔴 Şema SABİT OLMALI. Uzak istekte `{}` dönmek Jinja'da `Undefined`
+        üretir ve `{% if x is not none %}` denetimini YANLIŞLIKLA geçirip
+        500'e düşürür (yaşanan buydu). Bu yüzden uzakta da tüm anahtarlar
+        bulunur, yalnız değerler boştur."""
+        source = (FLASK_APP_DIR / "app.py").read_text(encoding="utf-8")
+        body = self._entry_facts_body(source)
+        self.assertIn("has_request_context() or not _is_local_request()", body)
+        self.assertIn("'is_local': False", body)
+        for key in ("is_local", "backup_age_days", "backup_date", "backup_stale"):
+            self.assertIn(f"'{key}':", body, f"uzak semasında eksik anahtar: {key}")
+        # Kaldırılan alanlar bir daha üretilmemeli (sızıntı yüzeyi genişlemesin).
+        for gone in ("data_dir", "data_dir_short", "free_gb"):
+            self.assertNotIn(f"'{gone}':", body, f"kaldırılan alan geri geldi: {gone}")
+        self.assertIn("'entry_facts':", source)
+        self.assertNotIn("_entry_data_dir", source)
+        self.assertNotIn("_short_data_dir", source)
+        # Şablon yalnız is_local bayrağına güveniyor.
+        html = self._read_template("login.html")
+        self.assertNotIn("facts.data_dir", html)
+        self.assertNotIn("facts.free_gb", html)
+        self.assertIn("{% if facts.is_local %}", html)
+
+    def test_entry_facts_is_read_only(self) -> None:
+        """Giriş ekranı OKUMALIDIR. get_storage_status() içindeki
+        _probe_writable() her çağrıda veri klasörüne geçici dosya yazıp siler;
+        entry_facts() onu kullanmamalı. backups/ dizini de YOKSA klasör
+        yaratılmamalı (mkdir yan etkisi) — bu yüzden os.path.isdir kontrolü
+        önce gelir ve listdir yalnız mevcutsa çağrılır."""
+        source = (FLASK_APP_DIR / "app.py").read_text(encoding="utf-8")
+        body = self._entry_facts_body(source)
+        self.assertNotIn("_probe_writable", body)
+        self.assertNotIn("get_storage_status", body)
+        self.assertIn("os.path.isdir(backup_dir)", body)
+        self.assertIn("os.listdir(backup_dir)", body)
+        self.assertIn(".kasaenc", body)
+        self.assertNotIn("mkdir", body)
+        # Disk kullanımı ölçülmüyor: satır kaldırıldı, syscall de kalktı.
+        self.assertNotIn("disk_usage", body)
+        # backups_dir() yerine doğrudan yol birleştirme (o fonksiyon mkdir yapar).
+        self.assertNotIn("backups_dir(", body)
+
+    @staticmethod
+    def _entry_facts_body(source: str) -> str:
+        """entry_facts() gövdesi; docstring ve yorumlar ayıklanır.
+
+        Docstring bu fonksiyonda `_probe_writable` ve `get_storage_status`
+        adlarını ANLATMAK için geçiyor — yorumları ayıklamazsak 'kullanılmıyor'
+        denetimi yanlış pozitif verir.
+        """
+        start = source.find("def entry_facts()")
+        end = source.find("\ndef ", start + 10)
+        body = source[start:end if end > 0 else len(source)]
+        return re.sub(r'""".*?"""', "", body, flags=re.S)
+
+
+class GeneratorWiringTests(unittest.TestCase):
+    """Şifre üreticinin "ürettiği şifreyi nereye yazıyor" bağlantısı (2026-10).
+
+    `setupPasswordGenerator(containerId, prefixId)` hedef alanı
+    `container.dataset.targetInput`'tan okur. Bu öznitelik yoksa `targetInput`
+    null'a düşer, `commit()` ilk satırda `if (targetInput)` ile sessizce
+    geçer ve şifre HİÇBİR YERE yazılmaz — kullanıcı "Üret"e basar, hiçbir şey
+    olmaz. Ölçülen hata buydu: modal (`#passwordGeneratorModal`) yalnız
+    index.html'de bulunur, index'de `#page-password` yoktur ve eski kod
+    sessiz `'page-password'` fallback'ine düşüyordu.
+    """
+
+    TEMPLATES = FLASK_APP_DIR / "templates"
+    STATIC = FLASK_APP_DIR / "static"
+    GENERATOR_JS = STATIC / "password-generator.js"
+
+    def _js(self) -> str:
+        return self.GENERATOR_JS.read_text(encoding="utf-8")
+
+    def _containers(self) -> list[str]:
+        js = self._js()
+        found = re.findall(r"setupPasswordGenerator\(\s*'([^']+)'\s*,", js)
+        self.assertGreaterEqual(len(found), 2, "setupPasswordGenerator cagrisi bulunamadi")
+        return found
+
+    def test_generator_js_has_no_silent_fallback(self) -> None:
+        js = self._js()
+        self.assertNotIn(
+            "container.dataset.targetInput || 'page-password'", js,
+            "sessiz fallback geri geldi: data-target-input yoksa hatayi gizle")
+        self.assertIn("generatorMiswired", js,
+                      "kablolama hatasi isaretlenmiyor")
+
+    def test_every_generator_container_declares_target_input(self) -> None:
+        templates = "\n".join(
+            p.read_text(encoding="utf-8")
+            for p in self.TEMPLATES.rglob("*.html")
+        )
+        for container_id in self._containers():
+            pattern = re.compile(
+                r'id="' + re.escape(container_id) + r'"[^>]*data-target-input="([^"]+)"')
+            match = pattern.search(templates)
+            self.assertIsNotNone(
+                match,
+                f'"{container_id}" konteynerinde data-target-input yok -> '
+                "uretilen sifre hicbir alana yazilmaz")
+            target = match.group(1)
+            self.assertIn(
+                f'id="{target}"', templates,
+                f'"{container_id}" data-target-input="{target}" ama bu id yok')
+
+    def test_generator_prefix_ids_exist(self) -> None:
+        """$('x') → '{prefix}x' ile türetilen id'ler şablonda olmalı.
+
+        Uzunluk kontrolü HER iki konteynerde de zorunlu (init'te
+        `syncLengthControl()` okur). "Üret" butonu yalnız modalda vardır: satır içi
+        panelde üretim şifre alanındaki `#page-regenerate-btn` ile tetiklenir,
+        bu yüzden `generateBtn?.` null-safe yazılmıştır. Entropi/kırılma
+        süresi göstergeleri de yalnız modalda vardır (`updateEntropyUI` null-safe).
+        """
+        js = self._js()
+        templates = "\n".join(
+            p.read_text(encoding="utf-8")
+            for p in self.TEMPLATES.rglob("*.html")
+        )
+        for container_id, prefix in re.findall(
+                r"setupPasswordGenerator\(\s*'([^']+)'\s*,\s*'([^']*)'", js):
+            self.assertGreaterEqual(len(container_id), 1)
+            for suffix in ("length", "length-display"):
+                self.assertIn(
+                    f'id="{prefix}{suffix}"', templates,
+                    f"{container_id}: uzunluk kontrolu eksik -> {prefix}{suffix}")
+            if container_id == 'passwordGeneratorModal':
+                for suffix in ("gen-now", "entropy-bits", "crack-time"):
+                    self.assertIn(
+                        f'id="modal-{suffix}"', templates,
+                        f"modal icin eksik id: modal-{suffix}")
+            else:
+                self.assertNotIn(
+                    f'id="{prefix}gen-now"', templates,
+                    f"{container_id} icin 'Uret' butonu olmamali; "
+                    "uretim #page-regenerate-btn ile tetiklenir")
+
+    def test_modal_generator_targets_its_own_display(self) -> None:
+        modal = (self.TEMPLATES / "partials" / "modals" / "generator.html").read_text(
+            encoding="utf-8")
+        self.assertIn('data-target-input="modal-generated-password-display"', modal)
+        self.assertIn('id="modal-generated-password-display"', modal)
+
+    def test_inline_generator_targets_password_field(self) -> None:
+        panel = (self.TEMPLATES / "partials" / "form" / "panel-access.html").read_text(
+            encoding="utf-8")
+        self.assertIn('id="pageGenerator"', panel)
+        self.assertIn('data-target-input="page-password"', panel)
+        self.assertIn('id="page-password"', panel)
+
+
+class ServiceWorkerCacheTests(unittest.TestCase):
+    """Service worker'ın statik varlık stratejisi (2026-10).
+
+    Ölçülen sorun: `GET /login?entry=loading` sunucuda **14 ms** sürüyordu; asıl
+    maliyet 21 render-blocking stylesheet (~617 KB). SW bu dosyalar için
+    NETWORK-FIRST kullanıyordu → her açılışta 21 istek ağdan geliyor, ve
+    loading.html → /login belge değişimi sırasında yeni belge ilk boyasını
+    yapana kadar pencere boş zemin gösteriyordu.
+
+    Beklenen sözleşme:
+      * `/static/*` → stale-while-revalidate (cache'ten anında dön)
+      * cache anahtarı **yol** (sorgu dizesi `?v=` HARİÇ) — ASSETS listesi
+        `?v=`'siz precache'liyor, sayfa `?v=`'li istek atıyor; tam URL
+        anahtarı ikisini asla eşleştiremezdi
+      * HTML gezinmeleri + /api/ + /settings/ ASLA cache'lenmez (gövdede CSRF
+        belirteci ve nonce'lu CSP var)
+      * /api/background/ görselleri SW cache'ine girmez
+    """
+
+    SW = FLASK_APP_DIR / "templates" / "sw.js"
+
+    def _sw(self) -> str:
+        return self.SW.read_text(encoding="utf-8")
+
+    def test_static_assets_are_stale_while_revalidate(self) -> None:
+        sw = self._sw()
+        self.assertIn("function staleWhileRevalidate(request)", sw)
+        # Ağ kritik yolda OLMAMALI: cache'te varsa hemen dön.
+        self.assertIn("if (cached) return cached;", sw)
+        self.assertIn("url.pathname.startsWith('/static/')", sw)
+
+    def test_no_network_first_for_static(self) -> None:
+        sw = self._sw()
+        self.assertNotIn(
+            "url.pathname.endsWith('.css') || url.pathname.endsWith('.js')",
+            sw,
+            "network-first static dala donuldu — her acilista 21 istek aga gider")
+
+    def test_cache_key_keeps_version_query(self) -> None:
+        """`?v=` bir sürüm imzasıdır: cache anahtarı bunu KORUMALI (düz yola
+        indirgemek `?v=` artırmayı etkisizleştirir ve kullanıcıya bayat dosya
+        servis eder)."""
+        sw = self._sw()
+        self.assertIn("function cacheKeyFor(url)", sw)
+        self.assertIn("return new Request(url);", sw)
+        self.assertNotIn("new URL(url).pathname", sw,
+                         "cache anahtari yola indirgenmis: ?v= etkisiz")
+        self.assertIn("cache.match(key, { ignoreVary: true })", sw)
+        self.assertIn("cache.put(key, res.clone())", sw)
+        self.assertNotIn("cache.put(req", sw, "cache anahtari normalize degil")
+        self.assertNotIn("cache.put(request", sw, "cache anahtari normalize degil")
+
+    def test_precache_contains_only_unversioned_assets(self) -> None:
+        """Install precache yalnizca surumsuz isteklenen dosyalari icermeli.
+
+        Surumlu CSS/JS ilk kullanimda agdan gelir; cache anahtari surum
+        sorgusunu korudugu icin surumsuz bir precache kaydi asla eslesmezdi.
+        """
+        sw = self._sw()
+        self.assertIn("const PRECACHE = [", sw)
+        self.assertNotIn("const ASSETS = [", sw)
+        self.assertNotRegex(sw, r'filename="[^"]+\?v=')
+        block = sw[sw.find("const PRECACHE = ["):sw.find("];", sw.find("const PRECACHE = ["))]
+        for asset in ("all.min.css", "fonts/sora.woff2", "icons/icon-512.svg"):
+            self.assertIn(asset, block)
+        # Sürümlü dosyalar precache'te OLMAMALI (ölü 800 KB).
+        for asset in ("tokens.css", "app.js", "glass.css", "entry-shell.css"):
+            self.assertNotIn(asset, block, f"{asset} surumlu; precache'te olamaz")
+
+    def test_html_and_api_are_never_cached(self) -> None:
+        sw = self._sw()
+        for marker in ("req.mode === 'navigate'",
+                       "url.pathname.startsWith('/api/')",
+                       "url.pathname.startsWith('/settings/')"):
+            self.assertIn(marker, sw)
+        # Bu dallar staleWhileRevalidate kullanmamalı.
+        handler = sw[sw.find("self.addEventListener('fetch'"):]
+        blocked = handler[:handler.find("url.pathname.startsWith('/static/')")]
+        self.assertNotIn("staleWhileRevalidate", blocked)
+
+    def test_background_images_bypass_cache(self) -> None:
+        sw = self._sw()
+        self.assertIn("BG_URL_PREFIX", sw)
+        handler = sw[sw.find("self.addEventListener('fetch'"):]
+        self.assertIn("url.pathname.startsWith(BG_URL_PREFIX)", handler)
+
+    def test_cache_name_and_precache_list(self) -> None:
+        sw = self._sw()
+        self.assertIn("assets-v209", sw)
+        block = sw[sw.find("const PRECACHE = ["):sw.find("];", sw.find("const PRECACHE = ["))]
+        for asset in ("all.min.css", "sweetalert2.min.css", "toastify.min.css",
+                      "sweetalert2.all.min.js", "toastify.min.js",
+                      "fonts/sora.woff2", "fonts/jetbrains-mono.woff2"):
+            self.assertIn(asset, block)
+
+
+class TooltipAnchorTests(unittest.TestCase):
+    """Tasarım tooltip balonu: hizalama ve "asılı kalmama" (2026-10).
+
+    Kullanıcı raporları:
+      * Anasayfa butonlarında balon ORTASINDAN değil, hafif SAĞINDAN çıkıyordu.
+        Sebep: konum her zaman metin çapasına göre hesaplanıyordu; ikonu solda
+        olan bir butonda ("<i>…</i>Yenile") metin kutu sağa kaydığı için
+        balon butonun ortasından kayıyordu.
+      * Bildirim düğmesine gelince panel açılıyor ama tooltip GÖRÜNMEYE DEVAM
+        EDİYORDU. `mouseout` tetiklenmiyor (imleç düğmenin üstünde kalıyor) ve
+        balonu yalnızca mouseout/focusout/scroll kapatıyordu.
+    """
+
+    STATIC = FLASK_APP_DIR / "static"
+    APP_JS = STATIC / "app.js"
+
+    def _js(self) -> str:
+        return self.APP_JS.read_text(encoding="utf-8")
+
+    def test_controls_anchor_to_box_center(self) -> None:
+        js = self._js()
+        self.assertIn(
+            "const anchorX = (el) => {", js,
+            "ayri bir kontrol/metin capa ayrimi yok")
+        self.assertIn("if (isControl(el)) return rect.left + rect.width / 2;", js,
+                      "denetimlerde balon kutu ortasina hizalanmali")
+        self.assertIn("anchorX(target) - w / 2", js,
+                      "position() hala textAnchorX kullaniyor")
+
+    def test_panel_open_hides_tooltip(self) -> None:
+        js = self._js()
+        # Dropdown tetikleyicisi (bildirim + ayarlar menüsü) ve modal açılışı.
+        self.assertIn("let hideTooltip = () => {};", js)
+        self.assertIn("hideTooltip = hide;", js, "hideTooltip geri cagrilabilir degil")
+        trigger = js[js.find("trigger.addEventListener('click'"):]
+        trigger = trigger[:trigger.find("});", trigger.find("stopPropagation()"))]
+        self.assertIn("hideTooltip();", trigger,
+                      "dropdown acilinda balon kapatilmiyor")
+
+    def test_modal_open_hides_tooltip(self) -> None:
+        js = self._js()
+        block = js[js.find("kasa:modal-opened"):]
+        block = block[:block.find("});")]
+        self.assertIn("hideTooltip();", block, "modal acilinda balon kapatilmiyor")
+
+    def test_tooltip_self_heals_when_pointer_leaves(self) -> None:
+        """Portal menü açılması gibi mouseout ÜRETMEYEN durumlarda balon
+        ekranda asılı kalıyordu; pointer konumu her frame doğrulanıyor."""
+        js = self._js()
+        self.assertIn("document.addEventListener('mousemove'", js)
+        self.assertIn("document.elementFromPoint(", js)
+        self.assertIn("node.contains(el) || el.contains(node)", js)
+        self.assertIn("if (_ttPending) { _ttPending = null;", js)
+
+
+class CardFilterRevealTests(unittest.TestCase):
+    """Arama sonrasi kartlarin "once camsiz, sonra camli" belirtisi (2026-10).
+
+    OLCULEN KOK NEDEN: sayfa-1 disindaki kartlar sablonda `hidden` dogar
+    (card-grid.html: `{% if loop.index0 >= card_page_size %}hidden{% endif %}`) —
+    yani `display:none`. Arama onlari gorunur yaptiginda display:none -> block
+    gecisi olur; Chromium backdrop-filter katmanini yeniden kurar ve ilk karede
+    ornekleme yapmadan boyar. `.vault-card-shell` cami SAF CSS'ten alir
+    (`backdrop-filter: var(--glass-blur)`) ve `.glass` sinifi tasimaz, yani
+    liquid-glass.js bu yolda devrede degildir.
+
+    COZUM: gorunurluk ANINDA acilir (eski `requestAnimationFrame(() => hidden =
+    false)` bir kare daha camsiz ekran uretiyordu) ve opaklik 0'dan baslayan
+    180ms'lik giris animasyonuyla oynatilir. Bulaniklasma 1-2 karede (~32 ms)
+    tamamlandigi icin kart belirgin hale gelmeden cam hazir olur.
+
+    NOT: `card-animated` (cardSlideIn) YALNIZCA ilk yuklemede oynatilir
+    (vault-index.js `finishInitialReveal`, 650ms sonra sinif kaldirilir) ve
+    transform icerdigi icin ayni Chromium sorununu yaratirdi; arama yolunda
+    zaten oynamiyordu.
+    """
+
+    STATIC = FLASK_APP_DIR / "static"
+    PARTIALS = FLASK_APP_DIR / "templates" / "partials"
+
+    def _cards_css(self) -> str:
+        return (self.STATIC / "cards.css").read_text(encoding="utf-8")
+
+    def _index_js(self) -> str:
+        return (self.STATIC / "vault-index.js").read_text(encoding="utf-8")
+
+    def _set_card_visible(self) -> str:
+        js = self._index_js()
+        start = js.find("const setCardVisible = (wrapper, visible")
+        self.assertGreater(start, -1, "setCardVisible bulunamadi")
+        end = js.find("\n    };", start)
+        return js[start:end]
+
+    def test_cards_start_hidden_beyond_first_page(self) -> None:
+        grid = (self.PARTIALS / "card-grid.html").read_text(encoding="utf-8")
+        self.assertIn("{% if loop.index0 >= card_page_size %}hidden{% endif %}", grid)
+
+    def test_card_shell_blur_comes_from_css_not_js(self) -> None:
+        """Kart cami saf CSS; JS yolu devrede degil (aksi halde tani degisir)."""
+        css = self._cards_css()
+        shell = list(re.finditer(r"\.vault-card-shell[^{}]*\{([^{}]*)\}", css))
+        self.assertTrue(shell, ".vault-card-shell kurali yok")
+        self.assertTrue(
+            any("backdrop-filter" in m.group(1) and "var(--glass-blur" in m.group(1)
+                for m in shell),
+            ".vault-card-shell backdrop-filter almiyor")
+        liquid = (self.STATIC / "liquid-glass.js").read_text(encoding="utf-8")
+        self.assertIn(".glass:not(.vault-card-shell)", liquid)
+
+    def test_filter_reveal_css_exists(self) -> None:
+        """Sinif JS tarafinda zaten kullaniliyordu ama CSS'i HIC YOKTI (oldu kod)."""
+        css = self._cards_css()
+        self.assertIn(".card-wrapper.filter-reveal", css)
+        self.assertIn("@keyframes cardFilterReveal", css)
+        self.assertIn("opacity: 0", css)
+        self.assertIn("cardFilterReveal 180ms", css)
+        self.assertIn('html[data-kasa-animations="off"] .card-wrapper.filter-reveal', css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+
+    def test_visibility_opens_synchronously(self) -> None:
+        """rAF gecikmesi bir kare daha camsiz ekran uretiyordu."""
+        js = self._index_js()
+        self.assertNotIn(
+            "requestAnimationFrame(() => { wrapper.hidden = false; })", js,
+            "gorunurluk yine rAF icinde aciliyor — bir kare camsiz ekran kalir")
+        body = self._set_card_visible()
+        self.assertIn("wrapper.hidden = false;", body)
+        # hidden=false, sinif eklemeden ONCE gelmeli.
+        self.assertLess(
+            body.index("wrapper.hidden = false;"),
+            body.index("wrapper.classList.add('filter-reveal')"),
+            "once sinif, sonra gorunurluk: yanlis sira")
+
+    def test_filter_reveal_class_is_cleared_after_animation(self) -> None:
+        """Sinif kalirsa yeniden aramada animasyon tetiklenmez (yeniden oynatmama)."""
+        js = self._index_js()
+        self.assertIn("addEventListener('animationend'", js)
+        self.assertIn("wrapper.classList.remove('filter-reveal')", js)
+        self.assertIn("void wrapper.offsetWidth;", js)
+
+    def test_animation_respects_reduce_motion(self) -> None:
+        js = self._index_js()
+        self.assertIn("const reduceMotion = () =>", js)
+        self.assertIn("if (!animate || reduceMotion()) return;", js)
+        # shadowing olmamali: filterCards icinde ikinci bir const olmamali.
+        self.assertEqual(js.count("const reduceMotion ="), 1)
 
 
 if __name__ == "__main__":
