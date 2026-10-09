@@ -130,6 +130,16 @@
         document.documentElement.setAttribute('data-kasa-power-save', normalizedPowerSave);
         localStorage.setItem('kasa-power-save', normalizedPowerSave);
 
+        // 🔴 Pano temizleme bilerek localStorage'a YAZILMAZ. Yukarıdaki
+        // görsel ayarların hepsi kasıtlı olarak yerelde tutulur (LAN
+        // oturumunda bile yerel tercih geçerli olsun diye); pano temizleme
+        // bir savunma ayarıdır ve kullanıcı tarayıcıdan bir bayt değiştirerek
+        // devre dışı bırakamamalıdır. Değer her render'da sunucudan gelir.
+        document.documentElement.setAttribute(
+            'data-kasa-clipboard-clear',
+            "{{ CLIPBOARD_CLEAR_SECONDS if CLIPBOARD_AUTO_CLEAR_ENABLED else 'off' }}"
+        );
+
         if (!localStorage.getItem('kasa-lan-warning-dismissed')
             && {{ 'true' if LAN_WARNING_ACKNOWLEDGED else 'false' }}) {
             localStorage.setItem('kasa-lan-warning-dismissed', '1');

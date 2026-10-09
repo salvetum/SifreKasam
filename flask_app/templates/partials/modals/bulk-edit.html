@@ -1,0 +1,66 @@
+<!-- Toplu Düzenleme Modal
+     Yazılabilir alanlar backend'in beyaz listesiyle birebir aynıdır
+     (`BULK_EDIT_ACTIONS`, app.py). Buradaki her düğme bir `data-bulk-action`
+     değeri taşır ve `bulk-edit.js` yalnız sunucunun kabul ettiği değerleri
+     gönderir — yeni bir alan eklemek için frontend VE backend birlikte
+     güncellenmelidir. -->
+<div class="kasa-modal" id="bulkEditModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="bulk-edit-title">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="bulk-edit-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-pen-to-square mr-2 modal-icon-accent"></i>{{ _('Toplu Düzenle') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-sm text-kasa-text-muted mb-4"><span id="bulk-edit-count">0</span> {{ _('kayıt düzenlenecek.') }}</p>
+
+                <div class="bulk-edit-grid">
+                    <button type="button" class="kasa-btn kasa-btn-muted bulk-edit-action" data-bulk-action="pin">
+                        <i class="fa-solid fa-star mr-1"></i>{{ _('Favoriye Ekle') }}
+                    </button>
+                    <button type="button" class="kasa-btn kasa-btn-muted bulk-edit-action" data-bulk-action="unpin">
+                        <i class="fa-solid fa-star-half-stroke mr-1"></i>{{ _('Favorilerden Çıkar') }}
+                    </button>
+                    <button type="button" class="kasa-btn kasa-btn-muted bulk-edit-action" data-bulk-action="tags_add">
+                        <i class="fa-solid fa-tag mr-1"></i>{{ _('Etiket Ekle') }}
+                    </button>
+                    <button type="button" class="kasa-btn kasa-btn-muted bulk-edit-action" data-bulk-action="tags_remove">
+                        <i class="fa-solid fa-tag mr-1"></i>{{ _('Etiket Kaldır') }}
+                    </button>
+                    <button type="button" class="kasa-btn kasa-btn-muted bulk-edit-action" data-bulk-action="expiry_set">
+                        <i class="fa-solid fa-calendar-day mr-1"></i>{{ _('Son Kullanma Ayarla') }}
+                    </button>
+                    <button type="button" class="kasa-btn kasa-btn-danger bulk-edit-action" data-bulk-action="expiry_clear">
+                        <i class="fa-solid fa-calendar-xmark mr-1"></i>{{ _('Son Kullanmayı Temizle') }}
+                    </button>
+                </div>
+
+                <div class="bulk-edit-extra mt-4" id="bulk-edit-tags-wrap" hidden>
+                    <label class="sr-only" for="bulk-edit-tags-input">{{ _('Etiketler (virgülle ayrılmış)') }}</label>
+                    <input type="text" id="bulk-edit-tags-input"
+                        placeholder="{{ _('ör. iş, banka, önemli') }}"
+                        class="w-full px-3 py-2.5 kasa-field text-sm">
+                </div>
+
+                <div class="bulk-edit-extra mt-3" id="bulk-edit-expiry-wrap" hidden>
+                    <label class="sr-only" for="bulk-edit-expiry-input">{{ _('Son kullanma tarihi') }}</label>
+                    <input type="date" id="bulk-edit-expiry-input"
+                        class="w-full px-3 py-2.5 kasa-field text-sm">
+                </div>
+
+                <p class="text-xs text-kasa-text-muted mt-4 leading-loose">
+                    <i class="fa-solid fa-circle-info mr-1 text-[#38bdf8]"></i>
+                    {{ _('Parola, kayıt türü ve şifreli özel alanlar toplu olarak değiştirilemez.') }}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="kasa-btn kasa-btn-muted" data-kasa-close>{{ _('Kapat') }}</button>
+                <button type="button" class="kasa-btn kasa-btn-primary" id="bulk-edit-apply" disabled>{{ _('Uygula') }}</button>
+            </div>
+        </div>
+    </div>
+</div>

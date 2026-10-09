@@ -2,7 +2,6 @@
    RESPONSIVE / MOBILE
    ════════════════════════════════════════════════════════════════ */
 
-
 /* Wide / fullscreen layout */
 @media (min-width: 1280px) {
   .max-w-6xl {
@@ -318,7 +317,6 @@
 
   /* Generator / Ekle sayfası 480 */
   .kasa-panel .grid-cols-1.md\:grid-cols-2.gap-4 { gap: 0.5rem; }
-  .kasa-panel .flex.gap-3.pt-1 { gap: 0.4rem; }
   .kasa-panel .kasa-btn { font-size: 0.78rem; min-height: 36px; padding: 0.4rem 0.7rem; }
   .kasa-panel .text-sm { font-size: 0.72rem; }
   .generator-panel.p-4 { padding: 0.75rem !important; }

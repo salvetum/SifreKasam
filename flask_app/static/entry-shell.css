@@ -502,7 +502,6 @@ html.kasa-entry-handoff .entry-shell {
 [data-bs-theme="light"] .entry-setup-blocked { color: #b42318; }
 [data-bs-theme="light"] .entry-first-setup-warning { color: #b45309; }
 [data-bs-theme="light"] .entry-shell-note { color: #b45309; }
-[data-bs-theme="light"] .entry-language-menu { background: #ffffff; }
 
 /* ─── Şifre eşleşme geri bildirimi (yalnız login.html) ──────────────────────── */
 #password-match-feedback {

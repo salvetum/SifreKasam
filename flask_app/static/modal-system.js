@@ -6,6 +6,77 @@
  * initModalSystem, app.js içindeki DOMContentLoaded sırasında çağrılır.
  */
 
+/**
+ * Odaklanabilir öğeler. `disabled` gözden geçer: bir kartın içindeki
+ * gizli alanlar `disabled` taşıyabilir ve odak sırasına girmemeli.
+ * `aria-hidden="true"` altındakiler de alınmaz.
+ */
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+const focusableWithin = (modal) => Array.from(
+  modal.querySelectorAll(FOCUSABLE_SELECTOR)
+).filter((el) => {
+  if (el.hasAttribute('inert') || el.getAttribute('aria-hidden') === 'true') return false;
+  if (el.closest('[aria-hidden="true"]')) return false;
+  // `display:none`/gizli kapsayıcı odak sırasına katılmaz; offsetParent
+  // `position:fixed` öğelerde null döndüğü için ek kontrol gerekiyor.
+  return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+});
+
+/**
+ * 🔴 Odak tuzağı (focus trap). `aria-modal="true"` yalnızca ekran
+ * okuyucuya "dışarısı inert" der; klavyeyi fiziksel olarak içeride
+ * TUTMAZ. Tab ile odak modalin dışına kaçarsa kullanıcı arkadaki
+ * sayfayı düzenlemeye başlar — bir şifre yöneticisinde bu hem kaza hem
+ * veri kaybı demektir.
+ *
+ * Odak hedefi: `autofocus` → `data-autofocus` → ilk odaklanabilir →
+ * modalın kendisi. `modal-system` her `.kasa-modal`'da `tabindex="-1"`
+ * taşıdığı için son çare de çalışır.
+ */
+const trapModalFocus = (modal) => {
+  if (!modal || modal.dataset.focusTrapped === 'on') return;
+  modal.dataset.focusTrapped = 'on';
+  modal.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') return;
+    const focusables = focusableWithin(modal);
+    if (!focusables.length) {
+      event.preventDefault();
+      modal.focus();
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === modal)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+};
+
+/** Animasyonlar kapalı mı? Odak zamanlaması buna göre değişir. */
+const transitionsDisabled = () =>
+  document.documentElement.getAttribute('data-kasa-animations') === 'off'
+  || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Modal açıldığında odak nereye gitsin? */
+const focusModalTarget = (modal) => {
+  const preferred =
+    modal.querySelector('[autofocus], [data-autofocus]') || focusableWithin(modal)[0];
+  (preferred || modal).focus?.();
+};
+
 export function initModalSystem({ customSelectStates, closeCustomSelect }) {
 
   window.kasaModalAc = (modalId) => {
@@ -21,6 +92,11 @@ export function initModalSystem({ customSelectStates, closeCustomSelect }) {
     modal.classList.add('is-visible');
     modal.setAttribute('aria-hidden', 'false');
     requestAnimationFrame(() => modal.classList.add('is-open'));
+    trapModalFocus(modal);
+    /* Odak, açılış animasyonu bitene kadar (190 ms) erteleniyor: henüz
+       `display:none` olan öğelere odak vermek Chromium'da sessizce
+       başarısız oluyor ve tuzak devreye girmiş olmadan odak kaçıyor. */
+    setTimeout(() => focusModalTarget(modal), transitionsDisabled() ? 0 : 200);
     modal.dispatchEvent(new CustomEvent('kasa:modal-opened'));
   };
 
@@ -36,8 +112,7 @@ export function initModalSystem({ customSelectStates, closeCustomSelect }) {
     modal.dispatchEvent(new CustomEvent('kasa:modal-closing', {
       detail: { remainingModalCount },
     }));
-    const transitionsDisabled = document.documentElement.getAttribute('data-kasa-animations') === 'off'
-      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animationsOff = transitionsDisabled();
     modal.classList.remove('is-open');
     modal.classList.add('is-closing');
     setTimeout(() => {
@@ -50,7 +125,19 @@ export function initModalSystem({ customSelectStates, closeCustomSelect }) {
         remainingModals.forEach(remainingModal => remainingModal.classList.remove('is-top-modal'));
         remainingModals[remainingModals.length - 1].classList.add('is-top-modal');
       }
-    }, transitionsDisabled ? 0 : 190);
+    }, animationsOff ? 0 : 190);
+    /* Kapanan modalin odagini, varsa ustteki moda geri veriyoruz; hicbir
+       modal kalmadiysa odak `<body>`ye dustugu icin Tab ile kullanicinin
+       basladigi yere (belki forma) donmus olur. */
+    const remaining = Array.from(
+      document.querySelectorAll('.kasa-modal.is-visible')
+    ).filter(visibleModal => visibleModal !== modal);
+    if (remaining.length) {
+      setTimeout(() => focusModalTarget(remaining[remaining.length - 1]), animationsOff ? 0 : 200);
+    } else if (document.activeElement === document.body) {
+      const restoreTo = document.querySelector('[data-modal-focus-return]');
+      restoreTo?.focus?.();
+    }
   };
 
   document.querySelectorAll('.kasa-modal').forEach(modal => {

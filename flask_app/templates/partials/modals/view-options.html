@@ -1,0 +1,63 @@
+<!-- Görünüm Seçenekleri Modal
+     Arama alanı ve sıralama seçicileri, çubuğun tek satıra sığması için
+     buraya taşındı (dashboard-bar.html'de yalnız düğme kaldı).
+
+     🔴 Sıralama SUNUCUDA uygulanır (`/?sort=`): başlık ve kategori şifreli
+     sütunlar, istemci tarafında şifresiz metin bulunmuyor. Seçici değişince
+     `vault-index.js` adres çubuğunu güncelleyip sayfayı yeniden yükler. -->
+<!-- 🔴 Neden `.vault-field`? `custom-controls.js:155` ->
+     `host: wrapper.closest('.settings-card, .vault-field')`; yalnız BU iki
+     sarmalayıcı açılışta `has-open-select` alır ve `.has-open-select`
+     `overflow: visible !important` uygular. Sarmalayıcı yoksa `host: null`
+     olur, menü `.modal-body`'nin `overflow-y: auto`'suyla KIRPILIR ve
+     `getBoundaryHost` kısa gövdeyi sınır sayıp menüyü ~90px'e kısar.
+     Ölçülen belirti: "dropdown menüleri çok küçük açılıyor". -->
+<div class="kasa-modal" id="viewOptionsModal" tabindex="-1" role="dialog" aria-modal="true"
+     aria-hidden="true" aria-labelledby="view-options-title">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="view-options-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-sliders mr-2 modal-icon-accent"></i>{{ _('Görünüm Seçenekleri') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="view-options-field vault-field">
+                    <label for="search-field-select" class="block text-sm font-medium text-kasa-text-muted mb-2">
+                        {{ _('Arama alanı') }}
+                    </label>
+                    <select id="search-field-select" data-custom-select class="w-full kasa-field text-sm">
+                        <option value="all" selected>{{ _('Tümü') }}</option>
+                        <option value="title">{{ _('Başlık') }}</option>
+                        <option value="username">{{ _('Kullanıcı adı') }}</option>
+                        <option value="email">{{ _('E-posta') }}</option>
+                        <option value="note">{{ _('Not') }}</option>
+                        <option value="card">{{ _('Kart no') }}</option>
+                    </select>
+                    <p class="text-xs text-kasa-text-muted mt-2 leading-loose">
+                        {{ _('Boş arama metni tüm kayıtlarla eşleşir; alan seçimi yalnız yazdığınız metni daraltır.') }}
+                    </p>
+                </div>
+
+                <div class="view-options-field vault-field mt-5">
+                    <label for="record-sort-select" class="block text-sm font-medium text-kasa-text-muted mb-2">
+                        {{ _('Sıralama') }}
+                    </label>
+                    <select id="record-sort-select" data-custom-select class="w-full kasa-field text-sm">
+                        {% for option in record_sort_options %}
+                        <option value="{{ option }}" {% if option == record_sort %}selected{% endif %}>
+                            {{ _(record_sort_labels[option]) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="kasa-btn kasa-btn-primary" data-kasa-close>{{ _('Tamam') }}</button>
+            </div>
+        </div>
+    </div>
+</div>

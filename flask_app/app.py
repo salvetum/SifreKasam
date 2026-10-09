@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from cryptography.fernet import Fernet
 import ipaddress
@@ -61,6 +61,10 @@ from kasa_core.constants import (
     DEFAULT_HARDWARE_ACCELERATION_ENABLED,
     DEFAULT_INTERFACE_ANIMATIONS_ENABLED,
     DEFAULT_POWER_SAVE_ENABLED,
+    DEFAULT_CLIPBOARD_AUTO_CLEAR_ENABLED,
+    DEFAULT_CLIPBOARD_CLEAR_SECONDS,
+    MAX_CLIPBOARD_CLEAR_SECONDS,
+    MIN_CLIPBOARD_CLEAR_SECONDS,
     LEGACY_PBKDF2_ITERATIONS,
     LEGACY_PBKDF2_SALT,
     MAX_BULK_IDS,
@@ -93,16 +97,39 @@ from kasa_core.crypto import (
 )
 from kasa_core.extensions import db, login_manager
 from kasa_core.i18n import TranslationService
+from kasa_core.attachments import (
+    MAX_ATTACHMENT_BYTES,
+    clear_attachment,
+    decrypt_attachment,
+    encrypt_attachment,
+    normalize_mime,
+    record_attachment_meta as _record_attachment_meta,
+    safe_attachment_name,
+    sanitize_filename,
+)
 from kasa_core.import_export import (
     build_export_payload,
     new_record_id,
     parse_expiry as _parse_expiry,
-    parse_import_payload as _parse_import_payload,
     parse_import_record as _parse_import_record_data,
     parse_old_txt,
     serialize_records as _serialize_records,
 )
 from kasa_core.models import PasswordHistory, Record, Setting, User
+from kasa_core.record_extras import (
+    custom_fields_from_form as _custom_fields_from_form,
+    decrypt_json as _decrypt_json,
+    encrypt_json as _encrypt_json,
+    fold_label as _fold_label,
+    normalize_custom_fields as _normalize_custom_fields,
+    normalize_tags as _normalize_tags,
+    tags_from_form as _tags_from_form,
+)
+from kasa_core.third_party_import import (
+    detect_format as _detect_import_format,
+    format_label as _third_party_format_label,
+    parse_third_party as _parse_third_party,
+)
 from kasa_core.paths import (
     get_backgrounds_dir,
     get_data_dir,
@@ -174,7 +201,11 @@ from kasa_core.validation import (
     safe_float,
     safe_int,
 )
-from brand_icons import getBrandIcon  # noqa: F401 (Jinja global olarak kayitli)
+from brand_icons import (
+    available_card_brands as _available_card_brands,
+    getBrandIcon,  # noqa: F401 (Jinja global olarak kayitli)
+    normalize_card_brand as _normalize_card_brand,
+)
 from kasa_core.versioning import (
     fetch_latest_release,
     is_newer_version as _is_newer_version,
@@ -337,6 +368,29 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # Özel alan + etiket (şifreli JSON). `db.create_all()` yalnız yeni
+    # veritabanında sütun ekler; mevcut kasalarda aşağıdaki ALTER gerekir.
+    for _new_column in ('encrypted_custom_fields', 'encrypted_tags', 'card_brand'):
+        try:
+            db.session.execute(db.text(f"ALTER TABLE records ADD COLUMN {_new_column} TEXT"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    # Kayıt eki: gövde BLOB (şifreli), ad/mime/boyut metin-tam sayı.
+    # 🔴 Gövde `BLOB` olarak ekleniyor; `TEXT` olsaydı base64 metnin gereksiz
+    # bir kopyasını taşırdık (SQLite zaten metni bayta çevirir).
+    for _column, _ddl in (
+        ('encrypted_attachment', 'BLOB'),
+        ('attachment_name', 'TEXT'),
+        ('attachment_mime', 'TEXT'),
+        ('attachment_size', 'INTEGER'),
+    ):
+        try:
+            db.session.execute(
+                db.text(f"ALTER TABLE records ADD COLUMN {_column} {_ddl}"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
     if os.environ.get('KASA_RESET_LAN_ON_START') == '1':
         try:
             lan_setting = Setting.query.filter_by(key='lan_enabled').first()
@@ -726,6 +780,39 @@ def entry_facts() -> dict[str, Any]:
     return facts
 
 
+# Uygulama geneli klavye kısayolları. 🔴 Tek doğruluk kaynağı burasıdır:
+# hem yardım listesi şablonu hem de `keyboard-shortcuts.js` bu listeyi tüketir.
+# Elle ikinci bir tablo tutulursa kısayol çalışır ama listede görünmez (ya da
+# tersi). `target` sözlüğü JS tarafında `modal:` / `navigate:` / `search`
+# önekleriyle çözülür. `keys` sözlüğü `shortcutFromEvent()` ile üretilen
+# kanonik biçimle **birebir** eşleşmek zorundadır (`mod` = Ctrl veya Cmd).
+#
+# 🔴 Etiketler burada **çevrilmez**; çeviri `inject_globals` içinde yapılır.
+# Modül yüklenirken çevirmek dili ilk anda dondururdu (import sırasında aktif
+# dil henüz bilinmiyor), sonradan dil değişince liste eski dilde kalırdı.
+KEYBOARD_SHORTCUTS = (
+    {'id': 'search',     'keys': 'mod+k',       'label': 'Aramaya odaklan',  'target': 'search',                         'bare': False},
+    {'id': 'add',        'keys': 'mod+shift+n', 'label': 'Yeni kayıt ekle',   'target': 'navigate:/ekle',                'bare': False},
+    {'id': 'generator',  'keys': 'mod+j',       'label': 'Parola üreticisi', 'target': 'modal:passwordGeneratorModal', 'bare': False},
+    {'id': 'import',     'keys': 'mod+shift+i', 'label': 'İçe aktar',         'target': 'modal:importModal',             'bare': False},
+    {'id': 'export',     'keys': 'mod+e',       'label': 'Dışa aktar',        'target': 'modal:exportModal',             'bare': False},
+    {'id': 'settings',   'keys': 'mod+,',       'label': 'Ayarlar',           'target': 'modal:settingsModal',           'bare': False},
+    # 🔴 `lock` yalnızca LİSTEDE görünür; sahibi partials/scripts/lock-shortcut.html
+    # (yedekli fetch yolu içeriyor). Burada ikinci sahibi olsaydı kilitleme iki
+    # kez POST edilirdi.
+    {'id': 'lock',       'keys': 'mod+l',       'label': 'Kasayı kilitle',    'target': 'none',                          'bare': False},
+    {'id': 'help',       'keys': 'shift+?',     'label': 'Kısayol listesi',   'target': 'modal:keyboardShortcutsModal',  'bare': True},
+)
+
+# Yardım listesinde kısayol satırlarını gruplara bölmek için sıralama.
+KEYBOARD_SHORTCUT_GROUPS = (
+    ('Genel', ('lock', 'settings', 'help')),
+    ('Kayıtlar', ('search', 'add')),
+    ('Veri', ('import', 'export')),
+    ('Parola', ('generator',)),
+)
+
+
 @app.context_processor
 def inject_globals():
     auto_lock_enabled  = True
@@ -750,6 +837,8 @@ def inject_globals():
     vault_accent_enabled = DEFAULT_VAULT_ACCENT_ENABLED
     hardware_acceleration = DEFAULT_HARDWARE_ACCELERATION_ENABLED
     power_save_enabled = DEFAULT_POWER_SAVE_ENABLED
+    clipboard_auto_clear = DEFAULT_CLIPBOARD_AUTO_CLEAR_ENABLED
+    clipboard_clear_seconds = DEFAULT_CLIPBOARD_CLEAR_SECONDS
     lan_enabled        = False
     lan_full_access    = False
     lan_reveal         = False
@@ -760,6 +849,15 @@ def inject_globals():
         t = _get_setting('auto_lock_timeout')
         if t is not None:
             auto_lock_timeout = safe_int(t, 5, 1, 240)
+        v = _get_setting('clipboard_auto_clear_enabled')
+        if v is not None:
+            clipboard_auto_clear = v.lower() == 'true'
+        t = _get_setting('clipboard_clear_seconds')
+        if t is not None:
+            clipboard_clear_seconds = safe_int(
+                t, DEFAULT_CLIPBOARD_CLEAR_SECONDS,
+                MIN_CLIPBOARD_CLEAR_SECONDS, MAX_CLIPBOARD_CLEAR_SECONDS,
+            )
         theme         = get_saved_theme()
         theme_mode    = get_theme_mode()
         glass_effects = get_glass_effects_enabled()
@@ -808,6 +906,22 @@ def inject_globals():
         'APP_VERSION':           APP_VERSION,
         'AUTO_LOCK_ENABLED':     auto_lock_enabled,
         'AUTO_LOCK_TIMEOUT':     auto_lock_timeout,
+        'CLIPBOARD_AUTO_CLEAR_ENABLED':   clipboard_auto_clear,
+        'CLIPBOARD_CLEAR_SECONDS':        clipboard_clear_seconds,
+        'CLIPBOARD_MIN_SECONDS':          MIN_CLIPBOARD_CLEAR_SECONDS,
+        'CLIPBOARD_MAX_SECONDS':          MAX_CLIPBOARD_CLEAR_SECONDS,
+        'KEYBOARD_SHORTCUTS':  [
+            {**shortcut, 'label': _(shortcut['label'])} for shortcut in KEYBOARD_SHORTCUTS
+        ],
+        'KEYBOARD_SHORTCUT_GROUPS': [
+            (_(group), tuple(ids)) for group, ids in KEYBOARD_SHORTCUT_GROUPS
+        ],
+        # 🔴 `label` JS'e GÖNDERİLMEZ: HTML tablosu sunucuda basılıyor ve
+        # etiket HTML kaçışı riski taşımadan işlenmiş olur.
+        'shortcut_bindings': [
+            {key: shortcut[key] for key in ('id', 'keys', 'target', 'bare')}
+            for shortcut in KEYBOARD_SHORTCUTS
+        ],
         'SAVED_THEME':           theme,
         'THEME_MODE':            theme_mode,
         'GLASS_EFFECTS_ENABLED': glass_effects,
@@ -851,6 +965,9 @@ def inject_globals():
         # hesaplanır ve uzak LAN istemciye boş döner.
         'entry_facts':          entry_facts,
         'getBrandIcon':          getBrandIcon,
+        # Kart markası seçici kayıt formunda (CreditCard); liste diskteki
+        # gerçek SVG dosyalarından türetilir (`brand_icons`).
+        'CARD_BRANDS':           _available_card_brands(),
         '_':                     _,
     }
 
@@ -963,6 +1080,10 @@ _LAN_TRANSFER_DENIED_ENDPOINTS = {
     # yedekleme
     'api_backups_list', 'api_backups_create', 'api_backups_delete',
     'api_backups_restore', 'health_backup_now',
+    # kayıt eki (yükleme = kasa verisini değiştirme, indirme = kasa verisini
+    # dışarı alma). İkisi de aynı sınıf yetenekler olduğu için aynı kapı.
+    'upload_record_attachment', 'download_record_attachment',
+    'delete_record_attachment',
 }
 
 # LAN'dan **açık metin şifre** döndüren uçlar. Varsayılan kapalıdır: ağdaki
@@ -972,6 +1093,10 @@ _LAN_TRANSFER_DENIED_ENDPOINTS = {
 # da bağımsız olarak kendi anahtarlarıyla denetlenirler.
 _LAN_REVEAL_ENDPOINTS = {
     'get_record_password', 'get_gecmis',
+    # Ek indirme düz metin sır döndürür; transfer kapısı zaten kapatıyor ama
+    # burada da listelenmesi, "hangi uçlar sır döndürür" sorusunun tek
+    # cevabı olması için gerekli (savunma katmanı: iki kapı birden).
+    'download_record_attachment',
 }
 
 # Düzenleme formu da sırları düz metin basar (`duzenle_sayfasi`: Password,
@@ -1731,15 +1856,95 @@ def login():
     _set_vault_key(mp)
     login_user(User("admin"), remember=False)
     return redirect(url_for('index'))
+
+# ── Kayıt sıralaması ──────────────────────────────────────────────────────
+# Neden sunucu ucunda: başlık ve kategori **şifreli** (Fernet) sütunlar, yani
+# `ORDER BY title` çalışmaz. Metin sıralaması ancak çözme sonrası Python'da
+# yapılabilir; tarih sıralaması ise SQL'de ucuzdur. İkisi de aynı URL
+# parametresi (`?sort=`) altında birleşir, böylece sıra adres çubuğunda kalır
+# (paylaşılabilir/yer imi) ve istemci tarafı sayfalama (50/kart) sıralamayı
+# bozmaz — kartlar DOM sırasına göre dilimleniyor.
+RECORD_SORT_OPTIONS = ('updated', 'created', 'title', 'title_desc',
+                       'category', 'type', 'expiry')
+DEFAULT_RECORD_SORT = 'updated'
+# Sıralama etiketleri şablonda `_(...)` ile çevrilmek üzere anahtarlar
+# olarak burada tutulur (sözlük olarak `render_template`'e verilir; Jinja
+# `_( 'anahtar' )` ile çevirir).
+RECORD_SORT_LABELS = {
+    'updated': 'Son değiştirilene göre',
+    'created': 'Eklenme sırasına göre',
+    'title': 'Başlığa göre (A-Z)',
+    'title_desc': 'Başlığa göre (Z-A)',
+    'category': 'Kategoriye göre (A-Z)',
+    'type': 'Türe göre',
+    'expiry': 'Son kullanma tarihine göre',
+}
+
+
+def requested_record_sort() -> str:
+    """`?sort=` değerini beyaz listeye karşı doğrular."""
+    value = normalize_text(request.args.get('sort', ''), max_length=20).casefold()
+    return value if value in RECORD_SORT_OPTIONS else DEFAULT_RECORD_SORT
+
+
+def _record_order_clauses(sort_key: str) -> tuple:
+    """Sorgunun `order_by` zinciri (pinned her zaman en üstte kalır)."""
+    if sort_key == 'created':
+        secondary = (Record.created_at.desc(), Record.updated_at.desc())
+    elif sort_key == 'expiry':
+        # `isnull()` öncü: tarihi olmayanlar sona. `expiry_date` gerçek bir
+        # DATETIME sütunu (metin değil) → SQL sıralaması mümkün.
+        secondary = (Record.expiry_date.is_(None), Record.expiry_date.asc())
+    else:
+        secondary = (Record.updated_at.desc(), Record.created_at.desc())
+    return (Record.is_pinned.desc(),) + secondary
+
+
+def _sort_record_group(items: list[dict[str, Any]], sort_key: str) -> list[dict[str, Any]]:
+    """Tek bir grupta (pinned veya pinned olmayan) metin sıralaması.
+
+    Metin anahtarında `_fold_label` kullanılır: `"İş".casefold()` birleşik
+    nokta üretip `"iş".casefold()` üretmez, yani düz `casefold()` Türkçe'de
+    `İş`/`iş` sıralamasını bozuyor (bkz. `record_extras.fold_label`).
+    Ters sıralamalarda İKİ GEÇİŞLİ kararlı sıralama kullanılır; tek geçişte
+    `reverse=True` ikincil anahtarı da ters çevirirdi.
+    """
+    def fold(field: str) -> Callable[[dict[str, Any]], str]:
+        return lambda item: _fold_label(item['full_data'].get(field) or '')
+
+    title_key, category_key = fold('title'), fold('category')
+    if sort_key in ('title', 'title_desc'):
+        items.sort(key=category_key)
+        items.sort(key=title_key, reverse=(sort_key == 'title_desc'))
+    elif sort_key == 'category':
+        items.sort(key=title_key)
+        items.sort(key=category_key)
+    elif sort_key == 'type':
+        items.sort(key=title_key)
+        items.sort(key=lambda i: i['full_data'].get('type') or '')
+    # 'updated' / 'created' / 'expiry' tamamen SQL'de çözülür.
+    return items
+
+
+def _order_records(items: list[dict[str, Any]], sort_key: str) -> list[dict[str, Any]]:
+    """Favorileri üstte tutarak sıralar.
+
+    Favoriler ayrı grupta tutulur: kullanıcı "başlığa göre A-Z" seçtiğinde de
+    yıldızlı kayıtlar en üstte kalır (mevcut davranışın korunması).
+    """
+    if sort_key in ('updated', 'created', 'expiry'):
+        return items  # sıra SQL'den geldi
+    pinned = [i for i in items if i['full_data'].get('is_pinned')]
+    rest = [i for i in items if not i['full_data'].get('is_pinned')]
+    return _sort_record_group(pinned, sort_key) + _sort_record_group(rest, sort_key)
+
+
 @app.route('/')
 @login_required
 def index():
-    fernet = get_fernet()
-    rows   = Record.query.order_by(
-        Record.is_pinned.desc(),
-        Record.updated_at.desc(),
-        Record.created_at.desc()
-    ).all()
+    fernet   = get_fernet()
+    sort_key = requested_record_sort()
+    rows     = Record.query.order_by(*_record_order_clauses(sort_key)).all()
 
     # Uzak LAN oturumu ve "şifreleri göster" kapalıyken kart numarası, kart
     # üzerindeki isim ve not/SecureNote metni de SIRR'dır. Bunlar şablonda
@@ -1756,21 +1961,41 @@ def index():
         email_value = decrypt_metadata(fernet, r.email)
         dec_comm = safe_decrypt(fernet, r.encrypted_comment)
         card_holder_value = decrypt_metadata(fernet, r.card_holder)
+        tags = _normalize_tags(_decrypt_json(fernet, r.encrypted_tags, []))
+        # 🔴 Özel alanlar SIR kabul edilir: "PIN", "API anahtarı" gibi alanlar
+        # kullanıcı tarafından sır olarak işaretlenebilir ama işaretlenmemiş
+        # olabilir de. Bu yüzden ızgaraya HİÇBİR zaman değer basılmaz — yalnız
+        # etiketler (metadata, `category` ile aynı sınıf) ve alan SAYISI.
+        custom_field_count = len(
+            _normalize_custom_fields(
+                _decrypt_json(fernet, r.encrypted_custom_fields, []))
+        )
+        attachment_meta = _record_attachment_meta(r, fernet) if r.encrypted_attachment else {}
 
         # Kart numarası CreditCard kaydında `login` alanında saklanır; yalnız
         # kart tipinde sırdır (normal kayıtta `login` kullanıcı adıdır ve
         # ızgaranın temel bilgisi olarak görünmeye devam eder).
         card_number_value = login_value if r.type == 'CreditCard' else ''
+        card_brand_value = r.card_brand or '' if r.type == 'CreditCard' else ''
         if hide_secrets:
             dec_comm = ''
             card_holder_value = ''
             card_number_value = ''
 
+        # Kartta son kullanma ve kaydın ne zaman değiştiği yüzeyde görünür
+        # değildi (yalnız rozet vardı). `expiry_date` bir DATETIME sütunudur;
+        # kartta yalnız gün bilgisi anlamlı olduğu için gün formatında basılır.
+        updated_text = r.updated_at.strftime('%d.%m.%Y') if r.updated_at else ''
+        card_expiry_text = (
+            r.expiry_date.strftime('%m/%Y') if r.type == 'CreditCard' and r.expiry_date
+            else ''
+        )
         if r.type == 'CreditCard':
             detaylar = {k: v for k, v in [
                 ('Kart Üzerindeki İsim', card_holder_value),
                 ('Kart Numarası', card_number_value),
-                ('CVV / Şifre', SECRET_PLACEHOLDER if r.encrypted_password else '')
+                ('CVV / Şifre', SECRET_PLACEHOLDER if r.encrypted_password else ''),
+                ('Son Kullanma', card_expiry_text),
             ] if v}
         elif r.type == 'SecureNote':
             detaylar = {'Not': dec_comm} if dec_comm else {}
@@ -1783,6 +2008,9 @@ def index():
                 ('İnternet Adresi', website_url),
                 ('Not',            dec_comm),
             ] if v}
+        # Son değiştirilme tarihi tüm tiplerde ince bir satır olarak basılır.
+        detaylar['Son Değiştirilme'] = updated_text if updated_text else None
+        detaylar = {k: v for k, v in detaylar.items() if v}
 
         kasa_verileri.append({
             'id': r.id,
@@ -1793,9 +2021,18 @@ def index():
                 'login': login_value, 'email': email_value, 'is_pinned': r.is_pinned,
                 'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
                 'card_holder': card_holder_value,
+                'card_brand': card_brand_value,
+                'tags': tags,
+                'custom_field_count': custom_field_count,
+                # Ek özeti: yalnız VARLIK + ad + boyut, gövde asla. Ad
+                # şifreli çözülür ama ızgarada basılır — bu yüzden
+                # `hide_secrets` varken TAMAMEN boşaltılır (dosya adı
+                # "pasaport.pdf" tek başına sırdır).
+                'attachment': {} if hide_secrets else attachment_meta,
             },
         })
 
+    kasa_verileri = _order_records(kasa_verileri, sort_key)
     show_onboarding = (
         _get_setting('onboarding_done') is None and not kasa_verileri
     )
@@ -1804,6 +2041,9 @@ def index():
         kayit_listesi=kasa_verileri,
         card_page_size=CARD_PAGE_SIZE,
         show_onboarding=show_onboarding,
+        record_sort_options=RECORD_SORT_OPTIONS,
+        record_sort_labels=RECORD_SORT_LABELS,
+        record_sort=sort_key,
     )
 
 # Düzenleme formu alan adı → Record niteliği. `/duzenle` POST'unda alan
@@ -1819,7 +2059,12 @@ _FORM_FIELD_TO_ATTR = {
     'password': 'encrypted_password',
     'comment': 'encrypted_comment',
     'card_holder': 'card_holder',
+    'card_brand': 'card_brand',
     'expiry_date': 'expiry_date',
+    # 🔴 `tags` ve `cf_*` alanları BURAYA girmez: `/duzenle` koruması
+    # ("GÖNDERILMEDİYSE korunur") `if form_field not in request.form`
+    # denetimine dayanır ve `cf_*` adları dizinli (`cf_label_0`, …) olduğu
+    # için tek bir anahtarla temsil edilemez. Koruma aşağıda ayrı yazıldı.
 }
 
 def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str, Any]:
@@ -1841,7 +2086,15 @@ def _record_from_form(fernet: Fernet, record_id: str | None = None) -> dict[str,
         encrypted_comment  = safe_encrypt(fernet, normalize_text(request.form.get('comment', ''), max_length=10000)),
         card_holder        = encrypt_metadata(
             fernet, normalize_text(request.form.get('card_holder'), max_length=120)),
+        # 🔴 Marka beyaz listeye karşı doğrulanır (`normalize_card_brand`);
+        # geçersiz/boş değer '' olarak yazılır — HTML'e ham kullanıcı metni
+        # basılması engellenir. Sır değil → düz metin.
+        card_brand           = _normalize_card_brand(request.form.get('card_brand')),
         expiry_date        = _parse_expiry(request.form.get('expiry_date', '')),
+        encrypted_custom_fields = _encrypt_json(
+            fernet, _custom_fields_from_form(request.form)),
+        encrypted_tags           = _encrypt_json(
+            fernet, _tags_from_form(request.form)),
     )
 
 @app.route('/ekle', methods=['GET', 'POST'])
@@ -1881,6 +2134,15 @@ def duzenle_sayfasi(kayit_id):
         for form_field, attr in _FORM_FIELD_TO_ATTR.items():
             if form_field not in request.form:
                 fields[attr] = getattr(r, attr)
+        # Özel alan/etiket alanları `cf_*` DİZİNİ olduğu için yukarıdaki
+        # harita onları kapsayamaz; varlık denetimi ayrı yapılır. Aynı
+        # gerekçe: LAN + "şifreleri göster" kapalıyken uzak istemci GET'i
+        # 403 alır ama POST atabilir; formu hiç görmediği için bu alanları
+        # göndermez ve mevcut değerleri sessizce SIFIRLANMAZ.
+        if 'tags' not in request.form:
+            fields['encrypted_tags'] = r.encrypted_tags
+        if not any(key.startswith('cf_label_') for key in request.form):
+            fields['encrypted_custom_fields'] = r.encrypted_custom_fields
         if r.encrypted_password and fields['encrypted_password'] and new_password != old_password:
             _append_password_history(kayit_id, r.encrypted_password, fernet)
         backup_database()
@@ -1908,6 +2170,16 @@ def duzenle_sayfasi(kayit_id):
         'Password': dec_pass, 'Comment': dec_comm,
         'expiry_date': r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '',
         'Card holder': decrypt_metadata(fernet, r.card_holder),
+        'Card brand': r.card_brand or '',
+        # Bu yol zaten `_LAN_REVEAL_FORM_GET_ENDPOINTS` ile korunuyor
+        # (`duzenle_sayfasi` GET'i LAN'da 403); özel alan DEĞERLERİ burada
+        # düz metin basılır, tıpkı `Password`/`Comment` gibi.
+        'tags': ', '.join(_normalize_tags(_decrypt_json(fernet, r.encrypted_tags, []))),
+        'custom_fields': _normalize_custom_fields(
+            _decrypt_json(fernet, r.encrypted_custom_fields, [])),
+        # Ek özeti (ad + boyut, gövde YOK). Bu yol `_LAN_REVEAL_FORM_GET_ENDPOINTS`
+        # ile LAN'da 403'lü, yani dosya adı LAN'a sızmaz.
+        'attachment': _record_attachment_meta(r, fernet),
     }
     return render_template('ekle.html', title="Kaydı Düzenle",
                            kayit={'id': kayit_id, 'full_data': mapped_data})
@@ -1965,6 +2237,92 @@ def get_record_password(kayit_id):
     # şifrenin kendisi denetime ASLA yazılmaz.
     _audit('sifre_gosterildi', kanal=_kanal_etiketi())
     return jsonify({'password': safe_decrypt(fernet, r.encrypted_password)})
+
+@app.route('/api/record/<kayit_id>/attachment', methods=['POST'])
+@login_required
+def upload_record_attachment(kayit_id):
+    """Kayda ek yükler (yeniden yükleme eskisinin üstüne yazar).
+
+    🔴 LAN kapısı: ekler karşılaştırma dışı dosyalardır (kimlik belgesi,
+    anahtar fotoğrafı…). Aynı gerekçeyle `export`/`import`/`backup` uçları
+    kapatıldığı gibi burası da **yalnız yerel** oturumda çalışır.
+    """
+    blocked = (_enforce_lan_transfer_block('upload_record_attachment')
+               or _enforce_lan_reveal_block('upload_record_attachment'))
+    if blocked:
+        return blocked
+    if 'file' not in request.files:
+        return jsonify({'error': 'file-required'}), 400
+    upload = request.files['file']
+    data = upload.read(MAX_ATTACHMENT_BYTES + 1)
+    if not data:
+        return jsonify({'error': 'empty-file'}), 400
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        return jsonify({'error': 'file-too-large',
+                        'limit': MAX_ATTACHMENT_BYTES}), 400
+    fernet = get_fernet()
+    r = db.get_or_404(Record, kayit_id)
+    backup_database()
+    clear_attachment(r)
+    r.encrypted_attachment = encrypt_attachment(fernet, data)
+    r.attachment_name = safe_encrypt(
+        fernet, sanitize_filename(upload.filename))
+    r.attachment_mime = normalize_mime(upload.mimetype)
+    r.attachment_size = len(data)
+    db.session.commit()
+    return jsonify({'status': 'ok', **_record_attachment_meta(r, fernet)})
+
+
+@app.route('/api/record/<kayit_id>/attachment')
+@login_required
+def download_record_attachment(kayit_id):
+    """Eki indirir.
+
+    🔴 İçerik **her zaman** `application/octet-stream` + `attachment` olarak
+    sunulur, kullanıcının MIME tipi ve dosya adı **gönderilmez**. Yüklenen
+    bir HTML/SVG'yi tarayıcıda çalıştırmak kalıcı XSS olurdu; `send_file`
+    tarayıcının Content-Type'a güvenmesi yüzünden tipi biz sabitleriz.
+    Dosya adı ASCII'ye indirgenmiş kopya olarak gider (non-ASCII başlıkta
+    tarayıcı/ara katman davranışı farklıdır).
+    """
+    blocked = (_enforce_lan_transfer_block('download_record_attachment')
+               or _enforce_lan_reveal_block('download_record_attachment'))
+    if blocked:
+        return blocked
+    fernet = get_fernet()
+    r = db.get_or_404(Record, kayit_id)
+    data = decrypt_attachment(fernet, r.encrypted_attachment)
+    if not data:
+        return jsonify({'error': 'no-attachment'}), 404
+    name = safe_attachment_name(safe_decrypt(fernet, r.attachment_name or ""))
+    _audit('ek_indirildi', kanal=_kanal_etiketi())
+    # 🔴 Dosya adı/ boy'su denetime ASLA yazılmaz: ad sırdır (kayıt adıyla
+    # aynı gerekçe), boyut ise kullanıcı verisi değil ama tutarlılık için
+    # `adet` beyaz listeli alanıyla sayılır. `audit` bilinmeyen alanı
+    # fail-closed reddettiği için yazmasak da olurdu.
+    response = send_file(io.BytesIO(data),
+                         mimetype='application/octet-stream',
+                         as_attachment=True,
+                         download_name=name)
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox"
+    return response
+
+
+@app.route('/api/record/<kayit_id>/attachment', methods=['DELETE'])
+@login_required
+def delete_record_attachment(kayit_id):
+    blocked = _enforce_lan_transfer_block('delete_record_attachment')
+    if blocked:
+        return blocked
+    r = db.get_or_404(Record, kayit_id)
+    if not r.encrypted_attachment:
+        return jsonify({'error': 'no-attachment'}), 404
+    backup_database()
+    clear_attachment(r)
+    db.session.commit()
+    return jsonify({'status': 'ok'})
+
 
 @app.route('/api/password-strength', methods=['POST'])
 @login_required
@@ -2592,7 +2950,7 @@ def health_export():
 # yönetilebilir; arayüz de LAN kartını uzak oturumlarda gizliyor.
 _LOCAL_ONLY_SETTING_FIELDS = {
     'lan_enabled', 'internet_kill_switch', 'live_breach_scan', 'auto_lock_enabled',
-    'auto_lock_timeout',
+    'auto_lock_timeout', 'clipboard_auto_clear_enabled', 'clipboard_clear_seconds',
     'lan_full_access_enabled',
     'lan_reveal_passwords_enabled',
     # Aşağıdakiler "kasa verisi" değil ama bir LAN istemcisinin zayıflatmaması
@@ -2667,6 +3025,15 @@ def save_settings():
         auto_lock_timeout = safe_int(request.form.get('auto_lock_timeout'), 5, 1, 240)
         _set_setting('auto_lock_timeout', str(auto_lock_timeout))
     _save_flag('auto_lock_enabled', lambda v: _set_setting('auto_lock_enabled', v))
+    if 'clipboard_clear_seconds' in request.form:
+        _set_setting('clipboard_clear_seconds', str(safe_int(
+            request.form.get('clipboard_clear_seconds'),
+            DEFAULT_CLIPBOARD_CLEAR_SECONDS,
+            MIN_CLIPBOARD_CLEAR_SECONDS,
+            MAX_CLIPBOARD_CLEAR_SECONDS,
+        )))
+    _save_flag('clipboard_auto_clear_enabled',
+               lambda v: _set_setting('clipboard_auto_clear_enabled', v))
     _save_flag('glass_effects_enabled', save_glass_effects)
     if 'accent_color' in request.form:
         save_accent_color(request.form.get('accent_color'))
@@ -3048,13 +3415,18 @@ def import_data():
 
     fernet   = get_fernet()
     filename = file.filename.lower()
+    # 🔴 `dropped` önceden sıfırlanmalı: yalnız `.kasaenc` dalı kendi sayacını
+    # kuruyordu ve `.json`/`.txt` yolunda `if dropped:` satırı
+    # UnboundLocalError atıyordu — kayıtlar commit edilip 500 dönüyordu
+    # ("içe aktarma çalışmıyor" izlenimi).
+    dropped = 0
+    source_label = ''
     try:
         if filename.endswith('.kasaenc'):
             file_password = (request.form.get('file_password') or '').strip()
             if not file_password:
                 return "Şifreli yedek için dosya şifresi gerekli.", 400
             raw = file.read()
-            dropped = 0
             try:
                 parsed, dropped = _decrypt_encrypted_records_report(raw, file_password)
             except _InvalidPasswordError:
@@ -3064,10 +3436,22 @@ def import_data():
             except (_EncryptedBackupError, ValueError):
                 return "Şifreli yedek açılamadı.", 400
             records = [_parse_import_record(item, fernet) for item in parsed]
+            source_label = _('şifreli yedek')
+        elif filename.endswith('.txt'):
+            # Eski kendi biçimimiz: JSON değil, `---` ayrılmış metin blokları.
+            items = parse_old_txt(file.read().decode('utf-8-sig'))
+            records = [_parse_import_record(item, fernet) for item in items]
+            source_label = _('eski yedek')
         else:
-            content = file.read().decode('utf-8-sig')
-            records = [_parse_import_record(item, fernet)
-                       for item in _parse_import_payload(filename, content)]
+            # Üçüncü parti dosyaları (Chrome/Firefox/LastPass/Bitwarden/
+            # 1Password/KeePass CSV·JSON·XML) **içerikten** algılanır; uzantıya
+            # güvenilmez (bkz. `kasa_core/third_party_import.py`).
+            raw = file.read()
+            items, dropped = _parse_third_party(filename, raw)
+            records = [_parse_import_record(item, fernet) for item in items]
+            source_label = _third_party_format_label(
+                _detect_import_format(filename, raw)
+            )
         if not records:
             return "İçe aktarılacak geçerli kayıt bulunamadı.", 400
         backup_database()
@@ -3078,6 +3462,8 @@ def import_data():
             # Kayıt sınırı aşıldı: ana sayfa bir uyarı toast'u göstersin
             # (vault-index.js `?import_dropped=` parametresini okur).
             return redirect(url_for('index', import_dropped=dropped))
+        if source_label:
+            return redirect(url_for('index', import_source=source_label))
         return redirect(url_for('index'))
     except UnicodeDecodeError:
         return "Dosya UTF-8 olarak okunamadı.", 400
@@ -3117,6 +3503,84 @@ def bulk_category():
     db.session.commit()
     invalidate_vault_report_cache()
     return jsonify({'status': 'ok', 'updated': updated})
+
+# Toplu düzenleme izin listeleri. Modül seviyesinde ve tek yerde: rota
+# `BULK_EDIT_ACTIONS` beyaz listesiyle ayrımı doğruluyor, test de aynı sabiti
+# okuyor (eylem listesinin genişlemesi farkında olmadan olmasın).
+BULK_EDIT_FLAGS = ('pin', 'unpin')
+BULK_EDIT_TAGS = ('tags_add', 'tags_remove')
+BULK_EDIT_EXPIRY = ('expiry_set', 'expiry_clear')
+BULK_EDIT_ACTIONS = BULK_EDIT_FLAGS + BULK_EDIT_TAGS + BULK_EDIT_EXPIRY
+
+
+@app.route('/api/bulk/edit', methods=['POST'])
+@login_required
+def bulk_edit():
+    """Seçili kayıtlara toplu alan düzenlemesi uygular.
+
+    Yazılabilir alanlar bilinçli olarak dar tutuldu: yalnız **kendi metin
+    alanları** (favori, etiket, son kullanma tarihi). Kayıt `type`'ı, şifresi
+    veya şifreli özel alanları toplu yazılmaz — kullanıcı bu yollardan kazara
+    veri kaybeder ve işlem geri alınamaz (toplu işlem tek hamlede commit
+    edildiği için).
+
+    🔴 Etiketler şifreli JSON kümesinde olduğu için **SQL `UPDATE` ile
+    toplu yazılamaz** (her kaydın şifresi çözülüp yeniden şifrelenmelidir);
+    bu yüzden etiket yolları kayıt kayıt döngü çalıştırır. `filter(...).update()`
+    yalnız düz sütunlar (`is_pinned`, `expiry_date`) için kullanılır.
+    """
+    ids = get_bulk_ids()
+    if not ids:
+        return jsonify({'status': 'error', 'message': 'ID listesi boş.'}), 400
+    payload = request_json()
+    action = normalize_text(payload.get('action')).casefold()
+    if action not in BULK_EDIT_ACTIONS:
+        return jsonify({'status': 'error', 'message': 'Geçersiz işlem.'}), 400
+
+    backup_database()
+    if action in BULK_EDIT_FLAGS:
+        updated = Record.query.filter(Record.id.in_(ids)).update(
+            {'is_pinned': action == 'pin'}, synchronize_session=False)
+        db.session.commit()
+    elif action == 'expiry_clear':
+        updated = Record.query.filter(Record.id.in_(ids)).update(
+            {'expiry_date': None}, synchronize_session=False)
+        db.session.commit()
+    elif action == 'expiry_set':
+        expiry = _parse_expiry(normalize_text(payload.get('value'), max_length=40))
+        if expiry is None:
+            db.session.rollback()
+            return jsonify({'status': 'error',
+                            'message': 'Geçersiz tarih biçimi.'}), 400
+        updated = Record.query.filter(Record.id.in_(ids)).update(
+            {'expiry_date': expiry}, synchronize_session=False)
+        db.session.commit()
+    else:
+        # Etiket ekleme/çıkarma: kayıt kayıt şifre çöz → birleştir → şifrele.
+        fernet = get_fernet()
+        # 🔴 `remove_tags` YALNIZ `tags_remove` yolunda doldurulur; ikisini
+        # koşulsuz doldurmak eklenen etiketi aynı adımda silerdi.
+        add_tags = _normalize_tags(payload.get('tags')) if action == 'tags_add' else []
+        remove_tags = ({_fold_label(tag) for tag in _normalize_tags(payload.get('tags'))}
+                       if action == 'tags_remove' else set())
+        if not add_tags and not remove_tags:
+            db.session.rollback()
+            return jsonify({'status': 'error',
+                            'message': 'Etiket gerekli.'}), 400
+        updated = 0
+        for record in Record.query.filter(Record.id.in_(ids)).all():
+            current = _decrypt_json(fernet, record.encrypted_tags, [])
+            merged = {*current, *add_tags} - remove_tags
+            canonical = _normalize_tags(sorted(merged))
+            if canonical == _normalize_tags(current):
+                continue
+            record.encrypted_tags = _encrypt_json(fernet, canonical)
+            updated += 1
+        db.session.commit()
+
+    invalidate_vault_report_cache()
+    return jsonify({'status': 'ok', 'updated': updated})
+
 
 @app.route('/api/bulk/export', methods=['POST'])
 @login_required

@@ -190,6 +190,75 @@ document.addEventListener('DOMContentLoaded', function () {
     window.kasaModalAc('bulkCategoryModal');
 });
 
+    // Toplu düzenleme: eylem seçimi ikinci bir adım (girdi alanı) gerektiriyorsa
+    // alanı gösterip `Uygula`'yı etkinleştirir. Değerler sunucunun beyaz
+    // listesiyle (`BULK_EDIT_ACTIONS`, app.py) ayrımı denetlenerek gönderilir.
+    var bulkEditAction = null;
+    var bulkEditApply = document.getElementById('bulk-edit-apply');
+    var bulkEditTagsWrap = document.getElementById('bulk-edit-tags-wrap');
+    var bulkEditExpiryWrap = document.getElementById('bulk-edit-expiry-wrap');
+    var bulkEditNeedsValue = ['tags_add', 'tags_remove', 'expiry_set'];
+
+    document.getElementById('bulk-edit-btn').addEventListener('click', function () {
+        var ids = Array.from(selected);
+        if (ids.length === 0) return;
+        document.getElementById('bulk-edit-count').textContent = ids.length;
+        window._bulkIds = ids;
+        bulkEditAction = null;
+        bulkEditApply.disabled = true;
+        bulkEditTagsWrap.hidden = true;
+        bulkEditExpiryWrap.hidden = true;
+        document.querySelectorAll('.bulk-edit-action').forEach(function (el) {
+            el.classList.remove('is-selected');
+        });
+        window.kasaModalAc('bulkEditModal');
+    });
+
+    function bulkEditSyncApply() {
+        bulkEditApply.disabled = !bulkEditAction
+            || (bulkEditAction === 'expiry_set'
+                && !document.getElementById('bulk-edit-expiry-input').value);
+    }
+
+    document.querySelectorAll('.bulk-edit-action').forEach(function (button) {
+        button.addEventListener('click', function () {
+            bulkEditAction = button.dataset.bulkAction;
+            document.querySelectorAll('.bulk-edit-action').forEach(function (el) {
+                el.classList.toggle('is-selected', el === button);
+            });
+            bulkEditTagsWrap.hidden = !['tags_add', 'tags_remove'].includes(bulkEditAction);
+            bulkEditExpiryWrap.hidden = bulkEditAction !== 'expiry_set';
+            bulkEditSyncApply();
+        });
+    });
+    document.getElementById('bulk-edit-expiry-input')?.addEventListener('input', bulkEditSyncApply);
+
+    bulkEditApply.addEventListener('click', async function () {
+        if (!bulkEditAction) return;
+        var body = { ids: window._bulkIds, action: bulkEditAction };
+        if (bulkEditAction === 'expiry_set') {
+            body.value = document.getElementById('bulk-edit-expiry-input').value;
+        } else if (bulkEditAction === 'tags_add' || bulkEditAction === 'tags_remove') {
+            body.tags = document.getElementById('bulk-edit-tags-input').value;
+        }
+        var button = this;
+        button.disabled = true;
+        try {
+            var response = await window.KASA_API_FETCH('/api/bulk/edit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response || !response.ok) throw new Error('bulk-edit-failed');
+            window.kasaModalKapat('bulkEditModal');
+            window.location.reload();
+        } catch (error) {
+            window.KASA_SHOW_WARNING_TOAST(_('Hata oluştu.'));
+        } finally {
+            button.disabled = false;
+        }
+    });
+
     document.getElementById('bulk-category-apply').addEventListener('click', async function () {
         var button = this;
         var category = document.getElementById('bulk-category-input').value.trim();

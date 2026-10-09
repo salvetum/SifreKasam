@@ -14,8 +14,9 @@ import { initHeartbeat } from './heartbeat.js';
 import { initNotifications } from './notifications.js?v=9.3';
 import { initScanSession } from './scan-session.js';
 import { initAppearanceSettings } from './appearance-settings.js';
-import { initVaultIndex } from './vault-index.js?v=2';
-import { initVaultForm } from './vault-form.js';
+import { initVaultIndex } from './vault-index.js?v=6';
+import { initKeyboardShortcuts } from './keyboard-shortcuts.js?v=1';
+import { initVaultForm } from './vault-form.js?v=2';
 import { initFormCalendar } from './form-calendar.js';
 import { initDataPanel } from './data-panel.js';
 import {
@@ -1568,6 +1569,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initRevealCopy({ apiJson });
   // ─── 6. MODAL SİSTEMİ (modal-system.js) ─────────────────────────────────
   initModalSystem({ customSelectStates, closeCustomSelect });
+  // ─── 6b. KLAVYE KISAYOLLARI ────────────────────────────────────────────
+  /* `initKeyboardShortcuts` yardım modalının varlığını denetleyip yoksa
+     hiçbir şey bağlamıyor (login/ayar ekranlarında 8 ölü dinleyici
+     kaydedilmesin diye) — bu yüzden koşulsuz çağrılabilir. */
+  initKeyboardShortcuts();
 
   // ─── 6a. MODAL SCROLLBAR TELAFİSİ (body scrollbar'ı kilitlenince kayma yok)
   {

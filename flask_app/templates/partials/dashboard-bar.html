@@ -72,6 +72,34 @@
                 <input type="text" id="search-input" placeholder="{{ _('Arama yap…') }}" autocomplete="off"
                     class="w-full px-3 py-2 kasa-field text-sm">
             </div>
+            {# 🔴 Arama alanı + sıralama seçicileri çubuktan KALDIRILDI.
+               1200×800'de iki açılır menü + arama kutusu + istatistik çipleri
+               tek satıra sığmayıp alta kayıyordu ve çubuk yüksekliği
+               değiştiği için kart ızgarası da itiliyordu. İkisi artık tek bir
+               "Görünüm seçenekleri" düğmesinin arkasında, modalda. Düğme
+               `aria-expanded`/`aria-controls` taşır ve odak yönetimi modal
+               sistemine devredilir (bkz. `partials/modals/view-options.html`). #}
+            <button type="button" id="view-options-btn" data-kasa-modal="viewOptionsModal"
+                class="view-options-btn" aria-haspopup="dialog" aria-expanded="false"
+                title="{{ _('Görünüm seçenekleri') }}">
+                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                <span class="sr-only">{{ _('Görünüm seçenekleri') }}</span>
+            </button>
         </div>
+    </div>
+
+    <!-- ── ETİKET FİLTRESİ (üçüncü satır) ──────────────────────────────
+         Boş kaldığında gizli: etiket yokken boş bir çubuk göstermek
+         yerine hiç görünmez. Doluluk İSTEMCİ tarafında kurulur — etiket
+         sayısı ve adları zaten kartlarda görünür metin (metadata sınıfı),
+         yani sunucudan ayrı bir "etiket listesi" uçuna gerek yoktur.
+         Çoklu seçim VE mantığıyla çalışır (iki etiket seçiliyse ikisine
+         birden sahip kartlar kalır). -->
+    <div class="tag-filter-bar" id="tag-filter-bar" hidden>
+        <span class="tag-filter-label" id="tag-filter-label">{{ _('Etiketler') }}</span>
+        <div class="tag-filter-chips" id="tag-filter-chips" role="group" aria-labelledby="tag-filter-label"></div>
+        <button type="button" id="tag-filter-clear" class="tag-filter-clear" hidden>
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i> {{ _('Etiketi temizle') }}
+        </button>
     </div>
 </div>

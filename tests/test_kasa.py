@@ -1,4 +1,4 @@
-﻿"""ŞifreKasam birleşik test paketi.
+"""ŞifreKasam birleşik test paketi.
 
 İçerik:
 - Kasa çekirdek servisleri (import/export, sürüm, zaman, görünüm)
@@ -2909,7 +2909,7 @@ class GlassOffSurfaceTests(unittest.TestCase):
         ".kasa-notif-menu",              # glass.css bölüm 6
         ".lan-warning-card",             # glass.css:307
         ".glass",                        # glass.css:307
-        "html[data-bs-theme=\"light\"] .kasa-navbar-inner",  # misc.css: 0.92
+        "html[data-bs-theme=\"light\"] .kasa-navbar-inner",  # misc.css: 0.93
         # İÇ İÇE kontroller: kendi başlarına saydam kalmaları sorun DEĞİL,
         # çünkü artık opak bir kapsayıcının ÜZERİNDE duruyorlar. Saydamlık
         # kapsayıcının arkasında kalmaz, üstte yalnız ince bir vurgu katmanı
@@ -3013,8 +3013,8 @@ class GlassOffSurfaceTests(unittest.TestCase):
 
     def test_asset_versions_bumped_for_glass_fixes(self) -> None:
         base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
-        self.assertIn("cards.css') }}?v=81", base)
-        self.assertIn("glass.css') }}?v=89", base)
+        self.assertIn("cards.css') }}?v=82", base)
+        self.assertIn("glass.css') }}?v=90", base)
     """Kart tasarımı + istatistik filtresi batch: şablon/asset/çeviri regresyonları."""
 
     PARTIALS = FLASK_APP_DIR / "templates" / "partials"
@@ -3193,7 +3193,7 @@ class GlassOffSurfaceTests(unittest.TestCase):
 
     def test_asset_versions_bumped(self) -> None:
         base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
-        self.assertIn("cards.css') }}?v=81", base)
+        self.assertIn("cards.css') }}?v=82", base)
         self.assertIn("theme-states.css') }}?v=74", base)
         self.assertIn("utilities.css') }}?v=76", base)
         self.assertIn("app.js') }}?v=9.50", base)
@@ -5059,6 +5059,7 @@ class SecurityHardeningTests(unittest.TestCase):
                 key='vault_initialized', value='true'))
             app_module.db.session.commit()
 
+    @staticmethod
     @staticmethod
     def _csrf(html: str) -> str:
         match = re.search(r'name="csrf_token" value="([^"]+)"', html)
@@ -7113,25 +7114,26 @@ class TooltipAnchorTests(unittest.TestCase):
 
 
 class CardFilterRevealTests(unittest.TestCase):
-    """Arama sonrasi kartlarin "once camsiz, sonra camli" belirtisi (2026-10).
+    """Arama sonrasi kartlarin "once buğusuz, sonra buğulu" belirtisi (2026-10).
 
-    OLCULEN KOK NEDEN: sayfa-1 disindaki kartlar sablonda `hidden` dogar
-    (card-grid.html: `{% if loop.index0 >= card_page_size %}hidden{% endif %}`) —
-    yani `display:none`. Arama onlari gorunur yaptiginda display:none -> block
-    gecisi olur; Chromium backdrop-filter katmanini yeniden kurar ve ilk karede
-    ornekleme yapmadan boyar. `.vault-card-shell` cami SAF CSS'ten alir
-    (`backdrop-filter: var(--glass-blur)`) ve `.glass` sinifi tasimaz, yani
-    liquid-glass.js bu yolda devrede degildir.
+    OLCULEN KOK NEDEN: sayfa-1 disindaki kartlar `display:none` ile dogardi
+    (`hidden`). display:none -> gorunur gecisinde Chromium backdrop-filter
+    KATMANINI yeniden kuruyor ve ilk karede ornekleme yapmadan boyuyor.
+    `.vault-card-shell` cami SAF CSS'ten alir (`backdrop-filter: var(--glass-blur)`)
+    ve `.glass` sinifi tasimaz, yani liquid-glass.js bu yolda devrede degildir.
 
-    COZUM: gorunurluk ANINDA acilir (eski `requestAnimationFrame(() => hidden =
-    false)` bir kare daha camsiz ekran uretiyordu) ve opaklik 0'dan baslayan
-    180ms'lik giris animasyonuyla oynatilir. Bulaniklasma 1-2 karede (~32 ms)
-    tamamlandigi icin kart belirgin hale gelmeden cam hazir olur.
+    COZUM: kart render agacindan HIC cikmiyor. Grid akisindan cikarmak icin
+    `position:absolute`, gorunmezlik icin `visibility:hidden`. Katman canli
+    kalir, yeniden kurulmaz, flas olmaz.
 
-    NOT: `card-animated` (cardSlideIn) YALNIZCA ilk yuklemede oynatilir
-    (vault-index.js `finishInitialReveal`, 650ms sonra sinif kaldirilir) ve
-    transform icerdigi icin ayni Chromium sorununu yaratirdi; arama yolunda
-    zaten oynamiyordu.
+    IKI BASARISIZ DENEME (regresyonu onlemek icin burada sabit):
+      1) `requestAnimationFrame(() => hidden = false)` -> bir kare daha camsiz.
+      2) `cardFilterReveal` (opacity + transform, `fill-mode: both`) ->
+         animasyon bitince kart `transform: translateY(0)` ile transform'lu
+         KALIYOR; transform backdrop orneklemeyi bozdugu icin kart animasyon
+         bittikten SONRA hala yanlis ornekleniyor. Animasyon sorunu 180 ms
+         uzatmakla degil, KALICI hale getiriyordu.
+    Giris animasyonu bu yuzden BILEREK YOK.
     """
 
     STATIC = FLASK_APP_DIR / "static"
@@ -7150,9 +7152,13 @@ class CardFilterRevealTests(unittest.TestCase):
         end = js.find("\n    };", start)
         return js[start:end]
 
-    def test_cards_start_hidden_beyond_first_page(self) -> None:
+    def test_cards_are_not_display_none_beyond_first_page(self) -> None:
+        """Sayfa disi kartlar `hidden` ile DOGMAMALI; akistan cikarilirlar."""
         grid = (self.PARTIALS / "card-grid.html").read_text(encoding="utf-8")
-        self.assertIn("{% if loop.index0 >= card_page_size %}hidden{% endif %}", grid)
+        self.assertIn("is-filtered-out", grid)
+        self.assertNotIn(
+            "{% if loop.index0 >= card_page_size %}hidden{% endif %}", grid,
+            "kartlar yine display:none ile doguyor")
 
     def test_card_shell_blur_comes_from_css_not_js(self) -> None:
         """Kart cami saf CSS; JS yolu devrede degil (aksi halde tani degisir)."""
@@ -7166,44 +7172,3451 @@ class CardFilterRevealTests(unittest.TestCase):
         liquid = (self.STATIC / "liquid-glass.js").read_text(encoding="utf-8")
         self.assertIn(".glass:not(.vault-card-shell)", liquid)
 
-    def test_filter_reveal_css_exists(self) -> None:
-        """Sinif JS tarafinda zaten kullaniliyordu ama CSS'i HIC YOKTI (oldu kod)."""
+    def test_filtered_out_rule_keeps_card_in_render_tree(self) -> None:
         css = self._cards_css()
-        self.assertIn(".card-wrapper.filter-reveal", css)
-        self.assertIn("@keyframes cardFilterReveal", css)
-        self.assertIn("opacity: 0", css)
-        self.assertIn("cardFilterReveal 180ms", css)
-        self.assertIn('html[data-kasa-animations="off"] .card-wrapper.filter-reveal', css)
-        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+        m = re.search(r"\.card-wrapper\.is-filtered-out\s*\{([^{}]*)\}", css)
+        self.assertIsNotNone(m, "cards.css'te is-filtered-out kurali yok")
+        body = m.group(1)
+        for decl in ("position: absolute", "visibility: hidden", "pointer-events: none"):
+            self.assertIn(decl, body, f"is-filtered-out kurali eksik: {decl}")
+        self.assertNotIn("display", body, "display kullanildi — katman yine dagilir")
+        # Absolute kartlar uzak ataya baglanip kaydirma alani yaratmasin.
+        container = re.search(r"#card-container\s*\{([^{}]*)\}", css)
+        self.assertIsNotNone(container, "#card-container kurali yok")
+        self.assertIn("position: relative", container.group(1))
 
-    def test_visibility_opens_synchronously(self) -> None:
-        """rAF gecikmesi bir kare daha camsiz ekran uretiyordu."""
+    def test_card_visibility_never_toggles_display_none(self) -> None:
         js = self._index_js()
-        self.assertNotIn(
-            "requestAnimationFrame(() => { wrapper.hidden = false; })", js,
-            "gorunurluk yine rAF icinde aciliyor — bir kare camsiz ekran kalir")
+        self.assertNotIn("wrapper.hidden", js, "kartlarda display:none geri geldi")
+        self.assertNotIn("requestAnimationFrame(() => { wrapper.hidden", js)
         body = self._set_card_visible()
-        self.assertIn("wrapper.hidden = false;", body)
-        # hidden=false, sinif eklemeden ONCE gelmeli.
-        self.assertLess(
-            body.index("wrapper.hidden = false;"),
-            body.index("wrapper.classList.add('filter-reveal')"),
-            "once sinif, sonra gorunurluk: yanlis sira")
+        self.assertIn("wrapper.classList.toggle('is-filtered-out', !visible)", body)
 
-    def test_filter_reveal_class_is_cleared_after_animation(self) -> None:
-        """Sinif kalirsa yeniden aramada animasyon tetiklenmez (yeniden oynatmama)."""
+    def test_no_entrance_animation_on_reveal(self) -> None:
+        """Iki deneme de basarisiz oldu; animasyon kalici olarak bozuyordu."""
+        css = self._cards_css()
         js = self._index_js()
-        self.assertIn("addEventListener('animationend'", js)
-        self.assertIn("wrapper.classList.remove('filter-reveal')", js)
-        self.assertIn("void wrapper.offsetWidth;", js)
+        self.assertNotIn("@keyframes cardFilterReveal", css)
+        self.assertNotIn(".card-wrapper.filter-reveal", css)
+        self.assertNotIn("filter-reveal", js)
+        body = self._set_card_visible()
+        for dead in ("offsetWidth", "animationend", "filter-reveal"):
+            self.assertNotIn(dead, body, f"setCardVisible icinde {dead} kaldi")
+        # Giris animasyonu icin transform OLMAMALI (backdrop orneklemeyi bozar).
+        self.assertNotIn("transform", body)
 
-    def test_animation_respects_reduce_motion(self) -> None:
+    def test_reduce_motion_still_available_for_scroll_and_category(self) -> None:
         js = self._index_js()
         self.assertIn("const reduceMotion = () =>", js)
-        self.assertIn("if (!animate || reduceMotion()) return;", js)
-        # shadowing olmamali: filterCards icinde ikinci bir const olmamali.
-        self.assertEqual(js.count("const reduceMotion ="), 1)
+        self.assertIn("reduceMotion() ? 'auto' : 'smooth'", js)
+        self.assertEqual(js.count("const reduceMotion ="), 1,
+                         "gölgeli ikinci tanım var")
+
+    def test_cache_bust_versions(self) -> None:
+        base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
+        self.assertIn("cards.css\') }}?v=82", base)
+        app_js = (self.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn("./vault-index.js?v=6", app_js)
+
+
+class GlassVeilParityTests(unittest.TestCase):
+    """Varsayilan arka plan perdesi == custom perde (2026-10).
+
+    Kullanici su belirtili bildirdi: "normal arka plan modlarinda cam
+    efektleri yari saydam / blur seviyesi yetersiz; ozel arka plan
+    modundakilerin aynisi normal moda aynen aktarilsin".
+
+    Cam yuzeylerinin CSS'i iki modda **zaten birebir ayni**; fark
+    arkadaki zemindi. `#default-bg-veil`, `#custom-bg-layer::after`
+    perdesinin kopyasi olmak uzere YAZILMISDI ama degerler kaymisdi:
+    yorum "%50 siyah / %42 beyaz" derken kod koyuda 0.62, acikta 0.50
+    uyguluyordu. Perde, blur'u beslemek icin kurulmus
+    `#default-bg-texture` dokusunu (opacity .80) ezdi; geriye duz bir
+    renk gecisi kalinca `backdrop-filter` bulaniklastiracak malzeme
+    bulamadigi icin cam "buzlu" degil "yari saydam panel" gibi duruyordu.
+
+    Test perde degerlerini iki kural arasinda **birebir** karsilastirir;
+    biri kayarsa dogrudan kacar.
+    """
+
+    CSS = FLASK_APP_DIR / "static" / "background.css"
+
+    def _veil_background(self, selector: str) -> str:
+        """Kuralin SADECE `background` degerini dondurur.
+
+        Blok sonuna kadar okunursa `pointer-events: none` gibi sonraki
+        bildirimler de gelir ve karsilastirma anlamli olmaz.
+        """
+        css = self.CSS.read_text(encoding="utf-8")
+        i = css.index(selector + " {")
+        block = css[i:css.index("}", i)]
+        j = block.index("background:") + len("background:")
+        return " ".join(block[j:block.index(";", j)].split())
+
+    def test_dark_veil_matches_custom_after(self) -> None:
+        self.assertEqual(
+            self._veil_background("#default-bg-veil"),
+            self._veil_background("#custom-bg-layer::after"),
+            "koyu perde custom::after ile ayni degil",
+        )
+
+    def test_light_veil_matches_custom_after(self) -> None:
+        self.assertEqual(
+            self._veil_background('[data-bs-theme="light"] #default-bg-veil'),
+            self._veil_background('[data-bs-theme="light"] #custom-bg-layer::after'),
+            "acik perde custom::after ile ayni degil",
+        )
+
+    def test_veil_is_a_copy_not_a_darkening_variant(self) -> None:
+        """Perde 0.62 gibi koyulasmaya geri donmesin."""
+        css = self.CSS.read_text(encoding="utf-8")
+        veil = self._veil_background("#default-bg-veil")
+        self.assertIn("rgba(8, 9, 18, 0.50)", veil)
+        self.assertNotIn("0.62", veil)
+        self.assertNotIn("0.42) 140%", veil)
+
+    def test_comment_matches_implementation(self) -> None:
+        """Yorumun iddiasi kodla ayni olmali (kayma buradan geldi).
+
+        Perde yorumu dosyanin ust bolumunde (doku basliginin altinda)
+        ve kurallarin 1500 satirlik kadar once yer aliyor; bu yuzden
+        konum degil **varlik** denetleniyor. Dogruluk yine
+        `test_*_veil_matches_custom_after` testlerinin isi.
+        """
+        css = self.CSS.read_text(encoding="utf-8")
+        self.assertIn("%50 siyah", css)
+        self.assertIn("%42 beyaz", css)
+
+    def test_veil_layers_hidden_in_custom_mode(self) -> None:
+        """Varsayilan katmanlar ozel modda kapali kalmali."""
+        css = self.CSS.read_text(encoding="utf-8")
+        for layer in ("#default-bg-veil", "#default-bg-texture"):
+            block = 'html[data-kasa-background="custom"] %s' % layer
+            self.assertIn(block, css)
+            self.assertIn("display: none !important", css[css.index(block):])
+
+    def test_background_layers_exist_in_base_html(self) -> None:
+        """Perde ve doku gercekten DOM'da olmali (CSS'i olu katman)."""
+        base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
+        for div in ('id="default-bg-texture"', 'id="default-bg-veil"',
+                    'id="custom-bg-layer"'):
+            self.assertIn(div, base)
+        self.assertLess(base.index('id="default-bg-texture"'),
+                        base.index('id="default-bg-veil"'),
+                        "doku perde'nin altinda kalmali")
+
+    def test_cache_bust_version(self) -> None:
+        base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
+        self.assertIn("background.css\') }}?v=91", base)
+
+    def _rule_block(self, css: str, selector: str) -> str:
+        """Bir kuralin tum govdesini dondurur (noktali virgulle kesmez)."""
+        i = css.index(selector + " {")
+        return css[i:css.index("}", i)]
+
+    def test_low_power_does_not_hide_blur_material(self) -> None:
+        """Tasarruf modu perde/dokuyu GIZLEMEMELI.
+
+        Oylesi bir kural yeniden eklendiginde cam yuzeylerinin arkasindaki
+        gorsel malzeme kaybolur; duz govde gradyani kalir ve
+        backdrop-filter'in bulaniklastiracak detayi kalmaz. Sonuc: giris
+        ekrani 45 sn hareketsiz kalinca tum yuzeyler "buzlu" yerine
+        "yari saydam panel"e donusuyordu.
+        """
+        css = self.CSS.read_text(encoding="utf-8")
+        for layer in ("#default-bg-veil", "#default-bg-texture"):
+            self.assertNotIn(
+                'data-kasa-low-power="on"] %s' % layer, css,
+                "%s tasarruf modunda gizlenmemeli" % layer,
+            )
+        # Genel denetim: low-power + bu iki katman + display:none ayni
+        # SECICI icinde gecmemeli. Kaba metin aramasi yetmez; yorumlar
+        # metinde de geciyor (gerekce yorumu bu iki token'i da iceriyor)
+        # ve #custom-bg-layer[data-animated] kurali low-power iceriyor
+        # ama bu iki katmanla ilgisi yok.
+        import re as _re
+        stripped = _re.sub(r"/\*.*?\*/", "", css, flags=_re.S)
+        for rule in _re.findall(r"([^{}]*)\{([^}]*)\}", stripped):
+            selector, body = rule[0], rule[1]
+            if 'data-kasa-low-power' not in selector:
+                continue
+            for layer in ("#default-bg-veil", "#default-bg-texture"):
+                if layer in selector:
+                    self.assertNotIn(
+                        "display: none", body,
+                        "low-power secicisi %s'i gizliyor: %s"
+                        % (layer, " ".join(selector.split())),
+                    )
+
+    def test_low_power_still_hides_layers_when_glass_is_off(self) -> None:
+        """Cam GERCEKTEN kapaliyken katmanlar gizli kalmali.
+
+        low-power'da tutuldu, glass-effects="off" cikarildi: cam tamamen
+        kapaliyken perde/doku gereksiz ve o durumda opak yuzey
+        yedekleri zorunlu (GlassOffSurfaceTests).
+        """
+        css = self.CSS.read_text(encoding="utf-8")
+        for layer in ("#default-bg-veil", "#default-bg-texture"):
+            block = 'html[data-glass-effects="off"] %s' % layer
+            self.assertIn(block, css, "cam kapaliyken %s gizlenmeli" % layer)
+            self.assertIn("display: none !important", css[css.index(block):])
+
+    def test_low_power_layers_have_no_animation(self) -> None:
+        """Gizlemenin performans gerekcesi OLMAYACAK.
+
+        Her iki katman da position:fixed ve TEK SEFERDE boyanan statik
+        katmanlardir: animation / transition / will-change icermezler.
+        Tasarruf modunun tek ise yarar kazandigi yer burasi olamaz; yani
+        onlari gizlemek saf bir gerileme (regression) idi.
+        """
+        css = self.CSS.read_text(encoding="utf-8")
+        for selector in ("#default-bg-texture", "#default-bg-veil"):
+            block = self._rule_block(css, selector)
+            for prop in ("animation", "transition", "will-change"):
+                self.assertNotIn(
+                    prop, block,
+                    "%s animasyon icermiyor; gizleme gerekcesi tutmaz" % selector,
+                )
+
+    def test_low_power_pauses_animations_globally(self) -> None:
+        """Animasyonlar zaten genel olarak durduruluyor.
+
+        base.css `html[data-kasa-low-power="on"] *` icinde
+        animation-play-state: paused uygular; statik katmanlari ayrica
+        gizlemek gereksizdi.
+        """
+        bc = (FLASK_APP_DIR / "static" / "base.css").read_text(encoding="utf-8")
+        i = bc.index('html[data-kasa-low-power="on"] *')
+        block = bc[i:bc.index("}", i)]
+        self.assertIn("animation-play-state: paused", block)
+        self.assertIn("transition-duration: 0.001ms", block)
+
+    def test_login_screen_is_reachable_by_low_power(self) -> None:
+        """Giris ekrani tasarruf moduna GIRER: regresyonun yolu kilitli.
+
+        Kanit zinciri:
+          login.html  -> {% extends "base.html" %}   (app.js yuklenir)
+          app.js      -> initHeartbeat(...)          (sart kontrolu YOK)
+          heartbeat.js-> RENDERER_IDLE_LOW_POWER_MS = 45000
+                       -> applyRendererLowPower()
+                       -> html[data-kasa-low-power="on"]
+        Ayrica gorsel malzeme kayboldugu icin kullanicinin ilk gordugu
+        ekran etkileniyordu.
+        """
+        login = (FLASK_APP_DIR / "templates" / "login.html").read_text(encoding="utf-8")
+        self.assertIn('{% extends "base.html" %}', login)
+
+        app_js = (FLASK_APP_DIR / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("initHeartbeat({ apiFetch })", app_js)
+
+        hb = (FLASK_APP_DIR / "static" / "heartbeat.js").read_text(encoding="utf-8")
+        self.assertIn("RENDERER_IDLE_LOW_POWER_MS = 45000", hb)
+        self.assertIn("data-kasa-low-power", hb)
+
+    def test_power_save_is_enabled_by_default(self) -> None:
+        """Varsayilan ACIK: bu yol kullanici ayarina dokunmadan calisir."""
+        consts = (FLASK_APP_DIR / "kasa_core" / "constants.py").read_text(encoding="utf-8")
+        self.assertIn("DEFAULT_POWER_SAVE_ENABLED = True", consts)
+
+    def test_entry_shell_has_no_low_power_override(self) -> None:
+        """entry-shell.css low-power kurallari ICERMEZ.
+
+        Kabuk, opak glass-off yedek tasiyan tek yuzey; low-power'da
+        backdrop-filter'i koruyup perde/dokuyu kaybediyordu. Kabukta
+        low-power kurali bulunmamasi, perdenin gorunur kalmasinin
+        gerekce oldugunu birlikte gosterir.
+        """
+        es = (FLASK_APP_DIR / "static" / "entry-shell.css").read_text(encoding="utf-8")
+        self.assertNotIn("data-kasa-low-power", es)
+        self.assertIn("[data-glass-effects=\"off\"] .entry-shell", es)
+
+
+
+class ThirdPartyImportTests(unittest.TestCase):
+    """Üçüncü parti içe aktarma — çözümleyiciler, kök neden kilitleri ve rota regresyonu."""
+
+    # ---------------------------------------------------------------- çözümleyici
+
+    def _parse(self, filename: str, raw: bytes):
+        from kasa_core.third_party_import import parse_third_party
+        return parse_third_party(filename, raw)
+
+    def test_bitwarden_login_is_detected_and_mapped(self) -> None:
+        payload = json.dumps({
+            "folders": [{"id": "f1", "name": "Isler"}],
+            "items": [{
+                "type": 1, "name": "GitHub", "notes": "not satiri",
+                "folderId": "f1",
+                "login": {
+                    "uris": [{"uri": "https://github.com"}],
+                    "username": "kaan", "password": "pw", "totp": "JBSWY3DPEHPK3PXP",
+                },
+                "fields": [
+                    {"name": "API anahtari", "value": "sk-123", "type": 3},
+                    {"name": "Not", "value": "duz", "type": 0},
+                ],
+            }],
+        }).encode("utf-8")
+        records, dropped = self._parse("bw.json", payload)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        self.assertEqual(record["title"], "GitHub")
+        self.assertEqual(record["login"], "kaan")
+        self.assertEqual(record["password"], "pw")
+        self.assertEqual(record["website_url"], "https://github.com")
+        self.assertEqual(record["type"], "Website")
+        # Klasör etikete dönüşmeli, kaybolmamalı.
+        self.assertEqual(record["tags"], ["isler"])
+        # Gizli alan gizli kalmalı (type 3 = Bitwarden "hidden").
+        by_label = {f["label"]: f for f in record["custom_fields"]}
+        self.assertTrue(by_label["API anahtari"]["secret"])
+        self.assertFalse(by_label["Not"]["secret"])
+        # 2FA kapsam dışı ama TOTP kaybolmamalı — şifreli özel alana gider.
+        self.assertIn("TOTP (2FA)", by_label)
+        self.assertEqual(by_label["TOTP (2FA)"]["value"], "JBSWY3DPEHPK3PXP")
+
+    def test_bitwarden_json_is_not_mistaken_for_csv(self) -> None:
+        """REGRESYON: virgul JSON'un her yerinde geçer; JSON önce sniff edilmeli.
+
+        İlk yazımda CSV denemesi JSON'dan önce geliyordu ve Bitwarden dışa
+        aktarımı `generic_csv` sayılıyordu (kullanıcı 0 kayıt görüyordu).
+        """
+        from kasa_core.third_party_import import detect_format
+        payload = json.dumps({
+            "items": [{"type": 1, "name": "a,b,c", "login": {"uris": [], "username": "u"}}]
+        }).encode("utf-8")
+        self.assertEqual(detect_format("export.json", payload), "bitwarden")
+
+    def test_bitwarden_card_and_secure_note(self) -> None:
+        payload = json.dumps({"folders": [], "items": [
+            {"type": 3, "name": "Banka", "card": {
+                "cardholderName": "Kaan A", "brand": "Visa",
+                "number": "4111111111111111", "expYear": "2029", "expMonth": "3",
+                "code": "123",
+            }},
+            {"type": 2, "name": "Vasiyet", "secureNote": {"type": 0, "content": "ic metin"}},
+        ]}).encode("utf-8")
+        records, _ = self._parse("bw.json", payload)
+        card, note = records
+        self.assertEqual(card["type"], "CreditCard")
+        # Modelde kart numarası `login` sütununda durur (reports.py).
+        self.assertEqual(card["login"], "4111111111111111")
+        self.assertEqual(card["card_holder"], "Kaan A")
+        self.assertEqual(card["expiry_date"], "2029-03")
+        self.assertTrue({f["label"]: f for f in card["custom_fields"]}["CVV"]["secret"])
+        self.assertEqual(note["type"], "SecureNote")
+        self.assertEqual(note["comment"], "ic metin")
+
+    def test_lastpass_csv_maps_groups_and_extra_fields(self) -> None:
+        raw = (
+            "url,username,password,totp,extra,name,grouping,fav\r\n"
+            "https://x.com,kullanici,sifre,,Ilk Satir: deger,Site Adi,Kisisel,0\r\n"
+        ).encode("utf-8")
+        from kasa_core.third_party_import import detect_format
+        self.assertEqual(detect_format("lastpass.csv", raw), "lastpass_csv")
+        records, _ = self._parse("lastpass.csv", raw)
+        record = records[0]
+        self.assertEqual(record["title"], "Site Adi")
+        self.assertEqual(record["login"], "kullanici")
+        self.assertEqual(record["tags"], ["kisisel"])
+        labels = {f["label"] for f in record["custom_fields"]}
+        self.assertIn("Ilk Satir", labels)
+
+    def test_generic_csv_handles_chrome_and_unknown_columns(self) -> None:
+        raw = (
+            "name,url,username,password,note\r\n"
+            "Ornek,https://ornek.com,kullanici,sifre,aciklama\r\n"
+        ).encode("utf-8")
+        records, _ = self._parse("chrome.csv", raw)
+        self.assertEqual(records[0]["title"], "Ornek")
+        self.assertEqual(records[0]["website_url"], "https://ornek.com")
+        self.assertEqual(records[0]["type"], "Website")
+
+    def test_keepass_xml_uses_full_group_path(self) -> None:
+        """REGRESYON: iç içe klasör yolunun TAMAMI etiket olmalı.
+
+        İlk yazımda yalnız doğrudan alt gruplar geziliyordu; `Root/Alt/Entry`
+        yolunda "Root" kayboluyordu.
+        """
+        raw = (
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<KeePassFile><Root><Group><Name>Root</Name>'
+            '<Group><Name>Alt</Name><Entry>'
+            '<String><Key>Title</Key><Value>Kasa Kaydi</Value></String>'
+            '<String><Key>UserName</Key><Value>k</Value></String>'
+            '<String><Key>Password</Key><Value>p</Value></String>'
+            '<String><Key>URL</Key><Value>https://k.example</Value></String>'
+            '<String><Key>Ozel Alan</Key><Value>gizli</Value></String>'
+            '</Entry></Group></Group></Root></KeePassFile>'
+        ).encode("utf-8")
+        records, _ = self._parse("kdb.xml", raw)
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        self.assertEqual(record["title"], "Kasa Kaydi")
+        self.assertEqual(sorted(record["tags"]), ["alt", "root"])
+        # Özel alan etiketi orijinal yazımıyla korunmalı (casefold sızdırmamalı).
+        self.assertEqual(record["custom_fields"][0]["label"], "Ozel Alan")
+
+    def test_keepass_deleted_objects_are_skipped(self) -> None:
+        raw = (
+            '<KeePassFile><Root><Group><Name>G</Name><Entry>'
+            '<String><Key>Title</Key><Value>Yasayan</Value></String>'
+            '</Entry></Group><DeletedObjects><Entry>'
+            '<String><Key>Title</Key><Value>Silinmis</Value></String>'
+            '</Entry></DeletedObjects></Root></KeePassFile>'
+        ).encode("utf-8")
+        records, _ = self._parse("kdb.xml", raw)
+        self.assertEqual([r["title"] for r in records], ["Yasayan"])
+
+    def test_onepassword_designation_mapping(self) -> None:
+        payload = json.dumps([{
+            "title": "Eposta", "url": "https://posta.example",
+            "tags": ["Is", "Kisisel"],
+            "detailsPlaintext": {"notesPlaintext": "not", "fields": [
+                {"designation": "username", "value": "kullanici"},
+                {"designation": "password", "value": "sifre"},
+                {"designation": "label", "id": "pin", "value": "1234", "type": "C"},
+            ]},
+        }]).encode("utf-8")
+        records, _ = self._parse("1p.json", payload)
+        record = records[0]
+        self.assertEqual(record["title"], "Eposta")
+        self.assertEqual(record["login"], "kullanici")
+        self.assertEqual(record["password"], "sifre")
+        self.assertEqual(record["website_url"], "https://posta.example")
+        self.assertEqual(record["tags"], ["is", "kisisel"])
+        self.assertTrue({f["label"]: f for f in record["custom_fields"]}["pin"]["secret"])
+
+    def test_own_json_format_still_works(self) -> None:
+        payload = json.dumps([
+            {"title": "Kayit", "login": "k", "password": "s", "tags": ["a"]},
+        ]).encode("utf-8")
+        records, _ = self._parse("kasa.json", payload)
+        self.assertEqual(records[0]["title"], "Kayit")
+        self.assertEqual(records[0]["tags"], ["a"])
+
+    def test_bom_tolerant_and_invalid_payload_raises(self) -> None:
+        payload = b"\xef\xbb\xbf" + json.dumps([{"title": "BOMlu"}]).encode("utf-8")
+        records, _ = self._parse("bom.json", payload)
+        self.assertEqual(records[0]["title"], "BOMlu")
+        with self.assertRaises(ValueError):
+            self._parse("bozuk.json", b"bu json degil")
+
+    def test_record_cap_is_enforced(self) -> None:
+        from kasa_core.constants import MAX_IMPORT_RECORDS
+        payload = json.dumps([{"title": f"k{i}"} for i in range(MAX_IMPORT_RECORDS + 5)]).encode("utf-8")
+        records, dropped = self._parse("cok.json", payload)
+        self.assertEqual(len(records), MAX_IMPORT_RECORDS)
+        self.assertEqual(dropped, 5)
+
+    def test_turkish_uppercase_i_folds_like_others(self) -> None:
+        """REGRESYON: `"İş".casefold()` birleşik nokta üretir, `"iş"` üretmez.
+
+        Ana dil Türkçe olduğu için bu iki etiket `casefold` ile AYRI kalıyor ve
+        tekilleştirme çalışmıyordu. `fold_label` birleşimi (U+0307) siler.
+        """
+        from kasa_core.record_extras import fold_label
+        self.assertEqual(fold_label("İş"), fold_label("iş"))
+        self.assertEqual(fold_label("İŞ"), fold_label("iş"))
+
+    # ------------------------------------------------------------------- rota
+
+    MASTER = "test-master-password"
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        token = self._csrf(self.client.get("/login").get_data(as_text=True))
+        self.client.post("/login", data={
+            "master_password": self.MASTER, "csrf_token": token,
+        })
+
+    def _post_import(self, filename: str, raw: bytes):
+        return self.client.post("/import", data={
+            "csrf_token": self._csrf(self.client.get("/ekle").get_data(as_text=True)),
+            "file": (io.BytesIO(raw), filename),
+        }, content_type="multipart/form-data", follow_redirects=False)
+
+    def test_plain_json_import_returns_redirect_not_500(self) -> None:
+        """REGRESYON: `.json` içe aktarımı `UnboundLocalError` ile 500 dönüyordu.
+
+        `dropped` sayacı yalnız `.kasaenc` dalında kuruluyordu; `.json`/`.txt`
+        yolunda `if dropped:` satırı sayacı okuyunca hata atıyordu — kayıtlar
+        commit edilmiş olmasına rağmen kullanıcı "hata oluştu" görüyordu.
+        """
+        self._login()
+        payload = json.dumps([
+            {"title": "JSON Kaydi", "login": "k", "password": "s"},
+        ]).encode("utf-8")
+        response = self._post_import("yedek.json", payload)
+        self.assertEqual(response.status_code, 302)
+        with app_module.app.app_context():
+            self.assertEqual(app_module.Record.query.count(), 1)
+
+    def test_third_party_csv_import_creates_encrypted_extras(self) -> None:
+        self._login()
+        raw = (
+            "name,url,username,password\r\n"
+            "CSV Kaydi,https://csv.example,kullanici,sifre\r\n"
+        ).encode("utf-8")
+        response = self._post_import("chrome.csv", raw)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("import_source", response.headers.get("Location", ""))
+        with app_module.app.app_context():
+            record = app_module.Record.query.first()
+            self.assertIsNotNone(record)
+            fernet = Fernet(app_module._derive_key_with_salt(
+                self.MASTER,
+                app_module._decode_salt(app_module.get_setting("pbkdf2_salt_b64")),
+            ))
+            self.assertEqual(
+                app_module.decrypt_metadata(fernet, record.title), "CSV Kaydi")
+            # Şifre gerçekten şifreli kalmalı.
+            self.assertNotIn("sifre", record.encrypted_password)
+
+    def test_plain_txt_legacy_path_still_works(self) -> None:
+        self._login()
+        raw = 'title: Eski Kayit\nLogin: k\nPassword: s\n---\n'.encode("utf-8")
+        response = self._post_import("eski.txt", raw)
+        self.assertEqual(response.status_code, 302)
+
+    # ------------------------------------------------------------------ şablon
+
+    def test_import_modal_accepts_third_party_extensions(self) -> None:
+        template = (
+            FLASK_APP_DIR / "templates" / "partials" / "modals" / "import.html"
+        ).read_text(encoding="utf-8")
+        stripped = re.sub(r"<!--.*?-->", "", template, flags=re.S)
+        accept = re.search(r'id="import-file"[^>]*accept="([^"]+)"', stripped, re.S)
+        self.assertIsNotNone(accept)
+        for suffix in (".json", ".csv", ".xml", ".txt", ".kasaenc"):
+            self.assertIn(suffix, accept.group(1))
+
+    def test_vault_index_reads_import_source_param(self) -> None:
+        script = (FLASK_APP_DIR / "static" / "vault-index.js").read_text(encoding="utf-8")
+        self.assertIn("import_source", script)
+        self.assertIn("import_dropped", script)
+
+class ClipboardAndModalA11yTests(unittest.TestCase):
+    """Pano temizleme ayarı ve modal odak yönetimi.
+
+    İkisi de "görünmez" davranışlar; testin tek işi bunları regresyona
+    karşı kilitlemek.
+    """
+
+    APP_MODULE = app_module
+    BASE = Path(__file__).resolve().parent.parent
+    STATIC = BASE / "flask_app" / "static"
+    SETTINGS_PARTIALS = BASE / "flask_app" / "templates" / "partials" / "settings"
+    MASTER = "test-master-password"
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+                "clipboard_auto_clear_enabled",
+                "clipboard_clear_seconds",
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER)))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    def _csrf(self) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"',
+                          self.client.get("/login").get_data(as_text=True))
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        response = self.client.post("/login", data={
+            "master_password": self.MASTER,
+            "csrf_token": self._csrf(),
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _save_settings(self, **fields) -> None:
+        """`/save_settings` bir AJAX ucu: CSRF yerine `X-App-Token` +
+        `X-Requested-With` ister (bkz. mevcut testler, ör. satır 2505)."""
+        self.client.post("/save_settings", data=fields, headers={
+            "X-App-Token": app_module.APP_TOKEN,
+            "X-Requested-With": "XMLHttpRequest",
+        })
+
+    # ── Pano temizleme: ayar tarafı ────────────────────────────────────────
+
+    def test_defaults_are_off(self) -> None:
+        """Varsayılan KAPALI: temizleme başka uygulamanın kopyaladığını
+        silebilir; bilinçli tercih (bkz. constants.py yorumu)."""
+        self.assertIs(
+            self.APP_MODULE.DEFAULT_CLIPBOARD_AUTO_CLEAR_ENABLED, False)
+        self.assertEqual(
+            self.APP_MODULE.DEFAULT_CLIPBOARD_CLEAR_SECONDS, 60)
+
+    def test_bounds_are_enforced_on_save(self) -> None:
+        """Aralık dışı değerler yazılmaz, sınırlara kırpılır."""
+        self.assertEqual(self.APP_MODULE.MIN_CLIPBOARD_CLEAR_SECONDS, 10)
+        self.assertEqual(self.APP_MODULE.MAX_CLIPBOARD_CLEAR_SECONDS, 600)
+        self._login()
+        self._save_settings(clipboard_clear_seconds="99999")
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module.get_setting("clipboard_clear_seconds"), "600")
+        self._save_settings(clipboard_clear_seconds="1")
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module.get_setting("clipboard_clear_seconds"), "10")
+        self._save_settings(clipboard_clear_seconds="45")
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module.get_setting("clipboard_clear_seconds"), "45")
+
+    def test_seconds_are_not_written_by_absent_field(self) -> None:
+        """🔴 Kısmi form (LAN) sıfırlamamalı — AGENTS.md'deki `disabled`
+        tuzağının sayısal karşılığı."""
+        self._login()
+        self._save_settings(clipboard_clear_seconds="45")
+        # Alan HİÇ gönderilmemiş bir form: yazılmamalı (AGENTS.md `disabled`
+        # tuzağının sayısal karşılığı — kısmi LAN formu sıfırlamaz).
+        self.client.post("/save_settings", data={}, headers={
+            "X-App-Token": app_module.APP_TOKEN,
+            "X-Requested-With": "XMLHttpRequest",
+        })
+        with app_module.app.app_context():
+            self.assertEqual(
+                app_module.get_setting("clipboard_clear_seconds"), "45")
+
+    def test_flag_is_local_only(self) -> None:
+        """LAN istemcisi savunma ayarını kapatamaz."""
+        self.assertIn("clipboard_auto_clear_enabled",
+                      self.APP_MODULE._LOCAL_ONLY_SETTING_FIELDS)
+        self.assertIn("clipboard_clear_seconds",
+                      self.APP_MODULE._LOCAL_ONLY_SETTING_FIELDS)
+
+    def test_prepaint_writes_server_value_not_localstorage(self) -> None:
+        """Savunma ayarı: localStorage'a yazılmaz, her render'da sunucudan
+        gelir (kullanıcı DevTools'tan bir baytla kapatamamalı)."""
+        html = (self.BASE / "flask_app" / "templates" / "partials"
+                / "prepaint.html").read_text(encoding="utf-8")
+        self.assertIn("data-kasa-clipboard-clear", html)
+        # Yalnızca bu özniteliğin YAZILDIĞI ifade sunucudan gelmeli; takip
+        # eden localStorage blokları (LAN/chroma uyarıları) ilgisizdir.
+        statement = html.split("data-kasa-clipboard-clear")[1].split(";")[0]
+        self.assertIn("CLIPBOARD_CLEAR_SECONDS", statement)
+        self.assertIn("CLIPBOARD_AUTO_CLEAR_ENABLED", statement)
+        self.assertNotIn("localStorage", statement)
+
+    def test_security_panel_has_the_toggle_and_stepper(self) -> None:
+        panel = (self.SETTINGS_PARTIALS / "panel-security.html").read_text(encoding="utf-8")
+        self.assertIn('name="clipboard_auto_clear_enabled"', panel)
+        self.assertIn('name="clipboard_clear_seconds"', panel)
+        self.assertIn("{% if CLIPBOARD_AUTO_CLEAR_ENABLED %}checked{% endif %}", panel)
+        self.assertIn("data-lockable", panel)
+        # Ayar formu gerçek bir HTML formu: `disabled` gönderilmez.
+        self.assertNotIn("disabled", re.sub(r"<!--.*?-->", "", panel, flags=re.S))
+
+    def test_dependency_locks_the_duration_row(self) -> None:
+        module = (self.STATIC / "settings-dependencies.js").read_text(encoding="utf-8")
+        self.assertIn("parent: '#clipboard_auto_clear_enabled'", module)
+        self.assertIn("card: '#clipboard-clear-timeout-row'", module)
+
+    # ── Pano temizleme: istemci tarafı ────────────────────────────────────
+
+    def test_clipboard_js_only_clears_its_own_text(self) -> None:
+        """Süre dolunca pano OKUNUR; içerik değişmişse dokunulmaz."""
+        js = (self.STATIC / "reveal-copy.js").read_text(encoding="utf-8")
+        self.assertIn("scheduleClipboardClear", js)
+        self.assertIn("readText", js)
+        # Yazma işlemi karşılaştırmadan SONRA ve koşullu olmalı.
+        self.assertIn("current !== text", js)
+
+    def test_clipboard_delay_is_bounded_client_side_too(self) -> None:
+        """Sunucu doğruluyor ama istemci de sınırlar: sunucu ayarı elle
+        değiştirilmişse 10 sn altı/aşırı büyük değer kabul edilmez."""
+        js = (self.STATIC / "reveal-copy.js").read_text(encoding="utf-8")
+        self.assertIn("seconds < 10 || seconds > 600", js)
+
+    # ── Modal odak yönetimi ───────────────────────────────────────────────
+
+    def test_modal_focus_trap_exists(self) -> None:
+        js = (self.STATIC / "modal-system.js").read_text(encoding="utf-8")
+        self.assertIn("trapModalFocus", js)
+        self.assertIn("focusModalTarget", js)
+        self.assertIn("event.key !== 'Tab'", js)
+        # Döngüsel: odak modalin içinde kalmalı
+        self.assertIn("last.focus()", js)
+        self.assertIn("first.focus()", js)
+
+    def test_modal_focus_prefers_autofocus(self) -> None:
+        js = (self.STATIC / "modal-system.js").read_text(encoding="utf-8")
+        self.assertIn("[autofocus], [data-autofocus]", js)
+
+    def test_focus_targeting_is_deferred_until_after_transition(self) -> None:
+        """🔴 Tuzak: `display:none` öğeye odak vermek Chromium'da sessizce
+        başarısızdır; odak açılış animasyonundan SONRA verilmelidir."""
+        js = (self.STATIC / "modal-system.js").read_text(encoding="utf-8")
+        self.assertIn("animationsOff ? 0 : 200", js)
+
+    def test_focusable_selector_excludes_disabled_and_hidden(self) -> None:
+        js = (self.STATIC / "modal-system.js").read_text(encoding="utf-8")
+        self.assertIn("'button:not([disabled])'", js)
+        self.assertIn("'input:not([disabled]):not([type=\"hidden\"])'", js)
+        self.assertIn("aria-hidden", js)
+        self.assertIn("getClientRects", js)
+
+    def test_every_modal_has_its_own_tabindex(self) -> None:
+        """`focusableWithin` boş dönerse son çare `modal.focus()`; bu ancak
+        modal `tabindex="-1"` taşıyorsa çalışır."""
+        root = self.BASE / "flask_app" / "templates"
+        checked = 0
+        for path in sorted(root.rglob("*.html")):
+            text = path.read_text(encoding="utf-8")
+            if 'class="kasa-modal"' not in text:
+                continue
+            own = next(line for line in text.splitlines() if 'class="kasa-modal"' in line)
+            self.assertIn("tabindex", own, path.name)
+            checked += 1
+        self.assertGreaterEqual(checked, 8)
+
+    def test_closing_a_modal_returns_focus_to_the_one_below(self) -> None:
+        js = (self.STATIC / "modal-system.js").read_text(encoding="utf-8")
+        self.assertIn("remaining[remaining.length - 1]", js)
+
+
+class RecordSortTests(unittest.TestCase):
+    """`/?sort=` kayıt sıralaması.
+
+    🔴 Neden sunucu ucunda: başlık ve kategori **şifreli** (Fernet) sütunlar,
+    `ORDER BY title` çalışmaz; metin sıralaması ancak çözme sonrası Python'da
+    yapılabilir. Ve kartlar istemci tarafı DOM sırasına göre dilimlendiği için
+    (50/kart) istemci tarafı sıralama sayfalamayı bozardı.
+    """
+
+    MASTER = "test-master-password"
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        token = self._csrf(self.client.get("/login").get_data(as_text=True))
+        response = self.client.post("/login", data={
+            "master_password": self.MASTER, "csrf_token": token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _fernet(self):
+        from cryptography.fernet import Fernet
+        with app_module.app.app_context():
+            salt = app_module._decode_salt(
+                app_module.get_setting("pbkdf2_salt_b64"))
+        self.assertIsNotNone(salt)
+        return Fernet(app_module._derive_key_with_salt(self.MASTER, salt))
+
+    def _add(self, record_id, title, category="Genel", record_type="Other",
+             pinned=False, created=None, updated=None, expiry=None) -> None:
+        """Doğrudan `Record` kurar (`_record_from_form` istek bağlamı ister)."""
+        from kasa_core.crypto import encrypt_metadata
+        fernet = self._fernet()
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Record(
+                id=record_id,
+                type=record_type,
+                category=category,
+                title=encrypt_metadata(fernet, title),
+                website_url="", login="", email="", card_holder="",
+                encrypted_password="", encrypted_comment="",
+                is_pinned=1 if pinned else 0,
+                encrypted_custom_fields="", encrypted_tags="",
+                created_at=created, updated_at=updated,
+                expiry_date=expiry,
+            ))
+            app_module.db.session.commit()
+
+    def _order(self, query=""):
+        """Ana sayfadaki kartların DOM sırasını (kayıt kimlikleri) döndürür.
+
+        `record-title-<id>` kimliği şablon kayıt kimliğinden gelir; başlık
+        metnini ayrıştırmak HTML kaçışı yüzünden gereksiz kırılgan.
+        """
+        response = self.client.get("/" + query)
+        self.assertEqual(response.status_code, 200)
+        body = response.get_data(as_text=True)
+        return re.findall(r'id="record-title-([a-z0-9-]+)"', body)
+
+    # ─── Beyaz liste ──────────────────────────────────────────────────
+
+    def test_requested_record_sort_accepts_whitelist(self):
+        for option in app_module.RECORD_SORT_OPTIONS:
+            with app_module.app.test_request_context(f"/?sort={option}"):
+                self.assertEqual(app_module.requested_record_sort(), option)
+
+    def test_requested_record_sort_rejects_unknown_values(self):
+        for bad in ("../../etc/passwd", "DROP TABLE records", "", "  "):
+            with app_module.app.test_request_context(f"/?sort={bad}"):
+                self.assertEqual(
+                    app_module.requested_record_sort(),
+                    app_module.DEFAULT_RECORD_SORT,
+                )
+
+    def test_requested_record_sort_falls_back_when_param_absent(self):
+        with app_module.app.test_request_context("/"):
+            self.assertEqual(
+                app_module.requested_record_sort(),
+                app_module.DEFAULT_RECORD_SORT,
+            )
+
+    def test_default_sort_is_updated_at_descending(self):
+        self._add("sort-u1", "Bir", updated=utc_now_naive() - timedelta(days=2))
+        self._add("sort-u2", "Iki", updated=utc_now_naive() - timedelta(days=1))
+        self._add("sort-u3", "Uc", updated=utc_now_naive())
+        self._login()
+        self.assertEqual(self._order(), ["sort-u3", "sort-u2", "sort-u1"])
+
+    def test_created_sort_uses_created_at(self):
+        now = utc_now_naive()
+        # updated_at ters sırada; created_at istenen sırada.
+        self._add("sort-c1", "Bir", created=now - timedelta(days=3),
+                  updated=now)
+        self._add("sort-c2", "Iki", created=now - timedelta(days=1),
+                  updated=now - timedelta(days=5))
+        self._login()
+        self.assertEqual(self._order("?sort=created"),
+                         ["sort-c2", "sort-c1"])
+
+    # ─── Metin sıralaması (şifreli sütunlar → Python) ─────────────────
+
+    def test_title_sort_is_turkish_case_folded(self):
+        # Düz `casefold()` "İş"i "iş"in ÖNÜNE koyar (birleşik nokta).
+        # `record_extras.fold_label` bunu katlar; sıralama da onu kullanmalı.
+        for record_id in ("sort-t1", "sort-t2", "sort-t3", "sort-t4"):
+            self._add(record_id, record_id, updated=utc_now_naive())
+        self._add("sort-lower", "isik", updated=utc_now_naive())
+        self._add("sort-upper", "ISIK", updated=utc_now_naive())
+        self._add("sort-i", "İş", updated=utc_now_naive())
+        self._add("sort-i2", "İşlem", updated=utc_now_naive())
+        self._login()
+        order = self._order("?sort=title")
+        self.assertLess(order.index("sort-i"), order.index("sort-i2"))
+        # Büyük/küçük harf ayrımı yapılmaz.
+        self.assertLess(order.index("sort-upper"), order.index("sort-lower"))
+
+    def test_title_desc_reverses_primary_but_keeps_secondary_ascending(self):
+        # Ters sıralama TEK geçişte `reverse=True` olsaydı ikincil anahtar da
+        # ters dönerdi; iki geçişli kararlı sıralama bunu engeller.
+        self._add("sort-d1", "Ortak", category="Beta")
+        self._add("sort-d2", "Ortak", category="Alfa")
+        self._add("sort-d3", "Aardvark", category="Zeta")
+        self._login()
+        order = self._order("?sort=title_desc")
+        # Başlık Z-A: "Ortak" > "Aardvark" → iki "Ortak" kaydı önce gelir.
+        self.assertEqual(order[:2], ["sort-d2", "sort-d1"])
+        # Aynı başlık içinde ikincil (kategori) A-Z kalmalı: Alfa, Beta.
+        self.assertLess(order.index("sort-d2"), order.index("sort-d1"))
+        self.assertEqual(order[-1], "sort-d3")
+
+    def test_category_sort_groups_by_category(self):
+        self._add("sort-k1", "b kaydi", category="Zulu")
+        self._add("sort-k2", "a kaydi", category="Alfa")
+        self._add("sort-k3", "a kaydi 2", category="Alfa")
+        self._login()
+        order = self._order("?sort=category")
+        self.assertLess(order.index("sort-k2"), order.index("sort-k3"))
+        self.assertLess(order.index("sort-k3"), order.index("sort-k1"))
+
+    def test_type_sort_groups_by_type(self):
+        self._add("sort-y1", "z", record_type="Website")
+        self._add("sort-y2", "y", record_type="CreditCard")
+        self._add("sort-y3", "x", record_type="Application")
+        self._login()
+        order = self._order("?sort=type")
+        # "Application" < "CreditCard" < "Website"
+        self.assertEqual(order, ["sort-y3", "sort-y2", "sort-y1"])
+
+    # ─── Son kullanma tarihi ─────────────────────────────────────────
+
+    def test_expiry_sort_puts_nearest_first_and_missing_last(self):
+        today = utc_now_naive().date()
+        self._add("sort-e1", "yok")
+        self._add("sort-e2", "uzak", expiry=today + timedelta(days=300))
+        self._add("sort-e3", "yakin", expiry=today + timedelta(days=5))
+        self._login()
+        self.assertEqual(self._order("?sort=expiry"),
+                         ["sort-e3", "sort-e2", "sort-e1"])
+
+    # ─── Favoriler ───────────────────────────────────────────────────
+
+    def test_pinned_records_stay_on_top_for_every_sort(self):
+        # Favoriler ayrı grupta tutulur: "başlığa göre A-Z" seçilse bile yıldız
+        # en üstte (mevcut davranışın korunması).
+        now = utc_now_naive()
+        self._add("sort-p-z", "Zzz", updated=now)
+        self._add("sort-p-a", "Aaa", updated=now)
+        self._add("sort-p-pinned", "Yıldız", pinned=True, updated=now)
+        self._login()
+        for option in app_module.RECORD_SORT_OPTIONS:
+            with self.subTest(sort=option):
+                order = self._order(f"?sort={option}")
+                self.assertEqual(order[0], "sort-p-pinned")
+
+    def test_pinned_clause_is_first_in_every_order_by_chain(self):
+        for option in app_module.RECORD_SORT_OPTIONS:
+            with self.subTest(sort=option):
+                clauses = app_module._record_order_clauses(option)
+                self.assertEqual(str(clauses[0]),
+                                 str(app_module.Record.is_pinned.desc()))
+
+    # ─── Arayüz ──────────────────────────────────────────────────────
+
+    def test_sort_selector_renders_every_option(self):
+        self._add("sort-ui", "tek kayit")
+        self._login()
+        body = self.client.get("/").get_data(as_text=True)
+        self.assertIn('id="record-sort-select"', body)
+        for option in app_module.RECORD_SORT_OPTIONS:
+            self.assertIn(f'value="{option}"', body)
+
+    def test_sort_selector_marks_current_choice(self):
+        self._add("sort-ui", "tek kayit")
+        self._login()
+        body = self.client.get("/?sort=category").get_data(as_text=True)
+        self.assertRegex(body, r'value="category"\s+selected')
+
+    def test_invalid_sort_still_renders_page(self):
+        self._add("sort-bad", "tek kayit")
+        self._login()
+        response = self.client.get("/?sort=%3Cscript%3Ealert(1)%3C/script%3E")
+        self.assertEqual(response.status_code, 200)
+        body = response.get_data(as_text=True)
+        self.assertNotIn("<script>alert(1)", body)
+        self.assertRegex(body, r'value="updated"\s+selected')
+
+    # ─── İstemci bağlantısı ──────────────────────────────────────────
+
+    def test_client_navigates_with_sort_param(self):
+        static_dir = Path(app_module.__file__).resolve().parent / "static"
+        source = (static_dir / "vault-index.js").read_text(encoding="utf-8")
+        self.assertIn("record-sort-select", source)
+        self.assertIn("url.searchParams.set('sort', sortSelect.value)", source)
+        # Varsayılan seçimde parametre adresten KALDIRILIR (temiz URL).
+        self.assertIn("url.searchParams.delete('sort')", source)
+        self.assertIn("window.location.assign(url.toString())", source)
+
+    def test_text_sorts_do_not_mutate_pinned_ordering_helper(self):
+        # `_order_records` SQL sıralamalı anahtarlarda listeyi DOKUNMAMALI
+        # (sıra zaten sorgudan geldi); yanlışlıkla yeniden sıralarsa
+        # `updated_at` sırası bozulur.
+        now = utc_now_naive()
+        self._add("sort-m1", "a", updated=now - timedelta(days=1))
+        self._add("sort-m2", "b", updated=now)
+        self._login()
+        self.assertEqual(self._order("?sort=updated"), ["sort-m2", "sort-m1"])
+
+
+class TagFilterTests(unittest.TestCase):
+    """Etiket filtresi — DOM'dan türetilen çubuk, VE mantığı, sır yüzeyini genişletmeyen eşleme."""
+
+    MASTER = "test-master-password"
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        token = self._csrf(self.client.get("/login").get_data(as_text=True))
+        response = self.client.post("/login", data={
+            "master_password": self.MASTER, "csrf_token": token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _fernet(self):
+        with app_module.app.app_context():
+            salt = app_module.get_setting("pbkdf2_salt_b64")
+            return Fernet(app_module._derive_key_with_salt(
+                self.MASTER, app_module._decode_salt(salt)))
+
+    def _add(self, title: str, tags, custom_fields=()) -> None:
+        fernet = self._fernet()
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Record(
+                id="tf-" + title,
+                type="Website",
+                category="Genel",
+                title=app_module.encrypt_metadata(fernet, title),
+                encrypted_password=app_module.safe_encrypt(fernet, "pw"),
+                encrypted_tags=app_module._encrypt_json(fernet, tags),
+                encrypted_custom_fields=app_module._encrypt_json(
+                    fernet, custom_fields),
+            ))
+            app_module.db.session.commit()
+
+    # -- Şablon --------------------------------------------------------
+
+    def _dashboard(self) -> str:
+        return (PROJECT_ROOT / "flask_app" / "templates" / "partials"
+                / "dashboard-bar.html").read_text(encoding="utf-8")
+
+    def _card_grid(self) -> str:
+        return (PROJECT_ROOT / "flask_app" / "templates" / "partials"
+                / "card-grid.html").read_text(encoding="utf-8")
+
+    def test_tag_filter_bar_exists_and_starts_hidden(self):
+        bar = self._dashboard()
+        self.assertIn('id="tag-filter-bar"', bar)
+        self.assertIn('id="tag-filter-chips"', bar)
+        self.assertIn('id="tag-filter-clear"', bar)
+        # Çubuk etiket yokken görünmemeli: `hidden` özniteliği istemci
+        # tarafındaki ilk kurulumda da durmalı.
+        bar_block = bar[bar.index('id="tag-filter-bar"'):][:120]
+        self.assertIn("hidden", bar_block)
+
+    def test_chip_group_is_labelled_and_clear_button_hidden(self):
+        bar = self._dashboard()
+        self.assertIn('role="group"', bar[bar.index("tag-filter-chips"):])
+        self.assertIn('aria-labelledby="tag-filter-label"', bar)
+        clear_block = bar[bar.index('id="tag-filter-clear"'):][:200]
+        self.assertIn("hidden", clear_block)
+
+    def test_card_tag_is_a_button_with_aria_pressed(self):
+        grid = self._card_grid()
+        badge = re.search(
+            r'<button[^>]*class="vault-card-tag"[^>]*>', grid)
+        self.assertIsNotNone(badge, "etiket rozeti <button> olmali")
+        self.assertIn('aria-pressed="false"', badge.group(0))
+        self.assertIn('type="button"', badge.group(0))
+
+    def test_card_tag_carries_no_data_attribute(self):
+        """Sır yüzeyini kasten genişletmemek için yeni data-* yok.
+
+        Filtre değerleri rozet textContent'inden okunur (`buildCardTags`);
+        etiket zaten kartta düz metin olarak görünüyorsa DOM'a ikinci bir
+        kopyasını sokmak gerekmezdi.
+        """
+        grid = self._card_grid()
+        badge = re.search(r'<button[^>]*class="vault-card-tag"[^>]*>',
+                          grid).group(0)
+        self.assertNotIn("data-tag", badge)
+        self.assertNotIn("data-tags", badge)
+
+    # -- JavaScript ----------------------------------------------------
+
+    def _js(self) -> str:
+        return (PROJECT_ROOT / "flask_app" / "static" / "vault-index.js").read_text(
+            encoding="utf-8")
+
+    def test_card_cache_carries_tags(self):
+        js = self._js()
+        self.assertIn("const buildCardTags = (wrapper)", js)
+        self.assertIn("tags: buildCardTags(wrapper)", js)
+
+    def test_tags_are_read_from_dom_text_not_data_attribute(self):
+        js = self._js()
+        block = js[js.index("const buildCardTags = (wrapper)"):
+                   js.index("const createCardCacheItem")]
+        self.assertIn(".vault-card-tag", block)
+        self.assertIn("textContent", block)
+        self.assertNotIn("dataset", block)
+
+    def test_tag_matching_is_and_semantics(self):
+        js = self._js()
+        block = js[js.index("const matchesActiveTags ="):
+                   js.index("const renderTagFilterBar")]
+        self.assertIn("if (!activeTags.size) return true;", block)
+        self.assertIn("every", block)
+        self.assertIn("item.tags.includes(tag)", block)
+
+    def test_tag_filter_participates_in_filter_cards(self):
+        js = self._js()
+        self.assertIn(
+            "return matchesSearch && matchesCategory && matchesStats "
+            "&& matchesActiveTags(item);", js)
+
+    def test_chip_value_travels_as_property_not_data_attribute(self):
+        """Çip içindeki sayı textContent'i bozmasın; data-* de yazılmadığı
+        için değer chip.tagValue taşır."""
+        js = self._js()
+        self.assertIn("chip.tagValue = tag;", js)
+        self.assertIn("if (chip.tagValue) toggleTag(chip.tagValue);", js)
+
+    def test_three_entry_points_share_one_toggle(self):
+        js = self._js()
+        self.assertIn("tagFilterChips?.addEventListener('click'", js)
+        self.assertIn("cardContainer?.addEventListener('click'", js)
+        self.assertIn("tagFilterClear?.addEventListener('click', clearTags);",
+                      js)
+        self.assertIn("const toggleTag = (tag) =>", js)
+        self.assertIn("const clearTags = () =>", js)
+
+    def test_card_badge_click_does_not_bubble_to_card(self):
+        js = self._js()
+        block = js[js.index("cardContainer?.addEventListener('click'"):
+                   js.index("tagFilterClear?.addEventListener")]
+        self.assertIn("preventDefault()", block)
+        self.assertIn("stopPropagation()", block)
+
+    def test_bar_rebuilt_when_card_cache_rebuilds(self):
+        js = self._js()
+        block = js[js.index("const rebuildCardCache = ("):
+                   js.index("const updateCachedCard")]
+        self.assertIn("renderTagFilterBar();", block)
+
+    def test_selected_tag_is_mirrored_on_card_badges(self):
+        js = self._js()
+        block = js[js.index("const syncTagBadges = () =>"):
+                   js.index("const toggleTag = (tag) =>")]
+        self.assertIn(".vault-card-tag", block)
+        self.assertIn("aria-pressed", block)
+        self.assertIn("is-active", block)
+
+    def test_zero_count_tags_survive_so_selection_can_be_cleared(self):
+        js = self._js()
+        self.assertIn(
+            "activeTags.forEach(tag => { if (!counts.has(tag)) "
+            "counts.set(tag, 0); });", js)
+
+    # -- CSS -----------------------------------------------------------
+
+    def test_css_defines_bar_and_active_chip(self):
+        css = (PROJECT_ROOT / "flask_app" / "static" / "misc.css").read_text(
+            encoding="utf-8")
+        for selector in (".tag-filter-bar", ".tag-filter-chip",
+                         ".tag-filter-chip.is-active", ".tag-filter-count",
+                         ".tag-filter-clear"):
+            self.assertIn(selector, css)
+
+    def test_tag_filter_surface_avoids_backdrop_filter(self):
+        """Küçük cam yüzeyi kazanç değil: backdrop-filter kullansaydı
+        GlassOffSurfaceTests opak data-glass-effects="off" yedeği zorunlu
+        kılardı."""
+        css = (PROJECT_ROOT / "flask_app" / "static" / "misc.css").read_text(
+            encoding="utf-8")
+        stripped = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        rules = re.findall(r"([^{}]*)\{([^}]*)\}", stripped)
+        offenders = [sel for sel, body in rules if "tag-filter" in sel
+                     and "backdrop-filter" in body]
+        self.assertEqual(offenders, [])
+
+    def test_card_tag_button_has_reset_border(self):
+        """Tarayıcı varsayılan buton kenarlığı rozeti çerçeveli gösterir."""
+        css = (PROJECT_ROOT / "flask_app" / "static" / "vault-form.css").read_text(
+            encoding="utf-8")
+        block = css[css.index(".vault-card-tag {"):
+                    css.index(".vault-card-tag.is-active")]
+        self.assertIn("border: 0;", block)
+        self.assertIn("cursor: pointer;", block)
+
+    # -- Entegrasyon + çeviri ------------------------------------------
+
+    def test_tags_render_on_cards(self):
+        self._login()
+        self._add("Tag Kart", ["is", "banka"])
+        html = self.client.get("/").get_data(as_text=True)
+        badges = re.findall(
+            r'<button[^>]*class="vault-card-tag"[^>]*>.*?</button>',
+            html, flags=re.S)
+        self.assertTrue(badges, "etiket rozeti basilmadi")
+        self.assertTrue(any("banka" in badge for badge in badges))
+
+    def test_card_without_tags_renders_no_badge(self):
+        self._login()
+        self._add("Etiketsiz", [])
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn('class="vault-card-tag"', html)
+
+    def test_custom_field_values_never_reach_the_grid(self):
+        self._login()
+        self._add("Sirli", ["x"], custom_fields=[
+            {"label": "PIN", "value": "1234-ANAHTAR", "secret": True}])
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn("1234-ANAHTAR", html)
+
+    def test_translations_exist_in_both_languages(self):
+        for lang in ("tr", "en"):
+            data = json.loads((PROJECT_ROOT / "flask_app" / "translations"
+                               / f"{lang}.json").read_text(encoding="utf-8"))
+            for key in ("Bu etikete süz", "Etiketler",
+                        "Etiketi temizle"):
+                self.assertIn(key, data, f"{lang}.json eksik: {key}")
+                self.assertTrue(str(data[key]).strip())
+
+    def test_cache_bust_versions(self):
+        html = (PROJECT_ROOT / "flask_app" / "templates" / "base.html").read_text(
+            encoding="utf-8")
+        app_js = (PROJECT_ROOT / "flask_app" / "static" / "app.js").read_text(
+            encoding="utf-8")
+        self.assertIn("./vault-index.js?v=6", app_js)
+        self.assertRegex(html, r"misc\.css[^?]*\?v=94")
+        self.assertRegex(html, r"vault-form\.css[^?]*\?v=112")
+
+
+class KeyboardShortcutTests(unittest.TestCase):
+    """Uygulama geneli klavye kısayolları.
+
+    🔴 En önemli test `test_server_and_js_tables_stay_in_sync`: yardım
+    listesi `app.py`'deki tablodan basılıyor, bağlama ise
+    `keyboard-shortcuts.js`'teki tablodan yapılıyor. İki tablo ayrışırsa
+    "listede Ctrl+K yazıyor ama tuş başka şeyi açıyor" gibi hatalar
+    üretilir ve bunu yalnız elle fark edersin. Test iki tabloyu
+    `keys` üzerinden karşılaştırır.
+    """
+
+    def _app_source(self):
+        return (FLASK_APP_DIR / 'app.py').read_text(encoding='utf-8')
+
+    def _js_source(self):
+        return (FLASK_APP_DIR / "static" / 'keyboard-shortcuts.js').read_text(encoding='utf-8')
+
+    def _js_keys(self):
+        block = self._js_source()
+        return set(re.findall(r"keys: '([^']+)'", block))
+
+    def _modal_template(self):
+        return (FLASK_APP_DIR / 'templates' / 'partials' / 'modals' / 'shortcuts.html').read_text(encoding='utf-8')
+
+    # ── Sunucu tablosu ────────────────────────────────────────────────────
+    def test_server_table_exists_with_eight_shortcuts(self):
+        self.assertIn('KEYBOARD_SHORTCUTS = (', self._app_source())
+        block = self._app_source().split('KEYBOARD_SHORTCUTS = (', 1)[1].split('\n)', 1)[0]
+        self.assertEqual(block.count("'id':"), 8)
+
+    def test_shortcut_ids_are_unique(self):
+        ids = re.findall(r"\{'id': '([a-z]+)'", self._app_source().split('KEYBOARD_SHORTCUTS = (', 1)[1])
+        self.assertEqual(len(ids), len(set(ids)), f'duplicate shortcut ids: {ids}')
+
+    def test_shortcut_keys_are_unique(self):
+        keys = re.findall(r"'keys': '([^']+)'", self._app_source().split('KEYBOARD_SHORTCUTS = (', 1)[1])
+        self.assertEqual(len(keys), len(set(keys)), f'duplicate shortcut keys: {keys}')
+
+    def test_labels_are_not_translated_at_module_level(self):
+        """🔴 Etiketler import anında çevrilirse dil sonradan değişince
+        yardım listesi eski dilde kalır. `_()` yalnız `inject_globals`
+        içinde çağrılmalı."""
+        block = self._app_source().split('KEYBOARD_SHORTCUTS = (', 1)[1].split('\n)', 1)[0]
+        self.assertNotIn("_('", block)
+        self.assertIn("_(shortcut['label'])", self._app_source())
+
+    def test_label_is_never_sent_to_the_browser(self):
+        """Etiketler HTML'de sunucuda basıldı; JS'e gönderilirse gereksiz
+        yüzey ve HTML kaçışı riski olur."""
+        self.assertIn("for key in ('id', 'keys', 'target', 'bare')", self._app_source())
+
+    # ── 🔴 PARİTE: sunucu tablosu ↔ JS tablosu ──────────────────────────
+    def test_server_and_js_tables_stay_in_sync(self):
+        server = set(re.findall(r"'keys': '([^']+)'", self._app_source().split('KEYBOARD_SHORTCUTS = (', 1)[1]))
+        self.assertEqual(server, self._js_keys(),
+                         'app.py ve keyboard-shortcuts.js kısayol anahtarları ayrışmış')
+
+    def test_both_tables_declare_the_same_ids(self):
+        server_ids = set(re.findall(r"\{'id': '([a-z]+)'", self._app_source().split('KEYBOARD_SHORTCUTS = (', 1)[1]))
+        js_ids = set(re.findall(r"id: '([a-z]+)'", self._js_source()))
+        self.assertEqual(server_ids, js_ids)
+
+    # ── Kilit kısayolunun tek sahibi olması ──────────────────────────────
+    def test_lock_shortcut_has_a_single_owner(self):
+        """🔴 Ctrl+L'in sahibi `partials/scripts/lock-shortcut.html` (yedekli
+        fetch yolu var). JS tablosunda da bağlansaydı aynı tuşa iki
+        dinleyici takılır ve kilitleme iki kez POST edilirdi."""
+        self.assertIn("'id': 'lock'", self._app_source())
+        block = self._app_source().split("'id': 'lock'", 1)[1].split('\n', 1)[0]
+        self.assertIn("'target': 'none'", block)
+        lock_shortcut = (FLASK_APP_DIR / 'templates' / 'partials' / 'scripts'
+                         / 'lock-shortcut.html').read_text(encoding='utf-8')
+        self.assertIn("key === 'l'", lock_shortcut)
+
+    def test_javascript_skips_none_targets(self):
+        self.assertIn("if (shortcut.target === 'none') return;", self._js_source())
+
+    # ── Gruplar ───────────────────────────────────────────────────────────
+    def test_groups_reference_only_known_ids(self):
+        source = self._app_source()
+        ids = set(re.findall(r"\{'id': '([a-z]+)'", source.split('KEYBOARD_SHORTCUTS = (', 1)[1]))
+        grouped = set()
+        for group_ids in re.findall(r"\('[^']+', \(([^)]*)\)\)", source):
+            grouped.update(re.findall(r"'([a-z]+)'", group_ids))
+        self.assertTrue(grouped.issubset(ids), f'grupta bilinmeyen id: {grouped - ids}')
+
+    def test_every_shortcut_appears_in_a_group(self):
+        source = self._app_source()
+        ids = set(re.findall(r"\{'id': '([a-z]+)'", source.split('KEYBOARD_SHORTCUTS = (', 1)[1]))
+        grouped = set()
+        for group_ids in re.findall(r"\('[^']+', \(([^)]*)\)\)", source):
+            grouped.update(re.findall(r"'([a-z]+)'", group_ids))
+        self.assertEqual(grouped, ids)
+
+    # ── Hedefler gerçekten var mı ─────────────────────────────────────────
+    def test_every_modal_target_exists_in_a_template(self):
+        targets = re.findall(r"'target': 'modal:([A-Za-z]+)'", self._app_source())
+        self.assertTrue(targets)
+        templates = list((FLASK_APP_DIR / 'templates').rglob('*.html'))
+        for modal_id in targets:
+            self.assertTrue(
+                any(f'id="{modal_id}"' in path.read_text(encoding='utf-8') for path in templates),
+                f'kısayol #{modal_id} modalına işaret ediyor ama modal şablonu yok')
+
+    def test_navigate_target_is_a_real_route(self):
+        self.assertIn("'target': 'navigate:/ekle'", self._app_source())
+        self.assertIn("@app.route('/ekle', methods=['GET', 'POST'])", self._app_source())
+
+    # ── Şablon ───────────────────────────────────────────────────────────
+    def test_help_modal_renders_groups_and_keys(self):
+        modal = self._modal_template()
+        for token in ('keyboardShortcutsModal', 'shortcuts-list', 'shortcuts-key',
+                      'KEYBOARD_SHORTCUTS', 'KEYBOARD_SHORTCUT_GROUPS',
+                      'tabindex="-1"', 'aria-modal="true"', 'data-kasa-close'):
+            self.assertIn(token, modal)
+
+    def test_help_modal_has_tabindex_for_focus_fallback(self):
+        """Focus trap'ın son çaresi modalın kendi `tabindex="-1"` idir."""
+        self.assertIn('id="keyboardShortcutsModal" tabindex="-1"', self._modal_template())
+
+    def test_help_modal_json_payload_is_nonce_signed(self):
+        """CSP: içe satır `<script>` nonce taşımak zorunda."""
+        script = self._modal_template().split('<script', 1)[1]
+        self.assertIn('nonce="{{ csp_nonce }}"', script.split('>', 1)[0])
+
+    def test_help_modal_is_included_on_the_vault_page(self):
+        index_html = (FLASK_APP_DIR / 'templates' / 'index.html').read_text(encoding='utf-8')
+        self.assertIn("partials/modals/shortcuts.html", index_html)
+        self.assertIn('data-kasa-modal="keyboardShortcutsModal"', index_html)
+
+    # ── JavaScript davranışı ──────────────────────────────────────────────
+    def test_shortcut_from_event_builds_canonical_string(self):
+        js = self._js_source()
+        self.assertIn('export function shortcutFromEvent(event)', js)
+        self.assertIn("parts.push('mod')", js)
+        self.assertIn("event.ctrlKey || event.metaKey", js)
+        self.assertIn("parts.push('shift')", js)
+        self.assertIn("return parts.join('+')", js)
+
+    def test_typing_guard_exists_for_bare_shortcuts(self):
+        """🔴 `?` gibi çıplak harf kısayolları yazarken tetiklenmemeli."""
+        js = self._js_source()
+        self.assertIn('const TYPING_SELECTOR', js)
+        self.assertIn('const isTypingContext', js)
+        self.assertIn('if (shortcut.bare && isTypingContext(event.target)) return;', js)
+
+    def test_ime_composition_and_default_prevented_are_respected(self):
+        js = self._js_source()
+        self.assertIn('event.defaultPrevented || event.isComposing', js)
+
+    def test_unresolvable_target_does_not_swallow_the_key(self):
+        """Hedef yoksa tuş `preventDefault` OLMAZ; yoksa kullanıcının
+        tarayıcı kısayolu (ör. Ctrl+F) kalıcı olarak ölür."""
+        self.assertIn('if (!resolveAction(shortcut.target)) return;', self._js_source())
+
+    def test_init_returns_null_without_the_help_modal(self):
+        """`app.js` login ekranında da yüklendiği için koşulsuz bağlanırsa
+        8 ölü dinleyici kaydedilirdi."""
+        self.assertIn('if (!document.getElementById(\'keyboardShortcutsModal\')) return null;',
+                      self._js_source())
+
+    def test_modal_open_prefers_the_trigger_button(self):
+        """Butona basmak hedef modalın kendi açılış mantığını da
+        çalıştırır (import dosya sıfırlama gibi)."""
+        js = self._js_source()
+        self.assertIn('[data-kasa-modal="${modalId}"]', js)
+        self.assertIn('button.click()', js)
+        self.assertIn('window.kasaModalAc', js)
+
+    def test_app_js_wires_the_module_with_a_cache_bust_version(self):
+        app_js = (FLASK_APP_DIR / "static" / 'app.js').read_text(encoding='utf-8')
+        self.assertIn("from './keyboard-shortcuts.js?v=1'", app_js)
+        self.assertIn('initKeyboardShortcuts()', app_js)
+
+    # ── CSS ───────────────────────────────────────────────────────────────
+    def test_shortcut_styles_do_not_add_blur_surfaces(self):
+        """Bilerek cam YOK; kullansaydı `GlassOffSurfaceTests` opak
+        `data-glass-effects="off"` yedeği zorunlu kılardı."""
+        css = re.sub(r"/\*.*?\*/", "", (FLASK_APP_DIR / "static" / 'misc.css').read_text(encoding='utf-8'), flags=re.S)
+        for selector, body in re.findall(r"([^{}]*)\{([^}]*)\}", css):
+            if 'shortcut' not in selector:
+                continue
+            self.assertNotIn('backdrop-filter', body, f'{selector} cam yüzeyi kullanıyor')
+
+    def test_shortcut_key_styles_defined(self):
+        css = (FLASK_APP_DIR / "static" / 'misc.css').read_text(encoding='utf-8')
+        for cls in ('.shortcuts-list', '.shortcuts-row', '.shortcuts-key', '.shortcuts-group-label'):
+            self.assertIn(cls, css)
+
+    # ── Çeviriler ─────────────────────────────────────────────────────────
+    def test_translations_exist_in_both_languages(self):
+        tr = json.loads((FLASK_APP_DIR / 'translations' / 'tr.json').read_text(encoding='utf-8'))
+        en = json.loads((FLASK_APP_DIR / 'translations' / 'en.json').read_text(encoding='utf-8'))
+        for key in ('Klavye Kısayolları', 'Kısayol listesi', 'Kasayı kilitle',
+                    'Yeni kayıt ekle', 'Aramaya odaklan', 'Parola üreticisi'):
+            self.assertIn(key, tr, f'tr eksik: {key}')
+            self.assertIn(key, en, f'en eksik: {key}')
+            self.assertTrue(en[key].strip(), f'en boş: {key}')
+            self.assertNotEqual(en[key], key, f'en çevrilmemiş: {key}')
+
+    # ── Sürüm ─────────────────────────────────────────────────────────────
+    def test_misc_css_cache_bust_version(self):
+        base = (FLASK_APP_DIR / 'templates' / 'base.html').read_text(encoding='utf-8')
+        self.assertIn('misc.css', base)
+        match = re.search(r'misc\.css[^?]*\?v=([\d.]+)', base)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), '94')
+
+
+class RecordAttachmentTests(unittest.TestCase):
+    """Kayıt eki: şifreli saklama, indirme, silme, LAN kapısı, sızıntı koruması.
+
+    🔴 Üç güvenlik kuralı burada kilitleniyor:
+    1. İçerik asla "satır içi" sunulmaz (`application/octet-stream` +
+       `nosniff` + `attachment`) — yüklenen HTML/SVG çalıştırılırsa kalıcı
+       XSS olurdu.
+    2. Dosya adı da şifrelidir.
+    3. LAN'da hem yükleme hem indirme kapalıdır.
+    """
+
+    MASTER = "test-master-password"
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+        self._login()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        token = self._csrf(self.client.get("/login").get_data(as_text=True))
+        response = self.client.post("/login", data={
+            "master_password": self.MASTER, "csrf_token": token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _fernet(self):
+        from cryptography.fernet import Fernet
+        with app_module.app.app_context():
+            salt = app_module._decode_salt(
+                app_module.get_setting("pbkdf2_salt_b64"))
+        self.assertIsNotNone(salt)
+        return Fernet(app_module._derive_key_with_salt(self.MASTER, salt))
+
+    def _add(self, title="kayit"):
+        from kasa_core.crypto import encrypt_metadata
+        fernet = self._fernet()
+        with app_module.app.app_context():
+            record = app_module.Record(
+                id=app_module.new_record_id(),
+                type="Website",
+                category="Genel",
+                title=encrypt_metadata(fernet, title),
+                website_url="", login="", email="", card_holder="",
+                encrypted_password="", encrypted_comment="",
+                is_pinned=0,
+            )
+            app_module.db.session.add(record)
+            app_module.db.session.commit()
+            return record.id
+
+    def _upload(self, record_id, payload=b"gizli-icerik", name="not.pdf",
+                mime="application/pdf"):
+        import io as _io
+        csrf = self._csrf(self.client.get("/").get_data(as_text=True))
+        data = {"file": (_io.BytesIO(payload), name, mime)}
+        return self.client.post(
+            f"/api/record/{record_id}/attachment",
+            data=data,
+            content_type="multipart/form-data",
+            headers={"X-CSRF-Token": csrf, "X-Requested-With": "XMLHttpRequest"},
+        )
+
+    # ─── Yükleme ──────────────────────────────────────────────────────
+
+    def test_upload_returns_metadata(self):
+        record_id = self._add()
+        response = self._upload(record_id)
+        self.assertEqual(response.status_code, 200, response.data[:300])
+        body = response.get_json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["name"], "not.pdf")
+        self.assertEqual(body["size"], len("gizli-icerik"))
+
+    def test_body_is_stored_encrypted(self):
+        record_id = self._add()
+        self._upload(record_id, payload=b"GIZLI-GOVDE-123456")
+        with app_module.app.app_context():
+            raw = bytes(app_module.Record.query.get(record_id).encrypted_attachment)
+        self.assertTrue(raw)
+        self.assertNotIn(b"GIZLI-GOVDE", raw)
+
+    def test_filename_is_encrypted(self):
+        record_id = self._add()
+        self._upload(record_id, name="kaskad_police_tamir.pdf")
+        with app_module.app.app_context():
+            stored = app_module.Record.query.get(record_id).attachment_name
+        self.assertTrue(stored)
+        self.assertNotIn("kaskad_police", stored)
+
+    def test_empty_file_is_rejected(self):
+        record_id = self._add()
+        self.assertEqual(self._upload(record_id, payload=b"").status_code, 400)
+
+    def test_oversize_file_is_rejected(self):
+        from kasa_core.attachments import MAX_ATTACHMENT_BYTES
+        record_id = self._add()
+        response = self._upload(record_id, payload=b"x" * (MAX_ATTACHMENT_BYTES + 1))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("limit", response.get_json())
+
+    def test_reupload_replaces_the_previous_file(self):
+        record_id = self._add()
+        self._upload(record_id, payload=b"birinci")
+        self._upload(record_id, payload=b"ikinci", name="yeni.pdf")
+        response = self.client.get(f"/api/record/{record_id}/attachment")
+        self.assertEqual(response.data, b"ikinci")
+
+    def test_path_traversal_in_filename_is_stripped(self):
+        from kasa_core.attachments import sanitize_filename
+        for raw in ("../../etc/passwd", "..\\windows\\system32\\x.dll",
+                    "a/b/c.txt"):
+            cleaned = sanitize_filename(raw)
+            self.assertNotIn("/", cleaned)
+            self.assertNotIn("\\", cleaned)
+            self.assertFalse(cleaned.startswith("."))
+
+    def test_control_characters_are_stripped(self):
+        from kasa_core.attachments import sanitize_filename
+        self.assertNotIn("\x00", sanitize_filename("a\x00b.txt"))
+
+    # ─── İndirme ──────────────────────────────────────────────────────
+
+    def test_download_returns_exact_bytes(self):
+        record_id = self._add()
+        self._upload(record_id, payload=b"\x89PNG-ish-bytes")
+        response = self.client.get(f"/api/record/{record_id}/attachment")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, b"\x89PNG-ish-bytes")
+
+    def test_download_is_never_inline(self):
+        record_id = self._add()
+        self._upload(record_id, name="x.html", mime="text/html")
+        response = self.client.get(f"/api/record/{record_id}/attachment")
+        self.assertIn("attachment", response.headers["Content-Disposition"])
+        self.assertEqual(response.mimetype, "application/octet-stream")
+
+    def test_download_sets_nosniff(self):
+        record_id = self._add()
+        self._upload(record_id)
+        response = self.client.get(f"/api/record/{record_id}/attachment")
+        self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
+
+    def test_download_does_not_echo_the_user_mime(self):
+        record_id = self._add()
+        self._upload(record_id, name="x.svg", mime="image/svg+xml")
+        response = self.client.get(f"/api/record/{record_id}/attachment")
+        self.assertNotIn("svg", response.mimetype)
+
+    def test_download_without_attachment_is_404(self):
+        record_id = self._add()
+        self.assertEqual(
+            self.client.get(f"/api/record/{record_id}/attachment").status_code, 404)
+
+    def test_download_requires_authentication(self):
+        from werkzeug.test import Client
+        record_id = self._add()
+        self._upload(record_id)
+        anon = Client(app_module.app)
+        self.assertIn(
+            anon.get(f"/api/record/{record_id}/attachment").status_code,
+            (302, 401, 403))
+
+    # ─── Silme ────────────────────────────────────────────────────────
+
+    def test_delete_clears_every_field(self):
+        from kasa_core.attachments import MAX_ATTACHMENT_BYTES  # noqa: F401
+        record_id = self._add()
+        self._upload(record_id)
+        csrf = self._csrf(self.client.get("/").get_data(as_text=True))
+        response = self.client.delete(
+            f"/api/record/{record_id}/attachment",
+            headers={"X-CSRF-Token": csrf, "X-Requested-With": "XMLHttpRequest"})
+        self.assertEqual(response.status_code, 200)
+        with app_module.app.app_context():
+            record = app_module.Record.query.get(record_id)
+            self.assertIsNone(record.encrypted_attachment)
+            self.assertEqual(record.attachment_name, "")
+            self.assertEqual(record.attachment_size, 0)
+
+    def test_delete_without_attachment_is_404(self):
+        record_id = self._add()
+        csrf = self._csrf(self.client.get("/").get_data(as_text=True))
+        response = self.client.delete(
+            f"/api/record/{record_id}/attachment",
+            headers={"X-CSRF-Token": csrf, "X-Requested-With": "XMLHttpRequest"})
+        self.assertEqual(response.status_code, 404)
+
+    # ─── LAN kapısı ───────────────────────────────────────────────────
+
+    def test_attachment_endpoints_are_lan_blocked(self):
+        for endpoint in ('upload_record_attachment', 'download_record_attachment',
+                         'delete_record_attachment'):
+            self.assertIn(
+                endpoint, app_module._LAN_TRANSFER_DENIED_ENDPOINTS,
+                f"{endpoint} LAN aktarım kapısında değil")
+
+    def test_download_is_also_in_the_reveal_list(self):
+        self.assertIn(
+            'download_record_attachment', app_module._LAN_REVEAL_ENDPOINTS)
+
+    # ─── Sızıntı koruması ─────────────────────────────────────────────
+
+    def test_grid_never_contains_the_body(self):
+        record_id = self._add()
+        self._upload(record_id, payload=b"GOVDE-ASLA-BASILMAZ")
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn("GOVDE-ASLA-BASILMAZ", html)
+
+    def test_edit_form_shows_name_but_not_body(self):
+        record_id = self._add()
+        self._upload(record_id, payload=b"GOVDE-ASLA-BASILMAZ", name="ek.pdf")
+        html = self.client.get(f"/duzenle/{record_id}").get_data(as_text=True)
+        self.assertIn("ek.pdf", html)
+        self.assertNotIn("GOVDE-ASLA-BASILMAZ", html)
+
+    def test_deleting_the_record_removes_the_attachment(self):
+        record_id = self._add()
+        self._upload(record_id)
+        csrf = self._csrf(self.client.get("/").get_data(as_text=True))
+        response = self.client.post(
+            f"/sil/{record_id}",
+            data={"csrf_token": csrf},
+            headers={"X-CSRF-Token": csrf, "X-Requested-With": "XMLHttpRequest"})
+        self.assertIn(response.status_code, (200, 302))
+        with app_module.app.app_context():
+            self.assertIsNone(app_module.Record.query.get(record_id))
+
+    # ─── Şablon ve JS ─────────────────────────────────────────────────
+
+    def test_extras_template_has_the_attachment_block(self):
+        template = (FLASK_APP_DIR / "templates" / "partials" /
+                    "form" / "panel-extras.html").read_text(encoding="utf-8")
+        self.assertIn("data-attachment-input", template)
+        self.assertIn("data-attachment-upload", template)
+        self.assertIn("data-attachment-remove", template)
+
+    def test_attachment_input_is_never_disabled(self):
+        template = (FLASK_APP_DIR / "templates" / "partials" /
+                    "form" / "panel-extras.html").read_text(encoding="utf-8")
+        for tag in re.findall(r"<input[^>]*>", template):
+            self.assertNotIn("disabled", tag)
+
+    def test_new_record_form_has_no_attachment_block(self):
+        html = self.client.get("/ekle").get_data(as_text=True)
+        # 🔴 Sayfanın TAMAMINA bakmak yanlış: `record-attachment.html` betiği
+        # `document.querySelector('[data-attachment-input]')` **string**'ini
+        # içeriyor. Aranan şey gerçek `<input ... data-attachment-input>`
+        # etiketi olmalı.
+        self.assertNotIn("<input type=\"file\" id=\"attachment-input\"", html)
+        self.assertNotIn("id=\"attachment-status\"", html)
+
+    def test_script_has_nonce_and_is_wired(self):
+        script = (FLASK_APP_DIR / "templates" / "partials" /
+                  "scripts" / "record-attachment.html").read_text(encoding="utf-8")
+        self.assertIn('nonce="{{ csp_nonce }}"', script)
+        self.assertIn("/attachment", script)
+        ekle = (FLASK_APP_DIR / "templates" / "ekle.html").read_text(encoding="utf-8")
+        self.assertIn("record-attachment.html", ekle)
+
+    def test_card_grid_renders_the_badge(self):
+        record_id = self._add()
+        self._upload(record_id, name="ek.pdf")
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("vault-card-attachment", html)
+        self.assertIn("ek.pdf", html)
+
+    def test_css_has_no_blurred_attachment_surface(self):
+        css = (FLASK_APP_DIR / "static" / "misc.css").read_text(encoding="utf-8")
+        stripped = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        for selector, body in re.findall(r"([^{}]*)\{([^}]*)\}", stripped):
+            if "attachment" in selector and "backdrop-filter" in body:
+                self.fail(f"ek yuzeyi blur kullaniyor: {selector}")
+
+    # ─── Çeviriler ────────────────────────────────────────────────────
+
+    def test_translations_exist_in_both_languages(self):
+        tr = json.loads((FLASK_APP_DIR / "translations" / "tr.json").read_text(encoding="utf-8"))
+        en = json.loads((FLASK_APP_DIR / "translations" / "en.json").read_text(encoding="utf-8"))
+        for key in ("Ek Dosya", "Eki Yükle", "Ek yüklendi."):
+            self.assertIn(key, tr)
+            self.assertIn(key, en)
+            self.assertNotEqual(en[key], key)
+
+    def test_translation_keys_are_a_subset(self):
+        tr = json.loads((FLASK_APP_DIR / "translations" / "tr.json").read_text(encoding="utf-8"))
+        en = json.loads((FLASK_APP_DIR / "translations" / "en.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(tr) - set(en), set())
+
+
+class RecordExtrasTests(unittest.TestCase):
+    """Özel alanlar ve etiketler — doğrulama, şifreleme ve sızıntı koruması."""
+
+    MASTER = "test-master-password"
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    # `SecurityHardeningTests` ile aynı kasa yalıtımı. Bu testler kayıt
+    # şifreliyor; sızarsa sonraki testin Fernet'i tutmaz (o sınıftaki
+    # izolasyon hatasının aynısı).
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        token = self._csrf(self.client.get("/login").get_data(as_text=True))
+        response = self.client.post("/login", data={
+            "master_password": self.MASTER, "csrf_token": token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _fernet(self):
+        """Kasa anahtarını test içinde türetir.
+
+        `app_module.get_fernet()` bir İSTEK bağlamı ister (oturumdaki
+        `_vault_keys` girdisine bakar); testler doğrudan DB'ye yazdığı için
+        burada tuzdan yeniden türetiyoruz — üretim yolunun aynısı.
+        """
+        from cryptography.fernet import Fernet
+        with app_module.app.app_context():
+            salt = app_module._decode_salt(
+                app_module.get_setting("pbkdf2_salt_b64"))
+        self.assertIsNotNone(salt)
+        return Fernet(app_module._derive_key_with_salt(self.MASTER, salt))
+
+    # ─── Doğrulama katmanı ───────────────────────────────────────────
+
+    def test_normalize_tags_sorts_dedupes_and_lowercases(self):
+        from kasa_core.record_extras import normalize_tags
+        self.assertEqual(normalize_tags("  Banka ,  ONEMLI ,banka"), ["banka", "onemli"])
+
+    def test_normalize_tags_accepts_list_and_rejects_junk(self):
+        from kasa_core.record_extras import normalize_tags
+        self.assertEqual(normalize_tags(["b", "a", "b"]), ["a", "b"])
+        self.assertEqual(normalize_tags(None), [])
+        self.assertEqual(normalize_tags(42), [])
+
+    def test_normalize_tags_enforces_limit(self):
+        from kasa_core.record_extras import MAX_TAGS, normalize_tags
+        self.assertEqual(len(normalize_tags([f"t{i}" for i in range(MAX_TAGS + 15)])), MAX_TAGS)
+
+    def test_normalize_custom_fields_drops_unlabelled_and_deduplicates(self):
+        from kasa_core.record_extras import normalize_custom_fields
+        got = normalize_custom_fields([
+            {"label": "PIN", "value": "1", "secret": True},
+            {"label": "", "value": "yok"},
+            {"label": "pin", "value": "2"},
+            "not-a-dict",
+        ])
+        self.assertEqual(got, [{"label": "PIN", "value": "1", "secret": True}])
+
+    def test_normalize_custom_fields_enforces_limit(self):
+        from kasa_core.record_extras import MAX_CUSTOM_FIELDS, normalize_custom_fields
+        got = normalize_custom_fields([
+            {"label": f"L{i}", "value": "v"} for i in range(MAX_CUSTOM_FIELDS + 10)
+        ])
+        self.assertEqual(len(got), MAX_CUSTOM_FIELDS)
+
+    def test_decrypt_json_returns_fallback_on_garbage(self):
+        from kasa_core.record_extras import decrypt_json
+        self.assertEqual(decrypt_json(None, "not-fernet", []), [])
+        self.assertEqual(decrypt_json(None, "", ["x"]), ["x"])
+
+    def test_encrypt_decrypt_roundtrip_keeps_plaintext_off_disk(self):
+        from cryptography.fernet import Fernet
+        from kasa_core.record_extras import decrypt_json, encrypt_json
+        fernet = Fernet(Fernet.generate_key())
+        blob = encrypt_json(fernet, ["gizli-etiket-degeri"])
+        self.assertNotIn("gizli-etiket-degeri", blob)
+        self.assertEqual(decrypt_json(fernet, blob, []), ["gizli-etiket-degeri"])
+
+    # ─── Form ayrıştırma ─────────────────────────────────────────────
+
+    def test_form_fields_are_indexed_and_secret_is_optional(self):
+        from werkzeug.datastructures import MultiDict
+        from kasa_core.record_extras import custom_fields_from_form
+        form = MultiDict([
+            ("cf_label_0", "PIN"), ("cf_value_0", "1234"), ("cf_secret_0", "1"),
+            ("cf_label_1", "Not"), ("cf_value_1", "acik"),
+        ])
+        got = custom_fields_from_form(form)
+        self.assertEqual(got[0], {"label": "PIN", "value": "1234", "secret": True})
+        self.assertFalse(got[1]["secret"])
+
+    def test_secret_checkbox_is_never_disabled(self):
+        # AGENTS.md tuzağı: formdaki bir `disabled` input GÖNDERİLMEZ.
+        # 🔴 Jinja YORUMU `{# … #}` önce atılır — bu panelin kendi gerekçe
+        # yorumu "disabled" kelimesini içeriyor ve test kendi kendini kandırırdı.
+        template = (
+            FLASK_APP_DIR / "templates" / "partials" / "form" / "panel-extras.html"
+        ).read_text(encoding="utf-8")
+        markup = re.sub(r"\{#.*?#\}", "", template, flags=re.S)
+        self.assertNotIn("disabled", markup)
+
+    # ─── Uçtan uca ───────────────────────────────────────────────────
+
+    def test_post_saves_custom_fields_and_tags(self):
+        fernet = self._fernet()
+        with app_module.app.test_request_context("/ekle", method="POST", data={
+            "csrf_token": "t", "kayit_tipi": "Other", "isim": "Test",
+            "cf_label_0": "PIN", "cf_value_0": "4321", "cf_secret_0": "1",
+            "tags": "banka, ONEMLI, banka",
+        }):
+            fields = app_module._record_from_form(fernet)
+
+        self.assertEqual(
+            app_module._decrypt_json(fernet, fields["encrypted_custom_fields"], []),
+            [{"label": "PIN", "value": "4321", "secret": True}],
+        )
+        self.assertEqual(app_module._decrypt_json(fernet, fields["encrypted_tags"], []),
+                         ["banka", "onemli"])
+        # Diskte düz metin olmamalı.
+        self.assertNotIn("4321", fields["encrypted_custom_fields"])
+        self.assertNotIn("banka", fields["encrypted_tags"])
+
+    def _seed_record(self, record_id, fields, tags):
+        """Kaydı doğrudan kurar.
+
+        `_record_from_form` `request.form` okuduğu için istek bağlamı ister;
+        seed'te yalnız kimlik + şifreli ekler gerekiyor, form yolu
+        `test_post_saves_custom_fields_and_tags` içinde ayrıca sınanıyor.
+        """
+        fernet = self._fernet()
+        with app_module.app.app_context():
+            record = app_module.Record(
+                id=record_id, type="Other", category="Genel", title="",
+                website_url="", login="", email="", card_holder="",
+                encrypted_password="", encrypted_comment="", is_pinned=0,
+                encrypted_custom_fields=app_module._encrypt_json(fernet, fields),
+                encrypted_tags=app_module._encrypt_json(fernet, tags),
+            )
+            app_module.db.session.add(record)
+            app_module.db.session.commit()
+
+    def test_index_never_exposes_custom_field_values(self):
+        self._seed_record(
+            "extras-leak",
+            [{"label": "PIN", "value": "GIZLI-4321", "secret": True}],
+            ["banka"],
+        )
+        self._login()
+        body = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn("GIZLI-4321", body)
+        self.assertIn("banka", body)  # etiketler metadata; `category` ile aynı sınıf
+
+    def test_index_shows_count_but_not_values(self):
+        self._seed_record(
+            "extras-count",
+            [{"label": "A", "value": "AAA"}, {"label": "B", "value": "BBB"}],
+            [],
+        )
+        self._login()
+        body = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn("AAA", body)
+        self.assertNotIn("BBB", body)
+        self.assertIn("vault-card-custom-fields", body)
+
+    def test_edit_form_roundtrips_extras(self):
+        self._seed_record(
+            "extras-edit",
+            [{"label": "PIN", "value": "7788", "secret": True}],
+            ["banka"],
+        )
+        self._login()
+        body = self.client.get("/duzenle/extras-edit").get_data(as_text=True)
+        self.assertIn("7788", body)          # form yolunda düz metin (Password gibi)
+        self.assertIn("cf_secret_0", body)   # gizli işareti korunur
+        self.assertIn("banka", body)
+
+    def test_partial_edit_form_preserves_existing_extras(self):
+        """LAN POST'u formu hiç görmediği için `cf_*`/`tags` göndermez → silinmemeli."""
+        self._seed_record(
+            "extras-keep",
+            [{"label": "PIN", "value": "7788", "secret": True}],
+            ["banka"],
+        )
+        self._login()
+        token = self._csrf(self.client.get("/").get_data(as_text=True))
+        response = self.client.post("/duzenle/extras-keep", data={
+            "csrf_token": token, "kayit_tipi": "Other", "isim": "Yeni Baslik",
+        })
+        self.assertEqual(response.status_code, 302)
+
+        fernet = self._fernet()
+        with app_module.app.app_context():
+            stored = app_module.db.session.get(app_module.Record, "extras-keep")
+            self.assertEqual(
+                app_module._decrypt_json(fernet, stored.encrypted_custom_fields, []),
+                [{"label": "PIN", "value": "7788", "secret": True}],
+            )
+            self.assertEqual(app_module._decrypt_json(fernet, stored.encrypted_tags, []), ["banka"])
+
+    # ─── Denetim günlüğü ────────────────────────────────────────────
+
+    def test_extras_never_reach_the_audit_log(self):
+        from kasa_core.audit import audit
+        self.assertFalse(audit("kayit_olusturuldu", tags=["gizli-etiket"]))
+        self.assertFalse(audit("kayit_olusturuldu", custom_fields=[{"value": "x"}]))
+
+    # ─── Kaynak dosyalar ─────────────────────────────────────────────
+
+    def test_panels_are_wired_and_carry_versions(self):
+        ekle = (FLASK_APP_DIR / "templates" / "ekle.html").read_text(encoding="utf-8")
+        self.assertIn("partials/form/panel-extras.html", ekle)
+
+        base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
+        self.assertIn("vault-form.css\') }}?v=112", base)
+
+        appjs = (FLASK_APP_DIR / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("./vault-form.js?v=2", appjs)
+
+    def test_custom_field_limit_is_shared_between_ui_and_backend(self):
+        js = (FLASK_APP_DIR / "static" / "vault-form.js").read_text(encoding="utf-8")
+        self.assertIn("const CF_MAX = 30;", js)
+        backend = (FLASK_APP_DIR / "kasa_core" / "record_extras.py").read_text(encoding="utf-8")
+        self.assertIn("MAX_CUSTOM_FIELDS = 30", backend)
+
+
+class FontAwesomeIconTests(unittest.TestCase):
+    """Kullanılan HER FontAwesome ikonu yerel `all.min.css` içinde var mı?
+
+    🔴 Neden gerekli: FA yerel dosyadan yükleniyor (CDN yok). Dosyada olmayan
+    bir `fa-*` sınıfı sessizce **boş render** olur — kod hatası üretmez,
+    kullanıcı yalnızca "simge yok" görür. Bu projede bir kez gerçekten
+    oldu: `fa-shield-exclamation` yerelde yoktu, `fa-shield-halved` ile
+    değiştirildi. (Bir ara `fa-building-columns` de "yok" sanılmıştı; o
+    ölçüm yanlıştı, ikon yerelde mevcut.)
+
+    Var olan testler yalnız belirli noktaları denetliyordu (kilit ikonu,
+    marka seçici); bu test TÜM şablon ve JS modüllerini kapsar.
+    """
+
+    MODIFIERS = {
+        "solid", "regular", "brands", "light", "thin", "duotone", "sharp",
+        "fw", "spin", "beat", "fade", "flip", "stack", "inverse", "beat-fade",
+        "spin-pulse", "spin-reverse", "border", "pull-left", "pull-right",
+        "xs", "sm", "lg", "xl", "2xl", "rotate", "rotate-by", "flip-horizontal",
+        "flip-vertical", "li", "ul", "s", "left", "right", "beat", "stack-1x",
+        "stack-2x", "1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x", "10x",
+    }
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.fa_css_path = FLASK_APP_DIR / "static" / "all.min.css"
+        cls.fa_css = cls.fa_css_path.read_text(encoding="utf-8", errors="replace")
+        cls.sources = {
+            path: path.read_text(encoding="utf-8", errors="replace")
+            for path in list((FLASK_APP_DIR / "templates").rglob("*.html"))
+            + list((FLASK_APP_DIR / "static").rglob("*.js"))
+        }
+
+    @staticmethod
+    def _available(selector_match) -> set[str]:
+        return set(re.findall(r"\.fa-([a-z0-9-]+)", selector_match))
+
+    def _defined_icons(self) -> set[str]:
+        """`all.min.css` içinde tanımlı ikon sınıfları.
+
+        🔴 FA kuralları **gruplanmış**: `.fa-a,.fa-b,.fa-c{--fa:"..."}`. Bu
+        yüzden seçici sonu virgül veya süslü parantezle bitmeli; `\s` arayan
+        desen kaba ölçümde tümünü "yok" sayıyordu.
+        """
+        return self._available(self.fa_css)
+
+    def _used_icons(self) -> dict[str, set[str]]:
+        used: dict[str, set[str]] = {}
+        for path, text in self.sources.items():
+            for name in re.findall(
+                r"(?<![\w-])fa-([a-z0-9]+(?:-[a-z0-9]+)*)", text
+            ):
+                if name in self.MODIFIERS:
+                    continue
+                used.setdefault(name, set()).add(str(path.name))
+        return used
+
+    def test_detector_recognises_a_known_icon(self):
+        """Algılayıcının çalıştığını doğrular (kendi kendini sınayan test)."""
+        defined = self._defined_icons()
+        self.assertIn("star", defined)
+        self.assertIn("lock", defined)
+
+    def test_detector_rejects_a_made_up_icon(self):
+        """Sahte ad EKLİMEMELİ — aksi hâlde test her şeyi geçirirdi."""
+        defined = self._defined_icons()
+        self.assertNotIn("kasa-bulutfikrim", defined)
+
+    def test_every_used_icon_exists_locally(self):
+        defined = self._defined_icons()
+        missing = {
+            name: sorted(files)
+            for name, files in self._used_icons().items()
+            if name not in defined
+        }
+        self.assertEqual(
+            missing, {},
+            "Yerel FontAwesome'da olmayan ikon kullan\u0131lm\u0131\u015f: "
+            + "; ".join(f"fa-{k} ({', '.join(v)})" for k, v in sorted(missing.items())),
+        )
+
+    def test_no_external_icon_cdn(self):
+        for path, text in self.sources.items():
+            self.assertNotIn("cdnjs.cloudflare.com", text, path.name)
+            self.assertNotIn("kit.fontawesome.com", text, path.name)
+
+    def test_known_previously_missing_icon_stays_replaced(self):
+        """`fa-shield-exclamation` YERELDE YOK; tekrar kazara kullanılmamalı.
+
+        🔴 `fa-building-columns` da bir ara "yok" sayılmış ve `fa-landmark`
+        ile değiştirilmişti — **bu ölçüm yanlıştı**, ikon aslında yerelde
+        var. İki ikon da kullanılabilir; buradaki tek gerçek eksi ikon
+        `shield-exclamation`.
+        """
+        defined = self._defined_icons()
+        self.assertNotIn("shield-exclamation", defined)
+        self.assertNotIn("fa-shield-exclamation", " ".join(self.sources.values()))
+
+    def test_bank_icons_are_both_available(self):
+        """Kart bankası seçicisindeki ikon ölçümüyle doğrulanmış olmalı."""
+        defined = self._defined_icons()
+        for name in ("shield-halved", "landmark", "building-columns"):
+            self.assertIn(name, defined)
+
+
+class CardBrandAndDatesTests(unittest.TestCase):
+    MASTER = "test-master-password"
+    """Kart markası seçici + kartta son kullanma / son değiştirilme tarihi.
+
+    🔴 Marka **beyaz listeli**: `card_brand` düz metin bir sütundur (marka sır
+    değil, `category`/`type` ile aynı sınıf) ve kart HTML'ine basılır.
+    `brand_icons.normalize_card_brand` geçersiz girdiyi '' 'a indirger; bu
+    testler o sözleşmeyi kilitler.
+    """
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        token = self._csrf(self.client.get("/login").get_data(as_text=True))
+        response = self.client.post("/login", data={
+            "master_password": self.MASTER, "csrf_token": token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+
+    def _tr(self):
+        return json.loads(
+            (FLASK_APP_DIR / "translations" / "tr.json").read_text(encoding="utf-8"))
+
+    def _en(self):
+        return json.loads(
+            (FLASK_APP_DIR / "translations" / "en.json").read_text(encoding="utf-8"))
+
+    def _fernet(self):
+        """Kasa anahtarini test icinde turetir (`get_fernet()` istek baglami ister)."""
+        from cryptography.fernet import Fernet
+        with app_module.app.app_context():
+            salt = app_module._decode_salt(
+                app_module.get_setting("pbkdf2_salt_b64"))
+        self.assertIsNotNone(salt)
+        return Fernet(app_module._derive_key_with_salt(self.MASTER, salt))
+
+    def _add_card(self, **overrides):
+        """Kart kaydini uretip gercek `Record` nesnesini DB'ye yazar.
+
+        Neden HTTP POST'u degil: `/ekle` POST ucu CSRF dogrulamasindan gectigi
+        icin test istemcisi 400 aliyor ve bu, kart/marka mantigiyla ilgisi
+        olmayan bir engel. Diger test siniflariyla ayni desen: form
+        `_record_from_form` ile istek baglaminda cevrilir, kayit DB'ye yazilir.
+        """
+        form = {
+            "csrf_token": "t",
+            "kayit_tipi": "CreditCard",
+            "isim": "Test Karti",
+            "login": "4111111111111111",
+            "password": "Tr0ub4dor&3-Quetzal-Lantern!",
+            "card_holder": "AD SOYAD",
+            "card_brand": "visa",
+            "expiry_date": "2029-11-30",
+        }
+        form.update(overrides)
+        fernet = self._fernet()
+        with app_module.app.test_request_context("/ekle", method="POST", data=form):
+            fields = app_module._record_from_form(fernet)
+        with app_module.app.app_context():
+            record = app_module.Record(**fields)
+            app_module.db.session.add(record)
+            app_module.db.session.commit()
+            return record.id
+    def test_model_has_card_brand_column(self):
+        self.assertIn('card_brand', app_module.Record.__table__.columns)
+
+    def test_migration_alter_list_includes_card_brand(self):
+        source = (FLASK_APP_DIR / "app.py").read_text(encoding="utf-8")
+        self.assertIn("'encrypted_custom_fields', 'encrypted_tags', 'card_brand'", source)
+
+    def test_form_field_map_includes_card_brand(self):
+        source = (FLASK_APP_DIR / "app.py").read_text(encoding="utf-8")
+        self.assertIn("'card_brand': 'card_brand'", source)
+
+    def test_valid_brand_passes_whitelist(self):
+        brands = [key for key, _label in app_module._available_card_brands()]
+        self.assertTrue(brands, "kart markasi listesi bos")
+        for brand in brands:
+            self.assertEqual(app_module._normalize_card_brand(brand), brand)
+
+    def test_brand_matching_is_case_and_space_insensitive(self):
+        self.assertEqual(app_module._normalize_card_brand('  VISA '), 'visa')
+        self.assertEqual(app_module._normalize_card_brand('Mastercard'), 'mastercard')
+        self.assertEqual(app_module._normalize_card_brand('AmEx'), 'amex')
+        self.assertEqual(app_module._normalize_card_brand('master-card'), 'mastercard')
+
+    def test_unknown_brand_is_rejected(self):
+        self.assertEqual(app_module._normalize_card_brand('zzz-not-a-bank'), '')
+        self.assertEqual(app_module._normalize_card_brand(''), '')
+
+    def test_whitelist_never_returns_the_raw_input(self):
+        """🔴 Sözleşme: **sonuç** her zaman geçerli bir marka anahtarı ya da ''.
+
+        Sözleşme: donen deger **daima** beyaz listedeki bir anahtar ya da ''.
+        Ham metin hicbir kosulda geri donmez; eslesme yalnizca normalize
+        edilmis tam esitlikle olur, bu yuzden `<script>alert(1)</script>` gibi
+        girdiler '' doner.
+        """
+        valid = {key for key, _label in app_module._available_card_brands()}
+        for raw in ('<script>alert(1)</script>', '"><img src=x>',
+                    'a' * 5000, 'visa OR 1=1', '  VISA  '):
+            result = app_module._normalize_card_brand(raw)
+            self.assertIn(result, valid | {''},
+                          f"{raw!r} -> {result!r} beyaz listede değil")
+
+    @staticmethod
+    def _card_block(html, title="Test Karti"):
+        """Kartin `<div class="card-wrapper">` blogunu dondurur.
+
+        Sayfa genelinde baska yuzeylerde de 'Son Kullanma' gecigi icin
+        tum HTML uzerinde assertIn/assertNotIn guvenilir degildir.
+        """
+        match = re.search(
+            r'<div class="card-wrapper[^"]*"[^>]*id="card-%s".*?(?=<div class="card-wrapper|</div>\s*</div>\s*<div id="card-pagination|<script)',
+            html, re.S)
+        if match:
+            return match.group(0)
+        start = html.find('data-title="' + title + '"')
+        if start == -1:
+            start = html.find(title)
+        return html[max(0, start - 4000):start + 4000] if start != -1 else ""
+
+    def test_brand_is_persisted_on_create(self):
+        self._login()
+        brand = 'visa'
+        self._add_card(card_brand=brand)
+        with app_module.app.app_context():
+            record = app_module.Record.query.filter_by(type='CreditCard').first()
+            self.assertIsNotNone(record)
+            self.assertEqual(record.card_brand, brand)
+
+    def test_invalid_brand_is_not_stored(self):
+        self._login()
+        self._add_card(card_brand='HACK <b>x</b>')
+        with app_module.app.app_context():
+            cards = app_module.Record.query.filter_by(type='CreditCard').all()
+        self.assertTrue(cards)
+        for record in cards:
+            self.assertEqual(record.card_brand or '', '')
+
+    def test_brand_never_reaches_html(self):
+        self._login()
+        self._add_card(card_brand='HACK <b>x</b>')
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn('HACK', html)
+
+    def test_edit_form_roundtrips_brand(self):
+        self._login()
+        brand = 'visa'
+        self._add_card(card_brand=brand)
+        with app_module.app.app_context():
+            record = app_module.Record.query.filter_by(type='CreditCard').first()
+            record_id = record.id
+        html = self.client.get(f"/duzenle/{record_id}").get_data(as_text=True)
+        self.assertIn(f'<option value="{brand}" selected>', html)
+
+    def test_card_grid_shows_expiry_for_card(self):
+        self._login()
+        self._add_card()
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn('Son Kullanma', html)
+        self.assertIn('11/2029', html)
+
+    def test_card_grid_shows_last_modified(self):
+        self._login()
+        self._add_card()
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn('Son Değiştirilme', html)
+
+    def test_non_card_has_no_expiry_row(self):
+        self._login()
+        self._add_card(kayit_tipi='Website', isim='Site', card_brand='',
+                       expiry_date='')
+        html = self.client.get("/").get_data(as_text=True)
+        # 'Son Kullanma' baska yuzeylerde de gecigi icin yalnizca bu kaydin
+        # kart bloguna bakilir.
+        card_html = self._card_block(html)
+        self.assertNotIn('Son Kullanma', card_html)
+
+
+    def test_get_brand_icon_prefers_explicit_brand(self):
+        """Acik kart markasi, baslik ve alan adindan oncelikli olmali.
+
+        Kart markasi artik URETILMIS bir isaret donduruyor; eskiden diskte SVG
+        dosyasi arandigi icin bu test `skipTest` ile atlaniyordu.
+        """
+        markup = str(app_module.getBrandIcon(
+            'Baska Marka', 'baska.example', 'CreditCard', 'visa'))
+        self.assertIn('data-brand="visa"', markup)
+        self.assertNotIn('data-brand="baska.example"', markup)
+
+    def test_card_brand_list_is_not_the_website_icon_list(self):
+        """Kart markalari web sitesi marka ikonlari degildir.
+
+        Olcum: `available_card_brands()` `static/brand-icons/*.svg` dosya
+        adlarini donduruyordu ve liste `['amazon','apple','github',...]` idi.
+        Kullanici "Visa / Mastercard" bekler; gecerli bir giriş (`visa`)
+        beyaz listede olmadigi icin her secim sessizce bos donuyordu.
+        """
+        keys = [key for key, _label in app_module._available_card_brands()]
+        self.assertIn('visa', keys)
+        self.assertIn('mastercard', keys)
+        for web_only in ('amazon', 'github', 'discord', 'netflix'):
+            self.assertNotIn(web_only, keys,
+                             f"{web_only} bir web sitesi markasi, kart markasi degil")
+
+    def test_card_brand_labels_are_human_readable(self):
+        """`<select>` ogeleri ham anahtari degil gorunen adi gosterir."""
+        pairs = app_module._available_card_brands()
+        self.assertTrue(all(label and label != key for key, label in pairs),
+                        pairs)
+        visa = dict(pairs)['visa']
+        self.assertEqual(visa, 'Visa')
+
+    def test_get_brand_icon_still_backward_compatible(self):
+        markup = str(app_module.getBrandIcon('Visa', '', 'CreditCard'))
+        self.assertIn('data-brand="', markup)
+
+    def test_form_has_brand_select_with_empty_default(self):
+        html = (FLASK_APP_DIR / "templates" / "partials" / "form" / "panel-access.html").read_text(encoding="utf-8")
+        self.assertIn('id="card_brand"', html)
+        self.assertIn('data-custom-select', html)
+        self.assertIn('<option value="">', html)
+
+    def test_form_wired_into_js_type_toggle(self):
+        js = (FLASK_APP_DIR / "static" / "vault-form.js").read_text(encoding="utf-8")
+        self.assertIn("el('card_brand_group')", js)
+        self.assertIn('setVis(cardBrandGroup, isCard)', js)
+
+    def test_brand_group_hidden_by_default(self):
+        html = (FLASK_APP_DIR / "templates" / "partials" / "form" / "panel-access.html").read_text(encoding="utf-8")
+        block = html[html.index('id="card_brand_group"'):][:300]
+        self.assertIn('hidden', block)
+
+    def test_translations_present(self):
+        tr, en = self._tr(), self._en()
+        for name in ("Kart Markası", "Belirtilmedi", "Son Kullanma",
+                     "Son Değiştirilme"):
+            self.assertIn(name, tr)
+            self.assertIn(name, en)
+            self.assertTrue(en[name])
+            self.assertNotEqual(en[name], name, f"{name} Ingilizce'ye cevrilmemis")
+
+    def test_brand_select_uses_an_icon_that_exists_locally(self):
+        html = (FLASK_APP_DIR / "templates" / "partials" / "form" / "panel-access.html").read_text(encoding="utf-8")
+        segment = html[html.index('id="card_brand_group"'):][:600]
+        icon = re.search(r'fa-(?!solid|regular|brands)([\w-]+)', segment)
+        self.assertIsNotNone(icon)
+        css = (FLASK_APP_DIR / "static" / "all.min.css").read_text(encoding="utf-8")
+        name = icon.group(1)
+        # 🔴 group(1) "fa-" öneksiz döner (desen `fa-(?!…)([\w-]+)`),
+        # CSS ise `.fa-landmark {` diyor -> ön ek açıkça geri konur.
+        self.assertRegex(css, r"\.fa-" + re.escape(name) + r"(\s|,|\{)")
+
+    def test_vault_form_js_version_bumped(self):
+        app_js = (FLASK_APP_DIR / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("./vault-form.js?v=2", app_js)
+
+
+
+class BulkEditTests(unittest.TestCase):
+    """Toplu düzenleme (`/api/bulk/edit`).
+
+    🔴 Yazılabilir alanlar bilinçli olarak dar: yalnız kendi metin alanları
+    (favori, etiket, son kullanma tarihi). Şifre, kayıt türü ve şifreli özel
+    alanlar toplu olarak değiştirilemez — tek hamlede commit edilen geri
+    alınamaz bir işlemde kullanıcı veri kaybeder.
+    """
+
+    MASTER = "test-master-password"
+
+    def setUp(self) -> None:
+        self.client = _new_test_client()
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+        self._seed_vault()
+        self._login()
+
+    def tearDown(self) -> None:
+        login_lockout._login_attempts.clear()
+        self._reset_vault_state()
+
+    @classmethod
+    def _reset_vault_state(cls) -> None:
+        with app_module.app.app_context():
+            for key in (
+                "master_hash",
+                "pbkdf2_salt_b64",
+                "vault_initialized",
+                app_module.RECORD_METADATA_SETTING,
+            ):
+                app_module.Setting.query.filter_by(key=key).delete()
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+            app_module.db.session.commit()
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+            if os.path.exists(app_module.VAULT_INIT_FILE):
+                os.remove(app_module.VAULT_INIT_FILE)
+
+    @classmethod
+    def _seed_vault(cls) -> None:
+        with app_module.app.app_context():
+            app_module.db.session.add(app_module.Setting(
+                key="master_hash",
+                value=app_module.hash_master_password(cls.MASTER),
+            ))
+            app_module.db.session.add(app_module.Setting(
+                key="pbkdf2_salt_b64", value=app_module._new_salt_b64()))
+            app_module.db.session.add(app_module.Setting(
+                key="vault_initialized", value="true"))
+            app_module.db.session.commit()
+
+    @staticmethod
+    def _csrf(html: str) -> str:
+        match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    def _login(self) -> None:
+        token = self._csrf(self.client.get("/login").get_data(as_text=True))
+        response = self.client.post("/login", data={
+            "master_password": self.MASTER, "csrf_token": token,
+        })
+        self.assertEqual(response.status_code, 302)
+
+    def _fernet(self):
+        from cryptography.fernet import Fernet
+        with app_module.app.app_context():
+            salt = app_module._decode_salt(
+                app_module.get_setting("pbkdf2_salt_b64"))
+        self.assertIsNotNone(salt)
+        return Fernet(app_module._derive_key_with_salt(self.MASTER, salt))
+
+    def _add(self, title="kayit", tags="", password="sifre-123"):
+        """Doğrudan `Record` kurar (`_record_from_form` istek bağlamı isterdi)."""
+        from kasa_core.crypto import encrypt_metadata, safe_encrypt
+        from kasa_core.record_extras import encrypt_json
+        fernet = self._fernet()
+        with app_module.app.app_context():
+            record = app_module.Record(
+                id=app_module.new_record_id(),
+                type="Website",
+                category="Genel",
+                title=encrypt_metadata(fernet, title),
+                website_url="", login="", email="", card_holder="",
+                encrypted_password=safe_encrypt(fernet, password),
+                encrypted_comment="",
+                is_pinned=0,
+                encrypted_custom_fields="",
+                encrypted_tags=encrypt_json(fernet, app_module._normalize_tags(tags)),
+            )
+            app_module.db.session.add(record)
+            app_module.db.session.commit()
+            return record.id
+
+    def _post(self, payload, expect=200):
+        # AJAX uçları CSRF'yi `X-App-Token` ile doğruluyor (form token'ı değil);
+        # bkz. `test_settings_runtime_reports_desired_and_actual_lan_state`.
+        response = self.client.post(
+            "/api/bulk/edit", json=payload,
+            headers={"X-App-Token": app_module.APP_TOKEN,
+                     "X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, expect, response.data[:400])
+        return response.get_json()
+
+    def _record(self, record_id):
+        with app_module.app.app_context():
+            return app_module.Record.query.get(record_id)
+
+    def _tags(self, record_id):
+        with app_module.app.app_context():
+            record = app_module.Record.query.get(record_id)
+            return app_module._decrypt_json(self._fernet(), record.encrypted_tags, [])
+
+    def _plain_password(self, record_id):
+        from kasa_core.crypto import safe_decrypt
+        with app_module.app.app_context():
+            record = app_module.Record.query.get(record_id)
+            return safe_decrypt(self._fernet(), record.encrypted_password)
+
+    # ─── Beyaz liste ──────────────────────────────────────────────────
+
+    def test_known_actions_are_accepted(self):
+        for action in ("pin", "unpin", "expiry_clear"):
+            result = self._post({"ids": [self._add()], "action": action})
+            self.assertEqual(result["status"], "ok", action)
+
+    def test_unknown_action_is_rejected(self):
+        for action in ("", "delete_all", "type", "../../etc/passwd"):
+            result = self._post({"ids": [self._add()], "action": action}, expect=400)
+            self.assertEqual(result["status"], "error")
+
+    def test_action_whitelist_matches_the_module_constant(self):
+        self.assertEqual(
+            set(app_module.BULK_EDIT_ACTIONS),
+            set(app_module.BULK_EDIT_FLAGS)
+            | set(app_module.BULK_EDIT_TAGS)
+            | set(app_module.BULK_EDIT_EXPIRY),
+        )
+
+    def test_empty_id_list_is_rejected(self):
+        result = self._post({"ids": [], "action": "pin"}, expect=400)
+        self.assertEqual(result["status"], "error")
+
+    # ─── Favori ───────────────────────────────────────────────────────
+
+    def test_pin_sets_every_selected_record(self):
+        first, second = self._add("bir"), self._add("iki")
+        result = self._post({"ids": [first, second], "action": "pin"})
+        self.assertEqual(result["updated"], 2)
+        self.assertTrue(self._record(first).is_pinned)
+        self.assertTrue(self._record(second).is_pinned)
+
+    def test_unpin_clears_every_selected_record(self):
+        first = self._add("bir")
+        self._post({"ids": [first], "action": "pin"})
+        self._post({"ids": [first], "action": "unpin"})
+        self.assertFalse(self._record(first).is_pinned)
+
+    def test_ids_outside_the_selection_are_untouched(self):
+        selected, untouched = self._add("secili"), self._add("dokunma")
+        self._post({"ids": [selected], "action": "pin"})
+        self.assertFalse(self._record(untouched).is_pinned)
+
+    # ─── Etiketler ────────────────────────────────────────────────────
+
+    def test_tags_add_merges_without_dropping_existing(self):
+        record_id = self._add(tags="is")
+        self._post({"ids": [record_id], "action": "tags_add", "tags": "banka, is"})
+        tags = self._tags(record_id)
+        self.assertIn("is", tags)
+        self.assertIn("banka", tags)
+
+    def test_tags_remove_deletes_only_the_named_tag(self):
+        record_id = self._add(tags="is,banka")
+        self._post({"ids": [record_id], "action": "tags_remove", "tags": "IS"})
+        self.assertEqual(self._tags(record_id), ["banka"])
+
+    def test_tags_matching_is_case_and_space_insensitive(self):
+        record_id = self._add(tags="Banka")
+        # Dış boşluk ve büyük/küçük harf eşleşmeli.
+        self._post({"ids": [record_id], "action": "tags_remove", "tags": "  BANKA "})
+        self.assertEqual(self._tags(record_id), [])
+
+    def test_tags_matching_folds_turkish_dotted_i(self):
+        # 🔴 `casefold()` tek başına "İş" → "i̇ş" (birleşik nokta) üretir ve
+        # "iş" ile eşleşmez; `fold_label` bu yüzden var. Etiketleme de
+        # aynı katlamayı kullanmak zorunda, yoksa bir kaydın etiketi
+        # başka bir kayıttan ayırt edilemez.
+        record_id = self._add(tags="İş")
+        self._post({"ids": [record_id], "action": "tags_remove", "tags": "iş"})
+        self.assertEqual(self._tags(record_id), [])
+
+    def test_empty_tag_payload_is_rejected(self):
+        result = self._post(
+            {"ids": [self._add()], "action": "tags_add", "tags": "  "}, expect=400)
+        self.assertEqual(result["status"], "error")
+
+    def test_tags_stay_encrypted(self):
+        record_id = self._add(tags="gizli-etiket")
+        with app_module.app.app_context():
+            raw = app_module.Record.query.get(record_id).encrypted_tags
+        self.assertTrue(raw)
+        self.assertNotIn("gizli-etiket", raw)
+
+    def test_no_op_tag_update_reports_zero(self):
+        record_id = self._add(tags="is")
+        result = self._post({"ids": [record_id], "action": "tags_add", "tags": "IS"})
+        self.assertEqual(result["updated"], 0)
+
+    # ─── Sır sınırları ────────────────────────────────────────────────
+
+    def test_bulk_edit_never_touches_the_password(self):
+        record_id = self._add(password="eski-parola-deger")
+        before = self._plain_password(record_id)
+        self.assertTrue(before)
+        self._post({"ids": [record_id], "action": "pin"})
+        self.assertEqual(self._plain_password(record_id), before)
+
+    def test_bulk_edit_never_touches_custom_fields(self):
+        from kasa_core.record_extras import encrypt_json
+        record_id = self._add()
+        with app_module.app.app_context():
+            record = app_module.Record.query.get(record_id)
+            record.encrypted_custom_fields = encrypt_json(
+                self._fernet(),
+                [{"label": "Anahtar", "value": "1234-ANAHTAR", "secret": True}],
+            )
+            app_module.db.session.commit()
+        for action in ("pin", "tags_add", "expiry_clear"):
+            self._post({"ids": [record_id], "action": action, "tags": "yeni"})
+        with app_module.app.app_context():
+            record = app_module.Record.query.get(record_id)
+            fields = app_module._decrypt_json(
+                self._fernet(), record.encrypted_custom_fields, [])
+        self.assertEqual(fields[0]["label"], "Anahtar")
+        self.assertEqual(fields[0]["value"], "1234-ANAHTAR")
+
+    def test_secret_custom_field_value_is_not_rendered(self):
+        from kasa_core.record_extras import encrypt_json
+        record_id = self._add()
+        with app_module.app.app_context():
+            record = app_module.Record.query.get(record_id)
+            record.encrypted_custom_fields = encrypt_json(
+                self._fernet(),
+                [{"label": "Anahtar", "value": "1234-ANAHTAR", "secret": True}],
+            )
+            app_module.db.session.commit()
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn("1234-ANAHTAR", html)
+
+    # ─── Tarih ────────────────────────────────────────────────────────
+
+    def test_expiry_set_writes_the_date(self):
+        record_id = self._add()
+        self._post({"ids": [record_id], "action": "expiry_set", "value": "2029-12-31"})
+        self.assertIsNotNone(self._record(record_id).expiry_date)
+
+    def test_expiry_set_rejects_garbage(self):
+        result = self._post(
+            {"ids": [self._add()], "action": "expiry_set", "value": "yarin"}, expect=400)
+        self.assertEqual(result["status"], "error")
+
+    def test_expiry_clear_nulls_the_date(self):
+        record_id = self._add()
+        self._post({"ids": [record_id], "action": "expiry_set", "value": "2029-12-31"})
+        self._post({"ids": [record_id], "action": "expiry_clear"})
+        self.assertIsNone(self._record(record_id).expiry_date)
+
+    # ─── Kimlik doğrulama ─────────────────────────────────────────────
+
+    def test_endpoint_requires_authentication(self):
+        from werkzeug.test import Client
+        anon = Client(app_module.app)
+        response = anon.post("/api/bulk/edit", json={"ids": ["x"], "action": "pin"})
+        self.assertIn(response.status_code, (302, 401, 403))
+
+    # ─── Arayüz ───────────────────────────────────────────────────────
+
+    def test_toolbar_has_the_edit_button(self):
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn('id="bulk-edit-btn"', html)
+
+    def test_modal_is_included(self):
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn('id="bulkEditModal"', html)
+        self.assertIn("data-kasa-close", html)
+        self.assertIn('aria-modal="true"', html)
+
+    def test_modal_offers_every_backend_action(self):
+        modal = (FLASK_APP_DIR / "templates" / "partials" / "modals" / "bulk-edit.html").read_text(encoding="utf-8")
+        for action in ("pin", "unpin", "tags_add", "tags_remove",
+                       "expiry_set", "expiry_clear"):
+            self.assertIn(f'data-bulk-action="{action}"', modal)
+
+    def test_modal_never_offers_destructive_actions(self):
+        modal = (FLASK_APP_DIR / "templates" / "partials" / "modals" / "bulk-edit.html").read_text(encoding="utf-8")
+        self.assertNotIn('data-bulk-action="delete"', modal)
+        self.assertNotIn('data-bulk-action="password"', modal)
+
+    def test_modal_input_is_never_disabled(self):
+        modal = (FLASK_APP_DIR / "templates" / "partials" / "modals" / "bulk-edit.html").read_text(encoding="utf-8")
+        for tag in re.findall(r"<input[^>]*>", modal):
+            self.assertNotIn("disabled", tag)
+
+    def test_lock_page_wires_the_button(self):
+        lock = (FLASK_APP_DIR / "templates" / "partials" / "modals" / "lock.html").read_text(encoding="utf-8")
+        self.assertIn("getElementById('bulk-edit-btn')", lock)
+        self.assertIn("/api/bulk/edit", lock)
+        self.assertIn("kasaModalAc('bulkEditModal')", lock)
+
+    # ─── Çeviriler ve sürümler ────────────────────────────────────────
+
+    def test_translations_exist_in_both_languages(self):
+        tr = json.loads((FLASK_APP_DIR / "translations" / "tr.json").read_text(encoding="utf-8"))
+        en = json.loads((FLASK_APP_DIR / "translations" / "en.json").read_text(encoding="utf-8"))
+        for key in ("Toplu Düzenle", "Favoriye Ekle", "Etiket Kaldır",
+                    "Son Kullanmayı Temizle"):
+            self.assertIn(key, tr)
+            self.assertIn(key, en)
+            self.assertNotEqual(en[key], key)
+
+    def test_translation_keys_are_a_subset(self):
+        tr = json.loads((FLASK_APP_DIR / "translations" / "tr.json").read_text(encoding="utf-8"))
+        en = json.loads((FLASK_APP_DIR / "translations" / "en.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(tr) - set(en), set())
+
+    def test_cache_bust_version(self):
+        base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
+        self.assertRegex(base, r"misc\.css[^?]*\?v=94")
+
+    def test_bulk_edit_surfaces_have_no_blur(self):
+        css = (FLASK_APP_DIR / "static" / "misc.css").read_text(encoding="utf-8")
+        stripped = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        for selector, body in re.findall(r"([^{}]*)\{([^}]*)\}", stripped):
+            if "bulk-edit" in selector and "backdrop-filter" in body:
+                self.fail(f"bulk-edit yuzeyi blur kullaniyor: {selector}")
+
+    def test_grid_rules_exist(self):
+        css = (FLASK_APP_DIR / "static" / "misc.css").read_text(encoding="utf-8")
+        self.assertIn(".bulk-edit-grid", css)
+        self.assertIn(".bulk-edit-action.is-selected", css)
+        self.assertIn(".bulk-edit-extra[hidden]", css)
+
+
+class LowPowerOpaqueTests(unittest.TestCase):
+    """Tasarruf (low-power) modunda kapatılan buğunun opak yedeğini zorlar.
+
+    DENETLENEN TUZAK: `base.css` `data-kasa-low-power="on"` altında
+    `.kasa-panel` için `backdrop-filter`'ı kapatıyor ama opak zemin vermiyordu.
+    Yüzeylerin opak görünmesi büyük ölçüde buğudan geldiği için sonuç
+    cam-kapalı (`data-glass-effects="off"`) yolunun aynısıydı: panel yarı
+    saydam kalıyordu. `GlassOffSurfaceTests` yalnız `data-glass-effects="off"`'u
+    denetlediği için bu yol görünmüyordu.
+    """
+
+    STATIC = FLASK_APP_DIR / "static"
+
+    #: `base.css` buğusunu kaldırdığı yüzeyler. Yeni bir yüzey buraya
+    #: eklenirse low-power opak yedeği de eklenmek zorunda.
+    BLUR_DISABLED_SURFACES = (".kasa-panel", ".kasa-modal .modal-content")
+
+    #: Zaten kendi CSS'inde opak tabaka taşıyan yüzeyler — bunlar için
+    #: low-power'a ÖZEL zemin kuralı GEREKSİZ (ve hatta istenmeyen: cam-kapalı
+    #: yolda da yok, eklenirse iki mod görünümlü olarak ayrışır).
+    #: `.modal-content` modals.css'te 0.88 opak; `.kasa-panel` değil — onu
+    #: cam-kapalı kuralı opaklaştırıyor, low-power da aynısını yapmalı.
+    NEEDS_FALLBACK = (".kasa-panel",)
+
+    MIN_ALPHA = 0.90
+
+    def _blocks(self, name):
+        stripped = re.sub(
+            r"/\*.*?\*/", "",
+            (self.STATIC / name).read_text(encoding="utf-8", errors="replace"),
+            flags=re.S,
+        )
+        out = []
+        for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", stripped):
+            out.append((" ".join(sel.split()), " ".join(body.split())))
+        return out
+
+    @staticmethod
+    def _alpha(value):
+        found = re.findall(r"rgba?\([^)]*?[,/]\s*([\d.]+)\s*\)", value)
+        return max((float(a) for a in found), default=0.0)
+
+    def _rules_for_file(self, filename, attribute, surface):
+        needle = f'{attribute}] {surface}'
+        return [
+            body for sel, body in self._blocks(filename) if needle in sel
+        ]
+
+    def _rules_for(self, attribute, surface):
+        needle = f'{attribute}] {surface}'
+        return [
+            body
+            for name in ("glass.css", "base.css", "theme-states.css")
+            for sel, body in self._blocks(name)
+            if needle in sel
+        ]
+
+    # ─── Opak yedek var mı ────────────────────────────────────────────
+
+    def test_base_css_disables_blur_only_for_known_surfaces(self):
+        blurred = []
+        for sel, body in self._blocks("base.css"):
+            if 'data-kasa-low-power="on"' not in sel or "backdrop-filter: none" not in body:
+                continue
+            blurred += [
+                p.strip()
+                for p in sel.split(",")
+                if p.strip().startswith("html[data-kasa-low-power=")
+            ]
+        self.assertTrue(blurred, "base.css içinde low-power blur kapatma kuralı yok")
+        for surface in self.BLUR_DISABLED_SURFACES:
+            self.assertIn(f'html[data-kasa-low-power="on"] {surface}', blurred)
+        # Yeni bir yüzey eklenirse opak yedeği de eklenmeli.
+        self.assertEqual(
+            sorted(set(blurred)),
+            sorted(f'html[data-kasa-low-power="on"] {s}' for s in self.BLUR_DISABLED_SURFACES),
+        )
+
+    def test_every_surface_needing_fallback_gets_one(self):
+        for surface in self.NEEDS_FALLBACK:
+            with self.subTest(surface=surface):
+                bodies = self._rules_for('data-kasa-low-power="on"', surface)
+                self.assertTrue(bodies, f"{surface}: low-power opak yedek kuralı yok")
+                best = max((self._alpha(b) for b in bodies), default=0.0)
+                self.assertGreaterEqual(
+                    best, self.MIN_ALPHA,
+                    f"{surface}: low-power yedeği opak değil (alpha {best})",
+                )
+
+    def test_both_themes_have_a_fallback(self):
+        for surface in self.NEEDS_FALLBACK:
+            with self.subTest(surface=surface):
+                bodies = self._rules_for('data-kasa-low-power="on"', surface)
+                self.assertTrue(
+                    any("#edf1f8" in b for b in bodies),
+                    f"{surface}: açık tema low-power yedeği yok",
+                )
+
+    @staticmethod
+    def _backgrounds(bodies):
+        """Kurallardaki `background:` bildirimlerini normalize edilmiş küme yapar.
+
+        Kural SAYISI karşılaştırılmaz: `theme-states.css` aynı yüzeye ek bir
+        `background: var(--glass)` kuralı koyar ama cascade'de `glass.css`
+        (daha sonra yükleniyor) üstüne biner. Önemli olan GERÇEK zemin
+        değerlerinin aynı olması.
+        """
+        found = set()
+        for body in bodies:
+            match = re.search(r"background:(.*?)(?:!important|$)", body)
+            if match:
+                found.add(" ".join(match.group(1).split()).rstrip(";"))
+        return found
+
+    def test_low_power_matches_the_glass_off_values(self):
+        """Low-power yedeği cam-kapalı karşılığıyla birebir aynı olmalı.
+
+        Değerler kayarsa iki mod görünümlü olarak ayrışır ve ayrışma fark
+        edilmez — `GlassVeilParityTests` ile aynı gerekçe.
+        """
+        for surface in self.NEEDS_FALLBACK:
+            with self.subTest(surface=surface):
+                # Karşılaştırma YEDEĞİN SAHİBİ OLAN DOSYAYA sabitlenir:
+                # `theme-states.css` de aynı yüzeye `background: var(--glass)`
+                # koyar ama `glass.css` cascade'de sonra geldiği için onu
+                # ezer. Değer karşılaştırması yürürlükteki katmanı denetlemeli.
+                low = self._backgrounds(
+                    self._rules_for('data-kasa-low-power="on"', surface))
+                off = self._backgrounds(
+                    self._rules_for_file(
+                        "glass.css", 'data-glass-effects="off"', surface))
+                self.assertTrue(low, f"{surface}: low-power zemin bildirimi yok")
+                self.assertTrue(off, f"{surface}: cam-kapalı zemin bildirimi yok")
+                self.assertEqual(
+                    low, off,
+                    f"{surface}: low-power ve cam-kapalı zemin değerleri ayrışıyor",
+                )
+
+    def test_low_power_does_not_duplicate_modal_content(self):
+        """`.modal-content` zaten opak; ek zemin kuralı cam-kapalı yolla
+        ayrışır. Bu test fazlalığı kilitler."""
+        self.assertNotIn(".kasa-modal .modal-content", self.NEEDS_FALLBACK)
+        bodies = self._rules_for('data-kasa-low-power="on"', ".kasa-modal .modal-content")
+        self.assertFalse(
+            [b for b in bodies if "background" in b],
+            "modal-content için low-power'a özel zemin kuralı eklenmiş",
+        )
+
+    # ─── Yanlışlıkla kaybolabilecek diğer davranışlar ─────────────────
+
+    def test_low_power_still_hides_the_animated_blobs(self):
+        found = [
+            sel
+            for sel, body in self._blocks("base.css")
+            if 'data-kasa-low-power="on"' in sel and "display: none" in body
+        ]
+        self.assertTrue(
+            any("body::before" in s for s in found),
+            "low-power blob gizlemesi kayboldu",
+        )
+
+    def test_low_power_still_pauses_animations_globally(self):
+        self.assertTrue(
+            [
+                1
+                for sel, body in self._blocks("base.css")
+                if 'data-kasa-low-power="on"] *' in sel and "animation-play-state" in body
+            ],
+            "low-power genel animasyon kilidi kayboldu",
+        )
+
+    def test_low_power_does_not_hide_blur_material(self):
+        """b71: low-power arka plan dokusu/perdesini gizlememeli."""
+        for sel, body in self._blocks("background.css"):
+            if 'data-kasa-low-power="on"' in sel and "display: none" in body:
+                self.assertNotIn("default-bg-texture", sel)
+                self.assertNotIn("default-bg-veil", sel)
+
+    def test_no_blurred_surface_is_left_without_a_low_power_answer(self):
+        """base.css'te low-power blur kapatılan her yüzey listede olmalı."""
+        listed = set(self.BLUR_DISABLED_SURFACES)
+        for sel, body in self._blocks("base.css"):
+            if 'data-kasa-low-power="on"' not in sel or "backdrop-filter: none" not in body:
+                continue
+            for part in sel.split(","):
+                s = part.strip()
+                if s.startswith("html[data-kasa-low-power="):
+                    self.assertIn(s.split("] ", 1)[1], listed)
+
+
+class ScriptDefinitionOrderTests(unittest.TestCase):
+    """JS `const` tanım/çağrı SIRASI — TDZ (geçici ölü bölge) tuzağı.
+
+    🔴 YÜKSEK ETKİLİ GERÇEK HATA (2026-10-09): `vault-index.js` içinde
+    `renderTagFilterBar` en sonunda `syncTagBadges()` çağırıyordu, ama
+    `syncTagBadges` `const` arrow olarak TANIMINDAN 5 SATIR SONRA geliyordu.
+    `const` arrow function'lar tanım satırı çalıştırılana kadar TDZ'dedir, yani
+    çağrı çalışma anında `ReferenceError` verir:
+
+        rebuildCardCache() -> renderTagFilterBar() -> syncTagBadges() 💥
+
+    Bu istisna `initVaultIndex` içinde `finishInitialReveal` PLANLANMADAN önce
+    patladığı için `.vault-card-curtain` hiç kalkmıyor ve **hiçbir kart
+    görünmüyordu** — 183 kayıt DB'de olmasına rağmen.
+
+    🔴 Bu hata neden testlerle yakalanmadı: Python paketi JS'i yalnızca METİN
+    olarak denetliyor, çalıştırmıyor; `node --check` de sadece sözdizimine
+    bakar. "JS parse ediyor" demek "çalışıyor" demek DEĞİLDİR.
+    """
+
+    JS = FLASK_APP_DIR / "static" / "vault-index.js"
+
+    def _lines(self) -> list:
+        return self.JS.read_text(encoding="utf-8").splitlines()
+
+    @staticmethod
+    def _define_line(lines: list, name: str) -> int:
+        desen = rf"\s*const {re.escape(name)}\s*=\s*(\(|async\s*\(|[A-Za-z_$][\w$]*\s*=>)"
+        for i, line in enumerate(lines, 1):
+            if re.match(desen, line):
+                return i
+        raise AssertionError(f"{name} tanimi bulunamadi")
+
+    def test_sync_tag_badges_is_defined_before_render_tag_filter_bar(self):
+        """Regresyon: bu sıra bozulursa kartların HİÇBİRİ renderlanmaz."""
+        lines = self._lines()
+        tanim = self._define_line(lines, "syncTagBadges")
+        cagri = [i for i, l in enumerate(lines, 1)
+                 if l.strip() == "syncTagBadges();"]
+        self.assertTrue(cagri, "syncTagBadges() cagrisi yok")
+        self.assertGreaterEqual(
+            min(cagri), tanim,
+            "syncTagBadges, renderTagFilterBar icinden ONCE cagriliyor ama "
+            "TANIMINDAN SONRA degil -> TDZ ReferenceError -> kartlar gorunmez")
+
+    def test_tag_filter_helpers_are_in_dependency_order(self):
+        """Etiket filtresi yardımcıları bağımlılık sırasında tanımlanmalı.
+
+        Zincir: matchesActiveTags -> syncTagBadges -> renderTagFilterBar ->
+        toggleTag/clearTags. Her biri bir öncekini çağırır.
+        """
+        lines = self._lines()
+        sirasi = ["buildCardTags", "matchesActiveTags", "syncTagBadges",
+                  "renderTagFilterBar", "toggleTag", "clearTags",
+                  "rebuildCardCache"]
+        satirlar = [self._define_line(lines, ad) for ad in sirasi]
+        self.assertEqual(
+            satirlar, sorted(satirlar),
+            f"Tanim sirasi bozuk: {list(zip(sirasi, satirlar))}")
+
+    def test_no_helper_is_called_before_its_own_definition(self):
+        """Genel denetim: init zincirinde çağrılan `const` yardımcılar."""
+        lines = self._lines()
+        # Yalnız doğrudan gövde cagrilari (`ad();`) — ic ice fonksiyonlarda
+        # tanimdan once yazilmis meşru cagrilar olabilir, onlar taranmaz.
+        ihlal = []
+        for i, line in enumerate(lines, 1):
+            m = re.match(r"\s*([A-Za-z_$][\w$]*)\(\);\s*$", line)
+            if not m:
+                continue
+            ad = m.group(1)
+            desen = rf"\s*const {re.escape(ad)}\s*=\s*(\(|async\s*\(|[A-Za-z_$][\w$]*\s*=>)"
+            tanim = next((j for j, l in enumerate(lines, 1)
+                          if re.match(desen, l)), None)
+            if tanim is not None and i < tanim:
+                ihlal.append(f"{ad}: cagri {i} < tanim {tanim}")
+        self.assertEqual(ihlal, [], f"TDZ ihlali: {ihlal}")
+
+    def test_card_reveal_is_scheduled_before_any_risky_early_call(self):
+        """`finishInitialReveal` planlanmadan önce patlayan çağrı olmamalı.
+
+        Perde (`vault-card-curtain`) yalnız `finishInitialReveal` ile kalkar;
+        ondan önceki bir istisna kartları görünmez bırakır.
+        """
+        lines = self._lines()
+        reveal = None
+        for i, line in enumerate(lines, 1):
+            if "finishInitialReveal))" in line or "requestAnimationFrame(finishInitialReveal" in line:
+                reveal = i
+                break
+        self.assertIsNotNone(reveal, "finishInitialReveal planlanmamis")
+        # `rebuildCardCache()` ve `renderTagFilterBar()` init sirasinda,
+        # perde kaldirmadan ONCE cagriliyor olabilir; siralari kayit.
+        cache = next((i for i, l in enumerate(lines, 1)
+                      if l.strip() == "rebuildCardCache();"), None)
+        self.assertIsNotNone(cache, "rebuildCardCache cagrisi yok")
+        self.assertLess(
+            cache, reveal,
+            "rebuildCardCache perde kaldirildiktan SONRA cagriliyor; "
+            "ilk cagri init sirasinda perde kalkmadan once olmali")
+
+
+class SearchFieldTests(unittest.TestCase):
+    """Arama alani secici (2026-10) — alan bazli arama.
+
+    Onceden arama kartin **tum gorunen metnini** taruyordu; kullanici "sadece
+    baslikta ara" diyebilemiyordu. Artik `matchesSearchTerm(item, term, mode)`
+    alana gore daraltiyor.
+
+    IKI KRITIK KURAL:
+      1. Alan filtresi TEK BASINA filtrelemez — bos metin her seyi eslestirir
+         (`matchesSearchTerm` ilk satiri `if (!term) return true`).
+      2. **DOM'a sirlayan yeni `data-*` eklenmez.** Alan degerleri yalniz
+         `textContent` + `.vault-detail-label[title]` ile okunur; sifre satiri
+         zaten maskeli (`••••••••`), LAN'da gizlenen alanlar bos string basar.
+    """
+
+    TEMPLATES = FLASK_APP_DIR / "templates"
+    STATIC = FLASK_APP_DIR / "static"
+
+    def _js(self) -> str:
+        return (self.STATIC / "vault-index.js").read_text(encoding="utf-8")
+
+    def _bar(self) -> str:
+        return (self.TEMPLATES / "partials" / "dashboard-bar.html").read_text(
+            encoding="utf-8")
+
+    def test_selector_lives_in_the_view_options_modal(self):
+        """Seçici çubuktan modal'a taşındı: 1200×800'de çubuk tek satıra sığmıyordu.
+
+        Çubuk artık yalnız arama kutusunu ve `view-options-btn` düğmesini taşır;
+        `search-field-select` ve `record-sort-select` modalın içindedir.
+        """
+        bar = (FLASK_APP_DIR / "templates" / "partials" / "dashboard-bar.html").read_text(encoding="utf-8")
+        modal = (FLASK_APP_DIR / "templates" / "partials" / "modals" / "view-options.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="search-field-select"', bar)
+        self.assertNotIn('id="record-sort-select"', bar)
+        self.assertIn('id="view-options-btn"', bar)
+        self.assertIn('id="search-field-select"', modal)
+        self.assertIn('id="record-sort-select"', modal)
+        # Çubukta arama kutusu KALMALI.
+        self.assertIn('id="search-input"', bar)
+        # Modal sistemi düğmeden açılabilmeli.
+        self.assertIn('data-kasa-modal="viewOptionsModal"', bar)
+
+    def test_modal_is_a11y_complete(self):
+        modal = (FLASK_APP_DIR / "templates" / "partials" / "modals" / "view-options.html").read_text(encoding="utf-8")
+        for parca in ('id="viewOptionsModal"', 'tabindex="-1"', 'role="dialog"',
+                      'aria-modal="true"', 'aria-labelledby=', 'data-kasa-close'):
+            self.assertIn(parca, modal)
+
+
+    def test_all_six_modes_are_wired(self) -> None:
+        js = self._js()
+        self.assertIn("SEARCH_FIELD_ORDER = ['all', 'title', 'username', 'email', 'note', 'card']", js)
+        self.assertIn("const searchField = getActiveSearchField();", js)
+        self.assertIn("matchesSearchTerm(item, term, searchField)", js)
+
+    def test_empty_term_matches_everything(self) -> None:
+        """Alan filtresi tek basina filtrelemez."""
+        js = self._js()
+        self.assertRegex(js, r"const matchesSearchTerm[\s\S]{0,400}?if \(!term\) return true;")
+        # Eski "sadece term" yolu kalmamis olmali
+        self.assertNotIn("const matchesSearch = !term || searchText.includes(term);", js)
+
+    def test_all_mode_keeps_previous_behaviour(self) -> None:
+        """'Tümü' modu eski davranisin birebir kendisi (geriye uyum)."""
+        js = self._js()
+        self.assertIn("if (mode === SEARCH_FIELD_ALL) return item.searchText.includes(term);", js)
+        self.assertIn("searchText: normalizeSearchText(wrapper.textContent)", js)
+
+    def test_cache_item_exposes_title_and_fields(self) -> None:
+        js = self._js()
+        self.assertIn("titleText: normalizeSearchText(", js)
+        self.assertIn("fields: buildCardFields(wrapper)", js)
+        self.assertIn(".vault-detail-label", js)
+        self.assertIn(".vault-detail-value", js)
+        # Anahtar etiketten okunur; etiket METNI ceviriye bagli oldugu icin
+        # once `title` attribute'una bakilir.
+        self.assertIn("getAttribute('title')", js)
+
+    def test_selection_is_persisted(self) -> None:
+        js = self._js()
+        self.assertIn("SEARCH_FIELD_STORAGE_KEY = 'kasa-search-field'", js)
+        self.assertIn("localStorage.setItem(SEARCH_FIELD_STORAGE_KEY, searchFieldSelect.value)", js)
+        self.assertIn("localStorage.getItem(SEARCH_FIELD_STORAGE_KEY)", js)
+        self.assertIn("if (SEARCH_FIELD_ORDER.includes(storedField)) searchFieldSelect.value = storedField;", js)
+
+    def test_no_new_secret_bearing_data_attributes(self) -> None:
+        """Guvenlik: alan degerleri DOM'a data-* ile SIZDIRILMAZ."""
+        js = self._js()
+        body = re.search(r"const buildCardFields = \(wrapper\) => \{[\s\S]*?\n    \};", js)
+        self.assertIsNotNone(body, "buildCardFields bulunamadi")
+        segment = body.group(0)
+        self.assertNotIn("dataset", segment)
+        self.assertNotIn("data-", segment)
+        # Kart sablonunda da yeni sif tasuyan data-* yok
+        grid = (self.TEMPLATES / "partials" / "card-grid.html").read_text(encoding="utf-8")
+        present = set(re.findall(r'data-([a-z-]+)=', grid))
+        self.assertTrue(
+            present <= {"expiry", "id", "pinned", "type", "username", "visible"},
+            f"beklenmeyen data-* ozelligi: {sorted(present)}")
+
+    def test_translations_exist(self) -> None:
+        for name in ("tr", "en"):
+            data = json.loads(
+                (FLASK_APP_DIR / "translations" / f"{name}.json").read_text(encoding="utf-8"))
+            for key in ("Tümü", "Başlık", "Kullanıcı adı", "E-posta", "Not",
+                        "Kart no", "Arama alanı"):
+                self.assertIn(key, data, f"{name}.json: '{key}' eksik")
+
+    def test_cache_bust_version(self) -> None:
+        app_js = (self.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn("./vault-index.js?v=6", app_js)
+        self.assertNotIn("./vault-index.js?v=3", app_js)
 
 
 if __name__ == "__main__":
+
     unittest.main()
+
+
+from brand_icons import (  # noqa: E402
+    CARD_BRAND_MARKS,
+    CARD_BRANDS,
+    _card_brand_mark,
+    normalize_card_brand,
+)
+
+
+class CardBrandMarkTests(unittest.TestCase):
+    """Üretilmiş kart ağı işaretleri (`brand_icons.CARD_BRAND_MARKS`).
+
+    🔴 Neden üretilmiş işaret: Visa/Mastercard/AmEx logoları ticari markadır;
+    kopyalanamaz. Projenin zaten kullandığı "satır içi SVG, sıfır ağ isteği"
+    yaklaşımıyla kart ağlarının görsel diline uygun özgün işaret üretilir
+    (tek renkli ağlarda çip, çift renkli ağlarda iç içe daire).
+
+    Bu sınıf daha önce `skipTest` ile atlanan iki testi gerçek çalışma haline
+    getirir: her beyaz liste markası artık kendi işaretini alır.
+    """
+
+    def _markup(self, brand):
+        return str(app_module.getBrandIcon('', '', 'CreditCard', card_brand=brand))
+
+    # ─── Kapsam ───────────────────────────────────────────────────────
+
+    def test_every_whitelisted_brand_has_a_mark(self):
+        for key in CARD_BRANDS:
+            self.assertIn(key, CARD_BRAND_MARKS,
+                          f'{key} beyaz listede ama işareti yok')
+
+    def test_no_mark_without_a_whitelist_entry(self):
+        for key in CARD_BRAND_MARKS:
+            self.assertIn(key, CARD_BRANDS,
+                          f'{key} işareti var ama beyaz listede değil')
+
+    def test_the_two_lists_have_the_same_size(self):
+        self.assertEqual(len(CARD_BRANDS),
+                         len(CARD_BRAND_MARKS))
+
+    # ─── Gerçekten kendi işaretini alıyor mu ──────────────────────────
+
+    def test_every_listed_brand_renders_its_own_mark(self):
+        for key in CARD_BRANDS:
+            markup = self._markup(key)
+            self.assertIn(f'data-brand="{key}"', markup, key)
+            self.assertNotIn('data-brand="default"', markup, key)
+
+    def test_marks_are_svg_not_a_fallback(self):
+        for key in CARD_BRANDS:
+            markup = self._markup(key)
+            self.assertIn('<svg', markup)
+            self.assertIn('viewBox', markup)
+
+    def test_single_and_dual_colour_marks_both_render(self):
+        single = [k for k, (_p, s) in CARD_BRAND_MARKS.items() if not s]
+        dual = [k for k, (_p, s) in CARD_BRAND_MARKS.items() if s]
+        self.assertTrue(single, 'tek renkli marka yok')
+        self.assertTrue(dual, 'çift renkli marka yok')
+        for key in single + dual:
+            self.assertIn(f'data-brand="{key}"', self._markup(key))
+
+    def test_marks_use_brand_colours(self):
+        """Her işaret kendi marka rengini kullanıyor (jenerik tek renk değil)."""
+        for key, colors in CARD_BRAND_MARKS.items():
+            markup = self._markup(key)
+            self.assertIn(colors[0], markup, key)
+
+    def test_dual_colour_mark_uses_both_colours(self):
+        for key, (_primary, secondary) in CARD_BRAND_MARKS.items():
+            if not secondary:
+                continue
+            self.assertIn(secondary, self._markup(key), key)
+
+    def test_mark_colours_are_valid_hex(self):
+        for key, (primary, secondary) in CARD_BRAND_MARKS.items():
+            for colour in (primary, secondary):
+                if not colour:
+                    continue
+                self.assertRegex(colour, r'^#[0-9A-Fa-f]{6}$', key)
+
+    def test_distinct_brands_use_distinct_primary_colours(self):
+        primaries = [c[0] for c in CARD_BRAND_MARKS.values()]
+        self.assertEqual(len(primaries), len(set(primaries)))
+
+    # ─── Geriye dönük uyum ────────────────────────────────────────────
+
+    def test_unknown_brand_falls_back_to_default(self):
+        self.assertIn('data-brand="default"', self._markup('bilinmeyen'))
+
+    def test_raw_input_is_still_rejected(self):
+        for raw in ('<script>x</script>', '../../etc/passwd', ''):
+            self.assertIn(normalize_card_brand(raw),
+                          ('', *CARD_BRANDS))
+
+    def test_explicit_brand_beats_domain_and_title(self):
+        markup = str(app_module.getBrandIcon(
+            'Baska Marka', 'baska.example', 'CreditCard', 'visa'))
+        self.assertIn('data-brand="visa"', markup)
+        self.assertNotIn('data-brand="baska.example"', markup)
+
+    def test_website_brands_are_unaffected(self):
+        cases = [('', 'github.com'), ('Netflix', ''), ('', 'amazon.com')]
+        for title, domain in cases:
+            markup = str(app_module.getBrandIcon(title, domain, 'Other'))
+            self.assertNotIn('data-brand="visa"', markup)
+            self.assertNotIn('data-brand="default"', markup, f'{title}{domain}')
+
+    def test_card_brand_lookup_does_not_touch_the_filesystem(self):
+        """Kart ağı diskte aranmamalı — marka klasörü bir web sitesi kümesidir."""
+        mark = _card_brand_mark('visa')
+        self.assertIsNotNone(mark)
+        # Aynı anahtarda disk araması da yapılsaydı None dönerdi.
+        from pathlib import Path
+        icon_dir = Path(app_module.__file__).resolve().parent / 'static' / 'brand-icons'
+        self.assertFalse((icon_dir / 'visa.svg').exists())
+
+    # ─── Kaçış / güvenlik ─────────────────────────────────────────────
+
+    def test_markup_contains_no_script_or_event_handler(self):
+        for key in CARD_BRANDS:
+            markup = self._markup(key)
+            self.assertNotIn('<script', markup.lower())
+            self.assertNotIn('onload', markup.lower())
+            self.assertNotIn('onerror', markup.lower())
+
+    def test_markup_is_markup_not_a_raw_template(self):
+        """`.format()` kalıntısı kalmamalı — yoksa tarayıcıya `{}` basılırdı."""
+        for key in CARD_BRANDS:
+            self.assertNotIn('{', self._markup(key), key)
+            self.assertNotIn('}', self._markup(key), key)
+
+    def test_mark_is_none_for_a_website_brand(self):
+        self.assertIsNone(_card_brand_mark('github'))

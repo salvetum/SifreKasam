@@ -17,7 +17,7 @@ html[data-glass-effects="off"] .kasa-panel-soft,
 html[data-glass-effects="off"] .kasa-field,
 html[data-glass-effects="off"] .kasa-btn,
 html[data-glass-effects="off"] .icon-btn,
-html[data-glass-effects="off"] .filter-btn,
+html[data-glass-effects="off"] .filter-btn, html[data-glass-effects="off"] .view-options-btn,
 html[data-glass-effects="off"] .card-icon-btn,
 html[data-glass-effects="off"] .generator-output-card,
 html[data-glass-effects="off"] .generator-options-card,
@@ -217,8 +217,6 @@ html[data-glass-effects="off"] .history-entry {
 [data-bs-theme="light"] .footer-action-btn,
 [data-bs-theme="light"] .footer-action-btn:hover,
 [data-bs-theme="light"] .vault-detail-value,
-[data-bs-theme="light"] .text-white,
-[data-bs-theme="light"] .text-light,
 [data-bs-theme="light"] .text-kasa-text { color: var(--text) !important; }
 
 [data-bs-theme="light"] .vault-card-shell .footer-action-btn,
@@ -275,8 +273,6 @@ html[data-glass-effects="off"] .history-entry {
 [data-bs-theme="light"] .text-\[\#38bdf8\]            { color: #0284c7 !important; }
 [data-bs-theme="light"] .text-\[\#f59e0b\],
 [data-bs-theme="light"] .text-amber-400               { color: #b45309 !important; }
-[data-bs-theme="light"] .text-sky-400                 { color: #0369a1 !important; }
-[data-bs-theme="light"] .text-emerald-400             { color: #047857 !important; }
 
 /* Genel metin overrideleri */
 [data-bs-theme="light"] .text-kasa-text-muted         { color: var(--text-muted) !important; }

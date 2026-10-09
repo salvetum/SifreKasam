@@ -7,13 +7,34 @@
                 </div>
             </div>
 
-            <div class="vault-field" id="card_holder_group" data-collapse="height" hidden>
-                <label for="card_holder">{{ _('Kart Üzerindeki İsim') }}</label>
-                <div class="vault-field-input-wrap">
-                    <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
-                    <input type="text" name="card_holder" id="card_holder" placeholder="ADI SOYADI"
-                        value="{{ kayit.full_data['Card holder'] if kayit and kayit.full_data.get('Card holder') }}"
-                        class="kasa-field" maxlength="120" autocomplete="off">
+            <div class="vault-form-row vault-form-row-two">
+                <div class="vault-field" id="card_holder_group" data-collapse="height" hidden>
+                    <label for="card_holder">{{ _('Kart Üzerindeki İsim') }}</label>
+                    <div class="vault-field-input-wrap">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" name="card_holder" id="card_holder" placeholder="ADI SOYADI"
+                            value="{{ kayit.full_data['Card holder'] if kayit and kayit.full_data.get('Card holder') }}"
+                            class="kasa-field" maxlength="120" autocomplete="off">
+                    </div>
+                </div>
+
+                {# Kart markası seçici. Liste `static/brand-icons` içindeki gerçek
+                   SVG dosyalarından türetilir (`brand_icons.available_card_brands`),
+                   yani her seçeneğin ikonu gerçekten render edilir. Değer
+                   beyaz listeye karşı doğrulanır (`normalize_card_brand`).
+                   🔴 Boş seçenek "Belirtilmedi" anlamına gelir ve `<option value="">`
+                   olarak gönderilir — marka sır değil, isteğe bağlı metadata. #}
+                <div class="vault-field" id="card_brand_group" data-collapse="height" hidden>
+                    <label for="card_brand">{{ _('Kart Markası') }}</label>
+                    <div class="vault-field-input-wrap">
+                        <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-landmark"></i></span>
+                        <select name="card_brand" id="card_brand" data-custom-select class="kasa-field">
+                            <option value="">{{ _('Belirtilmedi') }}</option>
+                            {% for marka_anahtar, marka_ad in CARD_BRANDS %}
+                            <option value="{{ marka_anahtar }}"{% if kayit and kayit.full_data.get('Card brand') == marka_anahtar %} selected{% endif %}>{{ marka_ad }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
             </div>
 

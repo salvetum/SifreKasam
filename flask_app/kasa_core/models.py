@@ -29,6 +29,25 @@ class Record(db.Model):
     is_pinned = db.Column(db.Integer, default=0)
     expiry_date = db.Column(db.DateTime, nullable=True)
     card_holder = db.Column(db.String, default="")
+    # Kart markası ("visa", "garanti" …) — `static/brand-icons` içindeki
+    # dosya adıyla birebir aynı olmalıdır, `brand_icons.normalize_card_brand`
+    # beyaz listeyle doğrular. 🔴 Düz metin, şifreli DEĞİL: marka sır değil,
+    # `category`/`type` ile aynı sınıf (metadata) ve ızgarada zaten görünür.
+    # Şifrelemek yalnız yazma maliyeti getirirdi.
+    card_brand = db.Column(db.String, default="")
+    # Özel alanlar ve etiketler: şifreli TEK JSON kümesi (ayrı tablo yok).
+    # Gerekçe ve güvenlik sınıflandırması `kasa_core/record_extras.py` başında.
+    encrypted_custom_fields = db.Column(db.Text, default="")
+    encrypted_tags = db.Column(db.Text, default="")
+    # Kayda eklenen dosya. Gövde Fernet metni olarak **bayt** saklanır (base64
+    # metnin bayta çevrilmiş hâli; ölçülebilir gerekçe `attachments.py`).
+    # 🔴 `encrypted_attachment` NULL ise kayıtta ek yoktur; `LargeBinary`
+    # nullable=False yapılsaydı her kayıt boş bayt taşırdı.
+    encrypted_attachment = db.Column(db.LargeBinary, nullable=True)
+    # Dosya adı da şifrelenir: "kaskad_police_tamir.pdf" adı bile sızdırır.
+    attachment_name = db.Column(db.String, default="")
+    attachment_mime = db.Column(db.String, default="")
+    attachment_size = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=utc_now_naive)
     updated_at = db.Column(
         db.DateTime,

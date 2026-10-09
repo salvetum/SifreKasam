@@ -57,16 +57,194 @@ export function initVaultIndex({
     const normalizeSearchText = (value) =>
       String(value || '').toLocaleLowerCase(window.LANG || 'tr').trim();
 
+    // Arama alanı seçimi: hangi alana göre daraltılacak.
+    // `Tümü` = mevcut davranış (kartın görünen tüm metni).
+    // Boş metin her zaman "hepsi eşleşir" — alan seçimi tek başına FİLTRE değil,
+    // yalnızca yazılan metni daraltır (aksi halde boş arama kutusu kasa boş
+    // gösterirdi).
+    const SEARCH_FIELD_ALL = 'all';
+    const SEARCH_FIELD_STORAGE_KEY = 'kasa-search-field';
+    // Alan etiketleri `kayit.normalized.detaylar` anahtarlarıdır (Türkçe).
+    // Kart DOM'unda her satırda `title` attribute'u HAM anahtarı taşır
+    // (bkz. card-grid.html) — etiket METNİ çevrilmiş olabilir, bu yüzden
+    // eşleştirme `title`'dan yapılır.
+    const SEARCH_FIELD_KEYS = {
+      title: [],
+      username: ['Kullanıcı Adı', 'Kullanıcı adı', 'Username'],
+      email: ['E-posta', 'Eposta', 'E-Mail', 'Email'],
+      note: ['Not'],
+      card: ['Kart Numarası', 'Kart Numarasi', 'Kart No', 'Kartno'],
+    };
+    const SEARCH_FIELD_ORDER = ['all', 'title', 'username', 'email', 'note', 'card'];
+
+    const getActiveSearchField = () => {
+      const select = document.getElementById('search-field-select');
+      const value = select?.value || '';
+      return SEARCH_FIELD_ORDER.includes(value) ? value : SEARCH_FIELD_ALL;
+    };
+
+    // Kartın alan-bazlı arama indeksi. Sır SIZINTISI YAPMAZ: değerler yalnız
+    // kartta ZATEN görünen metinden (`textContent`) okunur. Şifre/CVV satırı
+    // zaten maskeli (`••••••••`), LAN'da gizlenen alanlar (kart no, kart ismi,
+    // not) boş string basar → burada da boş kalır. Yeni `data-*` özniteliği
+    // DOM'a düz metin sokmak bu garantiyi bozardu; kasıtlı olarak yapılmadı.
+    const buildCardFields = (wrapper) => {
+      const fields = [];
+      wrapper.querySelectorAll('.vault-detail-row').forEach((row) => {
+        const labelEl = row.querySelector('.vault-detail-label');
+        const valueEl = row.querySelector('.vault-detail-value');
+        if (!labelEl || !valueEl) return;
+        // title = ham alan adı (çeviri bağımsız); yoksa metne düş.
+        const key = (labelEl.getAttribute('title') || labelEl.textContent || '').trim();
+        const value = (valueEl.textContent || '').trim();
+        if (!key || !value) return;
+        fields.push({
+          key,
+          haystack: normalizeSearchText(`${key} ${value}`),
+        });
+      });
+      return fields;
+    };
+
+    // Kartın etiketleri. 🔴 Yeni `data-*` özniteliği YOK: etiket adları
+    // kartta zaten düz metin olarak görünüyor (metadata sınıfı, `category`
+    // ile aynı), dolayısıyla tek doğruluk kaynağı `textContent` ve filtre
+    // değerini DOM'dan türetmek sır yüzeyini genişletmez. Etiketler
+    // `normalizeSearchText` ile karşılaştırılır (Türkçe küçük harf uyumlu).
+    const buildCardTags = (wrapper) =>
+      Array.from(wrapper.querySelectorAll('.vault-card-tag'))
+        .map(el => normalizeSearchText(el.textContent))
+        .filter(Boolean);
+
     const createCardCacheItem = (wrapper) => ({
       wrapper,
       id: wrapper.dataset.id || '',
+      // `searchText` korunuyor: geriye uyum + "Tümü" modu birebir mevcut
+      // davranış. Alan-bazlı modlar `fields`/`titleText` kullanır.
       searchText: normalizeSearchText(wrapper.textContent),
+      titleText: normalizeSearchText(
+        wrapper.querySelector('.vault-card-title')?.textContent || ''
+      ),
+      fields: buildCardFields(wrapper),
+      tags: buildCardTags(wrapper),
       type: wrapper.dataset.type || '',
       pinned: wrapper.dataset.pinned === 'true',
     });
 
+    // ── Etiket filtresi ────────────────────────────────────────────────
+    // Çoklu seçim VE mantığı: seçili etiketlerin HEPSİne sahip kart kalır.
+    // Boş küme = filtre yok. Kart sayfası DOM sırasına göre dilimlendiği
+    // için (bkz. `CARD_PAGE_SIZE`) etiket filtresi de istemci tarafında
+    // `filterCards` içinde uygulanır; sunucu tarafında etiket arama yok.
+    const activeTags = new Set();
+    const tagFilterBar = document.getElementById('tag-filter-bar');
+    const tagFilterChips = document.getElementById('tag-filter-chips');
+    const tagFilterClear = document.getElementById('tag-filter-clear');
+
+    const matchesActiveTags = (item) => {
+      if (!activeTags.size) return true;
+      return Array.from(activeTags).every(tag => item.tags.includes(tag));
+    };
+
+    // Kart üzerindeki rozetler, seçili etiketi görsel olarak gösterir
+    // (`aria-pressed` birlikte) — aynı filtre iki yerden de değiştirilebilir.
+    // 🔴 `renderTagFilterBar` BUNDAN SONRA tanımlanıyor ama onu çağırıyor:
+    // `const` arrow function'lar tanım satırına gelene kadar TDZ'de olduğu
+    // için (geçici ölü bölge) önceden çağrılırsa `ReferenceError` verir.
+    // Bu istisna `rebuildCardCache()` → `initVaultIndex` zincirinde
+    // `finishInitialReveal` planlanmadan ÖNCE patlarsa `.vault-card-curtain`
+    // hiç kalkmaz ve kartların HİÇBİRİ görünmez. Sıralama bu yüzden şart.
+    const syncTagBadges = () => {
+      getCards().forEach(wrapper => {
+        wrapper.querySelectorAll('.vault-card-tag').forEach(el => {
+          const isActive = activeTags.has(normalizeSearchText(el.textContent));
+          el.classList.toggle('is-active', isActive);
+          el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+      });
+    };
+
+    // Çubuk, kart önbelleğinden türetilir: her etiketin kaç kartta
+    // geçtiği sayılır ve alfabetik sırayla listelenir. Böylece ayrı bir
+    // "/api/tags" ucuna ve şablona veri taşımaya gerek kalmaz.
+    const renderTagFilterBar = () => {
+      if (!tagFilterBar || !tagFilterChips) return;
+      const counts = new Map();
+      cardCache.forEach(({ tags }) => {
+        new Set(tags).forEach(tag => counts.set(tag, (counts.get(tag) || 0) + 1));
+      });
+      // Seçili ama artık hiçbir kartta bulunmayan etiket kaybolmasın
+      // (kayıt silindiyse seçim de düşmeli değil, kullanıcı temizleyebilsin).
+      activeTags.forEach(tag => { if (!counts.has(tag)) counts.set(tag, 0); });
+
+      const entries = Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], window.LANG || 'tr'));
+      if (!entries.length) {
+        tagFilterBar.hidden = true;
+        tagFilterChips.replaceChildren();
+        return;
+      }
+      tagFilterBar.hidden = false;
+      tagFilterChips.replaceChildren(...entries.map(([tag, count]) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tag-filter-chip';
+        const isActive = activeTags.has(tag);
+        chip.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        chip.classList.toggle('is-active', isActive);
+        chip.title = `${tag} (${count})`;
+        // Etiket metnini `data-*` YAZMADAN taşımak için doğrudan özellik:
+        // rozet içindeki sayı `textContent`'e karışıp etiketi bozmasın
+        // ("2024" etiketi `replace(/\d+$/,'')` ile boşa düşüyordu) ve DOM'a
+        // yeni düz metin özniteliği girmesin (bkz. `buildCardTags` notu).
+        chip.tagValue = tag;
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-tag';
+        icon.setAttribute('aria-hidden', 'true');
+        chip.append(icon, document.createTextNode(` ${tag}`));
+        if (count) {
+          const badge = document.createElement('span');
+          badge.className = 'tag-filter-count';
+          badge.textContent = String(count);
+          chip.appendChild(badge);
+        }
+        return chip;
+      }));
+      if (tagFilterClear) tagFilterClear.hidden = activeTags.size === 0;
+      syncTagBadges();
+    };
+
+    const toggleTag = (tag) => {
+      if (activeTags.has(tag)) activeTags.delete(tag);
+      else activeTags.add(tag);
+      renderTagFilterBar();
+      filterCards({ preservePage: false });
+    };
+
+    const clearTags = () => {
+      activeTags.clear();
+      renderTagFilterBar();
+      filterCards({ preservePage: false });
+    };
+
+    // "E-posta yazdım ama 'Kart Numarası' modundayım" gibi yanlış-mod
+    // sonuçlarını önlemek için: seçili alanın modu, kartın alanları arasında
+    // karşılığı varsa ve O ALANDA değer yoksa eşleşme sayılmaz.
+    const matchesSearchTerm = (item, term, mode) => {
+      if (!term) return true;
+      if (mode === SEARCH_FIELD_ALL) return item.searchText.includes(term);
+      if (mode === 'title') return item.titleText.includes(term);
+
+      const keys = SEARCH_FIELD_KEYS[mode] || [];
+      const hasModeField = item.fields.some((f) => keys.includes(f.key));
+      if (!hasModeField) return false;
+      return item.fields.some((f) => keys.includes(f.key) && f.haystack.includes(term));
+    };
+
     const rebuildCardCache = () => {
       cardCache = getCards().map(createCardCacheItem);
+      // Kart kümesi değişince etiket çubuğu da yeniden kurulur: yeni
+      // kayıt eklenince etiketi, kayıt silinince etiketi kaybolur.
+      renderTagFilterBar();
     };
 
     const updateCachedCard = (wrapper) => {
@@ -107,37 +285,31 @@ export function initVaultIndex({
       });
     };
 
-    // ─── Kart görünürlüğü: `hidden` (display:none) → `display:block` geçişi
-    // Chromium'da backdrop-filter katmanını YENİDEN kurar ve ilk karede
-    // örnekleme yapmadan boyar; kullanıcı kartı "önce camsız, sonra camlı"
-    // görüyordu (cards.css: cardFilterReveal bloğu — ölçülen kök neden).
-    // Çözüm: display:none'ı bir rAF gecikmesiyle DEĞİL, doğrudan kaldır ve
-    // opaklığı 0'dan başlayan kısa giriş animasyonuyla oynat. Bulanıklama
-    // 1-2 karede tamamlandığı için kart belirgin hâle gelmeden cam hazır olur.
+    // ─── Kart görünürlüğü ────────────────────────────────────────────────────
+    // `display:none` KULLANILMAZ. Chromium, display:none'dan dönen elemanda
+    // backdrop-filter katmanını yeniden kurar ve ilk karede örnekleme yapmadan
+    // boyar → kart önce buğusuz, sonra buğulu görünür. (Ölçülen belirti.)
+    //
+    // Bunun yerine kart render ağacından HİÇ çıkmaz: grid akışından çıkarmak
+    // için position:absolute, görünmezlik için visibility:hidden. Katman canlı
+    // kalır, yeniden kurulmaz, dolayısıyla flaş olmaz.
+    //
+    // 🔴 Giriş animasyonu BİLEREK YOK. İki deneme de başarısız oldu:
+    //   1) rAF ile gizlemeyi ertelemek → bir kare daha camsız ekran.
+    //   2) opaklık+transform animasyonu (`cardFilterReveal`) → animasyon
+    //      `both` ile bittiği için kart `transform: translateY(0)` ile
+    //      transform'lu kalıyor; transform backdrop örneklemeyi bozduğu için
+    //      kart animasyon bittikten SONRA hâlâ yanlış örnekleniyor. Yani
+    //      animasyon sorunu 180 ms uzatmakla değil, kalıcı hale getiriyordu.
+    const isCardHidden = (wrapper) => wrapper.classList.contains('is-filtered-out');
+
+    const setCardVisible = (wrapper, visible) => {
+      wrapper.classList.toggle('is-filtered-out', !visible);
+    };
+
     const reduceMotion = () =>
       document.documentElement.getAttribute('data-kasa-animations') === 'off'
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    const setCardVisible = (wrapper, visible, animate = false) => {
-      if (!visible) {
-        wrapper.classList.remove('filter-reveal');
-        wrapper.hidden = true;
-        return;
-      }
-      if (!wrapper.hidden) return;
-      // Görünürlük ANINDA açılır: eski `requestAnimationFrame(() => hidden=false)`
-      // bir kare daha camsız ekran üretiyordu.
-      wrapper.hidden = false;
-      if (!animate || reduceMotion()) return;
-      wrapper.classList.remove('filter-reveal');
-      // Yeniden oynatma: kaldırma `hidden` dalında da yapılır ama sınıf
-      // görünürlük açıkken kalırsa bir sonraki aramada animasyon tetiklenmez.
-      void wrapper.offsetWidth;
-      wrapper.classList.add('filter-reveal');
-      wrapper.addEventListener('animationend', () => {
-        wrapper.classList.remove('filter-reveal');
-      }, { once: true });
-    };
 
     const createPageControl = (page, label = String(page), isActive = false) => {
       const button = document.createElement('button');
@@ -197,12 +369,16 @@ export function initVaultIndex({
       });
     };
 
+    // `animate` kasten kullanılmıyor (giriş animasyonu bilerek yok, yukarıya
+    // bak). Çağıranların imzasını bozmamak için parametre korunuyor.
     const filterCards = ({ preservePage = false, animate = false, scrollToGrid = false } = {}) => {
       const term = normalizeSearchText(searchInput?.value || '');
+      const searchField = getActiveSearchField();
       const activeBtn = document.querySelector('#category-filter button.active');
       const category  = activeBtn?.dataset.filter || 'all';
-      const matchedCards = cardCache.filter(({ id, searchText, type, pinned }) => {
-        const matchesSearch = !term || searchText.includes(term);
+      const matchedCards = cardCache.filter((item) => {
+        const { id, type, pinned } = item;
+        const matchesSearch = matchesSearchTerm(item, term, searchField);
         const matchesCategory =
           category === 'all'       ? true :
           category === 'favorites' ? pinned :
@@ -213,7 +389,7 @@ export function initVaultIndex({
           : statsFilter === 'eski'    ? vaultStats.eski_ids.includes(id)
           : statsFilter === 'expired' ? vaultStats.expired_ids.includes(id)
           : true;
-        return matchesSearch && matchesCategory && matchesStats;
+        return matchesSearch && matchesCategory && matchesStats && matchesActiveTags(item);
       });
       const pageCount = Math.max(1, Math.ceil(matchedCards.length / CARD_PAGE_SIZE));
       currentCardPage = preservePage ? Math.min(currentCardPage, pageCount) : 1;
@@ -226,8 +402,8 @@ export function initVaultIndex({
       let anyCardBecameVisible = false;
       cardCache.forEach(({ wrapper }) => {
         const willShow = visibleWrappers.has(wrapper);
-        if (willShow && wrapper.hidden) anyCardBecameVisible = true;
-        setCardVisible(wrapper, willShow, animate);
+        if (willShow && isCardHidden(wrapper)) anyCardBecameVisible = true;
+        setCardVisible(wrapper, willShow);
       });
 
       if (filterEmptyState) {
@@ -322,7 +498,29 @@ export function initVaultIndex({
     };
 
     const activateCategory = (filter) => {
-      categoryBtns.forEach(btn => {
+// Etiket filtresi olayları. Üç giriş noktası aynı `toggleTag`'e gider:
+    // çubuktaki çip, kart üzerindeki rozet ve "temizle" düğmesi. Çip
+    // dinleyicisi DELEGATED (çipler her yeniden kurulumda değişiyor), kart
+    // rozet dinleyicisi de delegated (kayıtlar yeniden render edilebiliyor).
+    tagFilterChips?.addEventListener('click', (event) => {
+      const chip = event.target.closest('.tag-filter-chip');
+      if (!chip) return;
+      if (chip.tagValue) toggleTag(chip.tagValue);
+    });
+    cardContainer?.addEventListener('click', (event) => {
+      const badge = event.target.closest('.vault-card-tag');
+      if (!badge) return;
+      // Rozet zaten kartın içinde; kartın tıklanabilir alanlarıyla
+      // çakışmasın diye olay yayılmıyor ama varsayılan davranışı da
+      // engelliyoruz (rozet "düzenle" gibi bir üst öğe değil).
+      event.preventDefault();
+      event.stopPropagation();
+      const tag = normalizeSearchText(badge.textContent);
+      if (tag) toggleTag(tag);
+    });
+    tagFilterClear?.addEventListener('click', clearTags);
+
+    categoryBtns.forEach(btn => {
         const isActive = btn.dataset.filter === filter;
         btn.classList.toggle('active', isActive);
         btn.setAttribute('aria-pressed', String(isActive));
@@ -382,6 +580,50 @@ export function initVaultIndex({
       cleanUrl.searchParams.delete('import_dropped');
       window.history.replaceState({}, '', cleanUrl.toString());
     }
+
+    // /import başarılıysa ?import_source=<etiket> ile gelir. Kullanıcı hangi
+    // biçimin tanındığını görsün: içe aktarma sessizce yanlış eşlenirse (örn.
+    // LastPass CSV'si genel CSV sanılır) bu satır olmadan fark edilmez.
+    const importSource = new URLSearchParams(window.location.search).get('import_source');
+    if (importSource) {
+      showSuccessToast(window._('{count} kayıt içe aktarıldı ({source}).')
+        .replace('{count}', String(document.querySelectorAll('.card-wrapper').length))
+        .replace('{source}', importSource));
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('import_source');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    }
+
+    // Sıralama seçicisi. Sıralama SUNUCUDA yapılır (`/?sort=`): başlık ve
+    // kategori şifreli sütunlar, yani istemci tarafında şifresiz metin
+    // bulunmuyor; ayrıca kartlar DOM sırasına göre dilimlendiği için
+    // istemci tarafı yeniden sıralama sayfalamayı bozardı.
+    // Adres çubuğu URL'si korunur: ileride derin bağlantı eklenirse
+    // sıralama onunla birlikte taşınır.
+    const sortSelect = document.getElementById('record-sort-select');
+    if (sortSelect) {
+      sortSelect.addEventListener('change', () => {
+        const url = new URL(window.location.href);
+        if (sortSelect.value === 'updated') {
+          url.searchParams.delete('sort');
+        } else {
+          url.searchParams.set('sort', sortSelect.value);
+        }
+        window.location.assign(url.toString());
+      });
+    }
+
+    // Görünüm seçenekleri düğmesi → modal. Düğme `data-kasa-modal` taşıdığı
+    // için açılışı modal sistemi yapar; buradaki tek görev `aria-expanded`
+    // senkronu. Sıralama seçicisi de bu modalın içindedir ve sunucu tarafında
+    // uygulandığı için seçim değişince `vault-index.js` sayfayı yeniden yükler.
+    const viewOptionsBtn = document.getElementById('view-options-btn');
+    viewOptionsBtn?.addEventListener('click', () => {
+        requestAnimationFrame(() => viewOptionsBtn.setAttribute('aria-expanded', 'true'));
+    });
+    document.getElementById('viewOptionsModal')?.addEventListener('kasa:modal-closing', () => {
+        viewOptionsBtn?.setAttribute('aria-expanded', 'false');
+    });
 
     // DEĞİŞİKLİK 1: tüm kartlar DOM'da + kapak görselleri yüklenene dek
     // giriş animasyonları duraklatılır; sonra topluca oynatılır.
@@ -444,6 +686,19 @@ export function initVaultIndex({
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => filterCards({ preservePage: false, animate: true }), 120);
     });
+
+    // Arama alanı seçici (Başlık / Kullanıcı adı / E-posta / Not / Kart no).
+    // Alan filtresi TEK BAŞINA filtrelemez: yalnız yazılan metni daraltır, boş
+    // metin her şeyi eşleştirir (matchesSearchTerm). Seçim kalıcıdır.
+    const searchFieldSelect = document.getElementById('search-field-select');
+    if (searchFieldSelect) {
+      const storedField = localStorage.getItem(SEARCH_FIELD_STORAGE_KEY);
+      if (SEARCH_FIELD_ORDER.includes(storedField)) searchFieldSelect.value = storedField;
+      searchFieldSelect.addEventListener('change', () => {
+        localStorage.setItem(SEARCH_FIELD_STORAGE_KEY, searchFieldSelect.value);
+        filterCards({ preservePage: false, animate: false });
+      });
+    }
 
     pagePrevButton?.addEventListener('click', () => {
       if (currentCardPage <= 1) return;

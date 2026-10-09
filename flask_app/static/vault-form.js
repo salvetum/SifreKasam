@@ -79,6 +79,7 @@ export function initVaultForm() {
   const passwordLabel   = el('password_label');
   const commentLabel    = el('comment_label');
   const cardHolderGroup = el('card_holder_group');
+  const cardBrandGroup  = el('card_brand_group');
   const cardTripleRow   = el('card_triple_row');
   const expiryAyField   = el('expiry_ay_field');
   const expiryYilField  = el('expiry_yil_field');
@@ -112,6 +113,7 @@ export function initVaultForm() {
     setVis(urlGroup, type === 'Website');
     setVis(kategoriGroup, Boolean(config.showKategori));
     setVis(cardHolderGroup, isCard);
+    setVis(cardBrandGroup, isCard);
     if (cardTripleRow) cardTripleRow.classList.toggle('is-active', isCard);
 
     setVis(loginGroup, Boolean(config.showLogin));
@@ -385,6 +387,63 @@ export function initVaultForm() {
           : 'fa-solid fa-chevron-up fa-xs';
       }
     });
+  }
+
+  // ─── Özel alanlar (custom fields) ─────────────────────────────────
+  // Dinamik satırların `name` özniteliği DİZİNİLİ olmak zorunda
+  // (`cf_label_0`, `cf_label_1`, …): backend `record_extras.py` tek bir
+  // anahtarla temsil edilemeyen alanları bu adlandırmayla okuyor ve
+  // `/duzenle`'de "hiç `cf_label_` yoksa mevcut değeri koru" kuralı
+  // LAN POST'unun alanları sessizce sıfırlamasını engelliyor.
+  const cfList = document.getElementById('custom-fields-list');
+  const cfTemplate = document.getElementById('custom-field-template');
+  const cfAddBtn = document.getElementById('custom-field-add');
+
+  // Backend sınırları (record_extras.py). UI da aynı sayıyı bilmeli ki
+  // kullanıcı limitte "alan ekle" düğmesine basıp hiçbir şey olmamasını yaşamasın.
+  const CF_MAX = 30;
+
+  const cfReindex = () => {
+    if (!cfList) return;
+    cfList.querySelectorAll('[data-custom-field]').forEach((row, i) => {
+      row.querySelector('[name^="cf_label_"]')?.setAttribute('name', `cf_label_${i}`);
+      row.querySelector('[name^="cf_value_"]')?.setAttribute('name', `cf_value_${i}`);
+      row.querySelector('[name^="cf_secret_"]')?.setAttribute('name', `cf_secret_${i}`);
+    });
+    if (cfAddBtn) {
+      cfAddBtn.disabled = cfList.querySelectorAll('[data-custom-field]').length >= CF_MAX;
+    }
+  };
+
+  if (cfList && cfTemplate) {
+    cfList.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-custom-field-remove]');
+      if (!removeBtn) return;
+      const row = removeBtn.closest('[data-custom-field]');
+      if (row) { row.remove(); cfReindex(); }
+    });
+
+    // Gizli işareti → input tipi password'a döner. Backend'de `secret`
+    // bayrağı boolean; checkbox gönderilmeyince False kabul edilir.
+    cfList.addEventListener('change', (e) => {
+      const box = e.target.closest('[data-custom-field-secret]');
+      if (!box) return;
+      const input = box.closest('[data-custom-field]')?.querySelector('[data-custom-field-value]');
+      if (!input) return;
+      input.type = box.checked ? 'password' : 'text';
+      if (box.checked) input.dataset.secretValue = '1'; else delete input.dataset.secretValue;
+    });
+
+    if (cfAddBtn) {
+      cfAddBtn.addEventListener('click', () => {
+        if (cfList.querySelectorAll('[data-custom-field]').length >= CF_MAX) return;
+        const row = cfTemplate.content.firstElementChild.cloneNode(true);
+        cfList.appendChild(row);
+        cfReindex();
+        row.querySelector('[data-custom-field-label]')?.focus();
+      });
+    }
+    cfReindex();
   }
 
   // ─── "Vazgeç" / "Geri": önceki sayfaya dön ─────────────────────────

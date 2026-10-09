@@ -1,0 +1,78 @@
+<script nonce="{{ csp_nonce }}">
+/* Kayıt eki yükleme/indirme/silme — `panel-extras.html` ile eşleşir.
+   Yükleme kendi AJAX ucuna gider; kayıt formunun POST'una DOKUNMAZ
+   (form `_record_from_form`'a gider ve dosya alanını tanımaz). */
+
+function formatBytes(bytes) {
+    const value = Number(bytes) || 0;
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function setupRecordAttachment() {
+    const status = document.getElementById('attachment-status');
+    if (!status) return;
+    const recordId = status.dataset.attachmentFor;
+    const input = document.querySelector('[data-attachment-input]');
+    const uploadBtn = document.querySelector('[data-attachment-upload]');
+    const removeBtn = document.querySelector('[data-attachment-remove]');
+    const nameEl = document.getElementById('attachment-name');
+    const sizeEl = document.querySelector('[data-attachment-size]');
+    const download = document.getElementById('attachment-download');
+    const ok = window.KASA_SHOW_SUCCESS_TOAST;
+    const warn = window.KASA_SHOW_WARNING_TOAST;
+
+    function show(meta) {
+        if (!meta || !meta.name) { status.hidden = true; return; }
+        nameEl.textContent = meta.name;
+        sizeEl.textContent = formatBytes(meta.size);
+        download.href = `/api/record/${recordId}/attachment`;
+        status.hidden = false;
+    }
+
+    uploadBtn?.addEventListener('click', async function () {
+        const file = input?.files?.[0];
+        if (!file) { warn?.(_('Lütfen bir dosya seçin.')); return; }
+        const body = new FormData();
+        body.append('file', file);
+        uploadBtn.disabled = true;
+        try {
+            const response = await window.KASA_API_FETCH(`/api/record/${recordId}/attachment`, {
+                method: 'POST', body,
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'upload-failed');
+            show(data);
+            ok?.(_('Ek yüklendi.'));
+        } catch (error) {
+            warn?.(_('Ek yüklenemedi.'));
+        } finally {
+            uploadBtn.disabled = false;
+            if (input) input.value = '';
+        }
+    });
+
+    removeBtn?.addEventListener('click', async function () {
+        if (removeBtn.disabled) return;
+        removeBtn.disabled = true;
+        try {
+            const response = await window.KASA_API_FETCH(`/api/record/${recordId}/attachment`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('delete-failed');
+            show(null);
+            ok?.(_('Ek kaldırıldı.'));
+        } catch (error) {
+            warn?.(_('Ek kaldırılamadı.'));
+        } finally {
+            removeBtn.disabled = false;
+        }
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupRecordAttachment);
+} else {
+    setupRecordAttachment();
+}</script>

@@ -74,6 +74,12 @@ html[data-kasa-low-power="on"] .blob-accent {
     display: none !important;
 }
 
+/* Low-power'da buğuyu kapat. 🔴 Yalnız buğuyu kapatmak yetmez: yüzeylerin
+   opak görünmesi büyük ölçüde `backdrop-filter`'dan geliyor ve arka planları
+   çok düşük opaklıklı (`rgba(255,255,255,0.045)` gibi). Buğu kapanınca
+   saydam tabaka kalır ve panel yarı saydam görünür. Opak yedek
+   `glass.css` içindeki `data-kasa-low-power="on"` kurallarında veriliyor —
+   cam-kapalı (`data-glass-effects="off"`) değerleriyle birebir aynı. */
 html[data-kasa-low-power="on"] .kasa-panel,
 html[data-kasa-low-power="on"] .kasa-modal .modal-content {
     backdrop-filter: none !important;
@@ -298,14 +304,6 @@ html[data-kasa-bg-wait] .card-animated {
    fill-mode:backwards — from keyframes (opacity:0) animasyon başlamadan
    önce uygulanır; böylece class eklenmesi ile animasyon başlangıcı
    arasındaki 1 karelik boşlukta kart tam opacity'de çizilmez. */
-/* Filtre geçişlerinde kartlara uygulanan reveal animasyonu. */
-.filter-reveal {
-    animation: filterFadeIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-}
-@keyframes filterFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
 
 @keyframes copyPop {
     0%   { transform: scale(0.82); opacity: 0.72; }

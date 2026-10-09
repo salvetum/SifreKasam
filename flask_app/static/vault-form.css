@@ -716,7 +716,6 @@ body.form-booted .vault-form-panel .vault-section-head > span {
 .toastify.kasa-toast-warning::before { content: '!'; }
 .toastify.kasa-toast-success::before { content: '✓'; }
 
-
 html[data-glass-effects="off"] .toastify.kasa-toast {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -781,7 +780,6 @@ html[data-glass-effects="off"] .toastify.kasa-toast {
         grid-template-columns: minmax(0, 1fr) 0%;
     }
 }
-
 
 /* ── FAZ B: Şifre Sağlığı (kompakt, şifrenin altında) ────────────── */
 .password-health {
@@ -1811,3 +1809,169 @@ html[data-glass-effects="off"] #page-regenerate-btn.gen-icon-spin {
   }
 }
 
+/* ─── Etiketler ve özel alanlar (panel-extras.html) ─────────────────────
+   Kayıt formunun genişlik düzeni `.vault-form-grid` tarafından yönetilir;
+   burada yalnız panel İÇİ yerleşim var. Sıralar: etiket kutusu → alan
+   listesi → "alan ekle" düğmesi → ipucu metni. */
+.vault-form-extras .vault-field + .vault-field {
+  margin-top: 1rem;
+}
+
+.vault-field-label-static {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.vault-field-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* Alan satırı: etiket | değer | gizli | sil. Mobilde alt alta yığılır. */
+.vault-custom-fields:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.vault-custom-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.vault-custom-field-value .kasa-field {
+  width: 100%;
+}
+
+.vault-custom-field-secret {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vault-custom-field-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 0.5rem);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.vault-custom-field-remove:hover {
+  color: var(--danger, #f87171);
+  background: color-mix(in srgb, var(--danger, #f87171) 12%, transparent);
+}
+
+.vault-custom-field-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 0.5rem);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.vault-custom-field-add:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.vault-custom-field-add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .vault-custom-field {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label   remove"
+      "value   value"
+      "secret  secret";
+    row-gap: 0.35rem;
+  }
+
+  .vault-custom-field > input[type="text"] { grid-area: label; }
+  .vault-custom-field-value { grid-area: value; }
+  .vault-custom-field-secret { grid-area: secret; }
+  .vault-custom-field-remove { grid-area: remove; }
+}
+
+/* ─── Kart üzerindeki etiket rozetleri ─────────────────────────────── */
+.vault-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+/* Etiket rozeti artık `<button>` (etikete göre süzmek için tıklanabilir).
+   `border: 0` şart: tarayıcının varsayılan buton kenarlığı rozeti kutu gibi
+   gösteriyordu. `cursor` yalnız etiket varsa pointer. */
+.vault-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 9rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 0;
+  border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.vault-card-tag:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
+}
+
+/* Seçili etiket — kart rozeti ile çubuktaki çip aynı görsel dili kullanır
+   (accent dolgusu + accent yazısı), böylece aktif filtre kartın üzerinde de
+   iz bırakır. */
+.vault-card-tag.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Değerler ızgaraya hiç basılmaz (bkz. app.py:index) — yalnız SAYI rozeti. */
+.vault-card-custom-fields {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}

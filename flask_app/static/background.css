@@ -2,7 +2,6 @@
    REVİZYON KATMANI — TEMA, FORM VE GENERATOR TUTARLILIĞI
    ════════════════════════════════════════════════════════════════ */
 
-
 body {
     background:
         radial-gradient(circle at 18% 10%, rgba(var(--accent-rgb), 0.30), transparent 34%),
@@ -150,16 +149,40 @@ html[data-bs-theme="light"] #default-bg-texture {
     opacity: 0.38;
 }
 
+/* 🔴 data-kasa-low-power BİLİNÇLİ OLARAK BU GRUBA YAZILMADI.
+   Tasarruf modunun gerçek hedefi animasyondur ve o zaten genel olarak
+   durduruluyor: base.css `html[data-kasa-low-power="on"] *` için
+   animation-play-state: paused / transition-duration: 0.001ms /
+   will-change: auto uygular. Bu katmanın kendisi position:fixed,
+   TEK SEFERDE boyanan statik bir katmandır — animation, transition veya
+   will-change deklarasyonu YOKTUR (ölçüldü), dolayısıyla gizlemek hiçbir
+   ölçülebilir kaynak tasarrufu sağlamaz.
+
+   Oysa gizlemek cam yüzeylerinin arkasındaki GÖRSEL MALZEMEYİ
+   kaldırıyordu: normal modda geriye düz gövde gradyanı kalıyor ve
+   backdrop-filter bulanıklaştıracak detay bulamayınca yüzeyler
+   "yarı saydam panel"e dönüşüyordu. Uyarıldığı yer: giriş ekranı
+   (login.html -> base.html -> app.js -> initHeartbeat) 45 sn hareketsiz
+   kaldığında tasarruf moduna geçip camı bu şekilde düşürüyordu.
+
+   data-glass-effects="off" ise listede KALIYOR: cam tamamen kapalıyken
+   perde/doku gereksiz maliyettir ve o durumda opak yüzey yedekleri
+   zorunludur (GlassOffSurfaceTests). */
 html[data-kasa-background="custom"] #default-bg-texture,
-html[data-glass-effects="off"] #default-bg-texture,
-html[data-kasa-low-power="on"] #default-bg-texture {
+html[data-glass-effects="off"] #default-bg-texture {
     display: none !important;
 }
 
 /* ── VARSAYILAN ARKA PLAN PERDESİ (custom perdenin birebir kopyası) ── */
 /* Custom modda #custom-bg-layer::after arkaplanı %50 koyulaştırıp camın
    belirgin olmasını sağlar; varsayılan modda aynı perde #default-bg-veil
-   ile verilir (z-index -2, doku katmanının üstünde, blobların altında). */
+   ile verilir (z-index -2, doku katmanının üstünde, blobların altında).
+
+   🔴 BU KURAL #custom-bg-layer::after İLE BİREBİR AYNI OLMALI.
+   Değerler kayarken yorum 50%/%42 derken kod 62%/%50 uyguluyordu;
+   perde, blur'u beslemek için kurulmuş #default-bg-texture dokusunu
+   (opacity .80) ezip camı "yarı saydam panel"e çeviriyordu.
+   Ayrışma GlassVeilParityTests ile testte kilitli. */
 #default-bg-veil {
     position: fixed;
     inset: 0;
@@ -167,19 +190,22 @@ html[data-kasa-low-power="on"] #default-bg-texture {
     pointer-events: none;
     display: block;
     background:
-        radial-gradient(circle at 50% 42%, rgba(8, 9, 18, 0.26) 0%, rgba(8, 9, 18, 0.42) 140%),
-        linear-gradient(rgba(8, 9, 18, 0.62), rgba(8, 9, 18, 0.62));
+        radial-gradient(circle at 50% 42%, rgba(8, 9, 18, 0.16) 0%, rgba(8, 9, 18, 0.30) 140%),
+        linear-gradient(rgba(8, 9, 18, 0.50), rgba(8, 9, 18, 0.50));
 }
 
 html[data-bs-theme="light"] #default-bg-veil {
     background:
-        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.26) 140%),
-        linear-gradient(rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0.50));
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.20) 140%),
+        linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42));
 }
 
+/* 🔴 data-kasa-low-power yine BİLİNÇLİ OLARAK YOK — gerekçe ve ölçüm
+   yukarıdaki #default-bg-texture yorumuyla aynı. Perde zaten düz bir
+   gradyan (tek boyama), animasyonu yok; gizlemek camın malzemesini
+   alıp yüzeyleri saydamlaştırmaktan başka işe yaramıyordu. */
 html[data-kasa-background="custom"] #default-bg-veil,
-html[data-glass-effects="off"] #default-bg-veil,
-html[data-kasa-low-power="on"] #default-bg-veil {
+html[data-glass-effects="off"] #default-bg-veil {
     display: none !important;
 }
 

@@ -75,10 +75,49 @@ import { showSuccessToast, showWarningToast } from './toast.js';
     }
   };
 
+  /**
+   * Pano temizleme ayarı: `<html data-kasa-clipboard-clear="60">` veya
+   * `"off"`. Değeri `prepaint.html` sunucudan yazar (bkz. oradaki yorum:
+   * savunma ayarı olduğu için localStorage'a yazılmaz).
+   */
+  const clipboardClearDelayMs = () => {
+    const raw = document.documentElement?.dataset?.kasaClipboardClear;
+    if (!raw || raw === 'off') return 0;
+    const seconds = Number(raw);
+    if (!Number.isFinite(seconds) || seconds < 10 || seconds > 600) return 0;
+    return seconds * 1000;
+  };
+
+  // Kopyaladığımız metni ve temizleme zamanlayıcısını tutuyoruz. Süre
+  // dolduğunda panoyu okuyup **hâlâ bizim metnimiz mi** diye karşılaştırırız:
+  // kullanıcı araya başka bir şey kopyaladıysa panoya dokunmayız. Okuma izni
+  // yoksa (readText reddedilirse) temizlemeyi atlar — kullanıcının başka bir
+  // metnini yanlışlıkla silmektense sır panoda kalması daha iyidir.
+  let pendingClipboardClear = null;
+
+  const scheduleClipboardClear = (text) => {
+    const delay = clipboardClearDelayMs();
+    if (!delay) return;
+    if (pendingClipboardClear) clearTimeout(pendingClipboardClear.timer);
+    const state = { text, timer: null };
+    state.timer = setTimeout(async () => {
+      pendingClipboardClear = null;
+      try {
+        const current = await navigator.clipboard?.readText?.();
+        if (typeof current === 'string' && current !== '' && current !== text) return;
+        await navigator.clipboard?.writeText?.('');
+      } catch (err) {
+        // Pano okuma izni yoksa sessizce vazgeç.
+      }
+    }, delay);
+    pendingClipboardClear = state;
+  };
+
   export const copyToClipboard = async (text, iconEl) => {
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
+        scheduleClipboardClear(text);
       } else {
         const textarea = Object.assign(document.createElement('textarea'), {
           value: text,
@@ -96,8 +135,6 @@ import { showSuccessToast, showWarningToast } from './toast.js';
       showWarningToast(window._('Kopyalama başarısız oldu.'));
     }
   };
-
-
 
 export function initRevealCopy({ apiJson }) {
   // LAN'da "şifreleri göster" kapalıyken sunucu 403 döner ve şifreyi hiç

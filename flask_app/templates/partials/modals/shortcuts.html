@@ -1,0 +1,53 @@
+<!-- Klavye Kısayolları Yardım Modalı -->
+<div class="kasa-modal" id="keyboardShortcutsModal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="shortcuts-modal-title">
+    <div class="modal-dialog modal-dialog-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="shortcuts-modal-title" class="modal-title modal-title-display font-semibold">
+                    <i class="fa-solid fa-keyboard mr-2 modal-icon-accent"></i>{{ _('Klavye Kısayolları') }}
+                </h2>
+                <button type="button" data-kasa-close class="kasa-close-btn" aria-label="{{ _('Kapat') }}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                {# 🔴 `KEYBOARD_SHORTCUTS` tek doğruluk kaynağı (app.py). Satırlar
+                   JS tarafındaki `keyboard-shortcuts.js` tablosuyla eşleşmek
+                   zorunda; test ikisini de aynı anda doğrular. #}
+                <p class="text-xs text-kasa-text-muted mb-4">
+                    <i class="fa-solid fa-circle-info mr-1 text-[#38bdf8]"></i>
+                    {{ _('Windows ve Linux için Ctrl, macOS için Cmd tuşunu kullanın.') }}
+                </p>
+                {% for group_label, shortcut_ids in KEYBOARD_SHORTCUT_GROUPS %}
+                    {% set group_shortcuts = KEYBOARD_SHORTCUTS | selectattr('id', 'in', shortcut_ids) | list %}
+                    {% if group_shortcuts %}
+                        <h3 class="shortcuts-group-label">{{ group_label }}</h3>
+                        <dl class="shortcuts-list">
+                            {% for shortcut in group_shortcuts %}
+                                <div class="shortcuts-row">
+                                    <dt class="shortcuts-action">{{ shortcut.label }}</dt>
+                                    <dd class="shortcuts-keys">
+                                        {# 🔴 `shortcut['keys']` ALT SİMGEYLE yazılmalı.
+                                           `shortcut.keys` Jinja'da önce ÖZELLİK arar ve
+                                           dict'in `.keys()` metodunu bulur — `TypeError:
+                                           'builtin_function_or_method' object has no
+                                           attribute 'split'` ile patlıyor. #}
+                                        {% for part in shortcut['keys'].split('+') %}
+                                            <kbd class="shortcuts-key">{{ part }}</kbd>
+                                        {% endfor %}
+                                    </dd>
+                                </div>
+                            {% endfor %}
+                        </dl>
+                    {% endif %}
+                {% endfor %}
+                {# 🔴 JS modülü yalnız `id/keys/target/bare` alanlarını alır;
+                   `label` bilerek gönderilmiyor (HTML tablosu sunucuda basıldı,
+                   JS'in etikete ihtiyacı yok). #}
+                <script nonce="{{ csp_nonce }}">
+                    window.KASA_SHORTCUTS = {{ shortcut_bindings | tojson }};
+                </script>
+            </div>
+        </div>
+    </div>
+</div>

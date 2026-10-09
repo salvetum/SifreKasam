@@ -54,6 +54,17 @@ DEFAULT_CONTENT_PROTECTION_ENABLED = False
 DEFAULT_HARDWARE_ACCELERATION_ENABLED = True
 DEFAULT_POWER_SAVE_ENABLED = True
 
+# Pano temizleme. Varsayılan **kapalı**: temizleme, kullanıcı bu uygulamadan
+# kopyaladıktan sonra başka bir uygulamadan kopyaladığı şeyi de silebilir.
+# Rakipler (KeePassXC, Bitwarden) varsayılanı açık tutar; biz ölçülebilir
+# veri kaybı riski nedeniyle açıkmayı seçiyoruz — kullanıcı tek tıkla açıyor.
+# 10 sn altı kullanışsız (yapıştırmak için yeterli değil), 600 sn üstü
+# "sır panoda bekliyor" penceresini anlamsız biçimde uzatıyor.
+DEFAULT_CLIPBOARD_AUTO_CLEAR_ENABLED = False
+DEFAULT_CLIPBOARD_CLEAR_SECONDS = 60
+MIN_CLIPBOARD_CLEAR_SECONDS = 10
+MAX_CLIPBOARD_CLEAR_SECONDS = 600
+
 LEGACY_PBKDF2_SALT = b"kasa_masaustu_salt_12345"
 PBKDF2_SALT_SETTING = "pbkdf2_salt_b64"
 PBKDF2_ITERATIONS = 600_000

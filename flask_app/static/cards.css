@@ -655,7 +655,6 @@ html[data-bs-theme="light"][data-glass-effects="off"] .card-page-jump-input {
     }
 }
 
-
 /* ── Kart ızgarası kademeli giriş (stagger) ────────────────────────
    Filtre/sayfa değişiminde yeniden render edilen kartlar sırayla
    yükselerek gelir; 12. kart sonrası hepsi aynı gecikmede. */
@@ -715,42 +714,32 @@ html[data-glass-effects="off"] .vault-card-shell .footer-action-btn:focus-visibl
     .vault-card-shell .footer-action-btn:focus-visible { transform: none; }
 }
 
-/* ─── Filtre sonrasi kart girisi (camsiz kare duzeltmesi) ──────────────────────
-   BELIRTI: kullanci "arama sonucu kartlari ONCE cam efektsiz geliyor, sonra
-   camli" diye raporladi.
+/* ─── Filtrelenen kart: display:none YOK ───────────────────────────────────────
+   BELIRTI: "arama yapinca gelen kartlar ilk buğusuz sonra buğulu geliyor"
+   (once "camsiz sonra camli" olarak da bildirilmisdi — ayni hata).
 
-   OLCULEN KOK NEDEN: sayfa-1 disindaki kartlar sablonda `hidden` dogar
-   (card-grid.html: `{% if loop.index0 >= card_page_size %}hidden{% endif %}`),
-   yani `display:none` ile. Arama onlari gorunur yaptiginda display:none -> block
-   gecisi olur; Chromium bu geciste backdrop-filter katmanini YENIDEN kurar ve
-   ilk karede ornekleme yapmadan boyar. Kart o karede "camsiz" gorunur.
+   OLCULEN KOK NEDEN: sayfa-1 disindaki kartlar display:none ile dogardi.
+   display:none -> gorunur gecisinde Chromium backdrop-filter KATMANINI
+   YENIDEN kuruyor ve ilk karede ornekleme yapmadan boyuyor.
 
-   COZUM: `card-animated` (cardSlideIn) YALNIZCA ilk yuklemede oynatilir
-   (vault-index.js: finishInitialReveal, 650ms sonra sinif kaldirilir) ve
-   transform icerdigi icin ayni Chromium sorununu yaratirdi; arama yolunda
-   zaten oynamiyordu. Onun yerine: gorunurluk ANINDA acilir, opaklik 0'dan
-   baslayan 180ms'lik bir giris animasyonuyla oynatilir. Bulaniklasma 1-2 karede
-   (~32 ms) tamamlandigi icin kart %20 opakliga gelmeden cam hazir olur; goz
-   "camsiz" kareyi goremez.
-   `both` fill-mode bitince degerleri geri yukler; sinif animationend'de
-   kaldirilir (aksi halde yeniden aramada animasyon yeniden oynamazdi).
-   Not: bu duzeltme `hidden` yerine gecmez — grid akisini degistirmek riskli,
-   gecilmis, uzerinde CSS'i olmayan bir sinif zaten bekliyordu. */
-@keyframes cardFilterReveal {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
+   COZUM: kart render agacindan hic cikmaz. Grid akisindan cikarmak icin
+   position:absolute, gorunmezlik icin visibility:hidden. Katman canli kalir,
+   yeniden kurulmaz, flaş olmaz.
 
-.card-wrapper.filter-reveal {
-    animation: cardFilterReveal 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
+   🔴 GIRIS ANIMASYONU BILEREK YOK. Iki deneme de basarisiz oldu:
+     1) rAF ile erteleme -> bir kare daha camsiz ekran.
+     2) `cardFilterReveal` (opacity + transform, `both` fill) -> animasyon
+        bittiginde kart `transform: translateY(0)` ile transform'lu KALIYOR;
+        transform backdrop orneklemeyi bozdugu icin kart animasyon
+        bittikten SONRA hala yanlis ornekleniyor. Yani animasyon sorunu
+        180 ms uzatmakla degil, KALICI hale getiriyordu. Kaldirildi.
 
-html[data-kasa-animations="off"] .card-wrapper.filter-reveal {
-    animation: none;
-}
+   Not: absolute konumlanan gizli kartlarin uzak bir atasina baglanip
+   kaydirma alani yaratmamasi icin `#card-container` zaten `position: relative`
+   (bu dosyanin basinda). */
 
-@media (prefers-reduced-motion: reduce) {
-    .card-wrapper.filter-reveal {
-        animation-duration: 0.01ms;
-    }
+.card-wrapper.is-filtered-out {
+    position: absolute;
+    visibility: hidden;
+    pointer-events: none;
 }

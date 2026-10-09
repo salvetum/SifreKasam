@@ -863,7 +863,12 @@ html[data-bs-theme="light"] .filter-btn[aria-pressed="true"] {
 #bulk-and-search-group {
     min-width: 0;
 }
-.record-search-wrap {
+/* Sıralama seçicisi: arama kutusunun sağında sabit genişlikte durur ve
+   dar ekranda aramanın altına tam genişlikte iner. `flex-shrink: 0`
+   olmazsa etiket metni iki satıra bölünüp çubuğu gereğinden uzun büyütür. */
+.record-sort-wrap {
+  flex: 0 0 auto;
+}.record-search-wrap {
     min-width: 0;
     flex: 1 1 120px;
     max-width: 260px;
@@ -872,8 +877,7 @@ html[data-bs-theme="light"] .filter-btn[aria-pressed="true"] {
     .record-search-wrap {
         flex: 1 1 100%;
         max-width: none;
-    }
-    #bulk-and-search-group {
+    }    #bulk-and-search-group {
         width: 100%;
     }
 }
@@ -988,4 +992,358 @@ html[data-kasa-low-power="on"][data-bs-theme="light"] .kasa-tooltip::after {
         transition: none;
         transform: none;
     }
+}
+
+/* ─── Etiket filtresi çubuğu ─────────────────────────────────────────
+   Bu blok BİLEREK `backdrop-filter` KULLANMIYOR. Cam kullanılsaydı
+   `GlassOffSurfaceTests` (bkz. AGENTS.md) opak bir `data-glass-effects="off"`
+   yedeği zorunlu kılardı; küçük bir filtre çubuğu için cam yüzeyi kazanç
+   değil. Dolayısıyla burada sadece accent karışımlı düz renkler var ve
+   düşük güç modunda da görünür kalır. */
+.tag-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.tag-filter-bar[hidden] {
+    display: none;
+}
+
+.tag-filter-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.tag-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tag-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    max-width: 12rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease,
+        border-color var(--motion-fast) ease;
+}
+
+.tag-filter-chip:hover {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--text);
+}
+
+.tag-filter-chip.is-active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.tag-filter-count {
+    font-size: 0.62rem;
+    opacity: 0.75;
+    font-variant-numeric: tabular-nums;
+}
+
+.tag-filter-clear {
+    flex: 0 0 auto;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.tag-filter-clear[hidden] {
+    display: none;
+}
+
+.tag-filter-clear:hover {
+    color: var(--text);
+    border-color: var(--accent);
+}
+
+@media (max-width: 480px) {
+    .tag-filter-bar,
+    .tag-filter-chips {
+        flex: 1 1 100%;
+    }
+    .tag-filter-chip {
+        max-width: 100%;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Klavye kısayolları yardım listesi
+   🔴 Bilerek `backdrop-filter` YOK: küçük bir bilgi tablosu için cam
+   yüzey kazanç değil, kullansaydı `GlassOffSurfaceTests` opak
+   `data-glass-effects="off"` yedeği zorunlu kılardı. Düz accent
+   karışımları kullanıldı.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.shortcuts-group-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 1.25rem 0 0.5rem;
+}
+.shortcuts-group-label:first-of-type {
+    margin-top: 0;
+}
+
+.shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    margin: 0;
+}
+
+.shortcuts-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.4375rem 0.625rem;
+    border-radius: var(--radius-sm, 0.5rem);
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.shortcuts-action {
+    font-size: 0.8125rem;
+    color: var(--text);
+    margin: 0;
+}
+
+.shortcuts-keys {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.shortcuts-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    height: 1.5rem;
+    padding: 0 0.4375rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6875rem;
+    line-height: 1;
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    border-radius: 0.3125rem;
+}
+
+@media (max-width: 480px) {
+    .shortcuts-row {
+        flex-wrap: wrap;
+    }
+    .shortcuts-keys {
+        flex-basis: 100%;
+        justify-content: flex-end;
+    }
+}
+/* Toplu düzenleme modalı ---------------------------------------------------- */
+.bulk-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.bulk-edit-action {
+    justify-content: center;
+    text-align: center;
+}
+
+.bulk-edit-action.is-selected {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* `hidden` yerine display:grid taşıyan öğelerde global display kuralları
+   yeniden kazanmasın diye açıkça geri alınıyor. */
+.bulk-edit-extra[hidden] {
+    display: none;
+}
+
+@media (max-width: 480px) {
+    .bulk-edit-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Kayıt eki bölümü — `partials/form/panel-extras.html` ile eşleşir.
+   🔴 bilerek `backdrop-filter` YOK: küçük bir durum satırı için cam yüzey
+   kazanç değil, kullansaydı `GlassOffSurfaceTests` opak glass-off yedeği
+   zorunlu kılardı. Düz accent karışımları kullanıldı. */
+.vault-attachment-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--kasa-border-hi);
+    border-radius: var(--kasa-radius, 0.6rem);
+    background: rgba(var(--accent-rgb), 0.06);
+    font-size: 0.85rem;
+}
+
+.vault-attachment-status > span:first-of-type {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vault-attachment-size {
+    flex: 0 0 auto;
+    opacity: 0.65;
+    font-variant-numeric: tabular-nums;
+}
+
+.vault-attachment-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    text-decoration: none;
+    color: var(--kasa-text-muted);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    border-radius: 0.4rem;
+}
+
+.vault-attachment-btn:hover {
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.1);
+}
+
+.vault-attachment-btn-danger:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.vault-attachment-upload {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.vault-attachment-upload .kasa-field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 640px) {
+    .vault-attachment-upload {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+/* Kart üzerindeki ek rozeti ------------------------------------------------ */
+.vault-card-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.35rem;
+    background: rgba(var(--accent-rgb), 0.12);
+    color: var(--kasa-text-muted);
+}
+/* Görünüm seçenekleri düğmesi + modal alanları --------------------------- */
+.view-options-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--kasa-border, rgba(255, 255, 255, 0.08));
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)), var(--glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: var(--text-muted, rgba(255, 255, 255, 0.65));
+    cursor: pointer;
+    transition: background var(--motion-fast, 150ms) ease,
+                color var(--motion-fast, 150ms) ease,
+                border-color var(--motion-fast, 150ms) ease;
+}
+
+.view-options-btn:hover {
+    background: radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.22), transparent 60%),
+                linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)), var(--glass);
+    color: var(--accent, #38bdf8);
+    border-color: rgba(var(--accent-rgb, 56, 189, 248), 0.35);
+}
+
+.view-options-btn:focus-visible {
+    outline: 2px solid var(--accent, #38bdf8);
+    outline-offset: 2px;
+}
+
+.view-options-field {
+    /* Düz zemin: küçük bir alan listesi için cam yüzey kazanç değil. */
+    background: transparent;
+}
+
+@media (max-width: 480px) {
+    .view-options-btn {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+}
+
+[data-bs-theme="light"] .view-options-btn {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.62)), var(--glass);
+    border-color: rgba(31, 41, 55, 0.14);
+}
+
+/* Cam kapalıyken opak yedek — GlassOffSurfaceTests bunu ZORUNLU kılar.
+   `backdrop-filter: none` tek başına yetmez: yüzeyin opak görünmesi büyük
+   ölçüde buğudan geliyor. Koyu/açık değerler `.kasa-field` ile aynı. */
+html[data-glass-effects="off"] .view-options-btn {
+    background: rgba(9, 11, 24, 0.92) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html[data-bs-theme="light"][data-glass-effects="off"] .view-options-btn {
+    background: rgba(255, 255, 255, 0.92) !important;
+    border-color: rgba(31, 41, 55, 0.16) !important;
 }

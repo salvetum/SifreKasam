@@ -43,6 +43,17 @@ const DEPENDENCIES = [
     ],
   },
   {
+    parent: '#clipboard_auto_clear_enabled',
+    parentBlocks: false,
+    dependents: [
+      // 🔴 `SettingsDependencyLockTests` her `card:` seçicisinin `id="..."`
+      // olarak bir ayarda bulunmasını şart koşuyor; bu yüzden bileşik
+      // seçici (`#a .b`) kullanılamaz — zaman aşımı satırına kendi
+      // `id`'si verildi.
+      { card: '#clipboard-clear-timeout-row', reason: 'Yalnızca pano temizleme açıkken süre ayarının etkisi vardır.' },
+    ],
+  },
+  {
     parent: '#lan-enabled-toggle',
     parentBlocks: false,
     dependents: [

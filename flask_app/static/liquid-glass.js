@@ -8,7 +8,6 @@
    KAPSAM: iki özel yüzeyde sabit parametreler, diğer tüm
    .glass yüzeylerde boyut-tabanlı kademeli kırılma:
      .settings-modal-content  →  #kasa-liquid-settings  (blur 22)
-     .entry-login-card        →  #kasa-liquid-login     (blur 13)
      .glass                   →  boyuta göre tier:
          büyük yüzeyler (≥150000 px²) : blur 20, saturate 1.4
          orta yüzeyler   (≥40000 px²)  : blur 14, saturate 1.3
@@ -22,8 +21,7 @@
   'use strict';
 
   var SPECIAL = [
-    { selector: '.settings-modal-content', blur: 22, saturate: 1.4 },
-    { selector: '.entry-login-card', blur: 13, saturate: 1.3 }
+    { selector: '.settings-modal-content', blur: 22, saturate: 1.4 }
   ];
 
   function refractionEnabled() {

@@ -211,6 +211,73 @@ _icon_cache: dict[str, str] = {}
 _available_brands: Optional[frozenset[str]] = None
 
 
+# ── Kart ağı işaretleri ─────────────────────────────────────────────────────
+# 🔴 Neden dosya değil de üretilmiş SVG: Visa/Mastercard/Amex logoları **ticari
+# markadır**; kopyalanamaz. Bu yüzden projenin zaten kullandığı yaklaşım
+# (satır içi SVG, sıfır ağ isteği — AGENTS.md "Marka ikonları") kart ağlarının
+# *görsel diline* uygun özgün işaretler üretir: kart yuvarlak dikdörtgeni +
+# EMV çipi (tek renkli ağlar) veya iç içe iki daire (çift renkli ağlar).
+# Tanıma için birincil kanal renk, ikincil kanal geometridir; 30px'lik ikon
+# kutusunda okunabilir bir monogram zaten mümkün değil.
+#
+# `_load_svg_content` bu anahtarları diskte arar ve BULAMAZ; bu yüzden
+# `getBrandIcon` önce `_card_brand_mark()`'a bakıyor. Düzenli marka anahtarları
+# (amazon, github…) bu kümede olmadığı için davranışları etkilenmiyor.
+CARD_BRAND_MARKS: dict[str, tuple[str, str]] = {
+    # anahtar -> (ana görsel, birlikte kullanılacak ikinci görsel veya "")
+    "visa": ("#1A1F71", ""),
+    "mastercard": ("#EB001B", "#F79E1B"),
+    "amex": ("#006FCF", ""),
+    "troy": ("#12897E", ""),
+    "unionpay": ("#00447C", "#E21836"),
+    "jcb": ("#0E4C96", "#1B1464"),
+    "diners": ("#0079BE", ""),
+    "maestro": ("#0099DF", "#ED0006"),
+    "discover": ("#F26E21", ""),
+    "hipercard": ("#2E3192", ""),
+    "electron": ("#1E5AA8", ""),
+    "worldelite": ("#124E78", ""),
+}
+
+_CARD_MARK_VIEWBOX = "0 0 32 32"
+
+# Kart yuvarlak dikdörtgeni: köşe yarıçapı 4, çip 4.5 birimlik iki halkalı
+# EMV teması. İkinci renk verilmemişse çip yarı saydam beyaz çizilir.
+_CARD_SINGLE = (
+    '<rect x="2" y="5" width="28" height="22" rx="4" fill="{primary}"/>'
+    '<rect x="5.5" y="10" width="9" height="7.5" rx="1.6" fill="#fff" opacity="0.34"/>'
+    '<path d="M10 10v7.5M5.5 13.75h9" stroke="#fff" stroke-opacity="0.34" '
+    'stroke-width="1.1" fill="none"/>'
+    '<rect x="18" y="12" width="9" height="1.8" rx="0.9" fill="#fff" opacity="0.34"/>'
+    '<rect x="18" y="16" width="6" height="1.8" rx="0.9" fill="#fff" opacity="0.28"/>'
+)
+# Çift renkli ağlar: kart gövdesi birinci renkte, sağ üstte ikinci renkli daire.
+_CARD_DUAL = (
+    '<rect x="2" y="5" width="28" height="22" rx="4" fill="{primary}"/>'
+    '<circle cx="23.5" cy="16" r="7.2" fill="{secondary}" opacity="0.92"/>'
+    '<circle cx="17.5" cy="16" r="7.2" fill="{primary}"/>'
+    '<rect x="5.5" y="10" width="9" height="7.5" rx="1.6" fill="#fff" opacity="0.3"/>'
+    '<path d="M10 10v7.5M5.5 13.75h9" stroke="#fff" stroke-opacity="0.3" '
+    'stroke-width="1.1" fill="none"/>'
+)
+
+
+def _card_brand_mark(brand: str) -> Optional[tuple[str, str]]:
+    """Kart ağı anahtarı için üretilmiş işareti döndürür, yoksa `None`.
+
+    Dönüş: `(svg_govde, viewBox)` — `getBrandIcon` bunu dosya tabanlı marka
+    yolunun yerine kullanır. Anahtarlar `CARD_BRANDS` beyaz listesiyle
+    sınırlıdır; `normalize_card_brand` dışından gelen ham metin buraya ulaşmaz.
+    """
+    colors = CARD_BRAND_MARKS.get(brand)
+    if colors is None:
+        return None
+    primary, secondary = colors
+    template = _CARD_SINGLE if not secondary else _CARD_DUAL
+    content = template.format(primary=primary, secondary=secondary)
+    return content, _CARD_MARK_VIEWBOX
+
+
 def _available_brand_keys() -> frozenset[str]:
     """Dosya sistemindeki mevcut ikonları listeler ve önbelleğe alır."""
     global _available_brands
@@ -289,19 +356,74 @@ def match_title_brand(title: str) -> Optional[str]:
     return None
 
 
-def getBrandIcon(title: str = "", domain: str = "", record_type: str = "") -> Markup:
+# 🔴 Kart markası listesi **kasıtlı olarak** `static/brand-icons` SVG'lerinden
+# okunmaz. O klasör **web sitesi/uygulama** markalarını içerir (amazon, apple,
+# github…) ve kart ağı değildir; kullanıcı "Visa / Mastercard" bekler.
+# Ölçülen hata: liste `['amazon','apple',…,'zoom']` idi ve geçerli bir giriş
+# (`visa`) beyaz listeye girmiyordu, yani her seçim sessizce boş dönüyordu.
+CARD_BRANDS: dict[str, str] = {
+    "visa": "Visa",
+    "mastercard": "Mastercard",
+    "amex": "American Express",
+    "troy": "Troy",
+    "unionpay": "UnionPay",
+    "jcb": "JCB",
+    "diners": "Diners Club",
+    "maestro": "Maestro",
+    "discover": "Discover",
+    "hipercard": "Hipercard",
+    "electron": "Electron",
+    "worldelite": "World Elite",
+}
+
+
+def available_card_brands() -> list[tuple[str, str]]:
+    """Kredi kartı seçicisinde sunulacak `(anahtar, görünen ad)` çiftleri.
+
+    🔴 Diskteki SVG yoksa `getBrandIcon` jenerik kart ikonuna düşer; kart ağı
+    markalarının çoğunun logosu projede yok ve bu kasıtlıdır — kullanıcı yine
+    de markasını seçebilmelidir. Liste sabittir, dosya sistemine bağlı değil.
+    """
+    return sorted(CARD_BRANDS.items())
+
+
+def normalize_card_brand(raw: str) -> str:
+    """Kullanıcının seçtiği markayı **beyaz liste** üzerinden doğrular.
+
+    🔴 Neden beyaz liste: `card_brand` şifrelenmeyen düz metin bir sütun
+    (marka sır değildir, `category`/`type` ile aynı sınıf). Doğrulamasız
+    kabul edilirse kullanıcı istediği uzunlukta metin yazabilir ve kart
+    satırı bu ham metni HTML'e basar.
+    """
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    if value in CARD_BRANDS:
+        return value
+    folded = value.casefold().replace(" ", "").replace("-", "").replace(".", "")
+    for key in CARD_BRANDS:
+        if folded == key or folded == key.replace(" ", ""):
+            return key
+    return ""
+
+
+def getBrandIcon(title: str = "", domain: str = "", record_type: str = "",
+                 card_brand: str = "") -> Markup:
     """Başlık, internet adresi veya kayıt tipine göre uygun ikonu döner.
 
-    Önce alan adı, ardından başlık analiz edilir. Eşleşme yoksa kayıt tipine
+    Önce **kart markası** (yalnız CreditCard kayıtlarında dolu), sonra alan
+    adı, ardından başlık analiz edilir. Eşleşme yoksa kayıt tipine
     göre anlamlı bir tip ikonu (Website→dünya, Application→masaüstü,
     CreditCard→kart, SecureNote→not) dönülür. Tip de bilinmiyorsa (boş/Other)
     jenerik kilit ikonuna düşülür (last resort). Sonuç satır içi SVG'dir —
     hiçbir dış URL / Favicon API isteği yapılmaz.
 
-    ``record_type`` opsiyoneldir; verilmezse (2 argümanli çağrilar) davranış
-    eski haliyle aynidir (marka yoksa default kilit ikonu).
+    ``record_type`` ve ``card_brand`` opsiyoneldir; verilmezse (2 argümanlı
+    çağrılar) davranış eski haliyle aynıdır (marka yoksa default kilit ikonu).
     """
-    brand = match_domain_brand(normalize_domain(domain))
+    brand = normalize_card_brand(card_brand) if card_brand else None
+    if brand is None:
+        brand = match_domain_brand(normalize_domain(domain))
     if brand is None:
         brand = match_title_brand(title)
 
@@ -316,11 +438,16 @@ def getBrandIcon(title: str = "", domain: str = "", record_type: str = "") -> Ma
             brand = "default"
             content, viewbox = _DEFAULT_CONTENT, _DEFAULT_VIEWBOX
     else:
-        content = _load_svg_content(brand)
-        if content is None:
-            brand, content, viewbox = "default", _DEFAULT_CONTENT, _DEFAULT_VIEWBOX
+        # Kart ağları diskte SVG olarak YOK; üretilmiş işaret önce denenir.
+        mark = _card_brand_mark(brand)
+        if mark is not None:
+            content, viewbox = mark
         else:
-            viewbox = "0 0 24 24"
+            content = _load_svg_content(brand)
+            if content is None:
+                brand, content, viewbox = "default", _DEFAULT_CONTENT, _DEFAULT_VIEWBOX
+            else:
+                viewbox = "0 0 24 24"
 
     svg = (
         f'<svg viewBox="{escape(viewbox)}" '

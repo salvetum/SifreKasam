@@ -112,7 +112,7 @@ html[data-bs-theme="light"][data-glass-quality="high"] {
 /* ── DÜŞÜK GÜÇ: cam yüzeylerde blur'u kaldır ──────────────────── */
 html[data-kasa-low-power="on"] .glass,
 html[data-kasa-low-power="on"] .settings-action-card,
-html[data-kasa-low-power="on"] .filter-btn,
+html[data-kasa-low-power="on"] .filter-btn, html[data-kasa-low-power="on"] .view-options-btn,
 html[data-kasa-low-power="on"] .kasa-btn:not(.kasa-btn-primary),
 html[data-kasa-low-power="on"] .kasa-dropdown-trigger,
 html[data-kasa-low-power="on"] #search-input,
@@ -139,7 +139,6 @@ html[data-kasa-low-power="on"] .vault-generator-panel {
    düşük güç / efekt kapalı / gradyan kapalı modlarında gizleme kuralı
    cards.css içindedir (bileşik `.glass` seçicisi hiçbir elementte
    eşleşmediği için buraya taşınmamıştır). */
-
 
 /* ── GLASS YARDIMCI SINIFLARI ────────────────────────────────── */
 /* Ortak glass özellikleri (.glass-sm artık yok: uygulamada hiçbir
@@ -416,6 +415,35 @@ html[data-bs-theme="light"][data-glass-effects="off"] .filter-empty-state,
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-navbar-inner,
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-navbar-right .kasa-btn-muted,
 html[data-bs-theme="light"][data-glass-effects="off"] .kasa-navbar .kasa-dropdown-trigger {
+    border-color: rgba(var(--accent-rgb), 0.20) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.06), transparent 44%),
+        linear-gradient(145deg, #edf1f8, #dde5f2) !important;
+}
+
+/* ── Low-power (tasarruf) modunda opak yedek ────────────────────────────
+   🔴 `base.css:77` `data-kasa-low-power="on"` altında bu yüzeylerin
+   `backdrop-filter`'ını kapatıyor ama opak zemin vermiyordu. Aynı tuzağın
+   low-power varyantı: blur gider, saydam tabaka kalır, panel "yarı saydam"
+   görünür — `data-glass-effects="off"` yolunun birebir aynısı.
+
+   Değerler yukarıdaki cam-kapalı kurallarla **aynı** tutuldu; `LowPowerOpaqueTests`
+   ayrışmayı testte kilitler. Yüzey listesi kasıtlı olarak dar: low-power
+   `base.css` yalnız bu ikisinin buğusunu kaldırıyor, diğer yüzeyler
+   buğusunu koruyor.
+
+   🔴 `.kasa-modal .modal-content` BİLEREK dışarıda: `modals.css`'te zaten
+   0.88 opak bir tabaka taşıyor, yani buğu kapanınca da saydam kalmıyor.
+   Cam-kapalı yolda da ona özel bir zemin kuralı yok — low-power'da da
+   olmamalı, yoksa iki mod görünümlü olarak ayrışır. */
+html[data-kasa-low-power="on"] .kasa-panel {
+    border-color: rgba(var(--accent-rgb), 0.22) !important;
+    background:
+        radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.09), transparent 44%),
+        linear-gradient(145deg, rgba(29,33,55,0.97), rgba(20,23,42,0.97)) !important;
+}
+
+html[data-bs-theme="light"][data-kasa-low-power="on"] .kasa-panel {
     border-color: rgba(var(--accent-rgb), 0.20) !important;
     background:
         radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.06), transparent 44%),

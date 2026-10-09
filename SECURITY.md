@@ -146,7 +146,7 @@ sentinel  : dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX
 sonrası   : <fuse sürümü:1 byte> <fuse sayısı:1 byte> <wire karakterleri>
 ```
 
-Ölçülen byte'lar (Forge 8 + Electron 44.5.1 build'i, `01 09` = sürüm 1, 9 fuse):
+Ölçülen byte'lar (Forge 8 + Electron 44.7.0 build'i, `01 09` = sürüm 1, 9 fuse):
 
 | | wire | durum |
 |---|---|---|
@@ -170,7 +170,7 @@ Sabitleme **kaldırıldı**; kalan override'lar `@xmldom/xmldom: 0.9.12`, `fast-
 
 ### Bağımlılıklar ve kalan `npm audit` uyarıları — bilerek yapılmayan (2026-10)
 
-Güncel: `electron 44.5.1`, `@electron/fuses 2.1.3`, `@electron-forge/{cli,maker-squirrel,maker-zip,plugin-fuses} 8.0.1`. Forge 8'e geçişte `require(esm)` sayesinde `forge.config.js` **hiç değişmedi** (Node ≥ 22.12 `require()` ile ESM yükleyebiliyor).
+Güncel: `electron 44.7.0`, `@electron/fuses 2.1.3`, `@electron-forge/{cli,maker-squirrel,maker-zip,plugin-fuses} 8.0.1`. Forge 8'e geçişte `require(esm)` sayesinde `forge.config.js` **hiç değişmedi** (Node ≥ 22.12 `require()` ile ESM yükleyebiliyor).
 
 **Electron 45 alpha bilerek alınmadı.** Ölçülen: Chromium 152 → 155 (+3), Node 24.21.0 aynı. Kırıcı değişiklikler arasında **ANGLE tüm platformlarda statik bağlanıyor** (GPU/ekran davranışı değişir — "Donanım Hızlandırma" ayarı ve `window.js`'deki siyah ekran notu bu risk alanında, headless doğrulanamaz) ve Electron ilk çalıştırmada kendini dinamik indiriyor. Ölçülen başlangıç yavaşlığı **Chromium sürümü değil, varlık ağırlığı** (21 render-blocking stylesheet, ~617 KB — bkz. §1 SW kaydı); yeni Chromium bunu değiştirmez. `@electron/fuses@2.1.3` hâlâ sadece `FuseVersion.V1` tanımlıyor → yeni fuse getirisi de yok.
 
@@ -314,7 +314,7 @@ Bu yüzden `integrity.js`'in backend için Ed25519 yaklaşımı (anahtar repo d�
 ## 5. Test durumu (bu turun sonu)
 
 ```
-py -3.12 -m pytest tests/test_kasa.py -q   →  416 passed, 97 subtests passed
+py -3.12 -m pytest tests/test_kasa.py -q   →  674 passed, 114 subtests passed
 py -3.12 scripts/security_lint.py          →  Security lint passed
 ```
 

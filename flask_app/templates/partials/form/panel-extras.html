@@ -1,0 +1,114 @@
+{# Etiketler + özel alanlar. Gerekçe: `kasa_core/record_extras.py` başlığı.
+   DİKKAT: buradaki checkbox (`cf_secret_N`) işaretlenmediğinde GÖNDERİLMEZ ve
+   backend `False` kabul eder — `disabled` ASLA konmamalıdır (AGENTS.md tuzağı). #}
+        <section class="vault-form-panel vault-form-extras" aria-labelledby="vault-section-extras">
+            <div class="vault-section-head">
+                <span><i class="fa-solid fa-tags"></i></span>
+                <div>
+                    <h2 id="vault-section-extras">{{ _('Etiketler ve Özel Alanlar') }}</h2>
+                    <p>{{ _('Etiketler virgülle ayrılır. Özel alanlar sır olabilir ve maskelenir.') }}</p>
+                </div>
+            </div>
+
+            <div class="vault-field">
+                <label for="tags">{{ _('Etiketler') }}</label>
+                <div class="vault-field-input-wrap">
+                    <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-tag"></i></span>
+                    <input type="text" name="tags" id="tags" placeholder="{{ _('iş, banka, önemli') }}"
+                        value="{{ kayit.full_data.tags if kayit and 'tags' in kayit.full_data else '' }}"
+                        class="kasa-field" maxlength="600">
+                </div>
+                <p class="vault-field-hint">{{ _('En fazla 20 etiket, her biri 30 karakter.') }}</p>
+            </div>
+
+            <div class="vault-field">
+                <span class="vault-field-label-static">{{ _('Özel Alanlar') }}</span>
+                <div id="custom-fields-list" class="vault-custom-fields">
+                    {% if kayit and kayit.full_data.custom_fields %}
+                        {% for alan in kayit.full_data.custom_fields %}
+                        <div class="vault-custom-field" data-custom-field>
+                            <input type="text" name="cf_label_{{ loop.index0 }}" value="{{ alan.label }}"
+                                placeholder="{{ _('Etiket') }}" class="kasa-field" maxlength="60" aria-label="{{ _('Etiket') }}">
+                            <div class="vault-field-input-wrap vault-custom-field-value">
+                                <input type="{{ 'password' if alan.secret else 'text' }}"
+                                    name="cf_value_{{ loop.index0 }}" value="{{ alan.value }}"
+                                    placeholder="{{ _('Değer') }}" class="kasa-field" maxlength="2000"
+                                    aria-label="{{ _('Değer') }}" data-secret-value="{{ '1' if alan.secret else '' }}">
+                            </div>
+                            <label class="vault-custom-field-secret" title="{{ _('Değeri gizle') }}">
+                                <input type="checkbox" name="cf_secret_{{ loop.index0 }}" value="1" {% if alan.secret %}checked{% endif %}
+                                    data-custom-field-secret>
+                                <span>{{ _('Gizli') }}</span>
+                            </label>
+                            <button type="button" class="vault-custom-field-remove" data-custom-field-remove
+                                title="{{ _('Alanı sil') }}" aria-label="{{ _('Alanı sil') }}">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <template id="custom-field-template">
+                    <div class="vault-custom-field" data-custom-field>
+                        <input type="text" data-custom-field-label placeholder="{{ _('Etiket') }}"
+                            class="kasa-field" maxlength="60" aria-label="{{ _('Etiket') }}">
+                        <div class="vault-field-input-wrap vault-custom-field-value">
+                            <input type="text" data-custom-field-value placeholder="{{ _('Değer') }}"
+                                class="kasa-field" maxlength="2000" aria-label="{{ _('Değer') }}">
+                        </div>
+                        <label class="vault-custom-field-secret" title="{{ _('Değeri gizle') }}">
+                            <input type="checkbox" data-custom-field-secret>
+                            <span>{{ _('Gizli') }}</span>
+                        </label>
+                        <button type="button" class="vault-custom-field-remove" data-custom-field-remove
+                            title="{{ _('Alanı sil') }}" aria-label="{{ _('Alanı sil') }}">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </template>
+                <button type="button" id="custom-field-add" class="vault-custom-field-add">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    <span>{{ _('Alan ekle') }}</span>
+                </button>
+                <p class="vault-field-hint">{{ _('En fazla 30 alan. Gizli işaretli değerler maskelenir.') }}</p>
+            </div>
+
+            {# ── Kayıt eki ──────────────────────────────────────────────
+               Yalnız DÜZENLEME ekranında görünür: yeni kayıtta henüz kayıt
+               kimliği yok, yükleme ucu `/api/record/<id>/attachment` istiyor.
+               Ek, kayıt formunun KENDİSİYLE gönderilmez (form POST'u
+               `_record_from_form`'a gider ve dosyayı tanımaz); ayrı AJAX ucu.
+               🔴 `disabled` ASLA konmaz — AGENTS.md tuzağı: ayar/HTML formu
+               gerçektir, eksik gönderilen alan backend'de False yazılır. #}
+            {% if kayit %}
+            <div class="vault-field vault-attachment-field">
+                <span class="vault-field-label-static">{{ _('Ek Dosya') }}</span>
+                <div id="attachment-status" class="vault-attachment-status"
+                    data-attachment-for="{{ kayit.id }}"
+                    {% if not kayit.full_data.attachment %}hidden{% endif %}>
+                    <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+                    <span id="attachment-name">{{ kayit.full_data.attachment.name if kayit.full_data.attachment else '' }}</span>
+                    <span class="vault-attachment-size"
+                        data-attachment-size>{{ kayit.full_data.attachment.size if kayit.full_data.attachment else 0 }}</span>
+                    <a id="attachment-download" class="vault-attachment-btn"
+                        href="{{ url_for('download_record_attachment', kayit_id=kayit.id) }}">
+                        <i class="fa-solid fa-download" aria-hidden="true"></i>{{ _('İndir') }}
+                    </a>
+                    <button type="button" id="attachment-remove" class="vault-attachment-btn vault-attachment-btn-danger"
+                        data-attachment-remove>
+                        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>{{ _('Kaldır') }}
+                    </button>
+                </div>
+                <div class="vault-attachment-upload">
+                    <input type="file" id="attachment-input" class="kasa-field"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx,.zip,.kasaenc"
+                        data-attachment-input>
+                    <button type="button" id="attachment-upload" class="kasa-btn kasa-btn-muted"
+                        data-attachment-upload>
+                        <i class="fa-solid fa-upload mr-1"></i>{{ _('Eki Yükle') }}
+                    </button>
+                </div>
+                <p class="vault-field-hint">{{ _('En fazla 2 MB. Ek şifreli saklanır ve yalnızca bu bilgisayardan indirilebilir.') }}</p>
+            </div>
+            {% endif %}
+        </section>

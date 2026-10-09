@@ -2,8 +2,11 @@
 <main aria-labelledby="dashboard-title">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 vault-card-curtain" id="card-container">
         {% for kayit in kayit_listesi %}
-        <article class="card-wrapper vault-card card-delay-{{ [loop.index0, 8]|min }}"
-             {% if loop.index0 >= card_page_size %}hidden{% endif %}
+        <!-- Sayfa dışındaki kartlar `hidden` (display:none) DEĞİL, `is-filtered-out`
+             ile akıştan çıkarılır: display:none'dan dönen kartta Chromium
+             backdrop-filter katmanını yeniden kurup ilk karede örnekleme
+             yapmadan boyuyor (kart "buğusuz → buğulu" görünüyordu). -->
+        <article class="card-wrapper vault-card card-delay-{{ [loop.index0, 8]|min }}{% if loop.index0 >= card_page_size %} is-filtered-out{% endif %}"
              aria-labelledby="record-title-{{ kayit.id }}"
              data-id="{{ kayit.id }}"
              data-type="{{ kayit.full_data.type }}"
@@ -21,7 +24,7 @@
                                 <input type="checkbox" id="select-{{ kayit.id }}" class="select-item bulk-select-checkbox" value="{{ kayit.id }}">
                             </label>
                             <span class="vault-type-icon text-base flex-shrink-0 drop-shadow-sm" title="{{ kayit.normalized.baslik }}">
-                                {{ getBrandIcon(kayit.normalized.baslik, kayit.full_data.website_url, kayit.full_data.type) }}
+                                {{ getBrandIcon(kayit.normalized.baslik, kayit.full_data.website_url, kayit.full_data.type, kayit.full_data.card_brand or '') }}
                             </span>
                              <h2 id="record-title-{{ kayit.id }}" class="vault-card-title font-display font-semibold text-sm truncate m-0 text-kasa-text" title="{{ kayit.normalized.baslik }}">
                                  {{ kayit.normalized.baslik }}
@@ -122,6 +125,38 @@
                         {% endfor %}
                     </div>
 
+                    {# Etiketler + özel alan SAYISI. Değerler burada ASLA basılmaz
+                       (bkz. app.py:index — özel alanlar sır kabul edilir); yalnız
+                       sayı ve etiket adları (metadata, `category` ile aynı sınıf).
+
+                       🔴 Tuzak: etiket rozetlerinde `data-tag` YOK. Rozet
+                       `<button>`'tur ama filtre değeri `textContent`'ten okunur
+                       (bkz. vault-index.js `buildCardTags`). Etiket zaten kartta
+                       düz metin olarak görünür, ama yeni `data-*` özniteliği
+                       eklemek "DOM'a düz metin sokma" kuralını gereksiz yere
+                       zayıflatıyordu; tek doğruluk kaynağı (metin) korunuyor. #}
+                    {% if kayit.full_data.tags or kayit.full_data.custom_field_count or kayit.full_data.attachment %}
+                    <div class="vault-card-tags">
+                        {% for etiket in kayit.full_data.tags %}
+                        <button type="button" class="vault-card-tag"
+                            title="{{ _('Bu etikete göre süz') }}" aria-pressed="false">
+                            <i class="fa-solid fa-tag text-[0.6rem]" aria-hidden="true"></i>{{ etiket }}</button>
+                        {% endfor %}
+                        {% if kayit.full_data.custom_field_count %}
+                        <span class="vault-card-custom-fields" title="{{ _('Özel alanlar yalnız düzenleme ekranında görünür') }}">
+                            <i class="fa-solid fa-sliders" aria-hidden="true"></i>{{ kayit.full_data.custom_field_count }}
+                        </span>
+                        {% endif %}
+                        {# Ek rozeti: yalnız VARLIK + ad. Gövde asla basılmaz ve
+                           `hide_secrets` varken `attachment` zaten `{}` gelir,
+                           yani LAN'da dosya adı da görünmez. #}
+                        {% if kayit.full_data.attachment %}
+                        <span class="vault-card-attachment" title="{{ kayit.full_data.attachment.name }}">
+                            <i class="fa-solid fa-paperclip" aria-hidden="true"></i>{{ kayit.full_data.attachment.name }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Card Footer -->

@@ -15,7 +15,13 @@ from kasa_core.crypto import (
     safe_decrypt,
     safe_encrypt,
 )
+from kasa_core.attachments import base64_payload, restore_attachment
 from kasa_core.models import Record
+from kasa_core.record_extras import (
+    encrypt_json,
+    normalize_custom_fields,
+    normalize_tags,
+)
 from kasa_core.validation import (
     normalize_record_type,
     normalize_text,
@@ -36,9 +42,19 @@ def parse_expiry(expiry_value: str | None) -> datetime | None:
         return None
 
 
-def serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
-    return [
-        {
+def serialize_records(rows, fernet: Fernet, include_attachments: bool = False) -> list[dict[str, Any]]:
+    """🔴 `include_attachments` varsayılan olarak **kapalıdır.**
+
+    Gerekçe: eşleme `.txt` çıktısına yazılmıyor, ve ekler base64 olarak
+    JSON'u şişiriyor. Düz JSON dışa aktarımı parolaları zaten düz metin
+    taşıyor; eklerin de aynı sınıfta olması tutarlı, ama yedek boyutunu
+    sessizce 30 katına çıkarabileceği için varsayılan kapalı. Çağıran
+    (şifreli `.kasaenc` dışa aktarımı ve otomatik yedekler) açıkça `True`
+    geçer.
+    """
+    payload = []
+    for record in rows:
+        item = {
             "type": record.type,
             "category": record.category,
             "title": decrypt_metadata(fernet, record.title),
@@ -54,8 +70,12 @@ def serialize_records(rows, fernet: Fernet) -> list[dict[str, Any]]:
                 else ""
             ),
         }
-        for record in rows
-    ]
+        if include_attachments and record.encrypted_attachment:
+            item["attachment_name"] = safe_decrypt(fernet, record.attachment_name or "")
+            item["attachment_mime"] = record.attachment_mime or ""
+            item["attachment_b64"] = base64_payload(fernet, record.encrypted_attachment)
+        payload.append(item)
+    return payload
 
 
 def serialize_records_txt(data: list[dict[str, Any]]) -> bytes:
@@ -150,7 +170,13 @@ def parse_import_record(
         if "SecureNote" in item
         else "Other"
     )
-    return Record(
+    # Etiketler ve özel alanlar içe aktarımda da korunur: üçüncü parti
+    # adaptörler Bitwarden klasörlerini, LastPass gruplarını ve KeePass
+    # klasör yollarını etikete, markanın özel alanlarını da `custom_fields`
+    # listesine çevirir (bkz. `kasa_core/third_party_import.py`).
+    tags = normalize_tags(item.get("tags") or item.get("tags_text"))
+    custom_fields = normalize_custom_fields(item.get("custom_fields"))
+    record = Record(
         id=new_record_id(),
         type=normalize_record_type(record_type),
         category=normalize_text(category, DEFAULT_CATEGORY, 120),
@@ -167,7 +193,19 @@ def parse_import_record(
         expiry_date=parse_expiry(
             normalize_text(item.get("expiry_date") or item.get("Expiry Date"))
         ),
+        encrypted_tags=encrypt_json(fernet, tags),
+        encrypted_custom_fields=encrypt_json(fernet, custom_fields),
     )
+    # Yedekte gelen ek varsa geri yüklenir. Gövde base64'tir ve `restore_attachment`
+    # tavanı doğrulayarak geçersiz/çok büyük gövdeyi sessizce düşürür.
+    restore_attachment(
+        record,
+        fernet,
+        item.get("attachment_name") or "",
+        item.get("attachment_b64") or "",
+        item.get("attachment_mime") or "",
+    )
+    return record
 
 
 def parse_import_payload(filename: str, content: str) -> list[dict[str, Any]]:

@@ -18,6 +18,11 @@
    class="kasa-btn kasa-btn-primary">
     <i class="fa-solid fa-plus text-xs"></i>{{ _('Kayıt Oluşturucu') }}
 </a>
+<button type="button" data-kasa-modal="keyboardShortcutsModal"
+    title="{{ _('Klavye Kısayolları') }}" aria-haspopup="dialog" aria-controls="keyboardShortcutsModal"
+    class="kasa-btn kasa-btn-icon" aria-keyshortcuts="Shift+?">
+    <i class="fa-solid fa-keyboard"></i>
+</button>
 {% endblock %}
 
 {% block content %}
@@ -30,5 +35,8 @@
 {% include 'partials/modals/generator.html' %}
 {% include 'partials/modals/history.html' %}
 {% include 'partials/modals/bulk-category.html' %}
+{% include 'partials/modals/bulk-edit.html' %}
+{% include 'partials/modals/view-options.html' %}
 {% include 'partials/modals/onboarding.html' %}
+{% include 'partials/modals/shortcuts.html' %}
 {% endblock %}
