@@ -347,9 +347,7 @@ html[data-kasa-gradient="off"] .vault-card-shell::after {
     white-space: nowrap;
 }
 .card-weak-chip i { font-size: 0.72em; }
-.card-wrapper.card-is-weak .vault-card-shell {
-    border-color: rgba(248,113,113,0.6) !important;
-}
+
 
 .vault-detail-list { display: grid; gap: 0.5rem; align-content: start; }
 

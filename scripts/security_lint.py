@@ -22,6 +22,15 @@ FIRST_PARTY_JAVASCRIPT = (
     ROOT / "flask_app" / "static" / "appearance-settings.js",
     ROOT / "flask_app" / "static" / "vault-index.js",
     ROOT / "flask_app" / "static" / "vault-form.js",
+    ROOT / "flask_app" / "static" / "color-math.js",
+    ROOT / "flask_app" / "static" / "data-panel.js",
+    ROOT / "flask_app" / "static" / "form-calendar.js",
+    ROOT / "flask_app" / "static" / "generator-history-drawer.js",
+    ROOT / "flask_app" / "static" / "keyboard-shortcuts.js",
+    ROOT / "flask_app" / "static" / "liquid-glass.js",
+    ROOT / "flask_app" / "static" / "notifications.js",
+    ROOT / "flask_app" / "static" / "scan-session.js",
+    ROOT / "flask_app" / "static" / "settings-dependencies.js",
 )
 CSP_SOURCE = ROOT / "flask_app" / "app.py"
 

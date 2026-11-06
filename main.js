@@ -254,6 +254,14 @@ async function onAppReady() {
       setTimeout(() => pruneUserCacheDirs(), 8000);
     }
   } catch (err) {
+    // 🔴 2026-10: kullanıcı LOADING ekranında kapatınca `window.js` close
+    // işleyicisi `rt.isQuiting = true` + `app.quit()` çağırıyor, Flask
+    // başlatma promise'i reddediliyor ve bu `catch` bloğu ÇIKIŞ SIRASINDA
+    // modal hata penceresi açıyordu ("ŞifreKasam hizmeti başlatılamadı").
+    // Kullanıcı zaten kapatmayı istedi; hata penceresi hem anlamsız hem de
+    // `showMessageBoxSync` ile süreci bloklayarak kapanmayı geciktiriyordu.
+    // Aynı koruma `backend-process.js:227` bütünlük yolunda zaten var.
+    if (rt.isQuiting) return;
     const isSquirrel = process.argv.some(arg => arg.startsWith('--squirrel-'));
     if (isSquirrel) app.exit(1);
     else showFriendlyFatalError('SRV', err, 'ŞifreKasam hizmeti başlatılamadı.');

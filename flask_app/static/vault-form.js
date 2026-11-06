@@ -403,12 +403,42 @@ export function initVaultForm() {
   // kullanıcı limitte "alan ekle" düğmesine basıp hiçbir şey olmamasını yaşamasın.
   const CF_MAX = 30;
 
+  // Göz düğmesinin görünen durumu, alanın gerçek gizlilik durumundan türetilir.
+  // Şablonda checkbox yerine düğme olduğu için `cf_secret_N` yeniden
+  // adlandırılmaz; gizli bayrağı `data-secret-value` üzerinden taşınır ve
+  // düğmeye gizli bir `cf_secret_N` kutusu yazılarak forma eklenir (aşağıda
+  // `cfSecretBox` bloğu). Böylece backend sözleşmesi bozulmaz.
+  const cfSyncEye = (row) => {
+    if (!row) return;
+    const input = row.querySelector('[data-custom-field-value]');
+    const eye = row.querySelector('[data-custom-field-eye]');
+    if (!input || !eye) return;
+    const hidden = input.type === 'password';
+    eye.setAttribute('aria-pressed', String(hidden));
+    const icon = eye.querySelector('i');
+    if (icon) icon.className = hidden ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+    eye.title = eye.getAttribute(hidden ? 'data-title-show' : 'data-title-hide') || eye.title;
+  };
+
   const cfReindex = () => {
     if (!cfList) return;
     cfList.querySelectorAll('[data-custom-field]').forEach((row, i) => {
       row.querySelector('[name^="cf_label_"]')?.setAttribute('name', `cf_label_${i}`);
       row.querySelector('[name^="cf_value_"]')?.setAttribute('name', `cf_value_${i}`);
-      row.querySelector('[name^="cf_secret_"]')?.setAttribute('name', `cf_secret_${i}`);
+      // Gizli kutu: düğme durumundan yeniden yazılır.
+      const input = row.querySelector('[data-custom-field-value]');
+      let box = row.querySelector('input[type="hidden"][name^="cf_secret_"]');
+      if (!box) {
+        box = document.createElement('input');
+        box.type = 'hidden';
+        box.name = `cf_secret_${i}`;
+        row.appendChild(box);
+      } else {
+        box.name = `cf_secret_${i}`;
+      }
+      const hidden = input?.type === 'password';
+      box.value = hidden ? '1' : '';
+      cfSyncEye(row);
     });
     if (cfAddBtn) {
       cfAddBtn.disabled = cfList.querySelectorAll('[data-custom-field]').length >= CF_MAX;
@@ -425,13 +455,20 @@ export function initVaultForm() {
 
     // Gizli işareti → input tipi password'a döner. Backend'de `secret`
     // bayrağı boolean; checkbox gönderilmeyince False kabul edilir.
-    cfList.addEventListener('change', (e) => {
-      const box = e.target.closest('[data-custom-field-secret]');
-      if (!box) return;
-      const input = box.closest('[data-custom-field]')?.querySelector('[data-custom-field-value]');
+    // Göz düğmesi: değer input'unun tipini değiştirir ve gizli kutuyu
+    // `cfReindex` üzerinden yeniden yazar. `type` değişimi odak kaybettirmez
+    // (aynı eleman), ama tarayıcı seçimi sıfırlayabilir — bu yüzden odak
+    // düğmede kalır.
+    cfList.addEventListener('click', (e) => {
+      const eye = e.target.closest('[data-custom-field-eye]');
+      if (!eye) return;
+      const row = eye.closest('[data-custom-field]');
+      const input = row?.querySelector('[data-custom-field-value]');
       if (!input) return;
-      input.type = box.checked ? 'password' : 'text';
-      if (box.checked) input.dataset.secretValue = '1'; else delete input.dataset.secretValue;
+      const toHidden = input.type !== 'password';
+      input.type = toHidden ? 'password' : 'text';
+      if (toHidden) input.dataset.secretValue = '1'; else delete input.dataset.secretValue;
+      cfReindex();
     });
 
     if (cfAddBtn) {
@@ -440,10 +477,122 @@ export function initVaultForm() {
         const row = cfTemplate.content.firstElementChild.cloneNode(true);
         cfList.appendChild(row);
         cfReindex();
+        cfSyncEye(row);
         row.querySelector('[data-custom-field-label]')?.focus();
       });
     }
     cfReindex();
+  }
+
+
+  // ─── Etiket çipleri ────────────────────────────────────────────────
+  // Virgülle ayrılmış düz metin yerine gerçek çip girişi. Form
+  // gönderimi DEĞİŞMEZ: gizli `input[name=tags]` her değişimde çip
+  // listesini virgülle birleştirir, `record_extras.tags_from_form` aynı
+  // sözleşmeyi okumaya devam eder.
+  const TAG_MAX = 20;
+  const TAG_LEN = 30;
+  const tagBox = el('tags-input');
+  const tagChips = document.querySelector('[data-tag-chips]');
+  const tagHidden = document.querySelector('[data-tags-text]');
+
+  if (tagBox && tagChips && tagHidden) {
+    const foldTag = (s) => String(s).normalize('NFC').toLowerCase()
+      .replace(/\u0307/g, '').trim().slice(0, TAG_LEN);
+
+    const tagList = () => tagHidden.value ? tagHidden.value.split(',')
+      .map((t) => t.trim()).filter(Boolean) : [];
+
+    const renderChips = () => {
+      tagChips.replaceChildren();
+      for (const tag of tagList()) {
+        const chip = document.createElement('span');
+        chip.className = 'vault-tag-chip';
+        chip.setAttribute('role', 'listitem');
+        const label = document.createElement('span');
+        label.textContent = tag;
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'vault-tag-chip-remove';
+        // Etiket metni konteynerin `data-remove-label` ozelliginden gelir;
+        // sablonda ceviri ile uretilir (bos ceviri cagrisi yapilmaz).
+        const removeLabel = tagChips.dataset.removeLabel || label.textContent;
+        x.setAttribute('aria-label', `${label.textContent} — ${removeLabel}`);
+        // innerHTML YASAK (security_lint + AGENTS.md): ikon DOM API ile kurulur.
+        const xIcon = document.createElement('i');
+        xIcon.className = 'fa-solid fa-xmark';
+        xIcon.setAttribute('aria-hidden', 'true');
+        x.appendChild(xIcon);
+        x.addEventListener('click', () => {
+          const next = tagList().filter((t) => foldTag(t) !== foldTag(label.textContent));
+          tagHidden.value = next.join(',');
+          renderChips();
+          tagBox.focus();
+        });
+        chip.append(label, x);
+        tagChips.appendChild(chip);
+      }
+    };
+
+    const addTags = (raw) => {
+      const parts = String(raw).split(',').map((s) => s.trim()).filter(Boolean);
+      if (!parts.length) return false;
+      const seen = new Set(tagList().map(foldTag));
+      let changed = false;
+      for (const part of parts) {
+        const tag = part.slice(0, TAG_LEN);
+        const key = foldTag(tag);
+        if (!key || seen.has(key) || tagList().length >= TAG_MAX) continue;
+        seen.add(key);
+        tagHidden.value = tagList().concat(tag).join(',');
+        changed = true;
+      }
+      if (changed) renderChips();
+      return changed;
+    };
+
+    tagBox.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+        if (!tagBox.value.trim()) {
+          // Boşsa Tab normal odak akışını sürdürsün.
+          if (e.key === 'Tab') return;
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        addTags(tagBox.value);
+        tagBox.value = '';
+      } else if (e.key === 'Backspace' && !tagBox.value) {
+        const list = tagList();
+        if (list.length) {
+          tagHidden.value = list.slice(0, -1).join(',');
+          renderChips();
+        }
+      }
+    });
+    // Virgülü de 'input' anında yakala (bazi klavyeler keydown uretmez).
+    tagBox.addEventListener('input', () => {
+      if (tagBox.value.includes(',')) {
+        addTags(tagBox.value);
+        tagBox.value = '';
+      }
+    });
+    tagBox.addEventListener('blur', () => {
+      if (tagBox.value.trim()) {
+        addTags(tagBox.value);
+        tagBox.value = '';
+      }
+    });
+    // Yapistirilan metni de ciplere cevir.
+    tagBox.addEventListener('paste', () => {
+      setTimeout(() => {
+        if (tagBox.value.includes(',')) {
+          addTags(tagBox.value);
+          tagBox.value = '';
+        }
+      }, 0);
+    });
+    renderChips();
   }
 
   // ─── "Vazgeç" / "Geri": önceki sayfaya dön ─────────────────────────

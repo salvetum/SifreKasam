@@ -1970,3 +1970,70 @@ html[data-glass-effects="off"] .auto-backup-item { animation: none; }
 .auto-backup-item-copy[data-tooltip]:focus-visible::before {
     transform: translateX(-50%) scaleX(1);
 }
+
+/* ── Bagimli ayar katlamasi (2026-10) ──────────────────────────────────────
+   Ust ayar kapaliyken alt ayar gizlenir; ust ayar acilinca alttan uzayarak
+   belirir. `max-height` secildi cunku DOM'da sarmalayici yok ve kartlarin
+   ic düzeni (flex/grid) degismemeli -- `grid-template-rows` hilesi bazi
+   kartlarda ic hizalamayi bozuyor. */
+.settings-card,
+.settings-timeout-row {
+    max-height: 900px;
+    opacity: 1;
+    transition: max-height 280ms ease, opacity 200ms ease,
+                padding 280ms ease, margin 280ms ease,
+                border-color 280ms ease;
+}
+
+.settings-card.is-collapsed,
+.settings-timeout-row.is-collapsed {
+    /* 🔴 `min-height: 0` ŞART: `.settings-card` 56px `min-height` ile geliyor ve
+       min-height, max-height'u GECERSIZ KILAR. Sadece `max-height: 0`
+       yazmak kartı kapanmıyordu — 56px yer kaplıyor, boşluk kalıyor ve
+       açılınca öğe eski yerine dönmüyordu.
+       🔴 `border-width: 0` dört kenarı da silmeli: `.is-locked` kenarları
+       `dashed` yapıyor, üst/alt sıfırlanınca sol/sağ 56px kesikli çizgi
+       olarak çiziliyordu ("- - - - -").
+       `!important` şart: `.settings-card` kendi `padding`/`border`
+       bildirimlerini zaten `!important` ile veriyor. */
+    max-height: 0 !important;
+    min-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    border-width: 0 !important;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    /* Kalan ogeler arasindaki `gap` de kapanmali, yoksa bosluk kalir. */
+    gap: 0 !important;
+}
+
+/* Hareket duyarliligi: gecis aninda boyama yapilmasin. */
+@media (prefers-reduced-motion: reduce) {
+    .settings-card,
+    .settings-timeout-row {
+        transition: none;
+    }
+}
+
+/* LAN uyari cat basligi (2026-10) -----------------------------------------
+   Uc uyari tek sarmalayicida; ortak baslik "tek cat" hissini verir. */
+.lan-warning-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+
+.lan-warning-heading > i {
+    color: #fbbf24;
+    font-size: 0.7rem;
+}

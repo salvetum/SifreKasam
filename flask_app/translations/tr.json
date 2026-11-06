@@ -686,5 +686,22 @@
   "Görünüm seçenekleri": "Görünüm seçenekleri",
   "Görünüm Seçenekleri": "Görünüm Seçenekleri",
   "Tamam": "Tamam",
-  "Boş arama metni tüm kayıtlarla eşleşir; alan seçimi yalnız yazdığınız metni daraltır.": "Boş arama metni tüm kayıtlarla eşleşir; alan seçimi yalnız yazdığınız metni daraltır."
+  "Boş arama metni tüm kayıtlarla eşleşir; alan seçimi yalnız yazdığınız metni daraltır.": "Boş arama metni tüm kayıtlarla eşleşir; alan seçimi yalnız yazdığınız metni daraltır.",
+  "Entropi nedir?": "Entropi nedir?",
+  "Entropi, şifrenin tahmin edilmesi gereken toplam bilgi miktarıdır (bit). Daha yüksek entropi, kırılmasının daha zor olduğu anlamına gelir.": "Entropi, şifrenin tahmin edilmesi gereken toplam bilgi miktarıdır (bit). Daha yüksek entropi, kırılmasının daha zor olduğu anlamına gelir.",
+  "Dikkat edilmesi gerekenler": "Dikkat edilmesi gerekenler",
+  "Etiket ekle": "Etiket ekle",
+  "Etiket ekle…": "Etiket ekle…",
+  "Değeri göster": "Değeri göster",
+  "Değeri gizle": "Değeri gizle",
+  "En fazla 20 etiket, her biri 30 karakter. Boşluk, Enter veya virgül ile ekleyin.": "En fazla 20 etiket, her biri 30 karakter. Boşluk, Enter veya virgül ile ekleyin.",
+  "Alan ekle": "Alan ekle",
+  "Alanı sil": "Alanı sil",
+  "Değer": "Değer",
+  "En fazla 30 alan. Gizli işaretli değerler maskelenir.": "En fazla 30 alan. Gizli işaretli değerler maskelenir.",
+  "Etiket": "Etiket",
+  "Etiketler ve Özel Alanlar": "Etiketler ve Özel Alanlar",
+  "Etiketler virgülle ayrılır. Özel alanlar sır olabilir ve maskelenir.": "Etiketler virgülle ayrılır. Özel alanlar sır olabilir ve maskelenir.",
+  "Özel Alanlar": "Özel Alanlar",
+  "Etiketi kaldır": "Etiketi kaldır"
 }

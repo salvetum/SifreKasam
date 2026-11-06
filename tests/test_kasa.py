@@ -2030,6 +2030,92 @@ class CsrfAndPasswordStrengthTests(unittest.TestCase):
         self.assertIn('çok zayıf', response.get_json()['error'])
 
 
+def _reset_vault_state_helper(
+    *,
+    extra_setting_keys: tuple = (),
+    clear_lan: bool = False,
+    clear_all_records: bool = False,
+    clear_vault_keys: bool = False,
+    remove_init_file: bool = False,
+) -> None:
+    """Vault durumunu test öncesi sıfırlar.
+
+    Tek kullanımdan tekrarlayan _reset_vault_state boilerplate'ını tek noktada
+    toplar. Her test sınıfı ihtiyacına göre parametrelerle özelleştirilir.
+
+    Args:
+        extra_setting_keys: Ek setting anahtarları (master_hash, pbkdf2_salt_b64,
+            vault_initialized otomatik dahil).
+        clear_lan: LAN ayarlarını da temizle (_clear_lan_access_settings).
+        clear_all_records: Tüm kayıt ve şifre geçmişini sil.
+        clear_vault_keys: Kasa anahtar önbelleğini temizle.
+        remove_init_file: vault.initialized dosyasını sil.
+    """
+    with app_module.app.app_context():
+        base_keys = (
+            "master_hash",
+            "pbkdf2_salt_b64",
+            "vault_initialized",
+        )
+        all_keys = base_keys + extra_setting_keys
+        for key in all_keys:
+            app_module.Setting.query.filter_by(key=key).delete()
+        if clear_lan:
+            app_module._clear_lan_access_settings()
+        if clear_all_records:
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+        app_module.db.session.commit()
+        if clear_vault_keys:
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+        if remove_init_file and os.path.exists(app_module.VAULT_INIT_FILE):
+            os.remove(app_module.VAULT_INIT_FILE)
+
+
+def _reset_vault_state_helper(
+    *,
+    extra_setting_keys: tuple = (),
+    clear_lan: bool = False,
+    clear_all_records: bool = False,
+    clear_vault_keys: bool = False,
+    remove_init_file: bool = False,
+) -> None:
+    """Vault durumunu test öncesi sıfırlar.
+
+    Tek kullanımdan tekrarlayan _reset_vault_state boilerplate'ını tek noktada
+    toplar. Her test sınıfı ihtiyacına göre parametrelerle özelleştirilir.
+
+    Args:
+        extra_setting_keys: Ek setting anahtarları (master_hash, pbkdf2_salt_b64,
+            vault_initialized otomatik dahil).
+        clear_lan: LAN ayarlarını da temizle (_clear_lan_access_settings).
+        clear_all_records: Tüm kayıt ve şifre geçmişini sil.
+        clear_vault_keys: Kasa anahtar önbelleğini temizle.
+        remove_init_file: vault.initialized dosyasını sil.
+    """
+    with app_module.app.app_context():
+        base_keys = (
+            "master_hash",
+            "pbkdf2_salt_b64",
+            "vault_initialized",
+        )
+        all_keys = base_keys + extra_setting_keys
+        for key in all_keys:
+            app_module.Setting.query.filter_by(key=key).delete()
+        if clear_lan:
+            app_module._clear_lan_access_settings()
+        if clear_all_records:
+            app_module.Record.query.delete()
+            app_module.PasswordHistory.query.delete()
+        app_module.db.session.commit()
+        if clear_vault_keys:
+            with app_module._vault_keys_lock:
+                app_module._vault_keys.clear()
+        if remove_init_file and os.path.exists(app_module.VAULT_INIT_FILE):
+            os.remove(app_module.VAULT_INIT_FILE)
+
+
 class LanAccessPasswordTests(unittest.TestCase):
     """LAN erişim şifresi: master şifre ağa gönderilmez, sarma/çözme doğrulanır."""
 
@@ -2046,15 +2132,16 @@ class LanAccessPasswordTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized',
-                        'lan_enabled'):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module._clear_lan_access_settings()
-            app_module.db.session.commit()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=("lan_enabled",),
+        clear_lan=True,
+        remove_init_file=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=("lan_enabled",),
+        clear_lan=True,
+        remove_init_file=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -5012,40 +5099,36 @@ class SecurityHardeningTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            # Ağ/kilit/yedek damgası ayarları da temizlenir: bu sınıftaki testler
-            # bunları seed ediyor veya gerçekten yazıyor, sızarsa sonraki testin
-            # kararını değiştirir (sızıntı, üretim hatası değil test izolasyonu
-            # hatasıdır).
-            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized',
-                        'lan_enabled', 'lan_full_access_enabled',
-                        'lan_reveal_passwords_enabled',
-                        'auto_lock_enabled', 'auto_lock_timeout',
-                        # 2026-10: bu anahtar SIFIRLANMADIĞI için sürecin ilk
-                        # girişinde `migrate_plaintext_record_metadata` tüm
-                        # metadata'yı ana şifreden türetilen Fernet ile
-                        # şifreliyor ve testin `encrypt_metadata` ile yazdığı
-                        # `card_holder` çözülemez hale geliyordu → kart-ismi
-                        # sızıntı assertion'ı koşul bağımsız olmaktan çıkıp
-                        # BOŞ (vacuous) kalıyordu. Aynı sınıftan bir izolasyon
-                        # hatasının yeni örneği (bkz. SECURITY.md).
-                        app_module.RECORD_METADATA_SETTING,
-                        app_module.LAST_BACKUP_SETTING,
-                        app_module._backups.LAST_AUTO_BACKUP_SETTING):
-                app_module.Setting.query.filter_by(key=key).delete()
-            # Kayıt tabloları da temizlenir. Bu sınıftaki testler kasa ANAHTARI
-            # ile şifreli kayıt bırakıyor; sızarsa sonraki testin şifre
-            # değiştirme (_reencrypt_task) işlemi TÜM kayıtları gezdiği için
-            # Fernet InvalidToken ile çöküyordu. Sızma bir hata üretmiyor, ANCAK
-            # yanlış test sırasına yol açıyordu (izole GEÇEN, tam koşuda FAIL).
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(
+                "lan_enabled",
+                "lan_full_access_enabled",
+                "lan_reveal_passwords_enabled",
+                "auto_lock_enabled",
+                "auto_lock_timeout",
+                app_module.RECORD_METADATA_SETTING,
+                app_module.LAST_BACKUP_SETTING,
+                app_module._backups.LAST_AUTO_BACKUP_SETTING,
+            ),
+        clear_all_records=True,
+        clear_vault_keys=True,
+        remove_init_file=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(
+            "lan_enabled",
+            "lan_full_access_enabled",
+            "lan_reveal_passwords_enabled",
+            "auto_lock_enabled",
+            "auto_lock_timeout",
+            app_module.RECORD_METADATA_SETTING,
+            app_module.LAST_BACKUP_SETTING,
+            app_module._backups.LAST_AUTO_BACKUP_SETTING,
+        ),
+        clear_all_records=True,
+        clear_vault_keys=True,
+        remove_init_file=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -6446,15 +6529,16 @@ class AuditLogIntegrationTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in ('master_hash', 'pbkdf2_salt_b64', 'vault_initialized',
-                        'lan_enabled'):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module._clear_lan_access_settings()
-            app_module.db.session.commit()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=("lan_enabled",),
+        clear_lan=True,
+        remove_init_file=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=("lan_enabled",),
+        clear_lan=True,
+        remove_init_file=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -6723,6 +6807,8 @@ class EntryShellTests(unittest.TestCase):
         """../static/ her iki bağlamda da çözülür (file:// ve GET /loading)."""
         html = self._read_template("loading.html")
         self.assertIn('href="../static/entry-shell.css?v=1"', html)
+        self.assertIn('src="../static/liquid-glass.js?v=5"', html)
+        # taşıdığı ve ikisi birlikte dağıtılabilir olduğu için aynı sürüm şart.
         self.assertIn('src="../static/liquid-glass.js?v=5"', html)
 
     def test_loading_html_keeps_token_out_of_script(self) -> None:
@@ -7636,22 +7722,14 @@ class ThirdPartyImportTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
-                app_module.RECORD_METADATA_SETTING,
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -7768,24 +7846,22 @@ class ClipboardAndModalA11yTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
+        _reset_vault_state_helper(
+        extra_setting_keys=(
                 app_module.RECORD_METADATA_SETTING,
                 "clipboard_auto_clear_enabled",
                 "clipboard_clear_seconds",
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+            ),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(
+            app_module.RECORD_METADATA_SETTING,
+            "clipboard_auto_clear_enabled",
+            "clipboard_clear_seconds",
+        ),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -7982,22 +8058,14 @@ class RecordSortTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
-                app_module.RECORD_METADATA_SETTING,
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -8249,22 +8317,14 @@ class TagFilterTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
-                app_module.RECORD_METADATA_SETTING,
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -8507,8 +8567,8 @@ class TagFilterTests(unittest.TestCase):
         app_js = (PROJECT_ROOT / "flask_app" / "static" / "app.js").read_text(
             encoding="utf-8")
         self.assertIn("./vault-index.js?v=6", app_js)
-        self.assertRegex(html, r"misc\.css[^?]*\?v=94")
-        self.assertRegex(html, r"vault-form\.css[^?]*\?v=112")
+        self.assertRegex(html, r"misc\.css[^?]*\?v=95")
+        self.assertRegex(html, r"vault-form\.css[^?]*\?v=114")
 
 
 class KeyboardShortcutTests(unittest.TestCase):
@@ -8717,7 +8777,7 @@ class KeyboardShortcutTests(unittest.TestCase):
         self.assertIn('misc.css', base)
         match = re.search(r'misc\.css[^?]*\?v=([\d.]+)', base)
         self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), '94')
+        self.assertEqual(match.group(1), '95')
 
 
 class RecordAttachmentTests(unittest.TestCase):
@@ -8746,22 +8806,14 @@ class RecordAttachmentTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
-                app_module.RECORD_METADATA_SETTING,
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -9072,22 +9124,14 @@ class RecordExtrasTests(unittest.TestCase):
     # izolasyon hatasının aynısı).
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
-                app_module.RECORD_METADATA_SETTING,
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -9309,7 +9353,7 @@ class RecordExtrasTests(unittest.TestCase):
         self.assertIn("partials/form/panel-extras.html", ekle)
 
         base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
-        self.assertIn("vault-form.css\') }}?v=112", base)
+        self.assertIn("vault-form.css\') }}?v=114", base)
 
         appjs = (FLASK_APP_DIR / "static" / "app.js").read_text(encoding="utf-8")
         self.assertIn("./vault-form.js?v=2", appjs)
@@ -9438,22 +9482,14 @@ class CardBrandAndDatesTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
-                app_module.RECORD_METADATA_SETTING,
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -9752,22 +9788,14 @@ class BulkEditTests(unittest.TestCase):
 
     @classmethod
     def _reset_vault_state(cls) -> None:
-        with app_module.app.app_context():
-            for key in (
-                "master_hash",
-                "pbkdf2_salt_b64",
-                "vault_initialized",
-                app_module.RECORD_METADATA_SETTING,
-            ):
-                app_module.Setting.query.filter_by(key=key).delete()
-            app_module.Record.query.delete()
-            app_module.PasswordHistory.query.delete()
-            app_module.db.session.commit()
-            with app_module._vault_keys_lock:
-                app_module._vault_keys.clear()
-            if os.path.exists(app_module.VAULT_INIT_FILE):
-                os.remove(app_module.VAULT_INIT_FILE)
-
+        _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+        )
+    _reset_vault_state_helper(
+        extra_setting_keys=(app_module.RECORD_METADATA_SETTING,),
+        clear_all_records=True,
+    )
     @classmethod
     def _seed_vault(cls) -> None:
         with app_module.app.app_context():
@@ -10059,7 +10087,7 @@ class BulkEditTests(unittest.TestCase):
 
     def test_cache_bust_version(self):
         base = (FLASK_APP_DIR / "templates" / "base.html").read_text(encoding="utf-8")
-        self.assertRegex(base, r"misc\.css[^?]*\?v=94")
+        self.assertRegex(base, r"misc\.css[^?]*\?v=95")
 
     def test_bulk_edit_surfaces_have_no_blur(self):
         css = (FLASK_APP_DIR / "static" / "misc.css").read_text(encoding="utf-8")

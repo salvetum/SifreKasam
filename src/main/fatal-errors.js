@@ -88,7 +88,16 @@ function showFriendlyFatalError(area, error, message = 'Kurulum veya başlatma i
       noLink: true,
     });
     if (result === 0 && logFile) {
-      shell.openPath(logFile).catch(() => {});
+      // 🔴 2026-10: `shell.openPath` ASENKRON çalışır. Eskiden hemen ardından
+      // `app.exit(1)` çağrılıyordu; süreç dosyayı açmadan öldüğü için "Log
+      // Dosyasını Aç" düğmesi hiçbir işe yaramıyordu. Önce aç, sonra çık.
+      shell.openPath(logFile)
+        .then((opened) => {
+          if (opened) return;          // shell'e devredildi, dokunma
+          app.quit();
+        })
+        .catch(() => app.quit());
+      return;
     }
     app.exit(1);
   };

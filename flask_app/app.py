@@ -5,7 +5,6 @@ import json
 import logging
 import logging.handlers
 import os
-import re
 import secrets
 import shutil
 import socket
@@ -182,7 +181,7 @@ from kasa_core.hibp import (
 )
 from kasa_core.encrypted_backup import (
     build_encrypted_export_payload as _encrypted_export,
-    decrypt_encrypted_records as _decrypt_encrypted_records,
+# (silindi: _decrypt_encrypted_records importu kullanilmiyordu)
     decrypt_encrypted_records_report as _decrypt_encrypted_records_report,
     generate_backup_password as _generate_backup_password,
     EncryptedBackupError as _EncryptedBackupError,
@@ -1297,6 +1296,11 @@ def invalidate_vault_report_cache() -> None:
         with _vault_report_cache_lock:
             _vault_report_cache.clear()
 
+def _commit_and_invalidate() -> None:
+    """Commit DB changes and invalidate the vault report cache in one step."""
+    db.session.commit()
+    invalidate_vault_report_cache()
+
 def _kanal_etiketi() -> str:
     """Olayın nereden geldiğini belirtir (yerel mi, uzak LAN mı)."""
     try:
@@ -2106,8 +2110,7 @@ def ekle_sayfasi():
         backup_database()
         new_record = Record(**fields)
         db.session.add(new_record)
-        db.session.commit()
-        invalidate_vault_report_cache()
+        _commit_and_invalidate()
         # Yalnızca kayıt SAYISI ve tipi günlüğe girer; başlık/şifre hiçbir
         # zaman buradan geçmez (bkz. kasa_core/audit.py alan adı reddi).
         _audit('kayit_olusturuldu', tur=fields.get('type', ''))
@@ -2149,8 +2152,7 @@ def duzenle_sayfasi(kayit_id):
         for key, val in fields.items():
             if key != 'id':
                 setattr(r, key, val)
-        db.session.commit()
-        invalidate_vault_report_cache()
+        _commit_and_invalidate()
         _audit('kayit_guncellendi', kanal=_kanal_etiketi(), adet=1)
         return redirect(url_for('index'))
 
@@ -2189,8 +2191,7 @@ def duzenle_sayfasi(kayit_id):
 def sil_kayit(kayit_id):
     backup_database()
     deleted = _delete_records_and_history([kayit_id])
-    db.session.commit()
-    invalidate_vault_report_cache()
+    _commit_and_invalidate()
     _audit('kayit_silindi', silinen_kayit_sayisi=deleted)
     if request.accept_mimetypes.best == 'application/json':
         return jsonify({'status': 'ok', 'deleted': deleted})
@@ -2202,8 +2203,7 @@ def pin_kayit(kayit_id):
     r = db.session.get(Record, kayit_id)
     if r:
         r.is_pinned = 0 if r.is_pinned else 1
-        db.session.commit()
-        invalidate_vault_report_cache()
+        _commit_and_invalidate()
     return redirect(url_for('index'))
 
 @app.route('/gecmis/<kayit_id>')
@@ -2880,8 +2880,7 @@ def health_duplicates_merge():
 
     backup_database()
     deleted = _delete_records_and_history(delete_ids)
-    db.session.commit()
-    invalidate_vault_report_cache()
+    _commit_and_invalidate()
     merged_groups = sum(
         1 for group in groups
         if any(member in delete_ids for member in group['member_ids'])
@@ -2919,8 +2918,7 @@ def health_rotate_weak():
         )
         record.updated_at = utc_now_naive()
         rotated += 1
-    db.session.commit()
-    invalidate_vault_report_cache()
+    _commit_and_invalidate()
     log.info("Sağlık: %s zayıf şifre yenilendi.", rotated)
     return jsonify({'status': 'ok', 'rotated': rotated})
 
@@ -3195,8 +3193,7 @@ def _create_rotating_backup(force: bool = False) -> dict | None:
         now = _now_iso()
         _set_setting(_backups.LAST_AUTO_BACKUP_SETTING, now)
         _touch_last_backup(now)
-        db.session.commit()
-        invalidate_vault_report_cache()
+        _commit_and_invalidate()
         return info
 
 
@@ -3289,8 +3286,7 @@ def api_backups_restore():
         PasswordHistory.query.delete()
         records = [_parse_import_record(item, fernet) for item in parsed]
         db.session.add_all(records)
-        db.session.commit()
-        invalidate_vault_report_cache()
+        _commit_and_invalidate()
         # dropped > 0 → kayıt sınırı aşıldı, kullanıcıya görünür uyarı gitsin
         # (arayüz toast ile gösterir; sessizce eksik yükleme olmasın).
         return jsonify({'status': 'ok', 'restored': len(records), 'truncated': dropped})
@@ -3456,8 +3452,7 @@ def import_data():
             return "İçe aktarılacak geçerli kayıt bulunamadı.", 400
         backup_database()
         db.session.add_all(records)
-        db.session.commit()
-        invalidate_vault_report_cache()
+        _commit_and_invalidate()
         if dropped:
             # Kayıt sınırı aşıldı: ana sayfa bir uyarı toast'u göstersin
             # (vault-index.js `?import_dropped=` parametresini okur).
@@ -3486,8 +3481,7 @@ def bulk_delete():
         return jsonify({'status': 'error', 'message': 'ID listesi boş.'}), 400
     backup_database()
     deleted = _delete_records_and_history(ids)
-    db.session.commit()
-    invalidate_vault_report_cache()
+    _commit_and_invalidate()
     return jsonify({'status': 'ok', 'deleted': deleted})
 
 @app.route('/api/bulk/category', methods=['POST'])
@@ -3500,8 +3494,7 @@ def bulk_category():
     backup_database()
     updated = Record.query.filter(Record.id.in_(ids)).update(
         {'category': category}, synchronize_session=False)
-    db.session.commit()
-    invalidate_vault_report_cache()
+    _commit_and_invalidate()
     return jsonify({'status': 'ok', 'updated': updated})
 
 # Toplu düzenleme izin listeleri. Modül seviyesinde ve tek yerde: rota
@@ -4193,8 +4186,7 @@ def _reencrypt_task(task_id: str, old_key: bytes, new_key: bytes, new_hash: str,
             setting = Setting.query.filter_by(key='master_hash').first()
             if setting:
                 setting.value = new_hash
-            db.session.commit()
-            invalidate_vault_report_cache()
+            _commit_and_invalidate()
             # Ana şifre değişti: tetikleyen dışındaki TÜM oturumların kasa anahtarı
             # eski anahtarla bağlı kalmasına izin verilmez. Ölü anahtarla yazılan bir
             # kayıt yeni ana anahtarla kalıcı olarak çözülemez, bu yüzden o oturumlar

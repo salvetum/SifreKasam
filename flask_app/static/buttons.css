@@ -131,14 +131,7 @@ html[data-kasa-gradient="off"] .kasa-btn-generator:hover {
     font-size: 0.9rem;
     text-decoration: none;
     transition: all var(--speed) ease;
-}
-.icon-btn:hover {
-    background: var(--surface-hover);
-    border-color: var(--glass-border-hi);
-    transform: translateY(-1px);
-}
-
-/* ── Filtre butonları */
+}/* ── Filtre butonları */
 .filter-btn {
     position: relative;
     isolation: isolate;
@@ -422,7 +415,6 @@ html[data-kasa-gradient="off"] .kasa-btn-generator:hover {
    versin. Açık tema renkleri theme-states.css'te ezildiği için bu
    blok yalnız koyu temayı besler; açık tema ayarı theme-states'ta. */
 .kasa-btn:not(.kasa-btn-primary),
-.icon-btn,
 .kasa-close-btn { color: #eef1fb; }
 
 .kasa-btn-danger {

@@ -186,10 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem(KASA_BG_POS_KEY, JSON.stringify({ url, t: Number(t) || 0 }));
     } catch (e) { /* localStorage dolu/erişilemez */ }
   };
-  const clearBgVideoPos = () => {
-    try { localStorage.removeItem(KASA_BG_POS_KEY); } catch (e) { /* yoksay */ }
-  };
-  const KASA_BG_FRAME_KEY = 'kasa-bg-frame';
   const writeBgVideoFrame = (url, t, poster) => {
     try {
       localStorage.setItem(KASA_BG_FRAME_KEY, JSON.stringify({ url, t: Number(t) || 0, poster }));

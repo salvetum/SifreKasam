@@ -281,7 +281,12 @@ body.form-booted .vault-form-panel .vault-section-head > span {
     align-items: center;
     min-width: 0;
 }
+/* 🔴 `.kasa-custom-select-trigger` DA dahil: `data-custom-select`
+   renderer'ı native `<select>`i gizleyip kendi trigger'ını üretiyor,
+   bu yüzden `.kasa-field` seçicisine girmez ve metin ikonun (34px)
+   altında kalmadan sola yaslanıyordu. 50px = ikon genişliği + boşluk. */
 .vault-field .vault-field-input-wrap .kasa-field,
+    .vault-field .vault-field-input-wrap .kasa-custom-select-trigger,
 .vault-field .vault-field-input-wrap textarea.kasa-field {
     padding-left: 50px !important; /* icon(34) + gap(12) + divider(2) + padding(2) ≈ 50px */
     width: 100%;
@@ -410,15 +415,7 @@ body.form-booted .vault-form-panel .vault-section-head > span {
 .vault-password-input {
     font-family: var(--font-mono);
     letter-spacing: 0.06em;
-}
-
-.vault-strength {
-    display: grid;
-    gap: 0.35rem;
-    min-height: 1.75rem;
-}
-
-.vault-generator-panel {
+}.vault-generator-panel {
     display: grid;
     gap: 1.05rem;
     padding: 1.25rem;
@@ -1849,20 +1846,7 @@ html[data-glass-effects="off"] #page-regenerate-btn.gen-icon-spin {
 
 .vault-custom-field-value .kasa-field {
   width: 100%;
-}
-
-.vault-custom-field-secret {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-}
-
-.vault-custom-field-remove {
+}.vault-custom-field-remove {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1918,9 +1902,7 @@ html[data-glass-effects="off"] #page-regenerate-btn.gen-icon-spin {
   }
 
   .vault-custom-field > input[type="text"] { grid-area: label; }
-  .vault-custom-field-value { grid-area: value; }
-  .vault-custom-field-secret { grid-area: secret; }
-  .vault-custom-field-remove { grid-area: remove; }
+  .vault-custom-field-value { grid-area: value; }.vault-custom-field-remove { grid-area: remove; }
 }
 
 /* ─── Kart üzerindeki etiket rozetleri ─────────────────────────────── */
@@ -1974,4 +1956,146 @@ html[data-glass-effects="off"] #page-regenerate-btn.gen-icon-spin {
   margin-top: 0.5rem;
   font-size: 0.68rem;
   color: var(--text-muted);
+}
+
+/* ── Etiket çipleri + özel alan kartları (2026-10 re-design) ─────────────
+   Etiketler artık virgülle ayrılmış düz metin değil, gerçek çip girdisi.
+   Çip rengi projemin vurgu tonunu kullanır; `backdrop-filter` YOK (küçük
+   yüzey, kazanç yok — cam kapalıyken opak yedek zorunluluğu gelirdi). */
+.vault-tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+}
+
+.vault-tag-chips:empty {
+    display: none;
+}
+
+.vault-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.vault-tag-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.68rem;
+    opacity: 0.7;
+    transition: opacity var(--motion-fast, 150ms) ease,
+                background var(--motion-fast, 150ms) ease;
+}
+
+.vault-tag-chip-remove:hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--danger, #f87171) 28%, transparent);
+    color: #fff;
+}
+
+.vault-tag-chip-remove:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Özel alan: yığılmış kart (4 kolonlu grid yerine). */
+.vault-custom-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.vault-custom-fields:not(:empty) {
+    margin-bottom: 0.6rem;
+}
+
+.vault-custom-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "label remove" "value value";
+    row-gap: 0.3rem;
+    column-gap: 0.35rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 0.65rem);
+    background: color-mix(in srgb, var(--text) 3%, transparent);
+    transition: border-color var(--motion-fast, 150ms) ease;
+}
+
+.vault-custom-field:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.vault-custom-field > input[type="text"] {
+    grid-area: label;
+    background: transparent;
+    border-color: transparent;
+    font-weight: 500;
+    padding-left: 0.35rem;
+}
+
+.vault-custom-field-value {
+    grid-area: value;
+    position: relative;
+}
+
+.vault-custom-field-remove {
+    grid-area: remove;
+}
+
+.vault-cf-eye {
+    position: absolute;
+    top: 50%;
+    right: 0.4rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: color var(--motion-fast, 150ms) ease;
+}
+
+.vault-cf-eye:hover {
+    color: var(--accent);
+}
+
+.vault-cf-eye:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.vault-custom-field-value:has(.vault-cf-eye) .kasa-field {
+    padding-right: 2.1rem;
+}
+
+@media (max-width: 640px) {
+    .vault-custom-field {
+        grid-template-areas: "label label" "value value" "remove remove";
+    }
+    .vault-custom-field-remove {
+        justify-self: end;
+    }
 }

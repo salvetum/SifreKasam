@@ -10,15 +10,28 @@
                 </div>
             </div>
 
-            <div class="vault-field">
-                <label for="tags">{{ _('Etiketler') }}</label>
+            <div class="vault-field vault-field-tags">
+                <label for="tags-input">{{ _('Etiketler') }}</label>
+                {# Çip girişi: gerçek `<input name="tags">` YOK, gizli alan var.
+                   `vault-form.js` çip listesini virgülle birleştirip buraya
+                   yazar; backend sözleşmesi (`tags_from_form`) değişmez.
+                   🔴 `hidden` kullanıldı — `display:none` kullansaydım
+                   `readFormData` yine de değeri okur, ama tarayıcı autofill'i
+                   ve "sıralı odak" (tab sırası) bozulurdu. #}
+                <div id="tag-chips" class="vault-tag-chips"
+                     data-tag-chips role="list"
+                     data-remove-label="{{ _('Etiketi kaldır') }}"
+                     aria-describedby="tags-hint"></div>
                 <div class="vault-field-input-wrap">
                     <span class="vault-field-icon" aria-hidden="true"><i class="fa-solid fa-tag"></i></span>
-                    <input type="text" name="tags" id="tags" placeholder="{{ _('iş, banka, önemli') }}"
-                        value="{{ kayit.full_data.tags if kayit and 'tags' in kayit.full_data else '' }}"
-                        class="kasa-field" maxlength="600">
+                    <input type="text" id="tags-input" class="kasa-field" maxlength="600"
+                        placeholder="{{ _('Etiket ekle…') }}" autocomplete="off"
+                        aria-label="{{ _('Etiket ekle') }}">
                 </div>
-                <p class="vault-field-hint">{{ _('En fazla 20 etiket, her biri 30 karakter.') }}</p>
+                <input type="hidden" name="tags" id="tags"
+                    data-tags-text
+                    value="{{ kayit.full_data.tags if kayit and 'tags' in kayit.full_data else '' }}">
+                <p class="vault-field-hint" id="tags-hint">{{ _('En fazla 20 etiket, her biri 30 karakter. Boşluk, Enter veya virgül ile ekleyin.') }}</p>
             </div>
 
             <div class="vault-field">
@@ -34,12 +47,14 @@
                                     name="cf_value_{{ loop.index0 }}" value="{{ alan.value }}"
                                     placeholder="{{ _('Değer') }}" class="kasa-field" maxlength="2000"
                                     aria-label="{{ _('Değer') }}" data-secret-value="{{ '1' if alan.secret else '' }}">
+                                <button type="button" class="vault-cf-eye" data-custom-field-eye
+                                    aria-label="{{ _('Değeri göster') }}"
+                                    title="{{ _('Değeri göster') }}" aria-pressed="{{ 'true' if alan.secret else 'false' }}">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                                <input type="hidden" name="cf_secret_{{ loop.index0 }}" value="{{ '1' if alan.secret else '' }}">
                             </div>
-                            <label class="vault-custom-field-secret" title="{{ _('Değeri gizle') }}">
-                                <input type="checkbox" name="cf_secret_{{ loop.index0 }}" value="1" {% if alan.secret %}checked{% endif %}
-                                    data-custom-field-secret>
-                                <span>{{ _('Gizli') }}</span>
-                            </label>
+                            
                             <button type="button" class="vault-custom-field-remove" data-custom-field-remove
                                 title="{{ _('Alanı sil') }}" aria-label="{{ _('Alanı sil') }}">
                                 <i class="fa-solid fa-xmark"></i>
@@ -56,10 +71,7 @@
                             <input type="text" data-custom-field-value placeholder="{{ _('Değer') }}"
                                 class="kasa-field" maxlength="2000" aria-label="{{ _('Değer') }}">
                         </div>
-                        <label class="vault-custom-field-secret" title="{{ _('Değeri gizle') }}">
-                            <input type="checkbox" data-custom-field-secret>
-                            <span>{{ _('Gizli') }}</span>
-                        </label>
+                        
                         <button type="button" class="vault-custom-field-remove" data-custom-field-remove
                             title="{{ _('Alanı sil') }}" aria-label="{{ _('Alanı sil') }}">
                             <i class="fa-solid fa-xmark"></i>

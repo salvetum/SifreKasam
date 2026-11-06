@@ -28,7 +28,6 @@ Dosya formatı (binary):
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import secrets
@@ -36,7 +35,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 

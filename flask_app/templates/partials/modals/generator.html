@@ -41,7 +41,25 @@
                                 </div>
                             </div>
                             <div class="gen-band-chips">
-                                <span class="gen-band-chip" title="{{ _('Şifrenin tahmin edilmesi gereken toplam bilgi miktarı (bit). Yüksek değer = daha güçlü.') }}"><i class="fa-solid fa-shield-halved"></i>{{ _('Entropi') }}: <b id="modal-entropy-bits">—</b> {{ _('bit') }}</span>
+                                {# 🔴 Entropi rozetinde `title` YETMEZ: tarayıcının
+                                   yerel tooltip'i gecikmeli açılır, klavye/ekran
+                                   okuyucuyla erişilemez ve metnin SAĞINDA
+                                   görünmez. Kullanıcı istediği için gerçek bir
+                                   bilgi düğmesi eklendi: metnin sağında, `aria`
+                                   ile ilişkilendirilmiş ve klavye ile
+                                   açılabilen bir açıklama. #}
+                                <span class="gen-band-chip">
+                                    <i class="fa-solid fa-shield-halved"></i>{{ _('Entropi') }}: <b id="modal-entropy-bits">—</b> {{ _('bit') }}
+                                    <button type="button" class="gen-info-btn"
+                                        aria-describedby="modal-entropy-help"
+                                        aria-label="{{ _('Entropi nedir?') }}"
+                                        title="{{ _('Entropi nedir?') }}">
+                                        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                    </button>
+                                    <span class="gen-info-bubble" id="modal-entropy-help" role="tooltip">
+                                        {{ _('Entropi, şifrenin tahmin edilmesi gereken toplam bilgi miktarıdır (bit). Daha yüksek entropi, kırılmasının daha zor olduğu anlamına gelir.') }}
+                                    </span>
+                                </span>
                                 <span class="gen-band-chip" title="{{ _('Bu şifrenin olası bir saldırgan tarafından kırılacağı tahmini süre.') }}"><i class="fa-regular fa-clock"></i>{{ _('Kırılma') }}: <b id="modal-crack-time">—</b></span>
                             </div>
                             <p id="modal-strength-empty" class="generator-strength-empty">

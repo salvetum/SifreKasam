@@ -62,16 +62,22 @@ export function initNotifications({ apiFetch }) {
   const actionsEl = document.getElementById('kasa-notif-actions');
   const markAllBtn = document.getElementById('notif-mark-all-read');
   const deleteAllBtn = document.getElementById('notif-delete-all');
-  if (listEl) listEl.innerHTML = '';
+  if (listEl) listEl.replaceChildren();
 
   let currentReminders = [];
 
   // ── Boş panel görünümü: liste yoksa veya API başarısız olsa da metin göster ──
   const renderEmpty = () => {
     if (!listEl) return;
-    listEl.innerHTML =
-      '<div class="kasa-notif-empty"><i class="fa-solid fa-circle-check" aria-hidden="true"></i>' +
-      '<span>' + window._('Hiçbir bildirim bulunmamaktadır') + '</span></div>';
+    const emptyIcon = document.createElement("i");
+    emptyIcon.className = "fa-solid fa-circle-check";
+    emptyIcon.setAttribute("aria-hidden", "true");
+    const emptySpan = document.createElement("span");
+    emptySpan.textContent = window._("Hiçbir bildirim bulunmamaktadır");
+    const emptyDiv = document.createElement("div");
+    emptyDiv.className = "kasa-notif-empty";
+    emptyDiv.append(emptyIcon, emptySpan);
+    listEl.replaceChildren(emptyDiv);
     if (headSubEl) headSubEl.textContent = window._('Tümü tamam');
     if (badgeEl) badgeEl.hidden = true;
     if (actionsEl) actionsEl.hidden = true;
@@ -199,26 +205,60 @@ export function initNotifications({ apiFetch }) {
     if (actionsEl) actionsEl.hidden = false;
 
     // Bildirim listesini oluştur
-    listEl.innerHTML = active.map((reminder) => {
+    // 🔴 innerHTML YASAK (security_lint + AGENTS.md): bildirim listesi
+    // sunucu verisinden oluşturulsada DOM API ile kurulur.
+    const gizleEtiketi = window._('Bu bildirimi gizle');
+    listEl.replaceChildren(...active.map((reminder) => {
       const copy = reminderCopy(reminder);
       const cta = reminder.cta || {};
-      const ctaAttrs = cta.action === 'settings'
-        ? 'data-action="settings" data-panel="' + (cta.panel || 'data') + '"'
-        : 'data-action="navigate" data-href="' + (cta.url || '/saglik') + '"';
-      return '' +
-        '<div class="kasa-notif-item" data-notif-id="' + reminder.id + '">' +
-        '  <span class="kasa-notif-item-icon"><i class="fa-solid ' + copy.icon + '" aria-hidden="true"></i></span>' +
-        '  <span class="kasa-notif-item-copy"><strong>' + copy.title + '</strong><span>' + copy.message + '</span></span>' +
-        '  <button type="button" class="kasa-btn kasa-btn-muted kasa-notif-cta" ' + ctaAttrs + '>' +
-        '    <i class="fa-solid fa-arrow-right" aria-hidden="true"></i> ' + copy.cta +
-        '  </button>' +
-        '  <button type="button" class="kasa-notif-dismiss" data-dismiss-id="' + reminder.id + '"' +
-        '    title="' + window._('Bu bildirimi gizle') + '"' +
-        '    aria-label="' + window._('Bu bildirimi gizle') + '">' +
-        '    <i class="fa-solid fa-xmark" aria-hidden="true"></i>' +
-        '  </button>' +
-        '</div>';
-    }).join('');
+      const item = document.createElement('div');
+      item.className = 'kasa-notif-item';
+      item.dataset.notifId = reminder.id;
+
+      const icon = document.createElement('span');
+      icon.className = 'kasa-notif-item-icon';
+      const iconI = document.createElement('i');
+      iconI.className = 'fa-solid ' + copy.icon;
+      iconI.setAttribute('aria-hidden', 'true');
+      icon.append(iconI);
+
+      const copySpan = document.createElement('span');
+      copySpan.className = 'kasa-notif-item-copy';
+      const title = document.createElement('strong');
+      title.textContent = copy.title;
+      const msg = document.createElement('span');
+      msg.textContent = copy.message;
+      copySpan.append(title, msg);
+
+      const ctaBtn = document.createElement('button');
+      ctaBtn.type = 'button';
+      ctaBtn.className = 'kasa-btn kasa-btn-muted kasa-notif-cta';
+      if (cta.action === 'settings') {
+        ctaBtn.dataset.action = 'settings';
+        ctaBtn.dataset.panel = cta.panel || 'data';
+      } else {
+        ctaBtn.dataset.action = 'navigate';
+        ctaBtn.dataset.href = cta.url || '/saglik';
+      }
+      const ctaIcon = document.createElement('i');
+      ctaIcon.className = 'fa-solid fa-arrow-right';
+      ctaIcon.setAttribute('aria-hidden', 'true');
+      ctaBtn.append(ctaIcon, document.createTextNode(' ' + copy.cta));
+
+      const dismiss = document.createElement('button');
+      dismiss.type = 'button';
+      dismiss.className = 'kasa-notif-dismiss';
+      dismiss.dataset.dismissId = reminder.id;
+      dismiss.title = gizleEtiketi;
+      dismiss.setAttribute('aria-label', gizleEtiketi);
+      const xIcon = document.createElement('i');
+      xIcon.className = 'fa-solid fa-xmark';
+      xIcon.setAttribute('aria-hidden', 'true');
+      dismiss.append(xIcon);
+
+      item.append(icon, copySpan, ctaBtn, dismiss);
+      return item;
+    }));
   };
 
   // ── Hatırlatma toastları ───────────────────────────────────────────────────

@@ -866,9 +866,7 @@ html[data-bs-theme="light"] .filter-btn[aria-pressed="true"] {
 /* Sıralama seçicisi: arama kutusunun sağında sabit genişlikte durur ve
    dar ekranda aramanın altına tam genişlikte iner. `flex-shrink: 0`
    olmazsa etiket metni iki satıra bölünüp çubuğu gereğinden uzun büyütür. */
-.record-sort-wrap {
-  flex: 0 0 auto;
-}.record-search-wrap {
+.record-search-wrap {
     min-width: 0;
     flex: 1 1 120px;
     max-width: 260px;
@@ -1346,4 +1344,71 @@ html[data-glass-effects="off"] .view-options-btn {
 html[data-bs-theme="light"][data-glass-effects="off"] .view-options-btn {
     background: rgba(255, 255, 255, 0.92) !important;
     border-color: rgba(31, 41, 55, 0.16) !important;
+}
+
+/* Üretici entropi bilgi düğmesi -------------------------------------------- */
+.gen-info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    margin-inline-start: 0.2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: color 160ms ease;
+}
+
+.gen-info-btn:hover,
+.gen-info-btn:focus-visible {
+    color: var(--accent);
+}
+
+.gen-info-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* 🔴 Baloncuk `hidden` DEĞİL: CSS ile açılıp kapanır, bu yüzden erişilebilirlik
+   için `visibility` kullanılır (display:none yerine) — ekran okuyucu metni
+   yine de okur. Metin `aria-describedby` ile düğmeye bağlıdır. */
+.gen-info-bubble {
+    position: absolute;
+    z-index: 30;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%) translateY(4px);
+    width: max-content;
+    max-width: 260px;
+    padding: 0.5rem 0.7rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--kasa-border-hi);
+    background: var(--panel-bg, rgba(20, 23, 42, 0.96));
+    color: var(--text);
+    font-size: 0.72rem;
+    line-height: 1.45;
+    text-align: start;
+    white-space: normal;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
+}
+
+.gen-band-chip {
+    position: relative;
+}
+
+.gen-info-btn:hover + .gen-info-bubble,
+.gen-info-btn:focus-visible + .gen-info-bubble,
+.gen-info-btn[aria-expanded="true"] + .gen-info-bubble {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
 }

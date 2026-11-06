@@ -584,3 +584,20 @@ export function initPasswordGenerator({
   // satır içi panel (pageGenerator) olarak çalışır; modal yalnızca index
   // sayfasında "Bu Şifreyle Kayıt Oluştur" akışı için kalır.
 }
+// Entropi bilgi düğmesi: hover/focus CSS ile çalışır; TIKLAMA ise
+// `aria-expanded` ile kilitler (dokunmatik cihazda hover yoktur).
+document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('.gen-info-btn');
+    if (!button) return;
+    const open = button.getAttribute('aria-expanded') === 'true';
+    document.querySelectorAll('.gen-info-btn[aria-expanded="true"]').forEach(
+        (other) => other.setAttribute('aria-expanded', 'false')
+    );
+    button.setAttribute('aria-expanded', open ? 'false' : 'true');
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.gen-info-btn[aria-expanded="true"]').forEach(
+        (button) => button.setAttribute('aria-expanded', 'false')
+    );
+});

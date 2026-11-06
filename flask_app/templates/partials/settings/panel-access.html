@@ -107,11 +107,14 @@
                         </div>
                         <div class="settings-lock-note" data-lock-note hidden></div>
                     </div>
-                    <div id="lan-restart-note" class="lan-restart-note">
-                        <i class="fa-solid fa-rotate"></i>
-                        <span>{{ _('Ayarlar kaydedildiğinde program otomatik olarak yeniden başlatılır.') }}</span>
-                    </div>
                     <div id="lan-warning-cards" class="lan-warning-cards-wrap">
+                        <!-- 2026-10: uyarilar artik tek cat altinda. Once uc ayri
+                             blok halinde ve restart notu aralarinda duruyordu;
+                             hangi uyarinin ne anlama geldigini ayirt etmek zordu. -->
+                        <div class="lan-warning-heading">
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>{{ _('Dikkat edilmesi gerekenler') }}</span>
+                        </div>
                         <div id="lan-full-access-warning" class="lan-warning-card {% if not LAN_FULL_ACCESS %}hidden{% endif %}">
                             <i class="fa-solid fa-triangle-exclamation"></i>
                             <p>{{ _('Tam yetki açıkken ağdaki her cihaz, giriş şifresini bilen biri kasanızın tüm kayıtlarını okuyabilir, düzenleyebilir ve silebilir. Yalnızca güvendiğiniz ağlarda kullanın.') }}</p>
@@ -160,6 +163,10 @@
                             <i class="fa-solid fa-circle-info"></i>
                             <span>{{ _('LAN erişiminin aktif olması için ayarları kaydetmeniz gerekiyor.') }}</span>
                         </div>
+                    </div>
+                    <div id="lan-restart-note" class="lan-restart-note">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span>{{ _('Ayarlar kaydedildiğinde program otomatik olarak yeniden başlatılır.') }}</span>
                     </div>
                     {% else %}
                     <div class="settings-card">

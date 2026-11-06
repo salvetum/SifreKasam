@@ -59,6 +59,9 @@ const DEPENDENCIES = [
     dependents: [
       { card: '#lan-full-access-card', reason: 'Yalnızca LAN erişimi açıkken kullanılabilir.' },
       { card: '#lan-reveal-card', reason: 'Yalnızca LAN erişimi açıkken kullanılabilir.' },
+      { card: '#lan-info-box', reason: 'Ağ adresi ve LAN şifresi yalnızca LAN erişimi açıkken anlamlıdır.' },
+      { card: '#lan-warning-cards', reason: 'LAN erişimi kapalıyken bu uyarılar geçerli değildir.' },
+      { card: '#lan-restart-note', reason: 'Yalnızca LAN ayarı değiştiğinde yeniden başlatma gerekir.' },
     ],
   },
   {
@@ -68,6 +71,22 @@ const DEPENDENCIES = [
       { card: '#glass-quality-card', reason: 'Cam efekti kapalıyken kalite ayarının etkisi yok.' },
       { card: '#glass-scales-card', reason: 'Cam efekti kapalıyken bulanıklık ve perde ayarlarının etkisi yok.' },
       { card: '#glass-frost-card', reason: 'Cam efekti kapalıyken buzlu görünüm ayarının etkisi yok.' },
+      // Bu uc kart yalnizca cam yuzeye uygulanir; cam kapaliyken gizlenir.
+      { card: '#card-sheen-card', reason: 'Cam efekti kapalıyken üst kenar ışıltısı görünmez.' },
+      { card: '#card-frame-card', reason: 'Cam efekti kapalıyken buzlu çerçeve görünmez.' },
+      { card: '#card-depth-card', reason: 'Cam efekti kapalıyken katmanlı derinlik görünmez.' },
+    ],
+  },
+  {
+    parent: '#gradients-toggle',
+    parentBlocks: false,
+    dependents: [
+      // 🔴 2026-10: bu kartlar yalnizca GRADIENT katmanina ait, ama id'leri
+      // kart div'inde degil icindeki input'ta duruyordu -> `is-collapsed`
+      // yanlis hedefe yaziliyordu. Artik kart div'inde.
+      { card: '#card-sheen-card', reason: 'Yalnızca gradient katmanı açıkken bu kart efekti görünür.' },
+      { card: '#card-frame-card', reason: 'Yalnızca gradient katmanı açıkken bu kart efekti görünür.' },
+      { card: '#card-depth-card', reason: 'Yalnızca gradient katmanı açıkken bu kart efekti görünür.' },
     ],
   },
   {
@@ -148,6 +167,16 @@ function setReason(card, reason) {
 function applyLock(card, reason) {
   const locked = Boolean(reason);
   card.classList.toggle('is-locked', locked);
+  // 2026-10: bagimli ayar ust anahtar kapaliyken KATLANIR. Once yalnizca
+  // soluk + kilit rozeti idi; kullanici ust ayari kapaliyken alt ayarin
+  // varligini bile bilmiyordu. Simdi kart/satir `max-height:0` ile kapanir ve
+  // ust anahtar acilinca `max-height` gecisiyle alttan uzayar. Degerler
+  // silinmez/sifirlanmaz -- yalnizca gorunurluk degisir.
+  card.classList.toggle('is-collapsed', locked);
+  // Ekran okuyucu icin katlanmis alan "gizli" sayilmali.
+  if (card.hasAttribute('aria-expanded')) {
+    card.setAttribute('aria-expanded', String(!locked));
+  }
   setReason(card, locked ? reason : null);
 
   card.querySelectorAll('input, select, textarea, button').forEach((field) => {

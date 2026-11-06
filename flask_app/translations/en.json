@@ -785,5 +785,22 @@
   "Görünüm seçenekleri": "View options",
   "Görünüm Seçenekleri": "View Options",
   "Tamam": "OK",
-  "Boş arama metni tüm kayıtlarla eşleşir; alan seçimi yalnız yazdığınız metni daraltır.": "An empty search matches every record; the field choice only narrows what you type."
+  "Boş arama metni tüm kayıtlarla eşleşir; alan seçimi yalnız yazdığınız metni daraltır.": "An empty search matches every record; the field choice only narrows what you type.",
+  "Entropi nedir?": "What is entropy?",
+  "Entropi, şifrenin tahmin edilmesi gereken toplam bilgi miktarıdır (bit). Daha yüksek entropi, kırılmasının daha zor olduğu anlamına gelir.": "Entropy is the total amount of information (in bits) needed to guess your password. Higher entropy means it is harder to crack.",
+  "Dikkat edilmesi gerekenler": "Points to note",
+  "Etiket ekle": "Add tag",
+  "Etiket ekle…": "Add tag…",
+  "Değeri göster": "Show value",
+  "Değeri gizle": "Hide value",
+  "En fazla 20 etiket, her biri 30 karakter. Boşluk, Enter veya virgül ile ekleyin.": "Up to 20 tags, 30 characters each. Add with space, Enter or comma.",
+  "Alan ekle": "Add field",
+  "Alanı sil": "Delete field",
+  "Değer": "Value",
+  "En fazla 30 alan. Gizli işaretli değerler maskelenir.": "Up to 30 fields. Values marked hidden are masked.",
+  "Etiket": "Label",
+  "Etiketler ve Özel Alanlar": "Tags and Custom Fields",
+  "Etiketler virgülle ayrılır. Özel alanlar sır olabilir ve maskelenir.": "Tags are comma separated. Custom fields can be secret and masked.",
+  "Özel Alanlar": "Custom Fields",
+  "Etiketi kaldır": "Remove tag"
 }

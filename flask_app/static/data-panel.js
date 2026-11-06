@@ -48,7 +48,10 @@ export function initDataPanel({ apiFetch }) {
     if (!backups || backups.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'auto-backup-empty';
-      empty.innerHTML = '<i class="fa-solid fa-inbox" aria-hidden="true"></i>';
+      const emptyIcon = document.createElement('i');
+      emptyIcon.className = 'fa-solid fa-inbox';
+      emptyIcon.setAttribute('aria-hidden', 'true');
+      empty.replaceChildren(emptyIcon);
       empty.appendChild(document.createTextNode(' ' + window._('Henüz yedek alınmadı')));
       listEl.appendChild(empty);
       return;
@@ -61,7 +64,9 @@ export function initDataPanel({ apiFetch }) {
       const icon = document.createElement('span');
       icon.className = 'auto-backup-item-icon';
       icon.setAttribute('aria-hidden', 'true');
-      icon.innerHTML = '<i class="fa-solid fa-file-shield"></i>';
+      const iconEl = document.createElement('i');
+      iconEl.className = 'fa-solid fa-file-shield';
+      icon.replaceChildren(iconEl);
       item.append(icon);
 
       const copy = document.createElement('div');
@@ -84,7 +89,9 @@ export function initDataPanel({ apiFetch }) {
       restoreBtn.setAttribute('aria-label', window._('Geri Yükle'));
       restoreBtn.title = window._('Geri Yükle');
       restoreBtn.dataset.tooltip = window._('Geri Yükle');
-      restoreBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
+      const restoreIcon = document.createElement('i');
+      restoreIcon.className = 'fa-solid fa-rotate-left';
+      restoreBtn.replaceChildren(restoreIcon);
       restoreBtn.addEventListener('click', () => restoreBackup(backup, restoreBtn));
 
       const deleteBtn = document.createElement('button');
@@ -93,7 +100,9 @@ export function initDataPanel({ apiFetch }) {
       deleteBtn.setAttribute('aria-label', window._('Sil'));
       deleteBtn.title = window._('Sil');
       deleteBtn.dataset.tooltip = window._('Sil');
-      deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+      const deleteIcon = document.createElement('i');
+      deleteIcon.className = 'fa-solid fa-trash-can';
+      deleteBtn.replaceChildren(deleteIcon);
       deleteBtn.addEventListener('click', () => deleteBackup(backup, deleteBtn));
 
       actions.append(restoreBtn, deleteBtn);
